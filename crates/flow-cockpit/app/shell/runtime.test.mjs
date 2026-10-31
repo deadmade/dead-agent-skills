@@ -1064,6 +1064,47 @@ test('views_get_their_route_tabs_and_blocks_through_ctx', async () => {
   assert.equal(section(root, 'activity'), null, 'a run-tab view draws only when its tab is selected');
 });
 
+test('shell_object_is_never_passed_to_a_view', async () => {
+  const app = fakeApp({
+    list: {
+      source: view(
+        'list',
+        'list',
+        `const p = document.createElement('p');
+         p.textContent = JSON.stringify([Object.keys(ctx).sort(), Object.keys(ctx.data).sort()]);
+         return p;`,
+      ),
+    },
+  });
+  const { root } = await started(app, { to: 'list' });
+  const [ctxKeys, dataKeys] = JSON.parse(section(root, 'list').textContent);
+  assert.deepEqual(ctxKeys, ['blocks', 'data', 'navigate', 'route', 'tabs']);
+  for (const name of ['shell', 'startSession', 'subscribeSession']) {
+    assert.ok(!ctxKeys.includes(name) && !dataKeys.includes(name), `a view can reach ${name}`);
+  }
+  assert.ok(dataKeys.includes('previewCommand'), 'the read-only preview is on data');
+});
+
+test('preview_command_asks_the_app_for_the_display_string_only', async () => {
+  const app = fakeApp({});
+  app.answers.preview_command = () => 'claude --session-id x';
+  const { runtime } = await started(app, { to: 'list' });
+  const input = { cwd: '/w', new_worktree: null, model: null, effort: null, prompt: null, session_id: 'x' };
+  assert.equal(await runtime.data.previewCommand(input), 'claude --session-id x');
+  assert.deepEqual(
+    app.calls.filter(([cmd]) => cmd === 'preview_command'),
+    [['preview_command', { input }]],
+  );
+  assert.equal(runtime.data.startSession, undefined);
+});
+
+test('the_runtime_hands_the_shell_chrome_data_and_the_route_not_a_session_control', async () => {
+  const app = fakeApp({});
+  const { runtime } = await started(app, { to: 'list', project: 'p1' });
+  assert.deepEqual(runtime.route(), { to: 'list', project: 'p1' });
+  assert.deepEqual(Object.keys(runtime).sort(), ['data', 'idle', 'navigate', 'route', 'start']);
+});
+
 /** A run view in the design's shape: a frame with a tab bar from ctx.tabs and the slot for a tab's view. */
 const RUN_FRAME = `
   const frame = document.createElement('div');

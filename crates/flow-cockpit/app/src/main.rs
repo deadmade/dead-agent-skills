@@ -110,6 +110,7 @@ fn run() -> ExitCode {
             commands::views,
             commands::view_source,
             commands::extensions,
+            commands::preview_command,
             pty::start_session,
             pty::resume_session,
             pty::send_input,
@@ -336,7 +337,7 @@ mod tests {
     fn every_registered_command_has_a_capability() {
         let registered = listed(include_str!("main.rs"), "tauri::generate_handler![");
         let manifest = listed(include_str!("../build.rs"), "const COMMANDS: &[&str] = &[");
-        assert_eq!(registered.len(), 17, "{registered:?}");
+        assert_eq!(registered.len(), 18, "{registered:?}");
         assert_eq!(
             manifest, registered,
             "build.rs's AppManifest and main.rs's handlers differ"

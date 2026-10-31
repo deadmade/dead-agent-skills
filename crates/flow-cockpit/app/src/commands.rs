@@ -17,9 +17,11 @@ use flow_cockpit_core::activity::{
     Activity, CaptureCache, PAGE, SessionLive, ToolDetail, TranscriptCache,
 };
 use flow_cockpit_core::index::{DocName, Entry, FlowRun, Index, Project};
+use flow_cockpit_core::session::launch::preview_command as preview;
 use jiff::Timestamp;
 use tauri::State;
 
+use crate::pty::{LaunchSpecInput, into_spec};
 use crate::views::{Extensions, ViewInfo, Views};
 
 /// What the commands and the poll share.
@@ -200,6 +202,12 @@ pub fn extensions(data: Data<'_>, project: Option<String>) -> Extensions {
         .extensions(data.repo(project.as_deref()).as_deref())
 }
 
+/// The exact `claude` command line the start form would run for `input`, shell-quoted for display. It starts nothing.
+#[tauri::command(async)]
+pub fn preview_command(input: LaunchSpecInput) -> Result<String, String> {
+    into_spec(input).map(|spec| preview(&spec))
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -257,6 +265,39 @@ mod tests {
             &[],
         );
         Home1(root, Shared::new(index, views))
+    }
+
+    fn input(session_id: &str) -> LaunchSpecInput {
+        LaunchSpecInput {
+            cwd: "/work/repo".to_owned(),
+            new_worktree: Some("feat x".to_owned()),
+            model: Some("opus".to_owned()),
+            effort: None,
+            prompt: Some("-hi".to_owned()),
+            session_id: session_id.to_owned(),
+        }
+    }
+
+    /// The preview is the command the launch runs: both build their spec through `into_spec`.
+    #[test]
+    fn preview_command_is_the_command_the_launch_builds() {
+        let id = "6f1c2b0e-8f3a-4d57-9b1e-2a4c5d6e7f80";
+        let shown = preview_command(input(id)).unwrap();
+        let spec = into_spec(input(id)).unwrap();
+        assert_eq!(
+            shown,
+            flow_cockpit_core::session::launch::preview_command(&spec)
+        );
+        assert_eq!(
+            shown,
+            format!("claude --session-id {id} --model opus -w 'feat x' -- -hi")
+        );
+    }
+
+    #[test]
+    fn preview_command_rejects_an_invalid_session_id() {
+        let err = preview_command(input("not-a-uuid")).unwrap_err();
+        assert!(err.starts_with("not a session id"), "{err}");
     }
 
     /// A session read waits on the transcripts, never on the index: while one is slow, the poll can still write.

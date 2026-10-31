@@ -14,6 +14,7 @@
     "allow-views",
     "allow-view-source",
     "allow-extensions",
+    "allow-preview-command",
     "allow-start-session",
     "allow-resume-session",
     "allow-send-input",

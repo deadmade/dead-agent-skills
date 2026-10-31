@@ -12,6 +12,7 @@ use flow_cockpit_core::index::{DocName, Entry, FlowRun, Project};
 use ts_rs::{Config, TS};
 
 use crate::poll::Changed;
+use crate::pty::LaunchSpecInput;
 use crate::views::{Extensions, ViewInfo};
 
 /// The app's own crossing types.
@@ -20,6 +21,7 @@ fn export_app_to(dir: &Path) -> Result<(), ts_rs::ExportError> {
     ViewInfo::export_all(&cfg)?;
     Extensions::export_all(&cfg)?;
     Changed::export_all(&cfg)?;
+    LaunchSpecInput::export_all(&cfg)?;
     Ok(())
 }
 

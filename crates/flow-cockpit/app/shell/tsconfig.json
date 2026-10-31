@@ -11,5 +11,5 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["runtime.js", "boot.js", "blocks/*.js", "api.d.ts", "../../bindings/*.ts"]
+  "include": ["runtime.js", "boot.js", "start-form.js", "blocks/*.js", "api.d.ts", "../../bindings/*.ts"]
 }

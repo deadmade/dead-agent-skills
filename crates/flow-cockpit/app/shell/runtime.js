@@ -262,6 +262,8 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     toolInput: (/** @type {string} */ session, /** @type {string} */ tool) => invoke('tool_input', { session, tool }),
     views: () => invoke('views'),
     viewSource: (/** @type {string} */ id) => invoke('view_source', { id }),
+    previewCommand: (/** @type {import('../../bindings/LaunchSpecInput').LaunchSpecInput} */ input) =>
+      invoke('preview_command', { input }),
   });
 
   /** @type {Route} */
@@ -767,6 +769,10 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
       return requestReload();
     },
     navigate,
+    /** What the views read, for the shell's own chrome (the start form) to read through too. Nothing here starts a session. */
+    data,
+    /** The route as it is now. @returns {Route} */
+    route: () => ({ ...route }),
     /** Resolves once every draw asked for so far is done. */
     idle: () => last,
   };

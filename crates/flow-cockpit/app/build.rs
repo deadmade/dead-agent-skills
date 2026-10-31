@@ -11,6 +11,7 @@ const COMMANDS: &[&str] = &[
     "views",
     "view_source",
     "extensions",
+    "preview_command",
     "start_session",
     "resume_session",
     "send_input",

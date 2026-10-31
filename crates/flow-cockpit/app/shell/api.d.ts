@@ -6,6 +6,7 @@ import type { Activity } from '../../bindings/Activity';
 import type { DocName } from '../../bindings/DocName';
 import type { Entry } from '../../bindings/Entry';
 import type { FlowRun } from '../../bindings/FlowRun';
+import type { LaunchSpecInput } from '../../bindings/LaunchSpecInput';
 import type { PhaseState } from '../../bindings/PhaseState';
 import type { Project } from '../../bindings/Project';
 import type { ToolDetail } from '../../bindings/ToolDetail';
@@ -28,6 +29,7 @@ export type * from '../../bindings/FlowDoc';
 export type * from '../../bindings/FlowRun';
 export type * from '../../bindings/FlowRunSummary';
 export type * from '../../bindings/Gate';
+export type * from '../../bindings/LaunchSpecInput';
 export type * from '../../bindings/Ledger';
 export type * from '../../bindings/LedgerTask';
 export type * from '../../bindings/Live';
@@ -97,6 +99,21 @@ export interface DataApi {
   views(): Promise<ViewInfo[]>;
   /** A view's code, types stripped; rejects with the error, which names the line. */
   viewSource(id: string): Promise<string>;
+  /** The exact `claude` command line the start form would run for `input`, shell-quoted. It starts nothing. */
+  previewCommand(input: LaunchSpecInput): Promise<string>;
+}
+
+/**
+ * What the window's own chrome may do and a view may not: it is built in `boot.js` and handed only to that chrome, never
+ * placed on `ViewContext`. Each call is a privileged command that changes the machine.
+ */
+export interface ShellApi {
+  /**
+   * Starts `claude` in a pseudo-terminal of `cols` by `rows` and resolves with its session id. The output channel it
+   * passes is never read here: the terminal pane subscribes with its own. Rejects with the reason, such as `claude` not
+   * being found.
+   */
+  startSession(input: LaunchSpecInput, cols: number, rows: number): Promise<string>;
 }
 
 /** One phase on a stepper; `gate` is the gate that follows it. */

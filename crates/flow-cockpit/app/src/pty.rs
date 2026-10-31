@@ -28,6 +28,7 @@ use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, nativ
 use serde::{Deserialize, Serialize};
 use tauri::ipc::{Channel, InvokeResponseBody, Response};
 use tauri::{AppHandle, Emitter, State};
+use ts_rs::TS;
 use uuid::Uuid;
 
 /// How long a session gets to exit on SIGHUP before it is killed: Claude Code took 0.65-1.05 s to clean up and exit.
@@ -517,7 +518,7 @@ pub fn emitting_exits(handle: AppHandle) -> HostedSessions {
 }
 
 /// The start form's fields as the window sends them.
-#[derive(Deserialize)]
+#[derive(Deserialize, TS)]
 pub struct LaunchSpecInput {
     pub cwd: String,
     pub new_worktree: Option<String>,
@@ -529,6 +530,19 @@ pub struct LaunchSpecInput {
 
 fn parse_id(id: &str) -> Result<Uuid, String> {
     Uuid::parse_str(id).map_err(|e| format!("not a session id: {e}"))
+}
+
+/// The one place the form's fields become a `LaunchSpec`, for the launch and its preview alike, so the command the
+/// form shows is the command that runs. An invalid session id is an error, never replaced by another.
+pub(crate) fn into_spec(input: LaunchSpecInput) -> Result<LaunchSpec, String> {
+    Ok(LaunchSpec {
+        session_id: parse_id(&input.session_id)?,
+        cwd: PathBuf::from(input.cwd),
+        new_worktree: input.new_worktree,
+        model: input.model,
+        effort: input.effort,
+        prompt: input.prompt,
+    })
 }
 
 /// Sends each chunk as raw bytes, which reach the window as an `ArrayBuffer` rather than a list of numbers.
@@ -551,15 +565,7 @@ pub fn start_session(
     rows: u16,
     on_output: Channel<InvokeResponseBody>,
 ) -> Result<String, String> {
-    let spec = LaunchSpec {
-        cwd: PathBuf::from(input.cwd),
-        new_worktree: input.new_worktree,
-        model: input.model,
-        effort: input.effort,
-        prompt: input.prompt,
-        session_id: parse_id(&input.session_id)?,
-    };
-    let id = sessions.start(spec, cols, rows)?;
+    let id = sessions.start(into_spec(input)?, cols, rows)?;
     sessions.subscribe(id, to_channel(on_output))?;
     Ok(id.to_string())
 }
