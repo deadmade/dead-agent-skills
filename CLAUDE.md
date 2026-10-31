@@ -93,15 +93,20 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
   only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
 - The flow cockpit (`docs/features/flow-observability/`): a Tauri window over flow runs, audits and Claude sessions, in
-  `crates/flow-cockpit/`, plus the `plugins/opt-in/flow-cockpit/` plugin, which carries only the `views` skill (Claude
+  `crates/flow-cockpit/`, that can also start, resume and host real `claude` sessions in terminals of its own
+  (`docs/features/cockpit-harness/`; Linux only so far, the Windows build offers neither Start nor Resume), plus the `plugins/opt-in/flow-cockpit/` plugin, which carries only the `views` skill (Claude
   writes extensions into the user's extensions folder, running the app from its `appPath` userConfig) and the capture
   hooks. The installer offers it on Linux x64 and Windows x64 (`BIN_PLUGINS` in `core/binaries.ts`): on Linux it only
   prints the flake's `nix run` command pinned to its release (`linuxHint`); on Windows it downloads
   `build-flow-cockpit.yml`'s zip (`flow-cockpit.exe` plus the default extensions) whole into
   `~/.claude/bin/flow-cockpit/`, replacing an older folder whole, and sets `appPath`. The workspace: `core/` parses flow.md, plan.md, audit
   reports, build logs and transcripts into a typed model and indexes projects, runs and sessions; `app/` is the window
-  (read-only commands, a 2 s poll that also rereads `config.toml`, extension loading, `--print-types`,
-  `--print-paths`). `app/shell/` holds the view runtime, the building blocks and `tokens.css` (JavaScript with JSDoc,
+  (read-only commands for the views; the session-control commands in `app/src/pty.rs`, which spawn each hosted
+  `claude` in its own PTY, stream its bytes untouched and stop it with SIGHUP before any SIGKILL, for the shell's own
+  chrome only; a 2 s poll that also rereads `config.toml`, extension loading, `--print-types`,
+  `--print-paths`). `app/shell/` holds the view runtime, the building blocks, `tokens.css` and the shell's own chrome (start form,
+  terminal panes, chips, run bar, close confirmation), which alone gets the `shell` object of session controls that no
+  view's `ctx` has (JavaScript with JSDoc,
   checked by `tsc --checkJs` against `api.d.ts`, which views import as the bare module `flow-cockpit`);
   `extensions/<name>/` the four default extensions (a folder of view `.ts` files and an optional `style.css`, loaded
   from disk, not compiled in), with their jsdom tests and fixtures in `extensions/tests/` and their `tsconfig.json`
@@ -137,7 +142,7 @@ These are copied from upstream by `scripts/sync-*.mjs` (the weekly `sync.yml` op
 sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0), `plugins/flows/agents/`,
 `plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
 `plugins/flows/skills/self-review/references/upstream/` with its `LICENSE` and `LICENSE-MIT`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
-`crates/flow-cockpit/app/shell/vendor/` (marked, DOMPurify, Mermaid) has no sync script: it is copied unchanged from
+`crates/flow-cockpit/app/shell/vendor/` (marked, DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync script: it is copied unchanged from
 the npm tarballs THIRD_PARTY.md names, so a new version replaces the files rather than editing them.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 

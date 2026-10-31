@@ -188,7 +188,7 @@ Two more things about stopping:
 
 - **`Channel<Vec<u8>>` sends JSON, not bytes.** Logged in the window: a `Channel<Vec<u8>>` message arrives as
   `[object Array]` (an array of numbers); a `Channel<InvokeResponseBody>` sent `InvokeResponseBody::Raw(bytes)`
-  arrives as `[object ArrayBuffer]`. tauri 2.12.5's own doc comment on `Channel` says the same. _(source)_ Raw messages
+  arrives as `[object ArrayBuffer]`. _(source)_ tauri 2.12.5's own doc comment on `Channel` says the same. _(source)_ Raw messages
   under 1024 bytes are delivered by `eval`, larger ones through `plugin:__TAURI_CHANNEL__|fetch`, which
   `webview/mod.rs` exempts from the ACL check (observed only that large messages arrived under `core:default`), so Task 4's `AppManifest` can't block output delivery.
 - **Split UTF-8:** 1 of 242 PTY reads in one session ended in the middle of a multi-byte character. xterm.js handles
@@ -223,8 +223,8 @@ SIGKILL after ~200 ms (_(source)_; observed: dead by SIGKILL within 0.3 s), befo
 commands, which orphans every running Bash command and skips `SessionEnd`. What worked: `child.clone_killer().kill()`
 (_(source)_ on Unix that is SIGHUP only, no escalation; observed: exit code 129, `SessionEnd` ran), poll `try_wait()` for a few seconds (5 s leaves margin over the ~1 s
 seen), and only then `child.kill()`. `kill_all` on window close (Task 12) must use the same path for every session in
-parallel, never `child.kill()` alone; and if the process simply exits, the kernel's hangup already does the graceful
-stop. `kill_sends_graceful_stop_before_sigkill` can keep its name; its fixture should be a child that traps SIGHUP.
+parallel, never `child.kill()` alone; and _(inferred)_ if the process simply exits, the kernel's hangup already does
+the graceful stop. `kill_sends_graceful_stop_before_sigkill` can keep its name; its fixture should be a child that traps SIGHUP.
 
 ### Affects Task 3: the child's environment and `claude` lookup
 

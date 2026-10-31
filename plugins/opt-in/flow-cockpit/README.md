@@ -6,6 +6,14 @@ worked on it. It reads the flow files, plans, build logs and Claude Code's trans
 seconds when they change. Our code writes nothing; the webview engine keeps its own small folder
 (`~/.local/share/dev.deadmade.flow-cockpit/`, `%LOCALAPPDATA%\dev.deadmade.flow-cockpit\` on Windows).
 
+It can also host Claude sessions itself, on Linux so far. **Start session** opens a form (project, folder or a new
+worktree, model, effort, a first prompt) that shows the exact `claude` command before it runs; the session then runs
+in a real terminal inside the window, beside its Activity view, with a chip per subagent and background command and,
+when a flow run lists the session, a run bar for that run. A session the window didn't start can be resumed from its
+own screen. These are plain `claude` processes the window owns, writing their transcripts as any session does:
+closing the window stops them, and asks first while one is still working or waiting on you. An ended session stays
+on screen until the window is reloaded. The Windows build offers neither Start nor Resume yet.
+
 Each screen is a **view**, a TypeScript file in an **extension**, a folder the app loads from disk. The four default
 extensions ship with the app; your own add to them or replace them, and any of them can be switched off. The app needs
 nothing from Claude Code for that. This plugin carries the `views` skill, which teaches Claude to write and change

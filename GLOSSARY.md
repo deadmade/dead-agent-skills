@@ -96,8 +96,8 @@ _Avoid_: session (one browser), user profile
 
 **Flow cockpit**:
 The desktop window that shows what the conductors and Claude sessions are doing, read from their documents and the
-capture. It only watches.
-_Avoid_: dashboard, board, harness
+capture. It can also start and host Claude sessions itself.
+_Avoid_: dashboard, board
 
 **Flow run**:
 One conductor run, recorded in a `docs/features/<slug>/flow.md`, from its start to `phase: done`.
@@ -115,6 +115,10 @@ _Avoid_: session (alone; a web-mcp session is a browser), chat
 A Claude session that belongs to no flow run or audit.
 _Avoid_: orphan session, ad-hoc session
 
+**Hosted session**:
+A Claude session the flow cockpit started and owns the process for, running in its own PTY.
+_Avoid_: embedded session, live session (that's a status), background session (Claude Code's own term for `--bg`)
+
 **Capture**:
 The record of what one Claude session did, written event by event by the flow-cockpit plugin's hooks.
 _Avoid_: log, telemetry, trace
@@ -122,6 +126,11 @@ _Avoid_: log, telemetry, trace
 **View**:
 One screen or tab of the flow cockpit: a TypeScript file that `export default`s a `View`, drawn by the window.
 _Avoid_: page, panel, widget
+
+**Run bar**:
+The flow cockpit's view of a hosted session's linked flow run: the phase stepper, the plan's task segments, the task
+in progress, and the flow.md `now:` line, shown on that session's Session tab.
+_Avoid_: toolbar, status bar
 
 **Extension**:
 A folder of views (and an optional `style.css`) the flow cockpit loads from disk; one can add views or replace others.
