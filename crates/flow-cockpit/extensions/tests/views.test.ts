@@ -64,6 +64,7 @@ function context(route: any, data: Partial<typeof DATA> = {}, api: Record<string
       doc: async (p: string, s: string, n: string) => d.docs[`${p}/${s}`]?.[n] ?? null,
       session: async (id: string, opts?: any) => pageOf(d.sessions[id], opts),
       toolInput: async (session: string, id: string) => d.inputs[`${session}/${id}`] ?? null,
+      toolResult: async () => null,
       views: async () => [],
       viewSource: async () => '',
       ...api,
@@ -739,6 +740,45 @@ test('activity_fetches_a_calls_input_when_its_fold_opens', async () => {
 
   // An input that can't be read says so in its fold.
   const failing = await openCall(older);
+  answers[1].reject(new Error('the transcript is gone'));
+  await settle();
+  assert.match(text(failing.querySelector('.unfold-body')), /couldn't be read.*the transcript is gone/);
+});
+
+test('activity_view_shows_a_result_fold_that_loads_on_open', async () => {
+  const asked: string[][] = [];
+  const answers: { resolve: (v: any) => void; reject: (e: any) => void }[] = [];
+  const toolResult = (session: string, id: string) => {
+    asked.push([session, id]);
+    return new Promise((resolve, reject) => answers.push({ resolve, reject }));
+  };
+  const toolInput = async () => ({ kind: 'Command', command: 'npm test', description: 'Run the tests' });
+  const { box } = await draw(
+    'activity',
+    { to: 'session', project: ALPHA, id: 's-link' },
+    {},
+    { toolInput, toolResult },
+  );
+  const [newer, older] = [...box.querySelectorAll('.turn')];
+  const call = await openCall(newer);
+  const openResult = async (row: Element) => {
+    const result = row.querySelector('details.tool-result') as HTMLDetailsElement;
+    const toggled = new Promise((resolve) => result.addEventListener('toggle', resolve, { once: true }));
+    result.open = true;
+    await toggled;
+    await settle();
+    return result;
+  };
+  assert.deepEqual(asked, [], 'nothing is fetched before the result fold opens');
+  const result = await openResult(call);
+  assert.deepEqual(asked, [['s-link', 't3']]);
+  assert.equal(text(result.querySelector('.unfold-body')), 'Loading…');
+  answers[0].resolve('file1\nfile2');
+  await settle();
+  assert.equal(result.querySelector('pre')?.textContent, 'file1\nfile2');
+
+  // A result that can't be read says so in its fold.
+  const failing = await openResult(await openCall(older));
   answers[1].reject(new Error('the transcript is gone'));
   await settle();
   assert.match(text(failing.querySelector('.unfold-body')), /couldn't be read.*the transcript is gone/);

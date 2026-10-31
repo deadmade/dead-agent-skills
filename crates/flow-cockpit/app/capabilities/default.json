@@ -11,6 +11,7 @@
     "allow-doc",
     "allow-session",
     "allow-tool-input",
+    "allow-tool-result",
     "allow-views",
     "allow-view-source",
     "allow-extensions",

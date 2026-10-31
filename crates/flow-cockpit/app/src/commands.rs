@@ -94,6 +94,12 @@ impl Shared {
         self.transcripts().tool_input(&path, tool)
     }
 
+    /// One tool call's full result text, by the session and the call's id.
+    pub fn tool_result(&self, session: &str, tool: &str) -> Option<String> {
+        let path = self.read().session_path(session)?;
+        self.transcripts().tool_result(&path, tool)
+    }
+
     /// A panic in another holder leaves the index as it was last written, which is still worth showing.
     pub fn read(&self) -> RwLockReadGuard<'_, Index> {
         self.index.read().unwrap_or_else(PoisonError::into_inner)
@@ -172,6 +178,12 @@ pub fn session(
 #[tauri::command(async)]
 pub fn tool_input(data: Data<'_>, session: &str, tool: &str) -> Option<ToolDetail> {
     data.tool_input(session, tool)
+}
+
+/// The full result text of the session's tool call `tool`, by its id.
+#[tauri::command(async)]
+pub fn tool_result(data: Data<'_>, session: &str, tool: &str) -> Option<String> {
+    data.tool_result(session, tool)
 }
 
 /// The views on `project`'s pages: its repository's own too, when the user trusts it.
@@ -325,5 +337,6 @@ mod tests {
         });
         assert!(shared.session("nope", None, None).is_none());
         assert!(shared.tool_input("s1", "toolu_nope").is_none());
+        assert!(shared.tool_result("s1", "toolu_nope").is_none());
     }
 }

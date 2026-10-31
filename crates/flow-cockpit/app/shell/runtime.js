@@ -272,6 +272,7 @@ export function createRuntime({
     session: (/** @type {string} */ id, /** @type {import('./api').SessionPage} */ page = {}) =>
       invoke('session', { id, before: page.before ?? null, limit: page.limit ?? null }),
     toolInput: (/** @type {string} */ session, /** @type {string} */ tool) => invoke('tool_input', { session, tool }),
+    toolResult: (/** @type {string} */ session, /** @type {string} */ tool) => invoke('tool_result', { session, tool }),
     backgroundTasks: (/** @type {string} */ session) => invoke('background_tasks', { session }),
     backgroundOutput: (/** @type {string} */ session, /** @type {string} */ task) =>
       invoke('background_output', { session, taskId: task }),

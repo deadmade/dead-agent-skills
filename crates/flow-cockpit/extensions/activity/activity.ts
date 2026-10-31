@@ -3,7 +3,7 @@
 // - `run-tab`, a run's Activity tab: the run's sessions in the rail, the selected one's turns beside it;
 // - `session`, one session's own screen, such as a loose session opened from the list.
 // A long session comes a page at a time: the newest 20 turns, and 20 older ones for each "Show older turns". A tool
-// call's input is read when its fold opens.
+// call's input is read when its fold opens, its result when the result fold inside it does.
 import type { View, ViewContext, Activity, AgentInfo, Text, ToolCall, ToolDetail, Turn } from 'flow-cockpit';
 
 /** How many turns a page holds. */
@@ -20,6 +20,8 @@ const loaded = new Map<string, Map<number, Turn>>();
 const firsts = new Map<string, Text | null>();
 /** Tool inputs read, by session and call id: an input never changes, and a redraw opens the same folds again. */
 const inputs = new Map<string, ToolDetail>();
+/** Tool results read, by session and call id: a finished call's result never changes either. */
+const results = new Map<string, string>();
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -77,6 +79,41 @@ function detail(ctx: ViewContext, d: ToolDetail): Node {
   return pre;
 }
 
+/**
+ * A tool call's result, read when its fold opens: the output as text. It is nothing until the call has one, so a call
+ * still running says so.
+ */
+function resultFold(ctx: ViewContext, session: string, call: ToolCall, key: string): HTMLDetailsElement {
+  const box = el('div');
+  const result = fold('Result', '', box, 'unfold tool-result');
+  result.dataset.keep = key;
+  const show = (text: string) => {
+    const pre = el('pre');
+    pre.textContent = text;
+    return pre;
+  };
+  result.addEventListener('toggle', () => {
+    if (!result.open || box.childNodes.length) return;
+    const id = `${session}\n${call.id}`;
+    const known = results.get(id);
+    if (known !== undefined) {
+      box.append(show(known));
+      return;
+    }
+    box.append(el('p', 'quiet', 'Loading…'));
+    ctx.data.toolResult(session, call.id).then(
+      (text) => {
+        if (text !== null) results.set(id, text);
+        box.replaceChildren(
+          text !== null ? show(text) : el('p', 'quiet', 'No result yet, or the transcript no longer holds it.'),
+        );
+      },
+      (err) => box.replaceChildren(failure("This call's result couldn't be read.", err)),
+    );
+  });
+  return result;
+}
+
 function toolRow(ctx: ViewContext, session: string, agents: AgentInfo[], call: ToolCall, key: string): HTMLLIElement {
   const label = el('span', 'tool', el('span', 'tool-name', call.tool), ' ', call.summary);
   const marks = [call.agent !== null ? agentName(agents, call.agent) : '', call.failed ? 'Failed' : '']
@@ -86,13 +123,14 @@ function toolRow(ctx: ViewContext, session: string, agents: AgentInfo[], call: T
   const row = fold(label, marks, body, call.failed ? 'unfold tool-call failed' : 'unfold tool-call');
   row.title = `${call.tool}: ${call.summary}`;
   row.dataset.keep = key;
-  // Read and drawn when it opens: a long session holds hundreds of calls, and their inputs can be large.
+  // Read and drawn when it opens: a long session holds hundreds of calls, and their inputs can be large. The result
+  // fold comes once the input is drawn, so the input's own "Loading…" is the body's only text until then.
   row.addEventListener('toggle', () => {
     if (!row.open || body.childNodes.length) return;
     const id = `${session}\n${call.id}`;
     const known = inputs.get(id);
     if (known) {
-      body.append(detail(ctx, known));
+      body.append(detail(ctx, known), resultFold(ctx, session, call, `${key}-result`));
       return;
     }
     body.append(el('p', 'quiet', 'Loading…'));
@@ -101,9 +139,14 @@ function toolRow(ctx: ViewContext, session: string, agents: AgentInfo[], call: T
         if (d) inputs.set(id, d);
         body.replaceChildren(
           d ? detail(ctx, d) : el('p', 'quiet', "This call's input isn't in its transcript any more."),
+          resultFold(ctx, session, call, `${key}-result`),
         );
       },
-      (err) => body.replaceChildren(failure("This call's input couldn't be read.", err)),
+      (err) =>
+        body.replaceChildren(
+          failure("This call's input couldn't be read.", err),
+          resultFold(ctx, session, call, `${key}-result`),
+        ),
     );
   });
   return el('li', '', row);

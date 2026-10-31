@@ -99,6 +99,11 @@ export interface DataApi {
   /** The input of the session's tool call `id`; null when the transcript no longer holds it. */
   toolInput(session: string, id: string): Promise<ToolDetail | null>;
   /**
+   * The text of the session's tool call `id`'s result, as the transcript holds it (its text blocks joined when it has
+   * several); null while the call has no result yet, or when the transcript no longer holds it.
+   */
+  toolResult(session: string, id: string): Promise<string | null>;
+  /**
    * The session's backgrounded commands (`run_in_background`), oldest first, read from Claude Code's own runtime
    * folder: empty when that folder isn't found.
    */

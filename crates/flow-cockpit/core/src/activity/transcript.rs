@@ -11,7 +11,9 @@ use std::time::SystemTime;
 
 use serde_json::Value;
 
-use super::{Activity, AgentParts, Item, Lines, Parts, ToolDetail, input_in, page};
+use super::{
+    Activity, AgentParts, Item, Lines, Parts, ToolDetail, content, input_in, page, str_of,
+};
 
 /// How many sessions the cache keeps; the one used longest ago goes first.
 const SESSIONS: usize = 4;
@@ -226,6 +228,42 @@ impl TranscriptCache {
         BufReader::new(file).read_until(b'\n', &mut line).ok()?;
         input_in(&line, id)
     }
+
+    /// The text of the call `id`'s result. Its result is a later line of the same file than the call's own, which
+    /// holds the `tool_result` for it; `None` when the call is unknown or no such line is there yet.
+    pub fn tool_result(&mut self, main: &Path, id: &str) -> Option<String> {
+        let (path, offset) = self.session(main).find(main, id)?;
+        let mut file = File::open(path).ok()?;
+        file.seek(SeekFrom::Start(offset)).ok()?;
+        BufReader::new(file)
+            .split(b'\n')
+            .map_while(Result::ok)
+            .find_map(|line| result_in(&line, id))
+    }
+}
+
+/// The text of the result of the call `id` in the line read back from its file, when that line holds it. A result's
+/// content is a string or a list of blocks, of which the text blocks are kept.
+fn result_in(line: &[u8], id: &str) -> Option<String> {
+    let entry: Value = serde_json::from_str(&String::from_utf8_lossy(line)).ok()?;
+    if str_of(&entry, "type") != Some("user") {
+        return None;
+    }
+    let block = content(&entry)?
+        .as_array()?
+        .iter()
+        .filter(|b| str_of(b, "type") == Some("tool_result"))
+        .find(|b| str_of(b, "tool_use_id") == Some(id))?;
+    Some(match block.get("content") {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Array(parts)) => parts
+            .iter()
+            .filter(|p| str_of(p, "type") == Some("text"))
+            .filter_map(|p| str_of(p, "text"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    })
 }
 
 #[cfg(test)]
@@ -248,5 +286,61 @@ mod tests {
         assert_eq!(cache.sessions.len(), SESSIONS);
         assert!(!cache.sessions.contains_key(&paths[0]), "the oldest went");
         assert!(cache.sessions.contains_key(&paths[SESSIONS]));
+    }
+
+    /// A transcript with a finished call (its result as text), one whose result is a list of text blocks and failed,
+    /// and one still waiting for its result.
+    const CALLS: &str = concat!(
+        r#"{"type":"user","message":{"role":"user","content":"List the files."},"timestamp":"2026-01-01T00:00:00Z"}"#,
+        "\n",
+        r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":"ls -la","description":"List"}}]},"timestamp":"2026-01-01T00:00:01Z"}"#,
+        "\n",
+        r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_a","content":"file1\nfile2"}]},"timestamp":"2026-01-01T00:00:02Z"}"#,
+        "\n",
+        r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_b","name":"Bash","input":{"command":"false"}}]},"timestamp":"2026-01-01T00:00:03Z"}"#,
+        "\n",
+        r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_b","is_error":true,"content":[{"type":"text","text":"boom"}]}]},"timestamp":"2026-01-01T00:00:04Z"}"#,
+        "\n",
+        r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_c","name":"Bash","input":{"command":"sleep 99"}}]},"timestamp":"2026-01-01T00:00:05Z"}"#,
+        "\n",
+    );
+
+    fn transcript(tag: &str, text: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("flow-cockpit-result-{}-{tag}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("s1.jsonl");
+        fs::write(&path, text).unwrap();
+        path
+    }
+
+    #[test]
+    fn tool_result_reads_a_finished_calls_output() {
+        let path = transcript("reads", CALLS);
+        let mut cache = TranscriptCache::default();
+        let answer = cache.tool_result(&path, "toolu_a");
+        let failed = cache.tool_result(&path, "toolu_b");
+        fs::remove_dir_all(path.parent().unwrap()).ok();
+        assert_eq!(
+            answer.as_deref(),
+            Some("file1\nfile2"),
+            "the result, not the call's input"
+        );
+        assert_eq!(
+            failed.as_deref(),
+            Some("boom"),
+            "a failed call keeps its output"
+        );
+    }
+
+    #[test]
+    fn tool_result_is_none_for_an_unfinished_or_unknown_call() {
+        let path = transcript("unfinished", CALLS);
+        let mut cache = TranscriptCache::default();
+        let waiting = cache.tool_result(&path, "toolu_c");
+        let unknown = cache.tool_result(&path, "toolu_nope");
+        fs::remove_dir_all(path.parent().unwrap()).ok();
+        assert_eq!(waiting, None);
+        assert_eq!(unknown, None);
     }
 }

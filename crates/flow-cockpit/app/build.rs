@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "doc",
     "session",
     "tool_input",
+    "tool_result",
     "views",
     "view_source",
     "extensions",
