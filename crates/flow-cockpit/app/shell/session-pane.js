@@ -1,7 +1,7 @@
 // A hosted session's terminal: shell chrome, not a view. One xterm.js `Terminal` per session id lives in a `<div>`
 // under `#terminals`, outside `#app`, so the view runtime's redraws never reach it. The pane touches neither `data` nor
 // `shell`: it calls the `api` it is given, which the shell builds from `shell.sendInput`, `shell.resizeSession`,
-// `shell.subscribeSession` and `data.scrollback`.
+// `shell.subscribeSession` and `shell.scrollback`.
 //
 // Nothing here reads or rewrites the bytes: every chunk, replayed or live, goes to `term.write` as it came, and what
 // xterm answers goes to `api.write` as it is.
@@ -11,12 +11,13 @@ import { FitAddon } from './vendor/addon-fit.mjs';
 /**
  * What the shell gives the pane for one session.
  * @typedef {object} SessionPaneApi
- * @property {(id: string, data: string) => unknown} write keystrokes, and xterm's own answers to the session's queries
+ * @property {(id: string, data: string | Uint8Array) => unknown} write keystrokes and xterm's own answers to the
+ *   session's queries as text; xterm's binary reports (old mouse modes) as bytes
  * @property {(id: string, cols: number, rows: number) => unknown} resize
  * @property {(id: string, onChunk: (bytes: ArrayLike<number>) => void) => unknown} subscribe replays the session's
  *   buffered output into `onChunk`, then streams what it prints; as many bytes of replay as `scrollback` returns
  * @property {(id: string, onExit: (code: number | null) => void) => unknown} [onExit] says when the process has ended
- * @property {(id: string) => Promise<ArrayBuffer | ArrayLike<number>>} scrollback the buffered output, read-only
+ * @property {(id: string) => Promise<ArrayBuffer | ArrayLike<number>>} scrollback the buffered output
  */
 
 /**
@@ -191,11 +192,17 @@ function attach(pane, api) {
   const input = pane.term.onData((data) => {
     if (pane.primed) attempt('input', () => api.write(pane.id, data));
   });
+  const binary = pane.term.onBinary((data) => {
+    // One character per byte, as xterm makes them.
+    const bytes = Uint8Array.from(data, (c) => c.charCodeAt(0) & 0xff);
+    if (pane.primed) attempt('input', () => api.write(pane.id, bytes));
+  });
   const size = pane.term.onResize(() => send(pane));
   const observer = new ResizeObserver(() => refit(pane));
   observer.observe(pane.element);
   const detach = () => {
     input.dispose();
+    binary.dispose();
     size.dispose();
     observer.disconnect();
     pane.api = null;

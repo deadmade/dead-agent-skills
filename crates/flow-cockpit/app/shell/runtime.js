@@ -39,6 +39,13 @@ const DOCS = ['Spec', 'Plan', 'Flow'];
 const reason = (err) => (err instanceof Error ? err.message : String(err));
 
 /**
+ * A command's output as a `<pre>` shows it: without the terminal's escape sequences (colors, cursor moves, titles),
+ * which would show as stray characters. Only the display: what was read is kept as it came.
+ * @param {string} text
+ */
+const plain = (text) => text.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, '');
+
+/**
  * An element's place in its view's section, which a redraw builds anew: from the nearest `id` or `data-keep` (the
  * section's own descendants only), else child indexes from the section.
  * @typedef {{ view: string, path: string[] }} Place
@@ -523,6 +530,13 @@ export function createRuntime({
   }
 
   /**
+   * The placeholders `terminalSlot` made. A view can draw an element with the same attribute, even for a hosted
+   * session's id and ahead of the real one: only these get a pane laid over them.
+   * @type {WeakSet<Element>}
+   */
+  const ownSlots = new WeakSet();
+
+  /**
    * A hosted session's terminal is never drawn in `#app`, which a redraw replaces: this empty element marks where it
    * goes, and `placePanes` lays the real pane (in `#terminals`) over it.
    * @param {string} id
@@ -532,6 +546,7 @@ export function createRuntime({
     slot.className = 'terminal-slot';
     slot.dataset.terminalSlot = id;
     slot.style.minHeight = '24rem';
+    ownSlots.add(slot);
     return slot;
   }
 
@@ -582,10 +597,42 @@ export function createRuntime({
   };
 
   /**
+   * What the user did in a session's output panel, kept across the redraws a live session gets every few seconds: the
+   * calls left open, the results and the background output read (so a redraw shows them at once, not "Loading…"), and
+   * how far each was scrolled. Keys are `call:<id>` and `output:<task>`.
+   * @typedef {{ open: Set<string>, read: Map<string, string>, top: Map<string, number> }} PanelKept
+   * @type {Map<string, PanelKept>}
+   */
+  const panelKept = new Map();
+
+  /** @param {string} session @returns {PanelKept} */
+  function keptFor(session) {
+    let kept = panelKept.get(session);
+    if (!kept) panelKept.set(session, (kept = { open: new Set(), read: new Map(), top: new Map() }));
+    return kept;
+  }
+
+  /**
+   * A `<pre>` of `text` that keeps how far it was scrolled under `key`, and gets it back once it is in the page.
+   * @param {PanelKept} kept @param {string} key @param {string} text
+   */
+  function keptPre(kept, key, text) {
+    const pre = document.createElement('pre');
+    pre.textContent = text;
+    pre.addEventListener('scroll', () => kept.top.set(key, pre.scrollTop));
+    const top = kept.top.get(key);
+    // The draw puts the panel in the page before its next await, so before this runs.
+    if (top) queueMicrotask(() => (pre.scrollTop = top));
+    return pre;
+  }
+
+  /**
    * One tool call in the output panel; its result is read when it opens.
    * @param {string} session @param {import('../../bindings/ToolCall').ToolCall} call
    */
   function panelCall(session, call) {
+    const kept = keptFor(session);
+    const key = `call:${call.id}`;
     const out = document.createElement('div');
     const fold = document.createElement('details');
     fold.className = call.failed ? 'unfold tool-call failed' : 'unfold tool-call';
@@ -593,7 +640,17 @@ export function createRuntime({
     head.textContent = `${call.tool} ${call.summary}${call.failed ? ' (failed)' : ''}`;
     fold.append(head, out);
     fold.addEventListener('toggle', () => {
-      if (!fold.open || out.childNodes.length) return;
+      if (!fold.open) {
+        kept.open.delete(call.id);
+        return;
+      }
+      kept.open.add(call.id);
+      if (out.childNodes.length) return;
+      const known = kept.read.get(key);
+      if (known !== undefined) {
+        out.replaceChildren(keptPre(kept, key, known));
+        return;
+      }
       const note = document.createElement('p');
       note.className = 'quiet';
       note.textContent = 'Loading…';
@@ -604,15 +661,20 @@ export function createRuntime({
             note.textContent = 'No result yet, or the transcript no longer holds it.';
             return;
           }
-          const pre = document.createElement('pre');
-          pre.textContent = text;
-          out.replaceChildren(pre);
+          kept.read.set(key, text);
+          out.replaceChildren(keptPre(kept, key, text));
         },
         (err) => {
           note.textContent = `This call's result couldn't be read: ${reason(err)}`;
         },
       );
     });
+    // Open before this redraw: open again, with the result already read, if it was.
+    if (kept.open.has(call.id)) {
+      const known = kept.read.get(key);
+      if (known !== undefined) out.append(keptPre(kept, key, known));
+      fold.open = true;
+    }
     return fold;
   }
 
@@ -629,23 +691,38 @@ export function createRuntime({
     title.textContent = chip.label;
     panel.append(title);
     if (chip.kind === 'background') {
+      // What was read for this command last time shows at once, and the fresh read replaces it.
+      const kept = keptFor(session);
+      const task = taskOf(chip);
+      const key = `output:${task}`;
+      const known = kept.read.get(key);
       const note = document.createElement('p');
       note.className = 'quiet';
       note.textContent = 'Loading…';
-      panel.append(note);
-      data.backgroundOutput(session, taskOf(chip)).then(
+      /** @type {HTMLElement} */
+      let shown = known === undefined ? note : keptPre(kept, key, plain(known));
+      panel.append(shown);
+      /** @param {string} message */
+      const fail = (message) => {
+        kept.read.delete(key);
+        note.textContent = message;
+        if (shown !== note) shown.replaceWith(note);
+        shown = note;
+      };
+      data.backgroundOutput(session, task).then(
         (text) => {
-          if (text === null) {
-            note.textContent = "This command's output can't be read.";
+          if (text === null) return fail("This command's output can't be read.");
+          // Only the newest command's output is kept: a command's can run to a megabyte.
+          for (const k of kept.read.keys()) if (k.startsWith('output:') && k !== key) kept.read.delete(k);
+          kept.read.set(key, text);
+          if (shown !== note) {
+            if (shown.textContent !== plain(text)) shown.textContent = plain(text);
             return;
           }
-          const pre = document.createElement('pre');
-          pre.textContent = text;
-          note.replaceWith(pre);
+          shown = keptPre(kept, key, plain(text));
+          note.replaceWith(shown);
         },
-        (err) => {
-          note.textContent = `This command's output couldn't be read: ${reason(err)}`;
-        },
+        (err) => fail(`This command's output couldn't be read: ${reason(err)}`),
       );
       return panel;
     }
@@ -763,9 +840,9 @@ export function createRuntime({
    */
   function placePanes() {
     slotWatch?.disconnect();
-    // Only a hosted session's placeholder counts: nothing else drawn in `#app` can get a pane laid over it.
+    // Only the runtime's own placeholder of a hosted session counts: nothing a view draws can get a pane laid over it.
     const found = [...root.querySelectorAll('[data-terminal-slot]')].find(
-      (el) => el instanceof window.HTMLElement && hosted.has(el.dataset.terminalSlot ?? ''),
+      (el) => ownSlots.has(el) && el instanceof window.HTMLElement && hosted.has(el.dataset.terminalSlot ?? ''),
     );
     slotNow = found instanceof window.HTMLElement ? found : null;
     const id = slotNow?.dataset.terminalSlot;

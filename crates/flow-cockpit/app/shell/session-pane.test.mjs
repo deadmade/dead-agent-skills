@@ -170,6 +170,21 @@ test('priming_ends_at_the_scrollback_byte_count_even_inside_one_chunk', async ()
   assert.equal(sent.length, 1, 'only the query past the replay is answered');
 });
 
+test('binary_mouse_reports_reach_the_session_as_bytes', async () => {
+  const { api, sent, emit } = fakeApi();
+  const pane = mountSessionPane(freshId(), api);
+  await settle();
+  // The session turns on the old mouse mode, whose reports xterm hands over as binary, not text.
+  emit('\x1b[?1000h');
+  await settle();
+  const screenEl = pane.element.querySelector('.xterm-screen');
+  screenEl.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, clientX: 5, clientY: 5, buttons: 1 }));
+  await settle();
+  const report = sent.at(-1)?.[1];
+  assert.ok(report instanceof Uint8Array, `a report arrives as bytes, got ${JSON.stringify(report)}`);
+  assert.deepEqual([...report.subarray(0, 4)], [0x1b, 0x5b, 0x4d, 0x20], 'ESC [ M and the button, byte for byte');
+});
+
 test('remounting_the_same_session_id_reuses_its_element', async () => {
   const { api, subscribed, emit } = fakeApi('kept line\r\n');
   const id = freshId();

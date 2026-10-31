@@ -16,12 +16,13 @@ const time = (iso) => {
 };
 
 /**
- * The newest flow run of the project whose sessions list holds `sessionId`; null for a session no run lists.
+ * The newest unfinished flow run of the project whose sessions list holds `sessionId`; null for a session no such run
+ * lists. A finished run (status `Done`, as the list's drawing ahead reads it) isn't read: a hosted session runs now.
  * @param {DataApi} data @param {string} project @param {string} sessionId @returns {Promise<FlowRun | null>}
  */
 export async function findLinkedRun(data, project, sessionId) {
   const listed = (await data.entries(project)) ?? [];
-  const runs = listed.flatMap((e) => (e.kind === 'FlowRun' ? [e] : []));
+  const runs = listed.flatMap((e) => (e.kind === 'FlowRun' && e.status !== 'Done' ? [e] : []));
   runs.sort((a, b) => time(b.last_activity) - time(a.last_activity));
   for (const { slug } of runs) {
     // A run that can't be read is no match, not a reason to draw no bar.

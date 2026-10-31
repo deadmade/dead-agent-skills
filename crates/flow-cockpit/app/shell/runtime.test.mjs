@@ -1094,6 +1094,23 @@ test('views_get_their_route_tabs_and_blocks_through_ctx', async () => {
   assert.equal(section(root, 'activity'), null, 'a run-tab view draws only when its tab is selected');
 });
 
+/** Everything a view's `ctx` holds, and everything on its `ctx.data`: read-only, nothing that reaches a session. */
+const CTX_KEYS = ['blocks', 'data', 'navigate', 'route', 'tabs'];
+const DATA_KEYS = [
+  'backgroundOutput',
+  'backgroundTasks',
+  'doc',
+  'entries',
+  'flowRun',
+  'previewCommand',
+  'projects',
+  'session',
+  'toolInput',
+  'toolResult',
+  'viewSource',
+  'views',
+];
+
 test('shell_object_is_never_passed_to_a_view', async () => {
   const app = fakeApp({
     list: {
@@ -1108,11 +1125,9 @@ test('shell_object_is_never_passed_to_a_view', async () => {
   });
   const { root } = await started(app, { to: 'list' });
   const [ctxKeys, dataKeys] = JSON.parse(section(root, 'list').textContent);
-  assert.deepEqual(ctxKeys, ['blocks', 'data', 'navigate', 'route', 'tabs']);
-  for (const name of ['shell', 'startSession', 'subscribeSession']) {
-    assert.ok(!ctxKeys.includes(name) && !dataKeys.includes(name), `a view can reach ${name}`);
-  }
-  assert.ok(dataKeys.includes('previewCommand'), 'the read-only preview is on data');
+  // Exactly these: anything added to either (a session control above all) must be added here on purpose.
+  assert.deepEqual(ctxKeys, CTX_KEYS);
+  assert.deepEqual(dataKeys, DATA_KEYS, 'only read-only calls, the preview among them');
 });
 
 test('preview_command_asks_the_app_for_the_display_string_only', async () => {
@@ -2085,10 +2100,7 @@ test('a_view_cannot_read_a_sessions_terminal_output', async () => {
   });
   const { root } = await hostedStart(app, SESSION);
   const keys = section(root, 'session').textContent.split(',');
-  assert.ok(keys.includes('session'), 'the view has its data');
-  for (const name of ['scrollback', 'sendInput', 'subscribeSession', 'hostedSessions', 'startSession']) {
-    assert.ok(!keys.includes(name), `ctx.data has no ${name}`);
-  }
+  assert.deepEqual(keys.sort(), DATA_KEYS, "a hosted session's view gets the same read-only data, nothing more");
 });
 
 test('an_already_hosted_sessions_screen_shows_its_terminal_not_a_resume_button', async () => {
@@ -2139,7 +2151,7 @@ test('a_view_has_no_resume_on_its_context', async () => {
     session: { source: view('session', 'session', 'return document.createTextNode(Object.keys(ctx).join(","));') },
   });
   const { root } = await hostedStart(app, SESSION, { ids: [], resume: async () => {} });
-  assert.ok(!section(root, 'session').textContent.includes('resume'));
+  assert.deepEqual(section(root, 'session').textContent.split(',').sort(), CTX_KEYS);
 });
 
 test('a_view_cannot_get_a_pane_laid_over_its_own_element', async () => {
@@ -2155,6 +2167,36 @@ test('a_view_cannot_get_a_pane_laid_over_its_own_element', async () => {
   assert.ok(root.querySelector('[data-terminal-slot]'), 'the view drew the attribute');
   assert.deepEqual(mounts, [], "but a session that isn't hosted gets no pane");
   assert.equal(terminals.childElementCount, 0);
+});
+
+test('a_views_forged_slot_for_a_hosted_session_is_not_where_its_pane_goes', async () => {
+  // Drawn ahead of the runtime's own placeholder, with the hosted session's id, and laid out somewhere else.
+  const forged = view(
+    'session',
+    'session',
+    `const d = document.createElement('div'); d.dataset.terminalSlot = '${SESSION_ID}'; d.dataset.forged = ''; return d;`,
+  );
+  const proto = dom.window.HTMLElement.prototype;
+  const measure = proto.getBoundingClientRect;
+  proto.getBoundingClientRect = function getBoundingClientRect() {
+    if (this.dataset?.forged === undefined) return measure.call(this);
+    return { x: 0, y: 0, left: 0, top: 0, width: 10, height: 10, right: 10, bottom: 10, toJSON() {} };
+  };
+  try {
+    const { root, terminals, mounts } = await hostedStart(fakeApp({ session: { source: forged } }), SESSION);
+    const slots = [...root.querySelectorAll('[data-terminal-slot]')];
+    assert.equal(slots.length, 2);
+    assert.ok(slots[0].hasAttribute('data-forged'), "the view's element comes first");
+    assert.deepEqual(mounts, [SESSION_ID]);
+    const pane = terminals.firstElementChild;
+    assert.deepEqual(
+      [pane.style.left, pane.style.top, pane.style.width, pane.style.height],
+      ['30px', '40px', '500px', '300px'],
+      "the pane is laid over the runtime's own placeholder",
+    );
+  } finally {
+    proto.getBoundingClientRect = measure;
+  }
 });
 
 test('outside_session_is_unchanged', async () => {
@@ -2556,6 +2598,49 @@ test('selecting_another_chip_replaces_it_with_the_panel', async () => {
   assert.equal(root.querySelector('[data-chip="background:bk1"]').getAttribute('aria-pressed'), 'true');
 });
 
+test('the_panel_keeps_its_open_calls_and_output_across_redraws', async () => {
+  const { app, root, runtime } = await chipsStart();
+  const redraw = async () => {
+    await app.emit('changed', { project: 'p1' });
+    await runtime.idle();
+  };
+  const panel = () => root.querySelector('.session-panel');
+  app.answers.tool_result = (a) => `result of ${a.tool}`;
+  root.querySelector('[data-chip="a1"]').click();
+  const toggle = (open) => {
+    const fold = panel().querySelector('details');
+    fold.open = open;
+    fold.dispatchEvent(new dom.window.Event('toggle'));
+  };
+  toggle(true);
+  await until(() => panel().textContent.includes('result of t-a1'), 'the result');
+
+  // A poll redraws the tab every few seconds: the call stays open with its result, which isn't read again.
+  const before = panel();
+  await redraw();
+  assert.notEqual(panel(), before, 'the panel was drawn anew');
+  assert.ok(panel().querySelector('details').open, 'the open call is open again');
+  assert.ok(panel().textContent.includes('result of t-a1'));
+  assert.equal(app.calls.filter(([cmd]) => cmd === 'tool_result').length, 1);
+  toggle(false);
+  await redraw();
+  assert.equal(panel().querySelector('details').open, false, 'and one closed stays closed');
+
+  // A background command: a redraw shows what was read at once, not "Loading…", while the fresh read is under way.
+  root.querySelector('[data-chip="background:bk1"]').click();
+  await until(() => panel()?.textContent.includes('[exited with code 0]'), 'its output');
+  /** @type {(text: string) => void} */
+  let release = () => {};
+  app.answers.background_output = () => new Promise((resolve) => (release = resolve));
+  await redraw();
+  assert.ok(!panel().textContent.includes('Loading'), panel().textContent);
+  assert.ok(panel().textContent.includes('building…'));
+  // The fresh read replaces it, shown without the terminal's colour codes.
+  release('building…\n\x1b[32mbuilt\x1b[0m \x1b]0;title\x07\n[exited with code 0]');
+  await until(() => panel().textContent.includes('built'), 'the fresh output');
+  assert.equal(panel().querySelector('pre').textContent, 'building…\nbuilt \n[exited with code 0]');
+});
+
 test('a_session_that_is_not_hosted_has_no_chips', async () => {
   const app = fakeApp(sessionViews());
   app.answers.session = () => chipActivity();
@@ -2632,6 +2717,16 @@ test('find_linked_run_is_null_for_a_loose_session', async () => {
   assert.equal(await findLinkedRun(data, 'p1', SESSION_ID), null);
   assert.deepEqual(data.asked, ['a'], 'only flow runs are read');
   assert.equal(await findLinkedRun(barData([], {}), 'p1', SESSION_ID), null, 'a project with no runs');
+});
+
+test('find_linked_run_reads_only_unfinished_runs', async () => {
+  const entries = [
+    { ...entryOf('finished', at(9)), status: 'Done' },
+    { ...entryOf('open', at(2)), status: 'Working' },
+  ];
+  const data = barData(entries, { finished: barRun([SESSION_ID]), open: barRun([OTHER_ID]) });
+  assert.equal(await findLinkedRun(data, 'p1', SESSION_ID), null, 'a finished run that lists it is no link');
+  assert.deepEqual(data.asked, ['open'], 'and is never read');
 });
 
 test('run_bar_shows_the_current_task_and_now_line', () => {
