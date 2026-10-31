@@ -5,3 +5,4 @@ pub mod activity;
 mod bindings;
 pub mod doc;
 pub mod index;
+pub mod session;
