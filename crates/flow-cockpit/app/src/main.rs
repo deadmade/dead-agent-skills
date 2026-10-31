@@ -318,6 +318,61 @@ mod tests {
         }
     }
 
+    /// The names in the list that follows `open` in `source`: the last `::` segment of each comma-separated entry.
+    fn listed(source: &str, open: &str) -> Vec<String> {
+        let start = source
+            .find(open)
+            .unwrap_or_else(|| panic!("no {open} in the source"))
+            + open.len();
+        let list = &source[start..start + source[start..].find(']').expect("an unclosed list")];
+        list.split(',')
+            .map(|item| item.trim().trim_matches('"'))
+            .filter(|name| !name.is_empty())
+            .map(|name| name.rsplit("::").next().unwrap_or(name).to_owned())
+            .collect()
+    }
+
+    #[test]
+    fn every_registered_command_has_a_capability() {
+        let registered = listed(include_str!("main.rs"), "tauri::generate_handler![");
+        let manifest = listed(include_str!("../build.rs"), "const COMMANDS: &[&str] = &[");
+        assert_eq!(registered.len(), 17, "{registered:?}");
+        assert_eq!(
+            manifest, registered,
+            "build.rs's AppManifest and main.rs's handlers differ"
+        );
+
+        let capability = include_str!("../capabilities/default.json");
+        let allowed: Vec<&str> = capability
+            .split('"')
+            .filter(|s| s.starts_with("allow-"))
+            .collect();
+        let wanted: Vec<String> = registered
+            .iter()
+            .map(|c| format!("allow-{}", c.replace('_', "-")))
+            .collect();
+        for permission in &wanted {
+            assert!(
+                allowed.contains(&permission.as_str()),
+                "{permission} missing from capabilities/default.json"
+            );
+        }
+        assert_eq!(
+            allowed.len(),
+            wanted.len(),
+            "capabilities/default.json allows a command that isn't registered"
+        );
+    }
+
+    #[test]
+    fn the_raw_tauri_global_is_off() {
+        let conf = include_str!("../tauri.conf.json");
+        assert!(
+            conf.contains("\"withGlobalTauri\": false"),
+            "tauri.conf.json must not set withGlobalTauri"
+        );
+    }
+
     #[test]
     fn print_types_holds_every_binding_without_imports() {
         let out = types();
