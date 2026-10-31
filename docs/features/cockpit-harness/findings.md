@@ -5,8 +5,8 @@ Throwaway spike, run 2026-10-31 on Linux (NixOS, x86_64), Claude Code 2.1.314, t
 and plays a script against it (keystrokes, resizes, signals, `ps`), and a short-lived worktree of
 `crates/flow-cockpit/app/` with one PTY session wired to an `xterm.js` pane outside `#app`, run under the app's real
 CSP and `core:default` capability in Xvfb (`:99`, later with openbox as window manager), driven by `xdotool` and
-checked by screenshots. Everything below was run and observed in that session; where a fact comes from reading
-source rather than running it, it says so.
+checked by screenshots. Observed in this session unless marked _(source)_ — read from Claude Code's, `portable-pty`'s
+or tauri's source, not run — or _(inferred)_ — a reasonable explanation for an observed result, not directly tested.
 
 ## Step 1: Pinned versions
 
@@ -24,7 +24,7 @@ The files to vendor are `package/lib/xterm.mjs`, `package/lib/addon-fit.mjs` (bo
 dependency. Pinned as `portable-pty = "=0.9.0"`, it adds these packages to `crates/flow-cockpit/Cargo.lock`:
 `cfg_aliases`, `downcast-rs`, `filedescriptor`, `lazy_static`, `nix` 0.28.0, `portable-pty`, `serial2`,
 `shared_library`, `shell-words`, `winreg` (some only build for Windows). The app built in `nix develop` with no new
-system library: on Linux the crate uses only libc.
+system library: _(inferred)_ on Linux the crate needs only libc.
 
 ## Step 2: A real session in the embedded pane
 
@@ -71,7 +71,8 @@ the real pane should name a font that has them.
   // master.get_size()? then reports exactly the new rows/cols (TIOCSWINSZ / TIOCGWINSZ)
   ```
 
-  `CommandBuilder`'s default `set_controlling_tty(true)` is what makes SIGWINCH reach `claude`; leave it on.
+  _(inferred)_ `CommandBuilder`'s default `set_controlling_tty(true)` is what makes SIGWINCH reach `claude` (the
+  default was never turned off to compare); leave it on.
 
 - **`--` before a prompt starting with `-`:** held. Without it, `claude --model haiku "-x Reply with exactly the word
 PINEAPPLE and nothing else."` exits 1 with `error: unknown option '-x Reply with exactly ...'`. With `claude --model
@@ -91,9 +92,13 @@ Confirmed shape, with corrections:
   `~/.claude/projects`.
 - **The `<cwd folder name>` segment is not reliably the transcript's folder.** Started with `-w spiketree`, the
   session's `tasks/` landed under `-tmp-opencode-spike-proj--claude-worktrees-spiketree` (matching its transcript)
-  while its `scratchpad/` landed under `-tmp-opencode-spike-proj` (the launch folder). A session in this repo that
-  moved into a worktree mid-session has its `tasks/` under the main checkout's folder while its transcript is under
-  the worktree's. The session id is the stable part.
+  while its `scratchpad/` landed under `-tmp-opencode-spike-proj` (the launch folder). Another session on this machine
+  (`fa9e783e-...`) has its transcript only under
+  `~/.claude/projects/-home-deadmade-projects-dead-claude-skills--claude-worktrees-flow-cockpit/`, while its `tasks/`
+  (holding `b*.output` files and `a*.output` symlinks) is under
+  `/tmp/claude-1000/-home-deadmade-projects-dead-claude-skills/fa9e783e-.../` (the main checkout's folder); a folder for
+  it also exists under the worktree's name. _(inferred)_ That session entered the worktree after it started. The
+  session id is the stable part.
 - Task ids: a backgrounded Bash command is `b` + 8 characters of `[a-z0-9]` (`birs7h46a`, `bb66kmm9g`). The same
   folder also holds `a` + 17 hex characters `.output` **symlinks to subagent transcripts**
   (`a0115b90ea4c9b854.output -> ~/.claude/projects/.../subagents/agent-a0115b90ea4c9b854.jsonl`), so `tasks/*.output`
@@ -122,11 +127,12 @@ environment, not this shell's), the app's PATH had no `~/.local/bin` and no `TER
 
 It is not safe in general:
 
-- `portable-pty` resolves a bare name against the **`PATH` in the `CommandBuilder`'s own environment** (a copy of
-  the parent's, taken in `CommandBuilder::new`). With `PATH=/usr/bin:/bin`, `spawn_command` fails with `Unable to
+- `portable-pty` resolves a bare name against the **`PATH` in the `CommandBuilder`'s own environment** (_(source)_ a
+  copy of the parent's, taken in `CommandBuilder::new`). With `PATH=/usr/bin:/bin`, `spawn_command` fails with `Unable to
 spawn claude because:\nNo viable candidates found in PATH "/usr/bin:/bin"`; with no `PATH` at all, `Unable to
 resolve the PATH`. Both are an `Err` from `spawn_command`, so a missing binary surfaces as a start error.
-- Claude Code's native installer puts `claude` in `~/.local/bin`, which this machine's GUI environment does not have.
+- _(not checked here: background knowledge)_ Claude Code's native installer puts `claude` in `~/.local/bin`, which
+  this machine's GUI environment does not have (observed: no `~/.local/bin` on its PATH).
 - An absolute path spawns (`/run/current-system/sw/bin/claude --version` under `PATH=/usr/bin:/bin` printed
   `2.1.314 (Claude Code)`), but the session's own tools would then run with that bare PATH.
 
@@ -152,36 +158,39 @@ Every Bash tool command `claude` runs, foreground or background, is started in *
 them. Only `claude`'s own exit path cleans them up. Measured, with a background `sleep 90` (or `sleep 300`) and a
 foreground `timeout 100 tail -f /dev/null` running:
 
-| how `claude` was stopped                                    | `claude` exits        | its command trees                 | `SessionEnd` hook ran |
-| ----------------------------------------------------------- | --------------------- | --------------------------------- | --------------------- |
-| SIGHUP (`child.clone_killer().kill()`, or `libc::kill`)     | 0.65-1.05 s, code 129 | gone, `.output` gets `[killed]`   | yes                   |
-| SIGTERM                                                     | ~0.9 s, code 143      | gone (idle case)                  | yes                   |
-| `child.kill()` (portable-pty: SIGHUP, ~0.2 s, then SIGKILL) | 0.25-0.3 s, Killed    | **orphaned**, reparented to PID 1 | no                    |
-| SIGKILL                                                     | immediate, Killed     | **orphaned**                      | no                    |
-| drop writer and master (reader thread still running)        | **does not exit**     | still running                     | -                     |
-| the app window closed (WM close, no cleanup code)           | within 1 s            | gone                              | (not checked)         |
-| the app process SIGKILLed                                   | within 1 s            | gone                              | (not checked)         |
+| how `claude` was stopped                                 | `claude` exits        | its command trees                 | `SessionEnd` hook ran |
+| -------------------------------------------------------- | --------------------- | --------------------------------- | --------------------- |
+| SIGHUP (`child.clone_killer().kill()`, or `libc::kill`)  | 0.65-1.05 s, code 129 | gone, `.output` gets `[killed]`   | yes                   |
+| SIGTERM                                                  | ~0.9 s, code 143      | gone (idle case)                  | yes                   |
+| `child.kill()` (_(source)_ SIGHUP, ~0.2 s, then SIGKILL) | 0.25-0.3 s, Killed    | **orphaned**, reparented to PID 1 | no                    |
+| SIGKILL                                                  | immediate, Killed     | **orphaned**                      | no                    |
+| drop writer and master (reader thread still running)     | **does not exit**     | still running                     | -                     |
+| the app window closed (WM close, no cleanup code)        | within 1 s            | gone                              | (not checked)         |
+| the app process SIGKILLed                                | within 1 s            | gone                              | (not checked)         |
 
 `web-mcp` (an MCP server `claude` starts, same process group) went away in every case. After the window-close and
 app-kill rows, `ps` showed no `claude`, `web-mcp`, `sleep` or `tail` left: when the cockpit's process ends for any
 reason the kernel closes the PTY master, `claude` gets SIGHUP and runs its own exit. The orphans appear only when
 the cockpit itself SIGKILLs a `claude` it still owns, which is what `portable-pty`'s `Child::kill()` does after
-~200 ms (five `try_wait` polls 50 ms apart) on Unix.
+~200 ms on Unix (observed: dead by SIGKILL 0.25-0.3 s after the call; _(source)_ the mechanism is SIGHUP, then
+five `try_wait` polls 50 ms apart, then SIGKILL).
 
 Two more things about stopping:
 
-- Dropping the writer is not a quiet "close stdin": `portable-pty`'s Unix writer, on drop, **writes `\n` and the
-  terminal's VEOF (Ctrl+D) into the PTY**, i.e. types Enter and Ctrl+D into `claude`.
-- Dropping the master does not hang up while `try_clone_reader()`'s duplicate is still open (the reader thread holds
+- Observed: after dropping the writer and the master, `claude` was still running 10 s later.
+- _(source)_ Dropping the writer is not a quiet "close stdin": `portable-pty`'s Unix writer's `Drop` **writes `\n` and
+  the terminal's VEOF (Ctrl+D) into the PTY**, i.e. types Enter and Ctrl+D into `claude`. No run captured those bytes
+  arriving.
+- _(inferred)_ Dropping the master does not hang up while `try_clone_reader()`'s duplicate is still open (the reader thread holds
   it), so it is no stop signal at all.
 
 ## Step 6: Surprises
 
 - **`Channel<Vec<u8>>` sends JSON, not bytes.** Logged in the window: a `Channel<Vec<u8>>` message arrives as
   `[object Array]` (an array of numbers); a `Channel<InvokeResponseBody>` sent `InvokeResponseBody::Raw(bytes)`
-  arrives as `[object ArrayBuffer]`. tauri 2.12.5's own doc comment on `Channel` says the same. Raw messages under
-  1024 bytes are delivered by `eval`, larger ones through `plugin:__TAURI_CHANNEL__|fetch`, which
-  `webview/mod.rs` exempts from the ACL check, so Task 4's `AppManifest` can't block output delivery.
+  arrives as `[object ArrayBuffer]`. tauri 2.12.5's own doc comment on `Channel` says the same. _(source)_ Raw messages
+  under 1024 bytes are delivered by `eval`, larger ones through `plugin:__TAURI_CHANNEL__|fetch`, which
+  `webview/mod.rs` exempts from the ACL check (observed only that large messages arrived under `core:default`), so Task 4's `AppManifest` can't block output delivery.
 - **Split UTF-8:** 1 of 242 PTY reads in one session ended in the middle of a multi-byte character. xterm.js handles
   that itself when given bytes: writing `[0x61,0xe2,0x9c]`, `[0x93,0xe6,0x97]`, `[0xa5,0x62]` as three `Uint8Array`s
   produced the line `a✓日b`.
@@ -207,11 +216,12 @@ same reason. Same fix wherever the plan says "a `tauri::ipc::Channel<Vec<u8>>`" 
 
 ### Affects Task 3 (and Task 12): how `kill` stops a session
 
-The plan's graceful phase ("closing the PTY's write side / the PTY's own hangup") doesn't work: dropping the writer
-types Enter and Ctrl+D, and dropping the master hangs nothing up while the reader holds a duplicate. And
-`portable-pty`'s `child.kill()` escalates to SIGKILL after ~200 ms, before `claude` (0.65-1.05 s) has killed its
+The plan's graceful phase ("closing the PTY's write side / the PTY's own hangup") doesn't work: observed, `claude`
+kept running after both were dropped; _(source)_ dropping the writer types Enter and Ctrl+D, and _(inferred)_ dropping
+the master hangs nothing up while the reader holds a duplicate. And `portable-pty`'s `child.kill()` escalates to
+SIGKILL after ~200 ms (_(source)_; observed: dead by SIGKILL within 0.3 s), before `claude` (0.65-1.05 s) has killed its
 commands, which orphans every running Bash command and skips `SessionEnd`. What worked: `child.clone_killer().kill()`
-(on Unix that is SIGHUP only, no escalation), poll `try_wait()` for a few seconds (5 s leaves margin over the ~1 s
+(_(source)_ on Unix that is SIGHUP only, no escalation; observed: exit code 129, `SessionEnd` ran), poll `try_wait()` for a few seconds (5 s leaves margin over the ~1 s
 seen), and only then `child.kill()`. `kill_all` on window close (Task 12) must use the same path for every session in
 parallel, never `child.kill()` alone; and if the process simply exits, the kernel's hangup already does the graceful
 stop. `kill_sends_graceful_stop_before_sigkill` can keep its name; its fixture should be a child that traps SIGHUP.
@@ -255,8 +265,8 @@ SIGTERM, a signal ("Killed") after SIGKILL.
 ### Affects Task 4: nothing to change
 
 Confirmed its premise: with a bare `tauri_build::build()` (no `AppManifest`) the spike's five commands ran under
-`core:default` with no `allow-` entry. The channel's fetch command bypasses the ACL by design, so streaming survives
-the lockdown.
+`core:default` with no `allow-` entry. _(source)_ The channel's fetch command bypasses the ACL by design, so
+streaming should survive the lockdown; Task 4 should confirm it in the built app.
 
 ### Affects Task 7: one unverified observation
 
@@ -281,3 +291,10 @@ graceful phase above doesn't exist there; Task 14 needs its own stop (and its ow
 - Ctrl+B to background a running command.
 - Whether `SessionEnd` ran when the window closed or the app was killed (only the absence of orphans was checked).
 - Why the window's F8 listener didn't fire with the pane focused.
+- Why dropping the writer and master doesn't stop `claude`: that the writer's `Drop` types `\n` + Ctrl+D is read from
+  source, and that the reader's duplicate keeps the master open is inferred; neither was captured directly.
+- That `set_controlling_tty(true)` is needed for SIGWINCH (never compared with it off).
+- That the channel's fetch command stays reachable once Task 4 wires an `AppManifest` (read from tauri's source).
+- Why session `fa9e783e-...`'s `tasks/` sits under the main checkout's folder (entering a worktree mid-session is the
+  likely cause, not reproduced).
+- Where Claude Code's native installer puts `claude` (no native install on this machine).
