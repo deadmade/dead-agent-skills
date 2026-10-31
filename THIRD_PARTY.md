@@ -144,8 +144,8 @@ synced upstream commit is in `UPSTREAM`.
 
 ## flow-cockpit
 
-`crates/flow-cockpit/app/shell/vendor/` holds three libraries the views' building blocks use, copied unchanged from
-their npm tarballs (each tarball checked against the registry's `dist.integrity`), each with its license next to it:
+`crates/flow-cockpit/app/shell/vendor/` holds the libraries the views' building blocks and the boot script use, copied unchanged
+from their npm tarballs (each tarball checked against the registry's `dist.integrity`), each with its license next to it:
 
 - **marked** 18.1.2: MIT, https://github.com/markedjs/marked (`lib/marked.esm.js`, and `lib/marked.d.ts` as
   `marked.esm.d.ts`; `LICENSE-marked`). Tarball `sha512-DfOnvLAQ6WYeWxWO1u4RyFOeqyHup6dks5PPqnoFiooU7ipRvidO/2j8plhAHIiZg574E9ZlzSjUiPMLAzFkgg==`.
@@ -160,6 +160,12 @@ their npm tarballs (each tarball checked against the registry's `dist.integrity`
   elkjs (EPL-2.0), chevrotain (Apache-2.0), d3 (ISC), d3-sankey (BSD-3-Clause), and MIT for @braintree/sanitize-url,
   @iconify/utils, @mermaid-js/parser, @upsetjs/venn.js, cytoscape-cose-bilkent, cytoscape-fcose, dagre-d3-es, dayjs,
   es-toolkit, katex, khroma, marked, roughjs, stylis, ts-dedent and uuid.
+- **@tauri-apps/api** 2.12.4 (npm `latest`): Apache-2.0 or MIT, https://github.com/tauri-apps/tauri (`core.js`, `core.d.ts`,
+  `event.js`, `event.d.ts` and `external/tslib/tslib.es6.js`, which `core.js` imports; `LICENSE-tauri-apps-api` is its
+  MIT text, `LICENSE-tauri-apps-api-Apache` its Apache-2.0 one). `boot.js` imports `invoke` and `listen` from it, so
+  the window needs no `withGlobalTauri`. `tslib.es6.js` is Microsoft's tslib (0BSD, its notice is the file's own
+  header). Tarball `sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==`
+  (sha256 `ea354409df3dcc473395111a5f6bf0031c8444cf827604515169aa3af5e9357a`).
 
 ## Night City (dead-skills)
 
