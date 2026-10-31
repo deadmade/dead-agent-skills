@@ -13,6 +13,7 @@ import { diff } from './blocks/diff.js';
 import { markdown, mermaidSources } from './blocks/markdown.js';
 import { ahead, mermaid, taskGraph, taskGraphSource } from './blocks/mermaid.js';
 import { stepper } from './blocks/stepper.js';
+import { MAIN, buildChips, filterActivity, followLatest, taskOf } from './session-chips.js';
 
 /**
  * @typedef {import('./api').View} View
@@ -529,6 +530,168 @@ export function createRuntime({
     return slot;
   }
 
+  /** A hosted session's chip choice, by session id, kept while the window is open: a chip's id, or `FOLLOW`. */
+  /** @type {Map<string, string>} */
+  const picks = new Map();
+  const FOLLOW = 'follow';
+  /** What a session with nothing read yet looks like. @type {import('../../bindings/Activity').Activity} */
+  const NOTHING = {
+    turns: [],
+    start: 0,
+    total: 0,
+    agents: [],
+    live: { waiting: null, since: null, left_open: false },
+  };
+
+  /**
+   * One tool call in the output panel; its result is read when it opens.
+   * @param {string} session @param {import('../../bindings/ToolCall').ToolCall} call
+   */
+  function panelCall(session, call) {
+    const out = document.createElement('div');
+    const fold = document.createElement('details');
+    fold.className = call.failed ? 'unfold tool-call failed' : 'unfold tool-call';
+    const head = document.createElement('summary');
+    head.textContent = `${call.tool} ${call.summary}${call.failed ? ' (failed)' : ''}`;
+    fold.append(head, out);
+    fold.addEventListener('toggle', () => {
+      if (!fold.open || out.childNodes.length) return;
+      const note = document.createElement('p');
+      note.className = 'quiet';
+      note.textContent = 'Loading…';
+      out.append(note);
+      data.toolResult(session, call.id).then(
+        (text) => {
+          if (text === null) {
+            note.textContent = 'No result yet, or the transcript no longer holds it.';
+            return;
+          }
+          const pre = document.createElement('pre');
+          pre.textContent = text;
+          out.replaceChildren(pre);
+        },
+        (err) => {
+          note.textContent = `This call's result couldn't be read: ${reason(err)}`;
+        },
+      );
+    });
+    return fold;
+  }
+
+  /**
+   * The panel for a chip that isn't the main one: an agent's replies and calls in time order, its report last, or a
+   * background command's output, read now.
+   * @param {string} session @param {import('../../bindings/Activity').Activity} activity
+   * @param {import('./session-chips.js').Chip} chip
+   */
+  function outputPanel(session, activity, chip) {
+    const panel = document.createElement('div');
+    panel.className = 'session-panel';
+    const title = document.createElement('h2');
+    title.textContent = chip.label;
+    panel.append(title);
+    if (chip.kind === 'background') {
+      const note = document.createElement('p');
+      note.className = 'quiet';
+      note.textContent = 'Loading…';
+      panel.append(note);
+      data.backgroundOutput(session, taskOf(chip)).then(
+        (text) => {
+          if (text === null) {
+            note.textContent = "This command's output can't be read.";
+            return;
+          }
+          const pre = document.createElement('pre');
+          pre.textContent = text;
+          note.replaceWith(pre);
+        },
+        (err) => {
+          note.textContent = `This command's output couldn't be read: ${reason(err)}`;
+        },
+      );
+      return panel;
+    }
+    const { text, tools } = filterActivity(activity, chip);
+    const when = (/** @type {{ at: string }} */ item) => Date.parse(item.at) || 0;
+    const items = [
+      ...text.map((t) => ({ at: t.at, node: () => blocks.markdown(t.text) })),
+      ...tools.map((c) => ({ at: c.at, node: () => panelCall(session, c) })),
+    ].sort((a, b) => when(a) - when(b));
+    if (!items.length) {
+      const note = document.createElement('p');
+      note.className = 'quiet';
+      note.textContent = `Nothing from ${chip.label} yet.`;
+      panel.append(note);
+    }
+    for (const item of items) panel.append(item.node());
+    return panel;
+  }
+
+  /**
+   * A hosted session's output pane: the chips, and under them the Activity view (`sections`, drawn once by this draw)
+   * for the main chip or this panel for any other. Choosing a chip swaps what is under the chips from what this draw
+   * already read (`activity`, `tasks`): the view's elements are kept, so the main chip brings back the same ones.
+   * @param {string} session @param {Node[]} sections
+   * @param {import('../../bindings/Activity').Activity} activity
+   * @param {import('../../bindings/BackgroundTask').BackgroundTask[]} tasks
+   */
+  function sessionOutput(session, sections, activity, tasks) {
+    const chips = buildChips(activity, tasks);
+    const bar = document.createElement('div');
+    bar.className = 'chips';
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', 'Output');
+    bar.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem';
+    const body = document.createElement('div');
+    body.className = 'session-output-body';
+
+    const shown = () => {
+      const pick = picks.get(session) ?? MAIN;
+      const id = pick === FOLLOW ? followLatest(chips) : pick;
+      return chips.find((c) => c.id === id) ?? chips[0];
+    };
+
+    const button = (/** @type {string} */ label) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = label;
+      return b;
+    };
+    const follow = button('Follow latest');
+    follow.dataset.follow = '';
+    follow.addEventListener('click', () => {
+      picks.set(session, picks.get(session) === FOLLOW ? shown().id : FOLLOW);
+      show();
+    });
+    bar.append(
+      ...chips.map((chip) => {
+        const b = button(chip.label);
+        b.dataset.chip = chip.id;
+        b.addEventListener('click', () => {
+          picks.set(session, chip.id);
+          show();
+        });
+        return b;
+      }),
+      follow,
+    );
+
+    function show() {
+      const chip = shown();
+      for (const b of bar.querySelectorAll('[data-chip]')) {
+        b.setAttribute('aria-pressed', String(b instanceof window.HTMLElement && b.dataset.chip === chip.id));
+      }
+      follow.setAttribute('aria-pressed', String(picks.get(session) === FOLLOW));
+      body.replaceChildren(...(chip.kind === 'main' ? sections : [outputPanel(session, activity, chip)]));
+    }
+    show();
+    const box = document.createElement('div');
+    box.className = 'session-output';
+    box.append(bar, body);
+    return box;
+  }
+
   /** The panes `mountPane` made, by session id: each is made once for the window's life, then shown and hidden. */
   /** @type {Map<string, HTMLElement>} */
   const panes = new Map();
@@ -621,9 +784,14 @@ export function createRuntime({
     const shown = entries.filter((e) => slotsOf(e).includes(at.to) || !slotsOf(e).length);
     const wanted = at.to === 'run' ? at.tab : undefined;
     const tab = wanted ? entries.find((e) => e.info.id === wanted && slotsOf(e).includes('run-tab')) : undefined;
-    const [sections, tabSection] = await Promise.all([
+    // A hosted session's chips are built from one read of its turns and background commands per draw.
+    const hostedHere = at.to === 'session' && mountPane !== undefined && hosted.has(at.id);
+    const [sections, tabSection, output] = await Promise.all([
       Promise.all(shown.map((e) => section(e, ctx))),
       tab ? section(tab, ctx) : wanted ? missingTab(wanted) : null,
+      hostedHere
+        ? Promise.all([data.session(at.id).catch(() => null), data.backgroundTasks(at.id).catch(() => null)])
+        : null,
     ]);
     if (listError !== null) {
       root.replaceChildren(card({ title: "The views couldn't be listed.", body: reason(listError), error: true }));
@@ -664,11 +832,13 @@ export function createRuntime({
       if (left.size > 50) left.delete(/** @type {string} */ (left.keys().next().value));
     }
     // A hosted session's tab: its terminal's place beside the view, which is drawn as it is for any other session.
-    if (at.to === 'session' && mountPane && hosted.has(at.id)) {
+    // The chips sit over the view, and a chip other than the main one swaps it for the output panel.
+    if (at.to === 'session' && output) {
       const beside = document.createElement('div');
       beside.className = 'hosted-session';
       beside.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem';
-      beside.append(...sections, terminalSlot(at.id));
+      const [activity, tasks] = output;
+      beside.append(sessionOutput(at.id, sections, activity ?? NOTHING, tasks ?? []), terminalSlot(at.id));
       root.replaceChildren(beside);
     } else root.replaceChildren(...sections);
     const host = sections.map((s) => s.querySelector('[data-slot="run-tab"]')).find(Boolean);

@@ -79,6 +79,7 @@ const { mermaid, ahead, taskGraph, taskGraphSource } = await import('./blocks/me
 const { diff } = await import('./blocks/diff.js');
 const { stepper } = await import('./blocks/stepper.js');
 const { card } = await import('./blocks/card.js');
+const { buildChips, followLatest, filterActivity } = await import('./session-chips.js');
 
 /** Lets the blocks' and the runtime's promises settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -2317,4 +2318,195 @@ test('reload_rehydrates_hosted_sessions_from_the_backend', async () => {
   } finally {
     [globalThis.window, globalThis.document] = shared;
   }
+});
+
+// The Session tab's chips: main, each subagent, each background command.
+const at = (m, s = 0) => `2026-10-31T10:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}Z`;
+const said = (when, agent, text) => ({ at: when, text, agent });
+const called = (id, when, agent) => ({ id, at: when, agent, tool: 'Bash', summary: `run ${id}`, failed: false });
+const agentInfo = (id, description, started = null, ended = null) => ({
+  id,
+  description,
+  kind: null,
+  model: null,
+  started,
+  ended,
+});
+/** Two turns: the main session's, and two subagents' replies and calls merged in, as the core hands them over. */
+const chipActivity = () => ({
+  turns: [
+    {
+      prompt: said(at(0), null, 'build it'),
+      replies: [said(at(1), null, 'main reply'), said(at(4), 'a1', 'report of a1')],
+      tools: [called('t-main', at(2), null), called('t-a1', at(3), 'a1'), called('t-b2', at(7), 'b2')],
+    },
+    { prompt: said(at(5), null, 'then this'), replies: [said(at(6), null, 'main again')], tools: [] },
+  ],
+  start: 0,
+  total: 2,
+  agents: [agentInfo('a1', 'Reviewer', at(3), at(4)), agentInfo('b2', 'Builder', at(7))],
+  live: { waiting: null, since: null, left_open: false },
+});
+const TASKS = [
+  { id: 'bk1', started: at(8) },
+  { id: 'bk2', started: at(2) },
+];
+
+test('builds_one_chip_per_agent_and_background_task', () => {
+  const chips = buildChips(chipActivity(), TASKS);
+  assert.deepEqual(
+    chips.map((c) => [c.kind, c.label]),
+    [
+      ['main', 'Main session'],
+      ['agent', 'Reviewer'],
+      ['agent', 'Builder'],
+      ['background', 'Background bk1'],
+      ['background', 'Background bk2'],
+    ],
+  );
+  assert.equal(new Set(chips.map((c) => c.id)).size, 5, 'every chip has an id of its own');
+  const [main, reviewer, builder, bk1, bk2] = chips;
+  assert.equal(main.id, 'main');
+  assert.equal(reviewer.id, 'a1', 'an agent chip carries its agent id');
+  assert.equal(main.lastActivity, at(6), 'main: the newest of what has no agent, not an agent call at 10:07');
+  assert.equal(reviewer.lastActivity, at(4));
+  assert.equal(builder.lastActivity, at(7));
+  assert.deepEqual([bk1.lastActivity, bk2.lastActivity], [at(8), at(2)]);
+  assert.deepEqual(
+    buildChips({ ...chipActivity(), agents: [], turns: [] }, []).map((c) => c.kind),
+    ['main'],
+    'a session with no agents or commands has the main chip alone',
+  );
+});
+
+test('agent_chip_filters_by_the_agent_field_not_a_separate_fetch', async () => {
+  const activity = chipActivity();
+  const [main, reviewer, builder, bk1] = buildChips(activity, TASKS);
+  const mine = filterActivity(activity, reviewer);
+  assert.deepEqual(
+    mine.text.map((t) => t.text),
+    ['report of a1'],
+  );
+  assert.deepEqual(
+    mine.tools.map((t) => t.id),
+    ['t-a1'],
+  );
+  assert.deepEqual(
+    filterActivity(activity, builder).tools.map((t) => t.id),
+    ['t-b2'],
+  );
+  assert.deepEqual(
+    filterActivity(activity, main).text.map((t) => t.text),
+    ['build it', 'main reply', 'then this', 'main again'],
+    'the main chip is what has no agent',
+  );
+  assert.deepEqual(filterActivity(activity, bk1), { text: [], tools: [] }, 'a command has no activity to filter');
+
+  // In the window: one read of the session per draw, however often the user switches chips.
+  const app = fakeApp(sessionViews());
+  app.answers.session = () => activity;
+  app.answers.background_tasks = () => TASKS;
+  app.answers.background_output = () => 'out';
+  const { root } = await hostedStart(app, SESSION);
+  const reads = () => app.calls.filter(([cmd]) => cmd === 'session').length;
+  assert.equal(reads(), 1);
+  for (const id of ['a1', 'b2', 'main', 'a1']) {
+    root.querySelector(`[data-chip="${id}"]`).click();
+    await settle();
+  }
+  assert.equal(reads(), 1, 'switching chips never asks for the session again');
+  assert.equal(app.calls.filter(([cmd]) => cmd === 'background_tasks').length, 1);
+});
+
+test('follow_latest_picks_the_newest', () => {
+  const chip = (id, lastActivity) => ({ id, label: id, kind: 'agent', lastActivity });
+  const chips = [chip('first', at(3)), chip('newest', at(9)), chip('last', at(5))];
+  assert.equal(followLatest(chips), 'newest', 'neither the first nor the last of the list');
+  assert.equal(followLatest(chips.toReversed()), 'newest');
+  // Compared as times, not as text: `.500Z` sorts before `Z` as a string.
+  assert.equal(followLatest([chip('whole', '2026-10-31T10:05:00Z'), chip('half', '2026-10-31T10:05:00.500Z')]), 'half');
+  assert.equal(followLatest([chip('x', ''), chip('y', at(1))]), 'y', 'a chip with no activity loses');
+  assert.equal(followLatest([]), 'main');
+  const real = buildChips(chipActivity(), TASKS);
+  assert.equal(followLatest(real), 'background:bk1', 'a background command can be the newest');
+});
+
+/** A hosted session whose tab has agents and background commands. */
+async function chipsStart() {
+  const app = fakeApp(sessionViews());
+  app.answers.session = () => chipActivity();
+  app.answers.background_tasks = () => TASKS;
+  app.answers.background_output = (a) => (a.taskId === 'bk1' ? 'building…\n[exited with code 0]' : 'other');
+  const started = await hostedStart(app, SESSION);
+  return { app, ...started };
+}
+
+test('selecting_main_shows_the_unmodified_activity_view', async () => {
+  const { root } = await chipsStart();
+  const activity = section(root, 'session');
+  assert.equal(activity.textContent, 'activity', 'by default the view is drawn as Task 7 built it');
+  assert.equal(root.querySelector('.session-panel'), null);
+  assert.deepEqual(
+    [...root.querySelectorAll('[data-chip]')].map((b) => b.dataset.chip),
+    ['main', 'a1', 'b2', 'background:bk1', 'background:bk2'],
+  );
+  assert.equal(root.querySelector('[data-chip="main"]').getAttribute('aria-pressed'), 'true');
+  root.querySelector('[data-chip="a1"]').click();
+  assert.equal(section(root, 'session'), null);
+  root.querySelector('[data-chip="main"]').click();
+  assert.equal(section(root, 'session'), activity, 'the very same view element is back, not a redraw of it');
+  assert.equal(root.querySelector('.session-panel'), null);
+  assert.ok(root.querySelector('[data-terminal-slot]'), 'and the terminal slot is untouched');
+});
+
+test('selecting_another_chip_replaces_it_with_the_panel', async () => {
+  const { app, root, terminals } = await chipsStart();
+  const slot = root.querySelector('[data-terminal-slot]');
+  root.querySelector('[data-chip="a1"]').click();
+  assert.equal(section(root, 'session'), null, 'the Activity view is gone');
+  const panel = root.querySelector('.session-panel');
+  assert.ok(panel.textContent.includes('report of a1'));
+  assert.ok(panel.textContent.includes('run t-a1'));
+  assert.ok(!panel.textContent.includes('main reply'), 'only that agent');
+  assert.ok(!panel.textContent.includes('run t-b2'));
+  assert.equal(root.querySelector('[data-chip="a1"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(root.querySelector('[data-terminal-slot]'), slot, 'the terminal slot stays where it was');
+  assert.equal(terminals.childElementCount, 1);
+
+  // A call's result is read when its fold opens.
+  app.answers.tool_result = (a) => `result of ${a.tool}`;
+  const fold = panel.querySelector('details');
+  fold.open = true;
+  fold.dispatchEvent(new dom.window.Event('toggle'));
+  await until(() => panel.textContent.includes('result of t-a1'), "the call's result");
+  assert.deepEqual(
+    app.calls.find(([cmd]) => cmd === 'tool_result')[1],
+    { session: SESSION_ID, tool: 't-a1' },
+    'asked of the session the call is in',
+  );
+
+  // A background command shows what it has written.
+  root.querySelector('[data-chip="background:bk1"]').click();
+  await until(() => root.querySelector('.session-panel')?.textContent.includes('[exited with code 0]'), 'its output');
+  assert.deepEqual(
+    app.calls.find(([cmd]) => cmd === 'background_output')[1],
+    { session: SESSION_ID, taskId: 'bk1' },
+    'asked by the task id, not the chip id',
+  );
+
+  // Follow latest picks the chip with the newest activity (the command at 10:08) and stays pressed.
+  root.querySelector('[data-chip="main"]').click();
+  assert.equal(root.querySelector('.session-panel'), null);
+  root.querySelector('[data-follow]').click();
+  await until(() => root.querySelector('.session-panel')?.textContent.includes('[exited with code 0]'), 'following');
+  assert.equal(root.querySelector('[data-follow]').getAttribute('aria-pressed'), 'true');
+  assert.equal(root.querySelector('[data-chip="background:bk1"]').getAttribute('aria-pressed'), 'true');
+});
+
+test('a_session_that_is_not_hosted_has_no_chips', async () => {
+  const app = fakeApp(sessionViews());
+  app.answers.session = () => chipActivity();
+  const { root } = await started(app, SESSION);
+  assert.equal(root.querySelector('[data-chip]'), null);
+  assert.equal(app.calls.filter(([cmd]) => cmd === 'session').length, 0, 'and the runtime reads nothing of its own');
 });
