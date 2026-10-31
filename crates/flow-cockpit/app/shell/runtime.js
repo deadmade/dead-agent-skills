@@ -245,12 +245,15 @@ function missingTab(id) {
 }
 
 /**
- * @param {{ root: HTMLElement, invoke: Invoke, listen: Listen, importModule?: (url: string) => Promise<any>, renderTimeout?: number, hosted?: ReadonlySet<string>, mountPane?: (id: string) => HTMLElement }} app
+ * @param {{ root: HTMLElement, invoke: Invoke, listen: Listen, importModule?: (url: string) => Promise<any>, renderTimeout?: number, hosted?: ReadonlySet<string>, mountPane?: (id: string) => HTMLElement, resume?: (id: string) => Promise<void> }} app
  *   `renderTimeout`: how long a view's render may take, in ms, before it shows as broken.
  *   `hosted`: the ids of the sessions this app runs, which the shell keeps current (a set the runtime only reads);
  *   `mountPane`: makes the terminal of one of them, an element in `#terminals`. The runtime calls it once per id, the first
  *   time that session's tab is drawn, and from then on only places and hides what it returned. Both are the shell's: a
  *   view's `ctx` has neither, nor anything that reaches the session.
+ *   `resume`: runs the session again (the shell's `resumeSession`, which also adds it to `hosted`). With it, the screen of
+ *   a session not in `hosted` has a Resume button; without it there is none. Like `mountPane` it is the shell's, so it
+ *   is on no view's `ctx`.
  */
 export function createRuntime({
   root,
@@ -260,6 +263,7 @@ export function createRuntime({
   renderTimeout = 5000,
   hosted = new Set(),
   mountPane,
+  resume,
 }) {
   /** The projects as of the current draw: one `projects` call per draw, for the runtime and the views alike. */
   /** @type {Promise<import('../../bindings/Project').Project[]> | null} */
@@ -529,6 +533,39 @@ export function createRuntime({
     slot.dataset.terminalSlot = id;
     slot.style.minHeight = '24rem';
     return slot;
+  }
+
+  /**
+   * The Resume button of a session this app doesn't run, drawn beside its Activity view. A resume that works is drawn
+   * again, now as a hosted session; one that fails says why and can be tried again.
+   * @param {string} id @param {(id: string) => Promise<void>} run
+   */
+  function resumeBar(id, run) {
+    const bar = document.createElement('div');
+    bar.className = 'resume-bar';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.resume = '';
+    button.textContent = 'Resume';
+    const problem = document.createElement('p');
+    problem.className = 'error';
+    problem.setAttribute('role', 'alert');
+    problem.hidden = true;
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      problem.hidden = true;
+      try {
+        await run(id);
+      } catch (err) {
+        problem.textContent = `The session didn't resume: ${reason(err)}`;
+        problem.hidden = false;
+        button.disabled = false;
+        return;
+      }
+      requestDraw();
+    });
+    bar.append(button, problem);
+    return bar;
   }
 
   /** A hosted session's chip choice, by session id, kept while the window is open: a chip's id, or `FOLLOW`. */
@@ -849,7 +886,9 @@ export function createRuntime({
       const [activity, tasks, run] = output;
       beside.append(sessionOutput(at.id, sections, activity ?? NOTHING, tasks ?? [], run), terminalSlot(at.id));
       root.replaceChildren(beside);
-    } else root.replaceChildren(...sections);
+    } else if (at.to === 'session' && resume && !hosted.has(at.id))
+      root.replaceChildren(resumeBar(at.id, resume), ...sections);
+    else root.replaceChildren(...sections);
     const host = sections.map((s) => s.querySelector('[data-slot="run-tab"]')).find(Boolean);
     // A tab no run-tab view draws says so in the slot; a run view that leaves no slot draws that tab itself.
     if (tab) (host ?? root).append(/** @type {Node} */ (tabSection));

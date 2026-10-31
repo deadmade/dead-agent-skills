@@ -444,6 +444,26 @@ fn session_reads_its_activity() {
 }
 
 #[test]
+fn session_cwd_round_trips_through_indexing() {
+    let w = World::new("cwd");
+    let mut index = w.index();
+    assert_eq!(index.session_cwd("s-link"), Some(w.path("work/alpha")));
+    assert_eq!(
+        index.session_cwd("s-wt"),
+        Some(w.path("work/alpha/.claude/worktrees/x")),
+        "a worktree session's own folder, not its project's checkout"
+    );
+    assert!(index.session_cwd("nope").is_none());
+    let alpha = project(&index, "alpha");
+    index.rebuild_project(&alpha.id, now());
+    assert_eq!(
+        index.session_cwd("s-wt"),
+        Some(w.path("work/alpha/.claude/worktrees/x")),
+        "still there after a project's sessions are reused, not read again"
+    );
+}
+
+#[test]
 fn run_statuses_come_from_documents_and_transcripts() {
     let w = World::new("statuses");
     let alpha = project(&w.index(), "alpha");

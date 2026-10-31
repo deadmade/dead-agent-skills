@@ -224,6 +224,13 @@ impl Index {
         Some(self.sessions.get(id)?.path.clone())
     }
 
+    /// The folder the session ran in, read off its transcript while indexing: where `claude --resume` has to be run
+    /// to find it. `None` for a session the index doesn't know.
+    #[must_use]
+    pub fn session_cwd(&self, id: &str) -> Option<PathBuf> {
+        Some(self.sessions.get(id)?.cwd.clone())
+    }
+
     /// The projects whose sessions Claude Code writes into the transcript folder named `folder` (a name directly
     /// under its projects folder): each project with a root of that name, and each with a session read from there,
     /// which is how a session started in a folder under a root is found. The name is never matched by its start:
@@ -297,6 +304,7 @@ impl Index {
                 Session {
                     path,
                     dir: dir.to_path_buf(),
+                    cwd: head.cwd,
                     project: identity.id,
                     mtime: at,
                     started: head.started.unwrap_or_else(|| at.to_string()),

@@ -15,7 +15,7 @@ import { mountStartForm } from './start-form.js';
 
 /**
  * @typedef {import('./api').ShellApi & {
- *   resumeSession(cwd: string, id: string, cols: number, rows: number): Promise<string>,
+ *   resumeSession(id: string, cols: number, rows: number): Promise<string>,
  *   sendInput(id: string, bytes: number[]): Promise<void>,
  *   resizeSession(id: string, cols: number, rows: number): Promise<void>,
  *   subscribeSession(id: string, onChunk: (bytes: ArrayLike<number>) => void): Promise<void>,
@@ -42,8 +42,9 @@ const shell = Object.freeze(
       hosted.add(id);
       return id;
     },
-    resumeSession: async (cwd, id, cols, rows) => {
-      const resumed = await invoke('resume_session', { cwd, id, cols, rows, onOutput: new Channel() });
+    // The folder isn't asked for: the app knows where each session ran, and says so when it doesn't.
+    resumeSession: async (id, cols, rows) => {
+      const resumed = await invoke('resume_session', { id, cols, rows, onOutput: new Channel() });
       hosted.add(resumed);
       return resumed;
     },
@@ -80,6 +81,8 @@ const runtime = createRuntime({
   listen,
   hosted,
   mountPane: (id) => mountSessionPane(id, paneApi).element,
+  // The terminal pane isn't there yet to measure: its fit sends the real size as soon as it mounts.
+  resume: async (id) => void (await shell.resumeSession(id, 80, 24)),
 });
 
 // Listening first: a close the app holds back waits for this dialog, so a window that couldn't show it would not close.

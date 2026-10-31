@@ -123,6 +123,8 @@
         buildAndTestSubdir = "app";
         nativeBuildInputs = with pkgs; [pkg-config wrapGAppsHook3];
         buildInputs = with pkgs; [webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
+        # The hosted-session tests start a command in a session of its own with `setsid`, which the build's PATH lacks.
+        nativeCheckInputs = [pkgs.util-linux];
         # These time the poll against file changes and the clock; they run in a local `cargo test`, not in the sandboxed
         # build.
         checkFlags = map (t: "--skip=${t}") ["poll_emits_once_per_change" "poll_sees_folders_created_later" "first_paint_before_link_scan"];

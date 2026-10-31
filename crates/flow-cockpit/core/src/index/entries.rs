@@ -111,6 +111,9 @@ pub(crate) struct Session {
     pub path: PathBuf,
     /// The `~/.claude/projects/<dir>` folder holding the transcript.
     pub dir: PathBuf,
+    /// The folder the session ran in, as its transcript says. Kept inside the index only: no summary or binding
+    /// carries it, so no view sees it.
+    pub cwd: PathBuf,
     pub project: String,
     pub mtime: Timestamp,
     pub started: String,

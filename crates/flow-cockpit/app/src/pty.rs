@@ -636,16 +636,34 @@ pub fn start_session(
     Ok(id.to_string())
 }
 
+/// Resumes the session `id` in the folder the index read off its transcript: the window never says where. A session the
+/// index has no folder for is an error, not a guess at one.
+pub(crate) fn resume_by_id(
+    sessions: &HostedSessions,
+    shared: &Shared,
+    id: &str,
+    cols: u16,
+    rows: u16,
+) -> Result<Uuid, String> {
+    let uuid = parse_id(id)?;
+    let cwd = shared
+        .read()
+        .session_cwd(&uuid.to_string())
+        .ok_or_else(|| format!("no folder known for session {uuid}"))?;
+    sessions.resume(&cwd, uuid, cols, rows)
+}
+
+/// Runs `claude --resume` for a session the app didn't host, in its own folder; its output streams to `on_output`.
 #[tauri::command(async)]
 pub fn resume_session(
     sessions: Sessions<'_>,
-    cwd: String,
+    shared: State<'_, Arc<Shared>>,
     id: String,
     cols: u16,
     rows: u16,
     on_output: Channel<InvokeResponseBody>,
 ) -> Result<String, String> {
-    let id = sessions.resume(Path::new(&cwd), parse_id(&id)?, cols, rows)?;
+    let id = resume_by_id(&sessions, &shared, &id, cols, rows)?;
     sessions.subscribe(id, to_channel(on_output))?;
     Ok(id.to_string())
 }
@@ -1150,6 +1168,39 @@ mod tests {
             text.contains("TERM:xterm-256color truecolor\r\n"),
             "{text:?}"
         );
+    }
+
+    #[test]
+    fn resume_session_resolves_the_folder_by_id_and_errors_for_an_unknown_one() {
+        let dir = Dir::new("resume-by-id");
+        let hosted = confined(&fixtures().claude_dir, "/nonexistent/shell");
+        let known = Uuid::new_v4();
+        let shared = shared_over(&dir.0, &[(known, secs(600))]);
+        assert_eq!(
+            resume_by_id(&hosted, &shared, &known.to_string(), 90, 25).unwrap(),
+            known
+        );
+        wait_until("the report", || screen(&hosted, known).contains("TERM:"));
+        let text = screen(&hosted, known);
+        assert!(
+            text.contains(&format!("ARGS:--resume {known}\r\n")),
+            "{text:?}"
+        );
+        assert!(
+            text.contains(&format!("CWD:{}\r\n", dir.0.join("work/alpha").display())),
+            "the session's own folder, found by its id: {text:?}"
+        );
+
+        let unknown = Uuid::new_v4();
+        let err = resume_by_id(&hosted, &shared, &unknown.to_string(), 80, 24).unwrap_err();
+        assert!(err.contains("no folder known"), "{err}");
+        assert!(
+            hosted.ids().iter().all(|id| *id != unknown),
+            "nothing was started for it"
+        );
+        let err = resume_by_id(&hosted, &shared, "not-a-uuid", 80, 24).unwrap_err();
+        assert!(err.contains("not a session id"), "{err}");
+        hosted.kill_all();
     }
 
     #[test]

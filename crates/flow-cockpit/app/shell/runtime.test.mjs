@@ -2026,7 +2026,7 @@ const sessionViews = () => ({
  * Starts the runtime with a `#terminals` beside the root, `ids` hosted, and a `mountPane` that adds a bare div there
  * (or the one given).
  */
-async function hostedStart(app, route, { ids = [SESSION_ID], mountPane } = {}) {
+async function hostedStart(app, route, { ids = [SESSION_ID], mountPane, resume } = {}) {
   const root = freshRoot();
   const terminals = document.createElement('div');
   terminals.id = 'terminals';
@@ -2049,6 +2049,7 @@ async function hostedStart(app, route, { ids = [SESSION_ID], mountPane } = {}) {
     importModule: importBlob,
     hosted,
     mountPane: mount,
+    resume,
   });
   await runtime.start(route);
   return { root, runtime, terminals, hosted, mounts };
@@ -2088,6 +2089,57 @@ test('a_view_cannot_read_a_sessions_terminal_output', async () => {
   for (const name of ['scrollback', 'sendInput', 'subscribeSession', 'hostedSessions', 'startSession']) {
     assert.ok(!keys.includes(name), `ctx.data has no ${name}`);
   }
+});
+
+test('an_already_hosted_sessions_screen_shows_its_terminal_not_a_resume_button', async () => {
+  const resumed = [];
+  const { root, mounts } = await hostedStart(fakeApp(sessionViews()), SESSION, {
+    resume: async (id) => void resumed.push(id),
+  });
+  assert.ok(root.querySelector(`[data-terminal-slot="${SESSION_ID}"]`), 'its terminal is drawn');
+  assert.deepEqual(mounts, [SESSION_ID]);
+  assert.equal(root.querySelector('[data-resume]'), null, 'and no Resume button');
+  assert.deepEqual(resumed, []);
+});
+
+test('resume_button_calls_resume_with_the_sessions_id', async () => {
+  const resumed = [];
+  /** The shell's callback hosts the session, as `shell.resumeSession` does. */
+  const resume = async (id) => {
+    resumed.push(id);
+    hosted.add(id);
+  };
+  const { root, hosted, mounts } = await hostedStart(fakeApp(sessionViews()), SESSION, { ids: [], resume });
+  const button = root.querySelector('[data-resume]');
+  assert.equal(button.textContent, 'Resume');
+  assert.equal(section(root, 'session')?.textContent, 'activity', 'beside the Activity view, which is drawn as before');
+  assert.equal(root.querySelector('[data-terminal-slot]'), null, 'no terminal until it runs');
+  assert.deepEqual(mounts, []);
+  button.click();
+  await until(() => root.querySelector(`[data-terminal-slot="${SESSION_ID}"]`), 'the terminal');
+  assert.deepEqual(resumed, [SESSION_ID], "with the session's own id, once");
+  assert.equal(root.querySelector('[data-resume]'), null, 'the button is gone once it runs');
+  assert.deepEqual(mounts, [SESSION_ID], 'its pane is mounted');
+});
+
+test('a_resume_that_fails_says_why_and_can_be_tried_again', async () => {
+  const resume = async () => {
+    throw new Error('no folder known for session x');
+  };
+  const { root, mounts } = await hostedStart(fakeApp(sessionViews()), SESSION, { ids: [], resume });
+  root.querySelector('[data-resume]').click();
+  await until(() => root.querySelector('[role="alert"]'), 'the reason');
+  assert.match(root.querySelector('[role="alert"]').textContent, /no folder known for session x/);
+  assert.equal(root.querySelector('[data-resume]').disabled, false, 'it can be tried again');
+  assert.deepEqual(mounts, []);
+});
+
+test('a_view_has_no_resume_on_its_context', async () => {
+  const app = fakeApp({
+    session: { source: view('session', 'session', 'return document.createTextNode(Object.keys(ctx).join(","));') },
+  });
+  const { root } = await hostedStart(app, SESSION, { ids: [], resume: async () => {} });
+  assert.ok(!section(root, 'session').textContent.includes('resume'));
 });
 
 test('a_view_cannot_get_a_pane_laid_over_its_own_element', async () => {
