@@ -10,6 +10,7 @@ mod bindings;
 mod commands;
 mod paths;
 mod poll;
+mod pty;
 mod strip;
 mod trust;
 mod views;
@@ -23,7 +24,7 @@ use std::thread;
 use flow_cockpit_core::index::{Home, Index};
 use include_dir::{Dir, include_dir};
 use jiff::Timestamp;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 use crate::commands::Shared;
 use crate::paths::{Defaults, NoHome, Platform};
@@ -109,8 +110,16 @@ fn run() -> ExitCode {
             commands::views,
             commands::view_source,
             commands::extensions,
+            pty::start_session,
+            pty::resume_session,
+            pty::send_input,
+            pty::resize_session,
+            pty::kill_session,
+            pty::hosted_sessions,
+            pty::scrollback,
         ])
         .setup(move |app| {
+            app.manage(pty::emitting_exits(app.handle().clone()));
             let handle = app.handle().clone();
             let mut poller = Poller::new(home, settings, &poll_shared);
             thread::spawn(move || {
