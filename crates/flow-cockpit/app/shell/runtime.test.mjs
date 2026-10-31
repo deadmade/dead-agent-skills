@@ -80,6 +80,7 @@ const { diff } = await import('./blocks/diff.js');
 const { stepper } = await import('./blocks/stepper.js');
 const { card } = await import('./blocks/card.js');
 const { buildChips, followLatest, filterActivity } = await import('./session-chips.js');
+const { findLinkedRun, renderRunBar } = await import('./run-bar.js');
 
 /** Lets the blocks' and the runtime's promises settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -2509,4 +2510,128 @@ test('a_session_that_is_not_hosted_has_no_chips', async () => {
   const { root } = await started(app, SESSION);
   assert.equal(root.querySelector('[data-chip]'), null);
   assert.equal(app.calls.filter(([cmd]) => cmd === 'session').length, 0, 'and the runtime reads nothing of its own');
+});
+
+// The run bar: a hosted session's linked flow run on its Session tab.
+const entryOf = (slug, last_activity) => ({ kind: 'FlowRun', slug, last_activity });
+/** A run as `flow_run` answers it: phases and gates, the plan's tasks, the ledger's states, the sessions. */
+const barRun = (sessions = [SESSION_ID]) => ({
+  summary: { slug: 'cockpit', now: 'Task 2 is in review.' },
+  flow: {
+    phase: 'build',
+    now: 'Task 2 is in review.',
+    gates: [
+      { n: 1, what: 'the plan', approved: '2026-10-28', reopened: false, raw: '' },
+      { n: 2, what: 'the build', approved: null, reopened: false, raw: '' },
+    ],
+    phases: [
+      { key: 'plan', name: 'Plan', state: 'Done', gate_after: 1 },
+      { key: 'build', name: 'Build', state: 'Now', gate_after: 2 },
+      { key: 'ship', name: 'Ship', state: 'Later', gate_after: null },
+    ],
+  },
+  plan: {
+    title: null,
+    tasks: ['1', '2', '2b', '3'].map((id) => ({ id, title: `Title ${id}`, does: null, depends_on: [], markdown: '' })),
+  },
+  ledger: {
+    plan: null,
+    rulings: [],
+    tasks: [
+      ['1', 'Done'],
+      ['2', 'Review'],
+    ].map(([id, state]) => ({ id, state, fix_rounds: 0, security: [], later: [], story: [], model: null })),
+  },
+  sessions,
+});
+/** A data object over `entries` and `runs` (slug to FlowRun); it records which runs `flowRun` was asked for. */
+const barData = (entries, runs) => {
+  const asked = [];
+  return {
+    asked,
+    entries: async () => entries,
+    flowRun: async (_project, slug) => (asked.push(slug), runs[slug] ?? null),
+  };
+};
+
+test('find_linked_run_matches_by_the_sessions_list', async () => {
+  const entries = [
+    entryOf('old', at(1)),
+    { kind: 'Loose', id: SESSION_ID, last_activity: at(59) },
+    entryOf('newest-without', at(30)),
+    { kind: 'Audit', slug: 'audit', last_activity: at(58) },
+    entryOf('middle', at(20)),
+  ];
+  const runs = {
+    old: { ...barRun([SESSION_ID]), summary: { slug: 'old' } },
+    'newest-without': barRun([OTHER_ID]),
+    middle: { ...barRun([OTHER_ID, SESSION_ID]), summary: { slug: 'middle' } },
+  };
+  const data = barData(entries, runs);
+  const found = await findLinkedRun(data, 'p1', SESSION_ID);
+  assert.equal(found.summary.slug, 'middle', 'the newest run whose sessions list holds the id');
+  assert.deepEqual(data.asked, ['newest-without', 'middle'], 'newest first, and it stops at the first match');
+});
+
+test('find_linked_run_is_null_for_a_loose_session', async () => {
+  const data = barData([entryOf('a', at(2)), { kind: 'Loose', id: SESSION_ID, last_activity: at(3) }], {
+    a: barRun([OTHER_ID]),
+  });
+  assert.equal(await findLinkedRun(data, 'p1', SESSION_ID), null);
+  assert.deepEqual(data.asked, ['a'], 'only flow runs are read');
+  assert.equal(await findLinkedRun(barData([], {}), 'p1', SESSION_ID), null, 'a project with no runs');
+});
+
+test('run_bar_shows_the_current_task_and_now_line', () => {
+  const bar = renderRunBar(barRun());
+  document.body.replaceChildren(bar);
+  assert.match(bar.querySelector('.track-text').textContent, /Build, phase 2 of 3/, 'the shared phase stepper');
+  assert.deepEqual(
+    [...bar.querySelectorAll('.run-bar-tasks .seg')].map((s) => s.className),
+    ['seg done', 'seg current', 'seg', 'seg'],
+    'a segment per plan task: done, in progress, not started',
+  );
+  assert.match(bar.querySelector('.run-bar-task').textContent, /Task 2: Title 2/);
+  assert.match(bar.querySelector('.run-bar-task').textContent, /in review/i);
+  assert.equal(bar.querySelector('.run-bar-now').textContent, 'now: Task 2 is in review.');
+  // Text from the run is text, never markup.
+  const hostile = barRun();
+  hostile.flow.now = '<img src=x onerror=alert(1)>';
+  const again = renderRunBar(hostile);
+  assert.equal(again.querySelector('img'), null);
+  assert.equal(again.querySelector('.run-bar-now').textContent, 'now: <img src=x onerror=alert(1)>');
+  // No plan, no ledger, no `now:`: the bar says only what it has.
+  const bare = barRun();
+  Object.assign(bare, { plan: null, ledger: null });
+  bare.flow.now = null;
+  const quiet = renderRunBar(bare);
+  assert.equal(quiet.querySelector('.run-bar-tasks'), null);
+  assert.equal(quiet.querySelector('.run-bar-task'), null);
+  assert.equal(quiet.querySelector('.run-bar-now'), null);
+});
+
+test('a_hosted_sessions_linked_run_shows_the_run_bar_and_numbers_its_subagent_chips', async () => {
+  const app = fakeApp(sessionViews());
+  const activity = chipActivity();
+  activity.agents = [agentInfo('a1', 'Implement Task 2b: the fix', at(3), at(4)), agentInfo('b2', 'Builder', at(7))];
+  app.answers.session = () => activity;
+  app.answers.background_tasks = () => [];
+  app.answers.entries = () => [entryOf('cockpit', at(5))];
+  app.answers.flow_run = () => barRun();
+  const { root } = await hostedStart(app, SESSION);
+  assert.ok(root.querySelector('.run-bar .stepper'), 'the run bar is on the Session tab');
+  assert.equal(root.querySelector('.run-bar-now').textContent, 'now: Task 2 is in review.');
+  assert.match(root.querySelector('[data-chip="a1"]').textContent, /task 2b/i, 'a chip names its plan task');
+  assert.equal(root.querySelector('[data-chip="b2"]').textContent, 'Builder', 'one that names none is left alone');
+  assert.equal(root.querySelector('[data-chip="main"]').textContent, 'Main session');
+
+  // A session no run lists has no bar and plain chips.
+  const loose = fakeApp(sessionViews());
+  loose.answers.session = () => activity;
+  loose.answers.background_tasks = () => [];
+  loose.answers.entries = () => [entryOf('cockpit', at(5))];
+  loose.answers.flow_run = () => barRun([OTHER_ID]);
+  const { root: plain } = await hostedStart(loose, SESSION);
+  assert.equal(plain.querySelector('.run-bar'), null);
+  assert.equal(plain.querySelector('[data-chip="a1"]').textContent, 'Implement Task 2b: the fix');
 });

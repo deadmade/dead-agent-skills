@@ -13,6 +13,7 @@ import { diff } from './blocks/diff.js';
 import { markdown, mermaidSources } from './blocks/markdown.js';
 import { ahead, mermaid, taskGraph, taskGraphSource } from './blocks/mermaid.js';
 import { stepper } from './blocks/stepper.js';
+import { findLinkedRun, renderRunBar, taskNumbers } from './run-bar.js';
 import { MAIN, buildChips, filterActivity, followLatest, taskOf } from './session-chips.js';
 
 /**
@@ -634,9 +635,11 @@ export function createRuntime({
    * @param {string} session @param {Node[]} sections
    * @param {import('../../bindings/Activity').Activity} activity
    * @param {import('../../bindings/BackgroundTask').BackgroundTask[]} tasks
+   * @param {import('../../bindings/FlowRun').FlowRun | null} run the flow run the session is linked to, if any
    */
-  function sessionOutput(session, sections, activity, tasks) {
+  function sessionOutput(session, sections, activity, tasks, run) {
     const chips = buildChips(activity, tasks);
+    const numbers = run ? taskNumbers(run, activity.agents) : new Map();
     const bar = document.createElement('div');
     bar.className = 'chips';
     bar.setAttribute('role', 'group');
@@ -666,7 +669,7 @@ export function createRuntime({
     });
     bar.append(
       ...chips.map((chip) => {
-        const b = button(chip.label);
+        const b = button(numbers.has(chip.id) ? `${chip.label} · task ${numbers.get(chip.id)}` : chip.label);
         b.dataset.chip = chip.id;
         b.addEventListener('click', () => {
           picks.set(session, chip.id);
@@ -688,6 +691,7 @@ export function createRuntime({
     show();
     const box = document.createElement('div');
     box.className = 'session-output';
+    if (run) box.append(renderRunBar(run));
     box.append(bar, body);
     return box;
   }
@@ -784,13 +788,18 @@ export function createRuntime({
     const shown = entries.filter((e) => slotsOf(e).includes(at.to) || !slotsOf(e).length);
     const wanted = at.to === 'run' ? at.tab : undefined;
     const tab = wanted ? entries.find((e) => e.info.id === wanted && slotsOf(e).includes('run-tab')) : undefined;
-    // A hosted session's chips are built from one read of its turns and background commands per draw.
+    // A hosted session's chips are built from one read of its turns and background commands per draw, and its run bar
+    // from the flow run that lists it.
     const hostedHere = at.to === 'session' && mountPane !== undefined && hosted.has(at.id);
     const [sections, tabSection, output] = await Promise.all([
       Promise.all(shown.map((e) => section(e, ctx))),
       tab ? section(tab, ctx) : wanted ? missingTab(wanted) : null,
       hostedHere
-        ? Promise.all([data.session(at.id).catch(() => null), data.backgroundTasks(at.id).catch(() => null)])
+        ? Promise.all([
+            data.session(at.id).catch(() => null),
+            data.backgroundTasks(at.id).catch(() => null),
+            findLinkedRun(data, at.project, at.id).catch(() => null),
+          ])
         : null,
     ]);
     if (listError !== null) {
@@ -837,8 +846,8 @@ export function createRuntime({
       const beside = document.createElement('div');
       beside.className = 'hosted-session';
       beside.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem';
-      const [activity, tasks] = output;
-      beside.append(sessionOutput(at.id, sections, activity ?? NOTHING, tasks ?? []), terminalSlot(at.id));
+      const [activity, tasks, run] = output;
+      beside.append(sessionOutput(at.id, sections, activity ?? NOTHING, tasks ?? [], run), terminalSlot(at.id));
       root.replaceChildren(beside);
     } else root.replaceChildren(...sections);
     const host = sections.map((s) => s.querySelector('[data-slot="run-tab"]')).find(Boolean);
