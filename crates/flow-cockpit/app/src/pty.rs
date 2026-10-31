@@ -595,6 +595,25 @@ pub fn kill_session(sessions: Sessions<'_>, id: String) -> Result<(), String> {
     sessions.kill(parse_id(&id)?)
 }
 
+/// Connects a fresh `on_output` to a session that is already running (or has exited): what it wrote so far is replayed,
+/// then the rest streams. A pane calls this when it mounts, a started session's first time and a reloaded window's again.
+#[tauri::command(async)]
+pub fn subscribe_session(
+    sessions: Sessions<'_>,
+    id: String,
+    on_output: Channel<InvokeResponseBody>,
+) -> Result<(), String> {
+    subscribe_by_id(&sessions, &id, to_channel(on_output))
+}
+
+fn subscribe_by_id(
+    sessions: &HostedSessions,
+    id: &str,
+    sink: impl FnMut(&[u8]) -> bool + Send + 'static,
+) -> Result<(), String> {
+    sessions.subscribe(parse_id(id)?, sink)
+}
+
 #[tauri::command(async)]
 pub fn hosted_sessions(sessions: Sessions<'_>) -> Vec<String> {
     sessions.ids().iter().map(Uuid::to_string).collect()
@@ -1054,6 +1073,56 @@ mod tests {
             shell: None,
         };
         assert_eq!(env.login_path("claude"), None, "the inherited PATH had it");
+    }
+
+    /// What `subscribe_session` runs: a window that reloaded re-attaches a fresh sink to a session still running.
+    #[test]
+    fn subscribe_session_reattaches_to_a_running_session_by_its_id_string() {
+        let dir = Dir::new("resubscribe");
+        let hosted = sessions();
+        let id = Uuid::new_v4();
+        hosted
+            .launch(
+                id,
+                &sh("echo before; sleep 0.4; echo after", &[]),
+                &dir.0,
+                80,
+                24,
+            )
+            .unwrap();
+        wait_until("the first line", || screen(&hosted, id).contains("before"));
+        let first = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&first);
+        subscribe_by_id(&hosted, &id.to_string(), move |chunk| {
+            lock(&sink).extend_from_slice(chunk);
+            true
+        })
+        .unwrap();
+        // The page reloads: the first channel is gone (its sink says so), and a fresh one is attached.
+        let second = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&second);
+        subscribe_by_id(&hosted, &id.to_string(), move |chunk| {
+            lock(&sink).extend_from_slice(chunk);
+            true
+        })
+        .unwrap();
+        wait_until("the later line", || contains(&lock(&second), "after"));
+        let text = String::from_utf8(lock(&second).clone()).unwrap();
+        assert_eq!(
+            text.matches("before").count(),
+            1,
+            "the backlog is replayed once: {text:?}"
+        );
+        assert!(
+            !contains(&lock(&first), "after"),
+            "the replaced sink still receives output"
+        );
+
+        let sink = |_: &[u8]| true;
+        let err = subscribe_by_id(&hosted, "not-a-uuid", sink).unwrap_err();
+        assert!(err.contains("not a session id"), "{err}");
+        let err = subscribe_by_id(&hosted, &Uuid::new_v4().to_string(), sink).unwrap_err();
+        assert!(err.contains("no hosted session"), "{err}");
     }
 
     #[test]

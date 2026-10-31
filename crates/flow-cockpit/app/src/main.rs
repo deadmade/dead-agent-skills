@@ -116,6 +116,7 @@ fn run() -> ExitCode {
             pty::resize_session,
             pty::kill_session,
             pty::hosted_sessions,
+            pty::subscribe_session,
             pty::scrollback,
         ])
         .setup(move |app| {
