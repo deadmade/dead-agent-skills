@@ -8,6 +8,7 @@
 // pane from `shell`, and `hosted`, the ids of the sessions this window can show one for.
 import { Channel, invoke } from './vendor/core.js';
 import { listen } from './vendor/event.js';
+import { mountCloseConfirm } from './close-confirm.js';
 import { createRuntime } from './runtime.js';
 import { mountSessionPane } from './session-pane.js';
 import { mountStartForm } from './start-form.js';
@@ -20,6 +21,7 @@ import { mountStartForm } from './start-form.js';
  *   subscribeSession(id: string, onChunk: (bytes: ArrayLike<number>) => void): Promise<void>,
  *   hostedSessions(): Promise<string[]>,
  *   scrollback(id: string): Promise<ArrayBuffer>,
+ *   confirmClose(): Promise<void>,
  * }} Shell
  */
 
@@ -51,6 +53,8 @@ const shell = Object.freeze(
     hostedSessions: () => invoke('hosted_sessions'),
     // The bytes the session has printed so far: raw terminal output, so it is the shell's and never a view's.
     scrollback: (id) => invoke('scrollback', { id }),
+    // "Close anyway": the app stops every session and closes the window. This closes the window, so it is the shell's.
+    confirmClose: () => invoke('confirm_close'),
   }),
 );
 
@@ -77,6 +81,13 @@ const runtime = createRuntime({
   hosted,
   mountPane: (id) => mountSessionPane(id, paneApi).element,
 });
+
+// Listening first: a close the app holds back waits for this dialog, so a window that couldn't show it would not close.
+try {
+  await mountCloseConfirm({ shell, listen });
+} catch (err) {
+  console.error('flow-cockpit: the close confirmation:', err);
+}
 
 try {
   for (const id of (await shell.hostedSessions()) ?? []) hosted.add(id);

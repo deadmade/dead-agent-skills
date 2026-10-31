@@ -16,6 +16,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::ffi::OsString;
+use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -30,6 +31,8 @@ use tauri::ipc::{Channel, InvokeResponseBody, Response};
 use tauri::{AppHandle, Emitter, State};
 use ts_rs::TS;
 use uuid::Uuid;
+
+use crate::commands::Shared;
 
 /// How long a session gets to exit on SIGHUP before it is killed: Claude Code took 0.65-1.05 s to clean up and exit.
 const GRACE: Duration = Duration::from_secs(5);
@@ -436,7 +439,6 @@ impl HostedSessions {
 
     /// Stops every session the way [`HostedSessions::kill`] does, all at once: a serial wait would take up to the
     /// grace period for each.
-    #[cfg_attr(not(test), expect(dead_code, reason = "called when the window closes"))]
     pub fn kill_all(&self) {
         let all: Vec<(Uuid, Arc<Session>)> = lock(&self.sessions)
             .iter()
@@ -495,6 +497,71 @@ impl HostedSessions {
         ids.sort_unstable();
         ids
     }
+}
+
+/// A transcript written to within this long ago is being worked on: the flow runs' own "Working" rule
+/// (`index/status.rs`, which keeps its threshold private).
+const WORKING: Duration = Duration::from_mins(2);
+
+/// Whether closing the window now could cost a hosted session its work: one waits on a question or a permission
+/// prompt, wrote to its transcript lately, or has no transcript the index knows of (just started). Anything that can't
+/// be read counts as unfinished, never as idle.
+pub fn needs_confirmation(hosted: &HostedSessions, shared: &Shared) -> bool {
+    hosted
+        .ids()
+        .iter()
+        .any(|id| unfinished(shared, &id.to_string()))
+}
+
+fn unfinished(shared: &Shared, id: &str) -> bool {
+    let Some(live) = shared.live(id) else {
+        return true;
+    };
+    if live.live.waiting.is_some() {
+        return true;
+    }
+    let Some(path) = shared.read().session_path(id) else {
+        return true;
+    };
+    match fs::metadata(path).and_then(|m| m.modified()) {
+        // A write time in the future is a clock that moved: as recent as it gets.
+        Ok(written) => written.elapsed().map_or(true, |age| age <= WORKING),
+        Err(_) => true,
+    }
+}
+
+/// Whether the window's close was confirmed with "Close anyway". Tauri-managed state.
+#[derive(Default)]
+pub struct CloseConfirmed(AtomicBool);
+
+/// What the window does with a close request.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Close {
+    /// The sessions are stopped: let the window close.
+    Proceed,
+    /// Hold the window open and ask the user first. Nothing was stopped.
+    Ask,
+}
+
+/// A close request: once confirmed, or when nothing hosted is unfinished, every session is stopped and the close goes
+/// ahead; otherwise the user is asked, and no session is touched.
+pub fn on_close_requested(
+    hosted: &HostedSessions,
+    shared: &Shared,
+    confirmed: &CloseConfirmed,
+) -> Close {
+    if confirmed.0.load(Ordering::Acquire) || !needs_confirmation(hosted, shared) {
+        hosted.kill_all();
+        Close::Proceed
+    } else {
+        Close::Ask
+    }
+}
+
+/// The user's "Close anyway": later close requests aren't asked about, and every session stops now.
+pub fn confirm_close_now(hosted: &HostedSessions, confirmed: &CloseConfirmed) {
+    confirmed.0.store(true, Ordering::Release);
+    hosted.kill_all();
 }
 
 /// The `session-exited` event's payload.
@@ -623,6 +690,18 @@ fn subscribe_by_id(
     sessions.subscribe(parse_id(id)?, sink)
 }
 
+/// "Close anyway": stops every hosted session, then closes the window, whose close request is no longer asked about.
+/// The shell's alone: a view must never be able to close the window.
+#[tauri::command(async)]
+pub fn confirm_close(
+    window: tauri::WebviewWindow,
+    sessions: Sessions<'_>,
+    confirmed: State<'_, CloseConfirmed>,
+) -> Result<(), String> {
+    confirm_close_now(&sessions, &confirmed);
+    window.close().map_err(|e| e.to_string())
+}
+
 #[tauri::command(async)]
 pub fn hosted_sessions(sessions: Sessions<'_>) -> Vec<String> {
     sessions.ids().iter().map(Uuid::to_string).collect()
@@ -638,8 +717,14 @@ mod tests {
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
     use std::sync::{OnceLock, mpsc};
+    use std::time::SystemTime;
+
+    use flow_cockpit_core::index::{Config, Home, Index};
+    use jiff::Timestamp;
 
     use super::*;
+    use crate::paths::Defaults;
+    use crate::views::Views;
 
     fn sessions() -> HostedSessions {
         HostedSessions::new(|_, _| {})
@@ -1172,6 +1257,188 @@ mod tests {
             .launch(id, &["cat".to_owned()], &dir.0, 80, 24)
             .unwrap();
         hosted.kill_all();
+    }
+
+    /// A home whose transcripts were last written the given time ago, and the `Shared` over it. A session launched
+    /// under an id not in `sessions` has no transcript.
+    fn shared_over(dir: &Path, sessions: &[(Uuid, Duration)]) -> Shared {
+        let cwd = dir.join("work/alpha");
+        fs::create_dir_all(&cwd).unwrap();
+        let folder: String = cwd
+            .to_string_lossy()
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+            .collect();
+        let transcripts = dir.join("claude/projects").join(folder);
+        fs::create_dir_all(&transcripts).unwrap();
+        for (id, ago) in sessions {
+            let path = transcripts.join(format!("{id}.jsonl"));
+            let cwd = cwd.display();
+            fs::write(
+                &path,
+                format!(
+                    "{{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":\"Hi.\"}},\"timestamp\":\"2026-01-01T00:00:00Z\",\"cwd\":\"{cwd}\"}}\n"
+                ),
+            )
+            .unwrap();
+            fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(SystemTime::now() - *ago)
+                .unwrap();
+        }
+        let home = Home {
+            claude_projects: dir.join("claude/projects"),
+            capture_dir: dir.join("capture"),
+        };
+        let index = Index::build(&home, &Config::default(), Timestamp::now());
+        let views = Views::new(
+            Defaults {
+                found: None,
+                looked: Vec::new(),
+            },
+            dir.join("extensions"),
+            Vec::new(),
+            &[],
+        );
+        Shared::new(index, views)
+    }
+
+    /// The capture file the hooks write for a session that asked a question nobody answered yet.
+    fn ask(dir: &Path, id: Uuid) {
+        fs::create_dir_all(dir.join("capture")).unwrap();
+        let line = format!(
+            "{{\"v\":1,\"ts\":\"{}\",\"event\":\"PreToolUse\",\"tool_use_id\":\"t1\",\"questions\":[{{\"question\":\"Proceed?\"}}]}}\n",
+            Timestamp::now()
+        );
+        fs::write(dir.join(format!("capture/{id}.jsonl")), line).unwrap();
+    }
+
+    fn cat(hosted: &HostedSessions, dir: &Path, id: Uuid) {
+        hosted.launch(id, &["cat".to_owned()], dir, 80, 24).unwrap();
+    }
+
+    fn secs(n: u64) -> Duration {
+        Duration::from_secs(n)
+    }
+
+    #[test]
+    fn needs_confirmation_true_when_a_session_is_working() {
+        let dir = Dir::new("confirm-working");
+        let (idle, working) = (Uuid::new_v4(), Uuid::new_v4());
+        let shared = shared_over(&dir.0, &[(idle, secs(600)), (working, secs(5))]);
+        let hosted = sessions();
+        cat(&hosted, &dir.0, idle);
+        assert!(!needs_confirmation(&hosted, &shared), "an idle one alone");
+        cat(&hosted, &dir.0, working);
+        assert!(
+            needs_confirmation(&hosted, &shared),
+            "a transcript written 5 s ago is being worked on"
+        );
+        hosted.kill_all();
+
+        let asking = Uuid::new_v4();
+        let shared = shared_over(&dir.0, &[(asking, secs(600))]);
+        let hosted = sessions();
+        cat(&hosted, &dir.0, asking);
+        assert!(!needs_confirmation(&hosted, &shared));
+        ask(&dir.0, asking);
+        assert!(
+            needs_confirmation(&hosted, &shared),
+            "a session waiting on a question is not safe to close"
+        );
+        hosted.kill_all();
+    }
+
+    #[test]
+    fn needs_confirmation_true_for_a_session_with_no_transcript_yet() {
+        let dir = Dir::new("confirm-none");
+        let idle = Uuid::new_v4();
+        let shared = shared_over(&dir.0, &[(idle, secs(600))]);
+        let hosted = sessions();
+        cat(&hosted, &dir.0, idle);
+        assert!(!needs_confirmation(&hosted, &shared));
+        cat(&hosted, &dir.0, Uuid::new_v4());
+        assert!(
+            needs_confirmation(&hosted, &shared),
+            "a session the index doesn't know yet counts as working"
+        );
+        hosted.kill_all();
+    }
+
+    #[test]
+    fn needs_confirmation_false_when_all_idle() {
+        let dir = Dir::new("confirm-idle");
+        let ids = [Uuid::new_v4(), Uuid::new_v4()];
+        let shared = shared_over(&dir.0, &[(ids[0], secs(600)), (ids[1], secs(3 * 3600))]);
+        let hosted = sessions();
+        assert!(
+            !needs_confirmation(&hosted, &shared),
+            "no hosted session, nothing to lose"
+        );
+        for id in ids {
+            cat(&hosted, &dir.0, id);
+        }
+        assert!(!needs_confirmation(&hosted, &shared));
+        hosted.kill_all();
+    }
+
+    #[test]
+    fn close_kills_every_hosted_session() {
+        let dir = Dir::new("close-kills");
+        let ids: Vec<Uuid> = (0..3).map(|_| Uuid::new_v4()).collect();
+        let written: Vec<(Uuid, Duration)> = ids.iter().map(|id| (*id, secs(600))).collect();
+        let shared = shared_over(&dir.0, &written);
+        let hosted = sessions();
+        let pids: Vec<u32> = ids
+            .iter()
+            .map(|&id| {
+                cat(&hosted, &dir.0, id);
+                pid_of(&hosted.get(id).unwrap())
+            })
+            .collect();
+        assert!(pids.iter().all(|&pid| alive(pid)));
+
+        let confirmed = CloseConfirmed::default();
+        assert_eq!(
+            on_close_requested(&hosted, &shared, &confirmed),
+            Close::Proceed,
+            "all idle: no prompt"
+        );
+
+        assert!(
+            pids.iter().all(|&pid| !alive(pid)),
+            "a session outlived the close"
+        );
+        assert_eq!(hosted.ids(), Vec::<Uuid>::new());
+    }
+
+    #[test]
+    fn confirmed_close_does_not_prompt_twice() {
+        let dir = Dir::new("close-once");
+        let working = Uuid::new_v4();
+        let shared = shared_over(&dir.0, &[(working, secs(5))]);
+        let hosted = sessions();
+        cat(&hosted, &dir.0, working);
+        let confirmed = CloseConfirmed::default();
+
+        assert_eq!(on_close_requested(&hosted, &shared, &confirmed), Close::Ask);
+        assert_eq!(
+            hosted.ids(),
+            [working],
+            "asking must not stop anything: the user may say no"
+        );
+
+        confirm_close_now(&hosted, &confirmed);
+        assert_eq!(hosted.ids(), Vec::<Uuid>::new(), "Close anyway stops them");
+        cat(&hosted, &dir.0, Uuid::new_v4());
+        assert_eq!(
+            on_close_requested(&hosted, &shared, &confirmed),
+            Close::Proceed,
+            "the close the confirmation triggers is not asked about again"
+        );
+        assert_eq!(hosted.ids(), Vec::<Uuid>::new());
     }
 
     #[test]

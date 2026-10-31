@@ -21,6 +21,7 @@ const COMMANDS: &[&str] = &[
     "hosted_sessions",
     "subscribe_session",
     "scrollback",
+    "confirm_close",
     "background_tasks",
     "background_output",
 ];

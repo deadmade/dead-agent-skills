@@ -42,7 +42,7 @@ test('window_tauri_is_not_global', async () => {
     'boot reached the app through its own invoke',
   );
   const listened = calls.filter(([cmd]) => cmd === 'plugin:event|listen');
-  assert.deepEqual(listened.map(([, args]) => args.event).sort(), ['changed', 'views-changed']);
+  assert.deepEqual(listened.map(([, args]) => args.event).sort(), ['changed', 'close-requested', 'views-changed']);
   assert.ok(listened.every(([, args]) => args.handler > 0 && args.target.kind === 'Any'));
 });
 

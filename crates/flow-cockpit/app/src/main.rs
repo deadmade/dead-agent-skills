@@ -101,6 +101,8 @@ fn run() -> ExitCode {
     let result = tauri::Builder::default()
         .plugin(stay_local)
         .manage(shared)
+        .manage(pty::CloseConfirmed::default())
+        .on_window_event(on_window_event)
         .invoke_handler(tauri::generate_handler![
             commands::projects,
             commands::entries,
@@ -121,6 +123,7 @@ fn run() -> ExitCode {
             pty::hosted_sessions,
             pty::subscribe_session,
             pty::scrollback,
+            pty::confirm_close,
             background_output::background_tasks,
             background_output::background_output,
         ])
@@ -145,6 +148,28 @@ fn run() -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => fail(&format!("flow-cockpit: {e}\n")),
+    }
+}
+
+/// Closing the window stops every hosted session. When one looks unfinished the close is held and the shell asks first
+/// (`close-requested`); its "Close anyway" is the `confirm_close` command. Without the managed state no session can
+/// exist, so the close goes ahead.
+fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    let tauri::WindowEvent::CloseRequested { api, .. } = event else {
+        return;
+    };
+    let (Some(hosted), Some(shared), Some(confirmed)) = (
+        window.try_state::<pty::HostedSessions>(),
+        window.try_state::<Arc<Shared>>(),
+        window.try_state::<pty::CloseConfirmed>(),
+    ) else {
+        return;
+    };
+    if pty::on_close_requested(&hosted, &shared, &confirmed) == pty::Close::Ask {
+        api.prevent_close();
+        if let Err(e) = window.emit("close-requested", ()) {
+            eprintln!("flow-cockpit: {e}");
+        }
     }
 }
 
@@ -341,7 +366,7 @@ mod tests {
     fn every_registered_command_has_a_capability() {
         let registered = listed(include_str!("main.rs"), "tauri::generate_handler![");
         let manifest = listed(include_str!("../build.rs"), "const COMMANDS: &[&str] = &[");
-        assert_eq!(registered.len(), 21, "{registered:?}");
+        assert_eq!(registered.len(), 22, "{registered:?}");
         assert_eq!(
             manifest, registered,
             "build.rs's AppManifest and main.rs's handlers differ"

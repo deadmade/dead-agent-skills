@@ -24,6 +24,7 @@
     "allow-hosted-sessions",
     "allow-subscribe-session",
     "allow-scrollback",
+    "allow-confirm-close",
     "allow-background-tasks",
     "allow-background-output"
   ]
