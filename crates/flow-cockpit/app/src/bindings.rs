@@ -11,6 +11,7 @@ use flow_cockpit_core::doc::{AuditDoc, FlowDoc, Ledger, PlanDoc};
 use flow_cockpit_core::index::{DocName, Entry, FlowRun, Project};
 use ts_rs::{Config, TS};
 
+use crate::background_output::BackgroundTask;
 use crate::poll::Changed;
 use crate::pty::LaunchSpecInput;
 use crate::views::{Extensions, ViewInfo};
@@ -22,6 +23,7 @@ fn export_app_to(dir: &Path) -> Result<(), ts_rs::ExportError> {
     Extensions::export_all(&cfg)?;
     Changed::export_all(&cfg)?;
     LaunchSpecInput::export_all(&cfg)?;
+    BackgroundTask::export_all(&cfg)?;
     Ok(())
 }
 

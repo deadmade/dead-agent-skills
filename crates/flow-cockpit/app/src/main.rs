@@ -5,6 +5,7 @@
 // A release build on Windows opens no console window; `--version` and friends attach to the parent's console.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod background_output;
 #[cfg(test)]
 mod bindings;
 mod commands;
@@ -119,6 +120,8 @@ fn run() -> ExitCode {
             pty::hosted_sessions,
             pty::subscribe_session,
             pty::scrollback,
+            background_output::background_tasks,
+            background_output::background_output,
         ])
         .setup(move |app| {
             app.manage(pty::emitting_exits(app.handle().clone()));
@@ -337,7 +340,7 @@ mod tests {
     fn every_registered_command_has_a_capability() {
         let registered = listed(include_str!("main.rs"), "tauri::generate_handler![");
         let manifest = listed(include_str!("../build.rs"), "const COMMANDS: &[&str] = &[");
-        assert_eq!(registered.len(), 18, "{registered:?}");
+        assert_eq!(registered.len(), 20, "{registered:?}");
         assert_eq!(
             manifest, registered,
             "build.rs's AppManifest and main.rs's handlers differ"

@@ -81,6 +81,56 @@ pub fn claude_projects(
     Ok(var_or_home(&env, "CLAUDE_CONFIG_DIR", platform, &[".claude"])?.join("projects"))
 }
 
+/// The folder Claude Code keeps a session's runtime files in (a backgrounded command's output): `claude-<uid>` in
+/// `$CLAUDE_CODE_TMPDIR`, else the OS temp folder (`$TMPDIR`, else `/tmp`, on Linux; `%TEMP%` on Windows). The Windows
+/// half is a guess, not yet checked against Claude Code on Windows: the user's name stands in for the Linux `<uid>`.
+pub fn claude_tmp_dir(
+    env: impl Fn(&str) -> Option<String>,
+    platform: Platform,
+) -> Result<PathBuf, NoHome> {
+    let user = match platform {
+        Platform::Linux => current_uid()
+            .map(|uid| uid.to_string())
+            .ok_or(NoHome("the user id"))?,
+        Platform::Windows => var(&env, "USERNAME")
+            .ok_or(NoHome("USERNAME"))?
+            .to_string_lossy()
+            .into_owned(),
+    };
+    tmp_dir_of(&env, platform, &user)
+}
+
+fn tmp_dir_of(
+    env: &impl Fn(&str) -> Option<String>,
+    platform: Platform,
+    user: &str,
+) -> Result<PathBuf, NoHome> {
+    let base = match (var(env, "CLAUDE_CODE_TMPDIR"), platform) {
+        (Some(dir), _) => dir,
+        (None, Platform::Linux) => var(env, "TMPDIR").unwrap_or_else(|| PathBuf::from("/tmp")),
+        (None, Platform::Windows) => var(env, "TEMP")
+            .or_else(|| var(env, "TMP"))
+            .ok_or(NoHome("TEMP"))?,
+    };
+    Ok(base.join(format!("claude-{user}")))
+}
+
+/// The user id; `None` where there is none (Windows, never reached for a real `Platform::Linux` run).
+#[cfg(unix)]
+#[expect(clippy::unnecessary_wraps, reason = "the other platforms have none")]
+fn current_uid() -> Option<u32> {
+    unsafe extern "C" {
+        fn getuid() -> u32;
+    }
+    // SAFETY: `getuid` takes no arguments, touches no memory and cannot fail.
+    Some(unsafe { getuid() })
+}
+
+#[cfg(not(unix))]
+fn current_uid() -> Option<u32> {
+    None
+}
+
 /// A variable that is set and not empty (the XDG rule: an empty one counts as unset).
 fn var(env: &impl Fn(&str) -> Option<String>, key: &str) -> Option<PathBuf> {
     env(key).filter(|v| !v.is_empty()).map(PathBuf::from)
@@ -173,6 +223,27 @@ mod tests {
         for (got, want) in cases {
             assert_eq!(got, Ok(want));
         }
+    }
+
+    #[test]
+    fn claude_runtime_folder_follows_the_temp_rules() {
+        let of = |vars: &[(&str, &str)], platform| tmp_dir_of(&env(vars), platform, "1000");
+        assert_eq!(of(&[], Platform::Linux), Ok(path(&["/tmp", "claude-1000"])));
+        assert_eq!(
+            of(&[("TMPDIR", "/t")], Platform::Linux),
+            Ok(path(&["/t", "claude-1000"]))
+        );
+        assert_eq!(
+            of(
+                &[("TMPDIR", "/t"), ("CLAUDE_CODE_TMPDIR", "/c")],
+                Platform::Linux
+            ),
+            Ok(path(&["/c", "claude-1000"]))
+        );
+        assert_eq!(
+            of(&[("TEMP", r"C:\T")], Platform::Windows),
+            Ok(path(&[r"C:\T", "claude-1000"]))
+        );
     }
 
     #[test]

@@ -3,6 +3,7 @@
 // is this file (a `paths` entry in the extensions' tsconfig.json); `flow-cockpit --print-types` prints it and the data
 // types as one declaration file of that module.
 import type { Activity } from '../../bindings/Activity';
+import type { BackgroundTask } from '../../bindings/BackgroundTask';
 import type { DocName } from '../../bindings/DocName';
 import type { Entry } from '../../bindings/Entry';
 import type { FlowRun } from '../../bindings/FlowRun';
@@ -17,6 +18,7 @@ export type * from '../../bindings/Activity';
 export type * from '../../bindings/AgentInfo';
 export type * from '../../bindings/AuditDoc';
 export type * from '../../bindings/AuditSummary';
+export type * from '../../bindings/BackgroundTask';
 export type * from '../../bindings/Changed';
 export type * from '../../bindings/Decision';
 export type * from '../../bindings/Deviation';
@@ -96,6 +98,16 @@ export interface DataApi {
   session(id: string, page?: SessionPage): Promise<Activity | null>;
   /** The input of the session's tool call `id`; null when the transcript no longer holds it. */
   toolInput(session: string, id: string): Promise<ToolDetail | null>;
+  /**
+   * The session's backgrounded commands (`run_in_background`), oldest first, read from Claude Code's own runtime
+   * folder: empty when that folder isn't found.
+   */
+  backgroundTasks(session: string): Promise<BackgroundTask[]>;
+  /**
+   * What the session's backgrounded command `task` has written so far, ending with Claude Code's own `[exited with code
+   * N]` or `[killed]` line once it has ended; null when it can't be read.
+   */
+  backgroundOutput(session: string, task: string): Promise<string | null>;
   views(): Promise<ViewInfo[]>;
   /** A view's code, types stripped; rejects with the error, which names the line. */
   viewSource(id: string): Promise<string>;

@@ -20,6 +20,8 @@ const COMMANDS: &[&str] = &[
     "hosted_sessions",
     "subscribe_session",
     "scrollback",
+    "background_tasks",
+    "background_output",
 ];
 
 fn main() {

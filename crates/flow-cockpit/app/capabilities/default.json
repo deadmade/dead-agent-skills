@@ -22,6 +22,8 @@
     "allow-kill-session",
     "allow-hosted-sessions",
     "allow-subscribe-session",
-    "allow-scrollback"
+    "allow-scrollback",
+    "allow-background-tasks",
+    "allow-background-output"
   ]
 }
