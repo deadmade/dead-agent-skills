@@ -555,7 +555,10 @@ export function createRuntime({
    */
   function placePanes() {
     slotWatch?.disconnect();
-    const found = root.querySelector('[data-terminal-slot]');
+    // Only a hosted session's placeholder counts: nothing else drawn in `#app` can get a pane laid over it.
+    const found = [...root.querySelectorAll('[data-terminal-slot]')].find(
+      (el) => el instanceof window.HTMLElement && hosted.has(el.dataset.terminalSlot ?? ''),
+    );
     slotNow = found instanceof window.HTMLElement ? found : null;
     const id = slotNow?.dataset.terminalSlot;
     if (slotNow && id !== undefined && mountPane && !panes.has(id)) {

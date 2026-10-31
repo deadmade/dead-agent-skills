@@ -83,10 +83,5 @@ try {
 } catch (err) {
   console.error('flow-cockpit: the running sessions:', err);
 }
-// A session that ends is no longer hosted: its tab draws as any session's does, and its pane is hidden.
-listen('session-exited', (event) => {
-  if (hosted.delete(event.payload?.id)) runtime.navigate(runtime.route());
-}).catch((err) => console.error('flow-cockpit:', err));
-
 mountStartForm({ data: runtime.data, shell, navigate: runtime.navigate, route: runtime.route });
 runtime.start();

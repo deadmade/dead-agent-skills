@@ -2088,6 +2088,21 @@ test('a_view_cannot_read_a_sessions_terminal_output', async () => {
   }
 });
 
+test('a_view_cannot_get_a_pane_laid_over_its_own_element', async () => {
+  const forged = view(
+    'session',
+    'session',
+    `const d = document.createElement('div'); d.dataset.terminalSlot = '${OTHER_ID}'; return d;`,
+  );
+  const { root, terminals, mounts } = await hostedStart(fakeApp({ session: { source: forged } }), {
+    ...SESSION,
+    id: OTHER_ID,
+  });
+  assert.ok(root.querySelector('[data-terminal-slot]'), 'the view drew the attribute');
+  assert.deepEqual(mounts, [], "but a session that isn't hosted gets no pane");
+  assert.equal(terminals.childElementCount, 0);
+});
+
 test('outside_session_is_unchanged', async () => {
   const today = await started(fakeApp(sessionViews()), SESSION);
   const { root, terminals, mounts } = await hostedStart(fakeApp(sessionViews()), SESSION, { ids: [OTHER_ID] });
@@ -2282,13 +2297,23 @@ test('reload_rehydrates_hosted_sessions_from_the_backend', async () => {
     assert.deepEqual(calls.find(([cmd]) => cmd === 'send_input')[1], { id: RELOADED_ID, bytes: [97] });
     assert.ok(calls.some(([cmd, a]) => cmd === 'resize_session' && a.id === RELOADED_ID));
 
-    // The session ends: it is no longer hosted, so the tab is the plain one again and the pane is hidden.
-    const listened = calls.filter(([cmd, a]) => cmd === 'plugin:event|listen' && a.event === 'session-exited');
-    assert.equal(listened.length >= 1, true, 'boot follows session-exited');
-    for (const [, a] of listened)
-      callbacks[a.handler - 1]({ event: 'session-exited', id: 1, payload: { id: RELOADED_ID, code: 0 } });
-    await until(() => !doc.querySelector('[data-terminal-slot]'), 'the redraw');
-    assert.equal(doc.querySelector(`#terminals [data-session-id="${RELOADED_ID}"]`).style.display, 'none');
+    // The session ends: it stays hosted, with its pane shown, so what it printed and its ending can be read.
+    const fire = (event, payload) => {
+      const heard = calls.filter(([cmd, args]) => cmd === 'plugin:event|listen' && args.event === event);
+      assert.ok(heard.length >= 1, `something listens for ${event}`);
+      for (const [, args] of heard) callbacks[args.handler - 1]({ event, id: 1, payload });
+    };
+    fire('session-exited', { id: RELOADED_ID, code: 0 });
+    await until(
+      () => doc.querySelector('#terminals .xterm-rows')?.textContent.includes('the session ended with code 0'),
+      "the pane's own ending line",
+    );
+    fire('changed', { project: 'p1' });
+    await settle();
+    await settle();
+    assert.ok(doc.querySelector(`#app [data-terminal-slot="${RELOADED_ID}"]`), 'the tab still draws its terminal');
+    const pane = doc.querySelector(`#terminals [data-session-id="${RELOADED_ID}"]`);
+    assert.notEqual(pane.style.display, 'none', 'and its pane is not hidden');
   } finally {
     [globalThis.window, globalThis.document] = shared;
   }
