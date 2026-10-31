@@ -19,6 +19,7 @@ import { mountStartForm } from './start-form.js';
  *   resizeSession(id: string, cols: number, rows: number): Promise<void>,
  *   subscribeSession(id: string, onChunk: (bytes: ArrayLike<number>) => void): Promise<void>,
  *   hostedSessions(): Promise<string[]>,
+ *   scrollback(id: string): Promise<ArrayBuffer>,
  * }} Shell
  */
 
@@ -48,19 +49,21 @@ const shell = Object.freeze(
     resizeSession: (id, cols, rows) => invoke('resize_session', { id, cols, rows }),
     subscribeSession: (id, onChunk) => invoke('subscribe_session', { id, onOutput: new Channel(onChunk) }),
     hostedSessions: () => invoke('hosted_sessions'),
+    // The bytes the session has printed so far: raw terminal output, so it is the shell's and never a view's.
+    scrollback: (id) => invoke('scrollback', { id }),
   }),
 );
 
 const root = document.getElementById('app');
 if (!root) throw new Error('index.html has no #app');
 
-/** What a terminal pane is given: the shell's commands for the session, and its buffered output (read-only). */
+/** What a terminal pane is given: the shell's commands for the session, and its buffered output. */
 const paneApi = {
   write: (/** @type {string} */ id, /** @type {string} */ text) =>
     shell.sendInput(id, Array.from(new TextEncoder().encode(text))),
   resize: shell.resizeSession,
   subscribe: shell.subscribeSession,
-  scrollback: (/** @type {string} */ id) => runtime.data.scrollback(id),
+  scrollback: shell.scrollback,
   onExit: (/** @type {string} */ id, /** @type {(code: number | null) => void} */ done) =>
     listen('session-exited', (event) => {
       if (event.payload?.id === id) done(event.payload.code ?? null);

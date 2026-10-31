@@ -18,8 +18,6 @@ import { stepper } from './blocks/stepper.js';
  * @typedef {import('./api').View} View
  * @typedef {import('./api').Route} Route
  * @typedef {import('./api').DataApi} DataApi
- * @typedef {DataApi & { scrollback(id: string): Promise<ArrayBuffer> }} Data `data` as the runtime builds it: a hosted
- *   session's pane reads its buffered output through `scrollback`, which `DataApi` doesn't list.
  * @typedef {import('./api').ViewContext} ViewContext
  * @typedef {import('../../bindings/ViewInfo').ViewInfo} ViewInfo
  * @typedef {import('../../bindings/Extensions').Extensions} Extensions
@@ -264,7 +262,7 @@ export function createRuntime({
   /** The projects as of the current draw: one `projects` call per draw, for the runtime and the views alike. */
   /** @type {Promise<import('../../bindings/Project').Project[]> | null} */
   let projectsNow = null;
-  /** @type {Data} */
+  /** @type {DataApi} */
   const data = Object.freeze({
     projects: () => (projectsNow ??= invoke('projects')),
     entries: (/** @type {string} */ project) => invoke('entries', { project }),
@@ -278,7 +276,6 @@ export function createRuntime({
     viewSource: (/** @type {string} */ id) => invoke('view_source', { id }),
     previewCommand: (/** @type {import('../../bindings/LaunchSpecInput').LaunchSpecInput} */ input) =>
       invoke('preview_command', { input }),
-    scrollback: (/** @type {string} */ id) => invoke('scrollback', { id }),
   });
 
   /** @type {Route} */

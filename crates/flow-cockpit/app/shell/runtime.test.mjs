@@ -2070,6 +2070,24 @@ test('hosted_session_shows_the_terminal_pane', async () => {
   );
 });
 
+test('a_view_cannot_read_a_sessions_terminal_output', async () => {
+  const app = fakeApp({
+    session: {
+      source: view(
+        'session',
+        'session',
+        "const p = document.createElement('p'); p.textContent = Object.keys(ctx.data).join(','); return p;",
+      ),
+    },
+  });
+  const { root } = await hostedStart(app, SESSION);
+  const keys = section(root, 'session').textContent.split(',');
+  assert.ok(keys.includes('session'), 'the view has its data');
+  for (const name of ['scrollback', 'sendInput', 'subscribeSession', 'hostedSessions', 'startSession']) {
+    assert.ok(!keys.includes(name), `ctx.data has no ${name}`);
+  }
+});
+
 test('outside_session_is_unchanged', async () => {
   const today = await started(fakeApp(sessionViews()), SESSION);
   const { root, terminals, mounts } = await hostedStart(fakeApp(sessionViews()), SESSION, { ids: [OTHER_ID] });
@@ -2248,6 +2266,11 @@ test('reload_rehydrates_hosted_sessions_from_the_backend', async () => {
     assert.equal(sub.id, RELOADED_ID);
     assert.match(sub.onOutput.toJSON(), /^__CHANNEL__:\d+$/, 'the pane subscribes with its own channel');
     assert.equal(calls.filter(([cmd]) => cmd === 'start_session').length, 0);
+    assert.deepEqual(
+      calls.find(([cmd]) => cmd === 'scrollback'),
+      ['scrollback', { id: RELOADED_ID }],
+      'the pane reads the buffered output through the shell',
+    );
 
     // What the pane sends goes through the shell's commands, as bytes.
     const keys = doc.querySelector('#terminals textarea');
