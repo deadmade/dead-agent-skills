@@ -371,7 +371,9 @@ impl HostedSessions {
             let mut sessions = lock(&self.sessions);
             if let Err(e) = Self::ensure_free(&sessions, id) {
                 drop(sessions);
-                let _ = lock(&session.child).kill();
+                let mut child = lock(&session.child);
+                let _ = child.kill();
+                let _ = child.wait();
                 return Err(e);
             }
             sessions.insert(id, Arc::clone(&session));
@@ -470,15 +472,16 @@ impl HostedSessions {
         Ok(())
     }
 
-    /// The last bytes the session wrote, empty for a session that isn't hosted.
-    fn scrollback_bytes(&self, id: Uuid) -> Vec<u8> {
-        self.get(id)
-            .map(|s| lock(&s.stream).ring.iter().copied().collect())
-            .unwrap_or_default()
+    /// The last bytes the session wrote. A session that isn't hosted (never started, or dismissed) is an error, which a
+    /// pane must be able to tell from a session that has written nothing yet.
+    fn scrollback_bytes(&self, id: Uuid) -> Result<Vec<u8>, String> {
+        let session = self.get(id)?;
+        let bytes = lock(&session.stream).ring.iter().copied().collect();
+        Ok(bytes)
     }
 
-    pub fn scrollback(&self, id: Uuid) -> Response {
-        Response::new(self.scrollback_bytes(id))
+    pub fn scrollback(&self, id: Uuid) -> Result<Response, String> {
+        self.scrollback_bytes(id).map(Response::new)
     }
 
     /// Every session whose process is still running.
@@ -621,7 +624,7 @@ pub fn hosted_sessions(sessions: Sessions<'_>) -> Vec<String> {
 
 #[tauri::command(async)]
 pub fn scrollback(sessions: Sessions<'_>, id: String) -> Result<Response, String> {
-    Ok(sessions.scrollback(parse_id(&id)?))
+    sessions.scrollback(parse_id(&id)?)
 }
 
 #[cfg(all(test, unix))]
@@ -667,7 +670,7 @@ mod tests {
     }
 
     fn screen(hosted: &HostedSessions, id: Uuid) -> String {
-        String::from_utf8_lossy(&hosted.scrollback_bytes(id)).into_owned()
+        String::from_utf8_lossy(&hosted.scrollback_bytes(id).unwrap()).into_owned()
     }
 
     /// A folder under the temp dir, removed when dropped.
@@ -777,7 +780,7 @@ mod tests {
             .launch(id, &sh("echo hello", &[]), &dir.0, 80, 24)
             .unwrap();
         wait_until("the output", || {
-            contains(&hosted.scrollback_bytes(id), "hello\r\n")
+            contains(&hosted.scrollback_bytes(id).unwrap(), "hello\r\n")
         });
     }
 
@@ -910,7 +913,7 @@ mod tests {
             (id, Some(3))
         );
         assert!(
-            contains(&hosted.scrollback_bytes(id), "bye"),
+            contains(&hosted.scrollback_bytes(id).unwrap(), "bye"),
             "the output is gone with the exit"
         );
         assert!(
@@ -943,7 +946,7 @@ mod tests {
         wait_until("the end of the output", || {
             screen(&hosted, id).ends_with("3000\r\n")
         });
-        let kept = hosted.scrollback_bytes(id);
+        let kept = hosted.scrollback_bytes(id).unwrap();
         assert_eq!(kept.len(), 1024, "the buffer is bounded, and full");
         let tail: Vec<String> = (2990..=3000).map(|n| n.to_string()).collect();
         let expected = format!("{}\r\n", tail.join("\r\n"));
@@ -955,9 +958,30 @@ mod tests {
             .launch(id, &sh("printf hi", &[]), &dir.0, 80, 24)
             .unwrap();
         wait_until("the output", || screen(&small, id) == "hi");
+    }
+
+    #[test]
+    fn scrollback_of_an_unhosted_session_is_an_error_not_empty_output() {
+        let dir = Dir::new("scrollback-unknown");
+        let hosted = sessions();
+        let unknown = Uuid::new_v4();
+        let err = hosted.scrollback_bytes(unknown).unwrap_err();
+        assert!(err.contains("no hosted session"), "{err}");
+        assert!(hosted.scrollback(unknown).is_err());
+
+        let id = Uuid::new_v4();
+        hosted
+            .launch(id, &["cat".to_owned()], &dir.0, 80, 24)
+            .unwrap();
+        assert_eq!(
+            hosted.scrollback_bytes(id),
+            Ok(Vec::new()),
+            "a session with no output yet is not an error"
+        );
+        hosted.kill(id).unwrap();
         assert!(
-            small.scrollback_bytes(Uuid::new_v4()).is_empty(),
-            "an unknown session has no output"
+            hosted.scrollback_bytes(id).is_err(),
+            "a dismissed session is not hosted any more"
         );
     }
 
