@@ -18,6 +18,8 @@ import { stepper } from './blocks/stepper.js';
  * @typedef {import('./api').View} View
  * @typedef {import('./api').Route} Route
  * @typedef {import('./api').DataApi} DataApi
+ * @typedef {DataApi & { scrollback(id: string): Promise<ArrayBuffer> }} Data `data` as the runtime builds it: a hosted
+ *   session's pane reads its buffered output through `scrollback`, which `DataApi` doesn't list.
  * @typedef {import('./api').ViewContext} ViewContext
  * @typedef {import('../../bindings/ViewInfo').ViewInfo} ViewInfo
  * @typedef {import('../../bindings/Extensions').Extensions} Extensions
@@ -243,14 +245,26 @@ function missingTab(id) {
 }
 
 /**
- * @param {{ root: HTMLElement, invoke: Invoke, listen: Listen, importModule?: (url: string) => Promise<any>, renderTimeout?: number }} app
+ * @param {{ root: HTMLElement, invoke: Invoke, listen: Listen, importModule?: (url: string) => Promise<any>, renderTimeout?: number, hosted?: ReadonlySet<string>, mountPane?: (id: string) => HTMLElement }} app
  *   `renderTimeout`: how long a view's render may take, in ms, before it shows as broken.
+ *   `hosted`: the ids of the sessions this app runs, which the shell keeps current (a set the runtime only reads);
+ *   `mountPane`: makes the terminal of one of them, an element in `#terminals`. The runtime calls it once per id, the first
+ *   time that session's tab is drawn, and from then on only places and hides what it returned. Both are the shell's: a
+ *   view's `ctx` has neither, nor anything that reaches the session.
  */
-export function createRuntime({ root, invoke, listen, importModule = (url) => import(url), renderTimeout = 5000 }) {
+export function createRuntime({
+  root,
+  invoke,
+  listen,
+  importModule = (url) => import(url),
+  renderTimeout = 5000,
+  hosted = new Set(),
+  mountPane,
+}) {
   /** The projects as of the current draw: one `projects` call per draw, for the runtime and the views alike. */
   /** @type {Promise<import('../../bindings/Project').Project[]> | null} */
   let projectsNow = null;
-  /** @type {DataApi} */
+  /** @type {Data} */
   const data = Object.freeze({
     projects: () => (projectsNow ??= invoke('projects')),
     entries: (/** @type {string} */ project) => invoke('entries', { project }),
@@ -264,6 +278,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     viewSource: (/** @type {string} */ id) => invoke('view_source', { id }),
     previewCommand: (/** @type {import('../../bindings/LaunchSpecInput').LaunchSpecInput} */ input) =>
       invoke('preview_command', { input }),
+    scrollback: (/** @type {string} */ id) => invoke('scrollback', { id }),
   });
 
   /** @type {Route} */
@@ -500,7 +515,79 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     return box;
   }
 
+  /**
+   * A hosted session's terminal is never drawn in `#app`, which a redraw replaces: this empty element marks where it
+   * goes, and `placePanes` lays the real pane (in `#terminals`) over it.
+   * @param {string} id
+   */
+  function terminalSlot(id) {
+    const slot = document.createElement('div');
+    slot.className = 'terminal-slot';
+    slot.dataset.terminalSlot = id;
+    slot.style.minHeight = '24rem';
+    return slot;
+  }
+
+  /** The panes `mountPane` made, by session id: each is made once for the window's life, then shown and hidden. */
+  /** @type {Map<string, HTMLElement>} */
+  const panes = new Map();
+  /** The placeholder the shown pane follows. @type {HTMLElement | null} */
+  let slotNow = null;
+  /** @type {ResizeObserver | null} */
+  let slotWatch = null;
+
+  /** Moves the shown pane over its placeholder's screen rect. */
+  function placeShown() {
+    const id = slotNow?.dataset.terminalSlot;
+    const pane = id === undefined ? undefined : panes.get(id);
+    if (!slotNow || !pane) return;
+    const { left, top, width, height } = slotNow.getBoundingClientRect();
+    pane.style.display = '';
+    Object.assign(pane.style, {
+      position: 'fixed',
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${width}px`,
+      height: `${height}px`,
+    });
+  }
+
+  /**
+   * After every draw: the pane for the placeholder this draw left (mounted the first time) goes over it, and every
+   * other pane is hidden, not removed: the sessions run on, and their terminals keep what they drew.
+   */
+  function placePanes() {
+    slotWatch?.disconnect();
+    const found = root.querySelector('[data-terminal-slot]');
+    slotNow = found instanceof window.HTMLElement ? found : null;
+    const id = slotNow?.dataset.terminalSlot;
+    if (slotNow && id !== undefined && mountPane && !panes.has(id)) {
+      try {
+        panes.set(id, mountPane(id));
+      } catch (err) {
+        console.error('flow-cockpit: the terminal:', err);
+        slotNow.textContent = `The terminal couldn't be shown: ${reason(err)}`;
+        slotNow = null;
+      }
+    }
+    for (const [other, pane] of panes) if (other !== id || !slotNow) pane.style.display = 'none';
+    if (!slotNow) return;
+    placeShown();
+    if (typeof window.ResizeObserver === 'function') {
+      slotWatch ??= new window.ResizeObserver(placeShown);
+      slotWatch.observe(slotNow);
+    }
+  }
+
   async function draw() {
+    try {
+      await paint();
+    } finally {
+      placePanes();
+    }
+  }
+
+  async function paint() {
     const at = Object.freeze({ ...route });
     const traversed = traversing;
     traversing = false;
@@ -572,7 +659,14 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
       left.set(drawnAt, leaving);
       if (left.size > 50) left.delete(/** @type {string} */ (left.keys().next().value));
     }
-    root.replaceChildren(...sections);
+    // A hosted session's tab: its terminal's place beside the view, which is drawn as it is for any other session.
+    if (at.to === 'session' && mountPane && hosted.has(at.id)) {
+      const beside = document.createElement('div');
+      beside.className = 'hosted-session';
+      beside.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem';
+      beside.append(...sections, terminalSlot(at.id));
+      root.replaceChildren(beside);
+    } else root.replaceChildren(...sections);
     const host = sections.map((s) => s.querySelector('[data-slot="run-tab"]')).find(Boolean);
     // A tab no run-tab view draws says so in the slot; a run view that leaves no slot draws that tab itself.
     if (tab) (host ?? root).append(/** @type {Node} */ (tabSection));
@@ -667,6 +761,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     last = last.then(step).catch((err) => {
       console.error('flow-cockpit:', err);
       root.replaceChildren(card({ title: "The window couldn't be drawn.", body: reason(err), error: true }));
+      placePanes();
     });
     return last;
   }
@@ -735,6 +830,8 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     const ctrlR = (event.ctrlKey || event.metaKey) && !event.altKey && r;
     const f5 = event.key === 'F5' && !event.ctrlKey && !event.metaKey && !event.altKey;
     if (!ctrlR && !f5) return;
+    // In a hosted session's terminal the key is Claude Code's (Ctrl+R searches its history): it isn't ours to take.
+    if (document.activeElement?.closest('#terminals')) return;
     event.preventDefault();
     if (!event.repeat) window.location.reload();
   }
@@ -760,6 +857,11 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
       window.addEventListener('hashchange', follow);
       window.addEventListener('mouseup', sideButton);
       window.addEventListener('keydown', reloadKey);
+      if (mountPane) {
+        // The shown pane follows its placeholder as the page scrolls and the window resizes, not only as it is drawn.
+        window.addEventListener('scroll', placeShown, true);
+        window.addEventListener('resize', placeShown);
+      }
       await listen('views-changed', () => requestReload());
       await listen('changed', (event) => {
         const project = event.payload?.project ?? null;

@@ -45,7 +45,35 @@ dom.window.requestIdleCallback = (callback) => {
   return setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 1);
 };
 
+// A hosted session's terminal is the real xterm.js (session-pane.js), which needs a layout jsdom doesn't do: every
+// element measures 10 by 20 px (a slot, 30/40 and 500 by 300), and xterm measures a cell from 32 characters' width.
+/** @param {import('jsdom').DOMWindow} win */
+function laidOut(win) {
+  win.matchMedia ??= () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+    addListener() {},
+    removeListener() {},
+  });
+  Object.defineProperty(win.HTMLElement.prototype, 'offsetWidth', { get: () => 320, configurable: true });
+  Object.defineProperty(win.HTMLElement.prototype, 'offsetHeight', { get: () => 20, configurable: true });
+  win.HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+    const [left, top, width, height] = this.dataset?.terminalSlot ? [30, 40, 500, 300] : [0, 0, 10, 20];
+    return { x: left, y: top, left, top, width, height, right: left + width, bottom: top + height, toJSON() {} };
+  };
+  win.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+laidOut(dom.window);
+globalThis.ResizeObserver = dom.window.ResizeObserver;
+Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true });
+
 const { createRuntime } = await import('./runtime.js');
+const { mountSessionPane } = await import('./session-pane.js');
 const { markdown, mermaidSources } = await import('./blocks/markdown.js');
 const { mermaid, ahead, taskGraph, taskGraphSource } = await import('./blocks/mermaid.js');
 const { diff } = await import('./blocks/diff.js');
@@ -1478,7 +1506,7 @@ test('missing_default_extensions_name_where_the_window_looked', async () => {
  * Runs `work` in a window of its own at `url`, so its history starts with one entry and only the runtime started in
  * it follows that history: the runtimes earlier tests started keep listening on the shared window.
  */
-async function inWindow(url, work) {
+async function inWindow(url, work, options = {}) {
   // jsdom can't reload a page (and its `location.reload` can't be replaced): it reports each try on the console.
   const console = new VirtualConsole();
   const reloads = { count: 0, errors: [] };
@@ -1486,7 +1514,7 @@ async function inWindow(url, work) {
     if (/navigation/.test(err.message)) reloads.count++;
     else reloads.errors.push(err.message);
   });
-  const own = new JSDOM('<!doctype html><html><body></body></html>', { url, virtualConsole: console });
+  const own = new JSDOM('<!doctype html><html><body></body></html>', { url, virtualConsole: console, ...options });
   const shared = [globalThis.window, globalThis.document];
   globalThis.window = own.window;
   globalThis.document = own.window.document;
@@ -1980,4 +2008,265 @@ test('stepper_marks_done_current_and_gates', () => {
     ['1ResearchDone', 'G1Gate 1Passed 28 Oct', '2BuildNow', 'G2Gate 2Open', '3Ship'],
   );
   assert.equal(list.querySelector('[aria-current="step"] .ttl').textContent, 'Build');
+});
+
+// A hosted session's Session tab: the Activity view with a placeholder beside it, and the terminal pane, which lives
+// in #terminals outside #app, placed over that placeholder.
+const SESSION_ID = '00000000-0000-4000-8000-000000000001';
+const OTHER_ID = '00000000-0000-4000-8000-000000000002';
+const SESSION = { to: 'session', project: 'p1', id: SESSION_ID };
+const sessionViews = () => ({
+  session: { source: view('session', 'session', says('activity')) },
+  list: { source: view('list', 'list', says('the list')) },
+});
+
+/**
+ * Starts the runtime with a `#terminals` beside the root, `ids` hosted, and a `mountPane` that adds a bare div there
+ * (or the one given).
+ */
+async function hostedStart(app, route, { ids = [SESSION_ID], mountPane } = {}) {
+  const root = freshRoot();
+  const terminals = document.createElement('div');
+  terminals.id = 'terminals';
+  document.body.append(terminals);
+  const hosted = new Set(ids);
+  const mounts = [];
+  const mount =
+    mountPane ??
+    ((id) => {
+      mounts.push(id);
+      const element = document.createElement('div');
+      element.dataset.sessionId = id;
+      terminals.append(element);
+      return element;
+    });
+  const runtime = createRuntime({
+    root,
+    invoke: app.invoke,
+    listen: app.listen,
+    importModule: importBlob,
+    hosted,
+    mountPane: mount,
+  });
+  await runtime.start(route);
+  return { root, runtime, terminals, hosted, mounts };
+}
+
+test('hosted_session_shows_the_terminal_pane', async () => {
+  const { root, terminals, mounts } = await hostedStart(fakeApp(sessionViews()), SESSION);
+  assert.equal(section(root, 'session')?.textContent, 'activity', 'the Activity view is drawn as before');
+  const slot = root.querySelector(`[data-terminal-slot="${SESSION_ID}"]`);
+  assert.ok(slot, 'a placeholder for the terminal is drawn next to it');
+  assert.equal(slot.childElementCount, 0, 'and the terminal itself is never drawn inside #app');
+  assert.deepEqual(mounts, [SESSION_ID]);
+  assert.ok(!root.querySelector('[data-session-id]'));
+  const pane = terminals.querySelector(`[data-session-id="${SESSION_ID}"]`);
+  assert.ok(pane, 'the pane is in #terminals');
+  assert.notEqual(pane.style.display, 'none');
+  // Placed over the placeholder, at its screen rect.
+  assert.deepEqual(
+    [pane.style.position, pane.style.left, pane.style.top, pane.style.width, pane.style.height],
+    ['fixed', '30px', '40px', '500px', '300px'],
+  );
+});
+
+test('outside_session_is_unchanged', async () => {
+  const today = await started(fakeApp(sessionViews()), SESSION);
+  const { root, terminals, mounts } = await hostedStart(fakeApp(sessionViews()), SESSION, { ids: [OTHER_ID] });
+  assert.equal(root.innerHTML, today.root.innerHTML, 'byte for byte the screen a window without hosting draws');
+  assert.equal(root.querySelector('[data-terminal-slot]'), null);
+  assert.deepEqual(mounts, []);
+  assert.equal(terminals.childElementCount, 0);
+});
+
+test('switching_project_leaves_other_hosted_sessions_running', async () => {
+  const app = fakeApp(sessionViews());
+  const { root, runtime, terminals, hosted } = await hostedStart(app, SESSION);
+  runtime.navigate({ to: 'list', project: 'p2' });
+  await runtime.idle();
+  assert.equal(root.textContent, 'the list');
+  assert.ok(!app.calls.some(([cmd]) => cmd === 'kill_session'), 'leaving a project stops nothing');
+  assert.deepEqual([...hosted], [SESSION_ID], 'the session stays hosted, whichever project is shown');
+  assert.equal(terminals.childElementCount, 1);
+
+  // Back on its tab, the same pane is shown again.
+  const pane = terminals.firstElementChild;
+  runtime.navigate(SESSION);
+  await runtime.idle();
+  assert.equal(terminals.firstElementChild, pane);
+  assert.notEqual(pane.style.display, 'none');
+});
+
+test('redraw_keeps_the_same_terminal_element', async () => {
+  const app = fakeApp(sessionViews());
+  const { root, terminals, mounts } = await hostedStart(app, SESSION);
+  const pane = terminals.firstElementChild;
+  const slot = root.querySelector('[data-terminal-slot]');
+  pane.dataset.typed = 'kept';
+
+  await app.emit('changed', { project: 'p1' });
+  await app.emit('changed', { project: 'p1' });
+  await settle();
+  await settle();
+  const again = root.querySelector('[data-terminal-slot]');
+  assert.notEqual(again, slot, 'the redraw built the view anew');
+  assert.deepEqual(mounts, [SESSION_ID], 'and the pane was mounted once');
+  assert.equal(terminals.firstElementChild, pane);
+  assert.equal(pane.dataset.typed, 'kept', 'the same element, never replaced');
+  assert.equal(terminals.childElementCount, 1);
+  assert.equal(pane.style.left, '30px', 'still placed over the placeholder');
+});
+
+test('navigating_away_hides_without_destroying', async () => {
+  const { runtime, terminals, mounts } = await hostedStart(fakeApp(sessionViews()), SESSION);
+  const pane = terminals.firstElementChild;
+  runtime.navigate({ to: 'list' });
+  await runtime.idle();
+  assert.ok(terminals.contains(pane), 'the pane is still in #terminals');
+  assert.equal(pane.style.display, 'none', 'but not shown');
+  assert.deepEqual(mounts, [SESSION_ID]);
+  runtime.navigate({ ...SESSION });
+  await runtime.idle();
+  assert.deepEqual(mounts, [SESSION_ID], 'coming back mounts nothing again');
+  assert.notEqual(pane.style.display, 'none');
+});
+
+/** A fake pane api over a session that has written nothing: it records what reached the session. */
+function fakeApi() {
+  const sent = [];
+  const api = {
+    write: (id, data) => sent.push([id, data]),
+    resize: () => {},
+    subscribe: async () => {},
+    onExit: () => () => {},
+    scrollback: async () => new ArrayBuffer(0),
+  };
+  return { api, sent };
+}
+
+/** `inWindow`, with a `#terminals` and the layout xterm.js needs. */
+function inTerminalWindow(work) {
+  return inWindow(
+    'http://localhost/',
+    async (win, reloads) => {
+      laidOut(win);
+      const terminals = win.document.createElement('div');
+      terminals.id = 'terminals';
+      win.document.body.append(terminals);
+      return work(win, reloads, terminals);
+    },
+    { pretendToBeVisual: true },
+  );
+}
+
+test('ctrl_r_inside_the_terminal_is_not_a_reload', async () => {
+  await inTerminalWindow(async (win, reloads, terminals) => {
+    const { api, sent } = fakeApi();
+    const app = fakeApp(sessionViews());
+    const root = win.document.createElement('main');
+    win.document.body.prepend(root);
+    const runtime = createRuntime({
+      root,
+      invoke: app.invoke,
+      listen: app.listen,
+      importModule: importBlob,
+      hosted: new Set([SESSION_ID]),
+      mountPane: (id) => mountSessionPane(id, api).element,
+    });
+    await runtime.start(SESSION);
+    await settle();
+    const keys = terminals.querySelector('textarea');
+    assert.ok(keys, 'a real xterm.js is mounted');
+    keys.focus();
+    assert.ok(terminals.contains(win.document.activeElement));
+
+    /** @returns {boolean} whether the window kept the key from the engine */
+    const press = (target, init) => {
+      const event = new win.KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+      target.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    // The key as the terminal gets it: it goes to the session, and the window doesn't reload.
+    press(keys, { key: 'r', code: 'KeyR', keyCode: 82, ctrlKey: true });
+    await settle();
+    assert.deepEqual(sent.at(-1), [SESSION_ID, '\x12'], 'Claude Code gets its history search');
+    assert.equal(reloads.count, 0);
+    // The key reaching the window with the focus in the pane (not through xterm's own handler): still no reload,
+    // and not kept from the engine either.
+    assert.ok(!press(terminals.firstElementChild, { key: 'r', code: 'KeyR', ctrlKey: true }));
+    assert.ok(!press(terminals.firstElementChild, { key: 'F5' }));
+    assert.equal(reloads.count, 0);
+    // Out of the pane, the same keys reload.
+    keys.blur();
+    assert.ok(press(win.document.body, { key: 'r', code: 'KeyR', ctrlKey: true }));
+    assert.equal(reloads.count, 1);
+    assert.deepEqual(reloads.errors, []);
+  });
+});
+
+test('reload_rehydrates_hosted_sessions_from_the_backend', async () => {
+  // A reloaded window: the backend still runs the session; boot.js asks for it, and the window's address names its tab.
+  // Its own id: a pane is made once per id for the module's life, and the tests above made SESSION_ID's.
+  const RELOADED_ID = '00000000-0000-4000-8000-0000000000a1';
+  const calls = [];
+  const callbacks = [];
+  const quiet = new VirtualConsole();
+  const own = new JSDOM(`<!doctype html><html><body><main id="app"></main><div id="terminals"></div></body></html>`, {
+    url: `http://localhost/#/session/p1/${RELOADED_ID}`,
+    virtualConsole: quiet,
+    pretendToBeVisual: true,
+  });
+  laidOut(own.window);
+  own.window.requestIdleCallback = (callback) =>
+    setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 1);
+  own.window.__TAURI_INTERNALS__ = {
+    invoke: async (cmd, args) => {
+      calls.push([cmd, args]);
+      if (cmd === 'extensions') return { styles: [], disabled: [], looked: [] };
+      if (cmd === 'projects') return [{ id: 'p1', name: 'alpha', roots: ['/w/alpha'] }];
+      if (cmd === 'hosted_sessions') return [RELOADED_ID];
+      if (cmd === 'scrollback') return new ArrayBuffer(0);
+      if (cmd === 'views') return [{ id: 'session', source: 'Builtin', replaced: false }];
+      if (cmd === 'view_source') return view('session', 'session', says('activity'));
+      return null;
+    },
+    transformCallback: (callback) => callbacks.push(callback),
+  };
+  const shared = [globalThis.window, globalThis.document];
+  globalThis.window = own.window;
+  globalThis.document = own.window.document;
+  try {
+    await import('./boot.js');
+    await until(() => calls.some(([cmd]) => cmd === 'subscribe_session'), 'the pane subscribing');
+    const doc = own.window.document;
+    const asked = calls.findIndex(([cmd]) => cmd === 'hosted_sessions');
+    assert.ok(asked >= 0, 'boot asks the backend which sessions run');
+    assert.ok(asked < calls.findIndex(([cmd]) => cmd === 'subscribe_session'), 'before the first draw mounts a pane');
+    assert.ok(doc.querySelector(`#app [data-terminal-slot="${RELOADED_ID}"]`));
+    assert.ok(doc.querySelector(`#terminals [data-session-id="${RELOADED_ID}"]`));
+    const [, sub] = calls.find(([cmd]) => cmd === 'subscribe_session');
+    assert.equal(sub.id, RELOADED_ID);
+    assert.match(sub.onOutput.toJSON(), /^__CHANNEL__:\d+$/, 'the pane subscribes with its own channel');
+    assert.equal(calls.filter(([cmd]) => cmd === 'start_session').length, 0);
+
+    // What the pane sends goes through the shell's commands, as bytes.
+    const keys = doc.querySelector('#terminals textarea');
+    keys.dispatchEvent(new own.window.KeyboardEvent('keydown', { key: 'a', code: 'KeyA', keyCode: 65, bubbles: true }));
+    keys.dispatchEvent(
+      new own.window.KeyboardEvent('keypress', { key: 'a', keyCode: 97, charCode: 97, bubbles: true }),
+    );
+    await until(() => calls.some(([cmd]) => cmd === 'send_input'), 'the keystroke');
+    assert.deepEqual(calls.find(([cmd]) => cmd === 'send_input')[1], { id: RELOADED_ID, bytes: [97] });
+    assert.ok(calls.some(([cmd, a]) => cmd === 'resize_session' && a.id === RELOADED_ID));
+
+    // The session ends: it is no longer hosted, so the tab is the plain one again and the pane is hidden.
+    const listened = calls.filter(([cmd, a]) => cmd === 'plugin:event|listen' && a.event === 'session-exited');
+    assert.equal(listened.length >= 1, true, 'boot follows session-exited');
+    for (const [, a] of listened)
+      callbacks[a.handler - 1]({ event: 'session-exited', id: 1, payload: { id: RELOADED_ID, code: 0 } });
+    await until(() => !doc.querySelector('[data-terminal-slot]'), 'the redraw');
+    assert.equal(doc.querySelector(`#terminals [data-session-id="${RELOADED_ID}"]`).style.display, 'none');
+  } finally {
+    [globalThis.window, globalThis.document] = shared;
+  }
 });
