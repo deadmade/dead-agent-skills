@@ -6,32 +6,27 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
   AGENT_BROWSER_FILES,
-  type AgentBrowserPin,
+  type UpstreamPin,
   agentBrowserAsset,
-  agentBrowserPlan,
-  agentBrowserVersion,
+  upstreamPlan,
   windowProblem,
 } from '../core/binaries.ts';
 import { ASSETS, ask, done, failures, readJson } from '../context.ts';
 import { searchBrowserWorks } from '../system/browser.ts';
 import { downloadBin } from '../system/net.ts';
-import { claude, errCode, startSync, which } from '../system/proc.ts';
+import { claude, errCode, startSync, versionOf, which } from '../system/proc.ts';
 import { log, progress } from '../ui/ui.ts';
 import { BIN_DIR, WEB_MCP } from './binaries.ts';
 
 export async function installAgentBrowser(): Promise<{ path?: string; works: boolean }> {
-  const pin: AgentBrowserPin = readJson(join(ASSETS, 'agent-browser.json'));
+  const pin: UpstreamPin = readJson(join(ASSETS, 'agent-browser.json'));
   const pinned = pin.upstream ?? '';
   const key = `${process.platform}-${process.arch}`;
-  const versionOf = (bin: string) => {
-    const r = startSync(bin, ['--version']);
-    return r.status === 0 ? agentBrowserVersion(r.stdout) : undefined;
-  };
   const asset = agentBrowserAsset(process.platform, process.arch, pin);
   const bin = asset && join(BIN_DIR, asset.exe);
   const ours = bin && versionOf(bin);
   const theirs = which('agent-browser');
-  const plan = agentBrowserPlan({
+  const plan = upstreamPlan({
     theirs: theirs && versionOf(theirs),
     ours,
     pinned,
@@ -50,7 +45,9 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
   let deps = false;
   if (plan.download !== 'skip') {
     const what = plan.download === 'install' ? 'Download' : `Upgrade ${ours} to`;
-    if (!(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))) {
+    if (
+      !(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))
+    ) {
       done.push('agent-browser: install skipped by you');
       windowWorks();
       return { works: false };

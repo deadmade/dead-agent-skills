@@ -44,7 +44,7 @@
         text = ''
           node --test --experimental-test-coverage --test-coverage-include='installer/**' \
             --test-coverage-exclude='installer/**/*.test.ts' --test-coverage-lines=79 'installer/**/*.test.ts'
-          exec node --test 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs'
+          exec node --test 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs' 'plugins/opt-in/headroom-trim/hooks/*.test.mjs'
         '';
       };
     in
@@ -72,7 +72,7 @@
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/flows/skills/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(installer/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };
@@ -121,7 +121,7 @@
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
         # What scripts/sync-*.mjs and the workflows use besides stdenv, and the Rust toolchain for tui-review's binary.
-        packages = with pkgs; [git gh nodejs_26 cargo rustc clippy rustfmt rust-analyzer];
+        packages = with pkgs; [git gh nodejs_26 uv cargo rustc clippy rustfmt rust-analyzer];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };
     });

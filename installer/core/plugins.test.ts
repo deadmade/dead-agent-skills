@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   optIns,
   needsToken,
@@ -16,6 +17,12 @@ import {
   manifestPath,
   idOf,
   withDependencies,
+  pluginInstallPath,
+  pluginDataDir,
+  hookPort,
+  trimServerCommands,
+  trimServerEnv,
+  trimServerPort,
   BUNDLE,
   type Marketplace,
   type PluginJson,
@@ -37,6 +44,7 @@ test('opt-ins from the real manifests', () => {
         'flows',
         'graphify',
         'hallmark',
+        'headroom-trim',
         'mcp-azure',
         'mcp-github',
         'md-pane',
@@ -195,4 +203,82 @@ test('manifestPath finds a local plugin manifest, null for url sources and unkno
   );
   assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
   assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
+});
+
+test('pluginInstallPath reads Claude Code installed_plugins.json', () => {
+  const installed = json('installer/core/fixtures/installed_plugins.json');
+  assert.equal(
+    pluginInstallPath(installed, 'flows@dead-claude-skills'),
+    'C:\\Users\\someone\\.claude\\plugins\\cache\\dead-claude-skills\\flows\\0.6.0',
+  );
+  assert.equal(pluginInstallPath(installed, 'headroom-trim@dead-claude-skills'), undefined);
+  assert.equal(pluginInstallPath({}, 'flows@dead-claude-skills'), undefined);
+  assert.equal(pluginInstallPath({ plugins: { 'a@b': [] } }, 'a@b'), undefined);
+  const scoped = {
+    plugins: {
+      'a@b': [
+        { scope: 'project', installPath: '/p' },
+        { scope: 'user', installPath: '/u' },
+      ],
+    },
+  };
+  assert.equal(pluginInstallPath(scoped, 'a@b'), '/u');
+  assert.equal(pluginInstallPath({ plugins: { 'a@b': [{ scope: 'local', installPath: '/l' }] } }, 'a@b'), '/l');
+});
+
+test('trimServerCommands: the sync and tiktoken command lines and the env', () => {
+  const c = trimServerCommands('/root', '/data');
+  const server = join('/root', 'server');
+  assert.deepEqual(c.sync, ['sync', '--locked', '--project', server]);
+  assert.deepEqual(c.tiktoken.slice(0, 7), ['run', '--locked', '--project', server, 'python', '-c', c.tiktoken[6]]);
+  assert.match(c.tiktoken[6], /^import tiktoken; tiktoken\.get_encoding\('o200k_base'\)$/);
+  assert.deepEqual(c.env, {
+    UV_PROJECT_ENVIRONMENT: join('/data', 'venv'),
+    TIKTOKEN_CACHE_DIR: join('/data', 'tiktoken'),
+    PYTHONDONTWRITEBYTECODE: '1',
+  });
+});
+
+test('trimServerEnv drops UV_*, PYTHON* and VIRTUAL_ENV from the shell, then adds ours', () => {
+  const env = {
+    PATH: '/bin',
+    UV_PYTHON: '3.9',
+    uv_index_url: 'x',
+    UV_PROJECT_ENVIRONMENT: '/elsewhere',
+    PYTHONPATH: '/p',
+    PythonHome: '/ph',
+    VIRTUAL_ENV: '/v',
+    VIRTUAL_ENV_PROMPT: 'kept',
+    MYUV_X: 'kept',
+    UNSET: undefined,
+  };
+  assert.deepEqual(trimServerEnv(env, { UV_PROJECT_ENVIRONMENT: '/d/venv' }), {
+    PATH: '/bin',
+    VIRTUAL_ENV_PROMPT: 'kept',
+    MYUV_X: 'kept',
+    UNSET: undefined,
+    UV_PROJECT_ENVIRONMENT: '/d/venv',
+  });
+});
+
+test('trimServerPort: the hook port of the installed copy, undefined when not installed or unreadable', () => {
+  const installed = { plugins: { 'headroom-trim@m': [{ scope: 'user', installPath: '/ht' }] } };
+  const hooks = json('plugins/opt-in/headroom-trim/hooks/hooks.json');
+  const read = (p: string) => (p === join('/ht', 'hooks', 'hooks.json') ? hooks : undefined);
+  assert.equal(trimServerPort(installed, 'headroom-trim@m', read), 47811);
+  assert.equal(trimServerPort(installed, 'other@m', read), undefined);
+  assert.equal(trimServerPort(installed, 'headroom-trim@m', () => undefined), undefined);
+});
+
+test('pluginDataDir replaces @ with - in the id', () => {
+  assert.equal(
+    pluginDataDir('/c', 'headroom-trim@dead-claude-skills'),
+    join('/c', 'plugins', 'data', 'headroom-trim-dead-claude-skills'),
+  );
+});
+
+test('hookPort reads the PostToolUse http hook url of the real hooks.json', () => {
+  assert.equal(hookPort(json('plugins/opt-in/headroom-trim/hooks/hooks.json')), 47811);
+  assert.equal(hookPort({}), undefined);
+  assert.equal(hookPort({ hooks: { PostToolUse: [{ hooks: [{ type: 'http', url: 'nope' }] }] } }), undefined);
 });

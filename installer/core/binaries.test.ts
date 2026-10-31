@@ -4,10 +4,12 @@ import { readFileSync } from 'node:fs';
 import {
   missingBinaries,
   newestChromeForTesting,
-  agentBrowserAction,
+  upstreamAction,
   agentBrowserAsset,
-  agentBrowserPlan,
-  agentBrowserVersion,
+  upstreamPlan,
+  versionIn,
+  uvAsset,
+  uvPlan,
   windowProblem,
   BIN_PLUGINS,
   binAsset,
@@ -106,12 +108,26 @@ test('tui-review checksum lines and what to do about tui-review', () => {
 
 test('agent-browser: install when missing, upgrade when older, keep when equal or newer', () => {
   const pinned = '0.39.1';
-  assert.equal(agentBrowserAction({ installed: undefined, pinned }), 'install');
-  assert.equal(agentBrowserAction({ installed: '0.38.0', pinned }), 'upgrade');
-  assert.equal(agentBrowserAction({ installed: '0.39.1', pinned }), 'skip');
-  assert.equal(agentBrowserAction({ installed: '0.40.0', pinned }), 'skip');
-  assert.equal(agentBrowserVersion('agent-browser 0.39.1\n'), '0.39.1');
-  assert.equal(agentBrowserVersion('nope'), undefined);
+  assert.equal(upstreamAction({ installed: undefined, pinned }), 'install');
+  assert.equal(upstreamAction({ installed: '0.38.0', pinned }), 'upgrade');
+  assert.equal(upstreamAction({ installed: '0.39.1', pinned }), 'skip');
+  assert.equal(upstreamAction({ installed: '0.40.0', pinned }), 'skip');
+  assert.equal(versionIn('agent-browser 0.39.1\n'), '0.39.1');
+  assert.equal(versionIn('uv 0.13.6 (abc 2026-01-01)'), '0.13.6');
+  assert.equal(versionIn('nope'), undefined);
+});
+
+test('uvPlan: ours wins whenever it exists, else a current PATH uv, else download', () => {
+  const pinned = '0.13.6';
+  const plan = (oursExists: boolean, ours?: string, theirs?: string) => uvPlan({ oursExists, ours, theirs, pinned });
+  assert.deepEqual(plan(true, '0.13.6', '0.14.0'), { use: 'ours', download: 'skip' });
+  assert.deepEqual(plan(true, '0.13.6'), { use: 'ours', download: 'skip' });
+  assert.deepEqual(plan(true, '0.12.0', '0.14.0'), { use: 'ours', download: 'upgrade' });
+  assert.deepEqual(plan(true, undefined, '0.14.0'), { use: 'ours', download: 'upgrade' }, 'ours is there but broken');
+  assert.deepEqual(plan(false, undefined, '0.13.6'), { use: 'path' });
+  assert.deepEqual(plan(false, undefined, '0.14.0'), { use: 'path' });
+  assert.deepEqual(plan(false, undefined, '0.12.0'), { use: 'ours', download: 'install' });
+  assert.deepEqual(plan(false), { use: 'ours', download: 'install' });
 });
 
 test('agent-browser: the pinned upstream binary, only with a pinned hash', () => {
@@ -129,16 +145,39 @@ test('agent-browser: the pinned upstream binary, only with a pinned hash', () =>
   assert.ok(!missingBinaries('linux', ['web-mcp'], () => false).some((r) => r.binary === 'agent-browser'));
 });
 
+test('uv: the pinned upstream archive, only with a valid pin', () => {
+  const pin = { upstream: '0.13.6', sha256: { 'win32-x64': 'a'.repeat(64), 'linux-x64': 'b'.repeat(64) } };
+  const base = 'https://github.com/astral-sh/uv/releases/download/0.13.6';
+  assert.deepEqual(uvAsset('win32', 'x64', pin), {
+    file: 'uv-x86_64-pc-windows-msvc.zip',
+    url: `${base}/uv-x86_64-pc-windows-msvc.zip`,
+    digest: 'a'.repeat(64),
+    exe: 'uv.exe',
+  });
+  assert.deepEqual(uvAsset('linux', 'x64', pin), {
+    file: 'uv-x86_64-unknown-linux-musl.tar.gz',
+    url: `${base}/uv-x86_64-unknown-linux-musl.tar.gz`,
+    digest: 'b'.repeat(64),
+    exe: 'uv-x86_64-unknown-linux-musl/uv',
+  });
+  assert.equal(uvAsset('darwin', 'arm64', pin), undefined);
+  assert.equal(uvAsset('linux', 'x64', { ...pin, upstream: '0.13; rm' }), undefined);
+  assert.equal(uvAsset('linux', 'x64', { ...pin, sha256: {} }), undefined);
+  assert.ok(!missingBinaries('linux', ['headroom-trim'], () => false).some((r) => r.binary === 'uv'));
+  const shipped = JSON.parse(readFileSync(new URL('../assets/uv.json', import.meta.url), 'utf8'));
+  assert.ok(uvAsset('win32', 'x64', shipped) && uvAsset('linux', 'x64', shipped));
+});
+
 test('agent-browser plan: a current PATH copy wins, else ours, downloaded only when missing or older', () => {
   const pinned = '0.39.1';
-  assert.deepEqual(agentBrowserPlan({ theirs: '0.39.1', ours: undefined, pinned }), { use: 'path' });
-  assert.deepEqual(agentBrowserPlan({ theirs: '0.40.0', ours: '0.38.0', pinned }), { use: 'path' });
-  assert.deepEqual(agentBrowserPlan({ theirs: '0.38.0', ours: '0.39.1', pinned }), { use: 'ours', download: 'skip' });
-  assert.deepEqual(agentBrowserPlan({ theirs: undefined, ours: undefined, pinned }), {
+  assert.deepEqual(upstreamPlan({ theirs: '0.39.1', ours: undefined, pinned }), { use: 'path' });
+  assert.deepEqual(upstreamPlan({ theirs: '0.40.0', ours: '0.38.0', pinned }), { use: 'path' });
+  assert.deepEqual(upstreamPlan({ theirs: '0.38.0', ours: '0.39.1', pinned }), { use: 'ours', download: 'skip' });
+  assert.deepEqual(upstreamPlan({ theirs: undefined, ours: undefined, pinned }), {
     use: 'ours',
     download: 'install',
   });
-  assert.deepEqual(agentBrowserPlan({ theirs: undefined, ours: '0.38.0', pinned }), {
+  assert.deepEqual(upstreamPlan({ theirs: undefined, ours: '0.38.0', pinned }), {
     use: 'ours',
     download: 'upgrade',
   });
