@@ -7,6 +7,7 @@
 //! to subagents' transcripts, which are not commands and are never listed or read.
 
 use std::fs;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -87,9 +88,35 @@ pub fn list_background_tasks(dir: &Path) -> Vec<BackgroundTask> {
         .collect()
 }
 
-/// What command `task_id` has written so far, as the file holds it: Claude Code's own `[exited with code N]` or
-/// `[killed]` line ends it, and stays. `None` for an id that isn't plain, no such file (or not a regular file), or a
-/// failed read.
+/// How much of a command's output is read: its last bytes. A command that streams logs can write far more than a
+/// view can take on each poll, and the end is what matters, since Claude Code's trailer is there.
+const MAX_OUTPUT_BYTES: u64 = 1024 * 1024;
+
+/// The last `cap` bytes of `path` (all of it when shorter), starting at a character: the continuation bytes of a
+/// character the cut went through are dropped, so no replacement character opens the text.
+fn read_tail(path: &Path, cap: u64) -> Option<String> {
+    let mut file = fs::File::open(path).ok()?;
+    let cut = file.metadata().ok()?.len() > cap;
+    if cut {
+        file.seek(SeekFrom::End(-i64::try_from(cap).ok()?)).ok()?;
+    }
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).ok()?;
+    let start = if cut {
+        bytes
+            .iter()
+            .take(3)
+            .take_while(|b| **b & 0xC0 == 0x80)
+            .count()
+    } else {
+        0
+    };
+    Some(String::from_utf8_lossy(&bytes[start..]).into_owned())
+}
+
+/// What command `task_id` has written so far, as the file holds it, up to its last [`MAX_OUTPUT_BYTES`]: Claude
+/// Code's own `[exited with code N]` or `[killed]` line ends it, and stays. `None` for an id that isn't plain, no such
+/// file (or not a regular file), or a failed read.
 pub fn read_background_output(dir: &Path, task_id: &str) -> Option<String> {
     if !is_plain_id(task_id) {
         return None;
@@ -99,8 +126,7 @@ pub fn read_background_output(dir: &Path, task_id: &str) -> Option<String> {
     if !fs::symlink_metadata(&path).ok()?.is_file() {
         return None;
     }
-    let bytes = fs::read(path).ok()?;
-    Some(String::from_utf8_lossy(&bytes).into_owned())
+    read_tail(&path, MAX_OUTPUT_BYTES)
 }
 
 /// The session's `tasks/` folder, when Claude Code's runtime folder and the session's place in it are known.
@@ -247,6 +273,43 @@ mod tests {
             None,
             "a subagent's transcript link is not a task's output"
         );
+    }
+
+    #[test]
+    fn a_long_output_is_read_as_its_tail() {
+        let base = Dir::new("tail");
+        let dir = tasks_dir(&base.0, "folder", SESSION);
+        let cap = usize::try_from(MAX_OUTPUT_BYTES).unwrap();
+        let big = format!(
+            "START\n{}\nEND\n[exited with code 0]\n",
+            "x".repeat(cap * 2)
+        );
+        output(&dir, "bbigoutput", &big, 5);
+        let got = read_background_output(&dir, "bbigoutput").unwrap();
+        assert_eq!(got.len(), cap);
+        assert!(got.ends_with("END\n[exited with code 0]\n"));
+        assert!(!got.contains("START"));
+        assert_eq!(got, big[big.len() - cap..]);
+
+        // Exactly the cap is no cut; the common short file is whole.
+        let exact = "y".repeat(cap);
+        output(&dir, "bexactcap1", &exact, 5);
+        assert_eq!(read_background_output(&dir, "bexactcap1"), Some(exact));
+    }
+
+    #[test]
+    fn a_cut_through_a_character_starts_at_the_next_one() {
+        let base = Dir::new("tail-utf8");
+        let path = base.0.join("out");
+        // "é" is two bytes: a cut of 4 bytes of "aébcd" lands on its second byte.
+        fs::write(&path, "aébcd").unwrap();
+        assert_eq!(read_tail(&path, 4).as_deref(), Some("bcd"));
+        assert_eq!(read_tail(&path, 5).as_deref(), Some("ébcd"));
+        assert_eq!(read_tail(&path, 3).as_deref(), Some("bcd"));
+        assert_eq!(read_tail(&path, 6).as_deref(), Some("aébcd"));
+        fs::write(&path, "🦀bc").unwrap();
+        assert_eq!(read_tail(&path, 4).as_deref(), Some("bc"));
+        assert_eq!(read_tail(&path, 0).as_deref(), Some(""));
     }
 
     #[test]
