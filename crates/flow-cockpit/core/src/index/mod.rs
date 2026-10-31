@@ -24,7 +24,7 @@ pub use config::{Config, Home};
 pub use entries::{AuditSummary, DocName, Entry, FlowRun, FlowRunSummary, SessionSummary};
 pub use links::LinkCache;
 pub use projects::Project;
-pub use status::Status;
+pub use status::{Status, WORKING_SECS};
 
 use entries::{Derived, Docs, Session, derive, load_docs, mtime, read_head};
 use projects::{Resolver, roots_of};

@@ -24,6 +24,7 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use flow_cockpit_core::index::WORKING_SECS;
 use flow_cockpit_core::session::launch::{LaunchSpec, build_resume_argv, build_start_argv};
 use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use serde::{Deserialize, Serialize};
@@ -499,10 +500,6 @@ impl HostedSessions {
     }
 }
 
-/// A transcript written to within this long ago is being worked on: the flow runs' own "Working" rule
-/// (`index/status.rs`, which keeps its threshold private).
-const WORKING: Duration = Duration::from_mins(2);
-
 /// Whether closing the window now could cost a hosted session its work: one waits on a question or a permission
 /// prompt, wrote to its transcript lately, or has no transcript the index knows of (just started). Anything that can't
 /// be read counts as unfinished, never as idle.
@@ -525,7 +522,9 @@ fn unfinished(shared: &Shared, id: &str) -> bool {
     };
     match fs::metadata(path).and_then(|m| m.modified()) {
         // A write time in the future is a clock that moved: as recent as it gets.
-        Ok(written) => written.elapsed().map_or(true, |age| age <= WORKING),
+        Ok(written) => written
+            .elapsed()
+            .map_or(true, |age| age.as_secs() <= WORKING_SECS.cast_unsigned()),
         Err(_) => true,
     }
 }

@@ -7,7 +7,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 /// A transcript that grew within this many seconds is being worked on.
-const WORKING_SECS: i64 = 2 * 60;
+pub const WORKING_SECS: i64 = 2 * 60;
 /// A run with nothing happening for this long is stale.
 const STALE_SECS: i64 = 3 * 24 * 3600;
 
