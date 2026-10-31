@@ -387,3 +387,27 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
   .list-table .col-kind, .list-table .col-now, .list-table .col-scope, .list-table .col-findings, .list-table .col-started { display: none; }
   .list-table .name { width: auto; }
 }
+
+/* ---------- the shell's own chrome: hosted sessions, outside the views ----------
+ * The Start session button keeps one place on every page, over the rail's foot, clear of a hosted session's terminal
+ * (the right column). Dialogs and panels draw on the paper and say they are dark, so the engine's own controls and
+ * dialog boxes are dark too, not light boxes. */
+.start-dialog, .close-dialog, .resume-bar, .chips, .run-bar, .session-panel, .start-session { color-scheme: dark; }
+.start-session { position: fixed; left: var(--gutter); bottom: var(--gutter); z-index: 1; margin: 0; padding: var(--space-2) var(--space-4); border: 1px solid var(--color-rule); border-radius: var(--radius-pill); background: var(--color-paper-3); color: var(--color-ink); font-size: var(--text-sm); box-shadow: 0 2px 12px rgb(0 0 0 / 0.35); transition: background-color var(--dur-micro) var(--ease-out); }
+button.start-session:hover { background: var(--color-paper-4); }
+.start-session.unavailable { color: var(--color-muted); background: var(--color-paper-2); max-width: min(24rem, calc(100% - 2 * var(--gutter))); }
+.start-dialog, .close-dialog { width: min(40rem, calc(100% - 2 * var(--gutter))); padding: var(--space-5); border: 1px solid var(--color-rule); border-radius: var(--radius-row); background: var(--color-paper-2); color: var(--color-ink); }
+.start-dialog::backdrop, .close-dialog::backdrop { background: rgb(10 8 16 / 0.6); }
+.start-form { display: grid; gap: var(--space-3); }
+.close-dialog > * + * { margin-top: var(--space-3); }
+.start-form .field { flex-wrap: wrap; }
+.start-form .field > input, .start-form .field > textarea { flex: 1 1 16rem; min-height: 36px; padding: var(--space-1) var(--space-3); border: 1px solid var(--color-rule); border-radius: var(--radius-row); background: var(--color-paper); color: var(--color-ink); font: inherit; font-size: var(--text-sm); }
+.start-form .field > textarea { resize: vertical; }
+.start-form .command { display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius-code); background: var(--color-code-bg); font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.start-form .error, .close-dialog .error, .resume-bar .error { color: var(--color-error); }
+dialog .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+dialog .actions button, .resume-bar button, .chips .chip { min-height: 36px; padding: 0 var(--space-4); border: 1px solid var(--color-rule); border-radius: var(--radius-row); background: var(--color-paper-3); color: var(--color-ink); font-size: var(--text-sm); transition: background-color var(--dur-micro) var(--ease-out); }
+dialog .actions button:hover, .resume-bar button:hover, .chips .chip:hover { background: var(--color-paper-4); }
+.chips .chip[aria-pressed="true"] { border-color: var(--color-current); background: var(--color-paper-4); }
+.resume-bar { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); margin: var(--space-4) var(--gutter); }
+.run-bar { margin-bottom: var(--space-4); }

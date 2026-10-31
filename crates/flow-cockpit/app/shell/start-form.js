@@ -127,7 +127,7 @@ export function mountStartForm({ data, shell, navigate, route, host = document.b
   form.method = 'dialog';
   const dialog = el('dialog', 'start-dialog', form);
   dialog.setAttribute('aria-labelledby', title.id);
-  const trigger = el('button', '', 'Start session');
+  const trigger = el('button', 'start-session', 'Start session');
   trigger.type = 'button';
   trigger.dataset.startSession = '';
   host.append(trigger, dialog);
