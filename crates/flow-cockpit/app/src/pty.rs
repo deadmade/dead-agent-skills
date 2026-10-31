@@ -162,6 +162,8 @@ struct Session {
     child: Mutex<Box<dyn Child + Send + Sync>>,
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
     stream: Mutex<Stream>,
+    /// When the session last printed anything; `None` until it first does.
+    printed: Mutex<Option<Instant>>,
     /// Whether the process has exited.
     exit: Mutex<bool>,
     exited: Condvar,
@@ -178,6 +180,7 @@ impl Session {
     }
 
     fn push(&self, chunk: &[u8]) {
+        *lock(&self.printed) = Some(Instant::now());
         let mut stream = lock(&self.stream);
         stream.ring.extend(chunk);
         let excess = stream.ring.len().saturating_sub(stream.cap);
@@ -366,6 +369,7 @@ impl HostedSessions {
                 cap: self.scrollback,
                 sink: None,
             }),
+            printed: Mutex::new(None),
             exit: Mutex::new(false),
             exited: Condvar::new(),
             reader_done: AtomicBool::new(false),
@@ -498,16 +502,26 @@ impl HostedSessions {
         ids.sort_unstable();
         ids
     }
+
+    /// Whether the session printed anything within the Working window. A long foreground command writes nothing to
+    /// the transcript while it runs, but its session keeps printing (Claude Code's spinner and timer). A session that
+    /// can't be found counts as printing.
+    fn printed_lately(&self, id: Uuid) -> bool {
+        self.get(id).map_or(true, |session| {
+            lock(&session.printed)
+                .is_some_and(|at| at.elapsed().as_secs() <= WORKING_SECS.cast_unsigned())
+        })
+    }
 }
 
 /// Whether closing the window now could cost a hosted session its work: one waits on a question or a permission
-/// prompt, wrote to its transcript lately, or has no transcript the index knows of (just started). Anything that can't
-/// be read counts as unfinished, never as idle.
+/// prompt, printed or wrote to its transcript lately, or has no transcript the index knows of (just started). Anything
+/// that can't be read counts as unfinished, never as idle.
 pub fn needs_confirmation(hosted: &HostedSessions, shared: &Shared) -> bool {
     hosted
         .ids()
         .iter()
-        .any(|id| unfinished(shared, &id.to_string()))
+        .any(|&id| hosted.printed_lately(id) || unfinished(shared, &id.to_string()))
 }
 
 fn unfinished(shared: &Shared, id: &str) -> bool {
@@ -1431,6 +1445,44 @@ mod tests {
             cat(&hosted, &dir.0, id);
         }
         assert!(!needs_confirmation(&hosted, &shared));
+        hosted.kill_all();
+    }
+
+    #[test]
+    fn needs_confirmation_true_while_a_session_prints_with_no_transcript_write() {
+        let dir = Dir::new("confirm-printing");
+        let (busy, quiet) = (Uuid::new_v4(), Uuid::new_v4());
+        // Both transcripts were last written well past the Working window.
+        let shared = shared_over(&dir.0, &[(busy, secs(600)), (quiet, secs(600))]);
+        let hosted = sessions();
+        hosted
+            .launch(quiet, &sh("echo once; exec cat", &[]), &dir.0, 80, 24)
+            .unwrap();
+        wait_until("the quiet one's line", || {
+            screen(&hosted, quiet).contains("once")
+        });
+        // What it printed is older than the window: idle, as its transcript says.
+        *lock(&hosted.get(quiet).unwrap().printed) =
+            Instant::now().checked_sub(Duration::from_secs(WORKING_SECS.cast_unsigned() + 1));
+        assert!(!needs_confirmation(&hosted, &shared));
+
+        // A long foreground command: nothing reaches the transcript, but the session keeps printing.
+        hosted
+            .launch(
+                busy,
+                &sh("while :; do printf .; sleep 0.1; done", &[]),
+                &dir.0,
+                80,
+                24,
+            )
+            .unwrap();
+        wait_until("the busy one's output", || {
+            screen(&hosted, busy).contains("...")
+        });
+        assert!(
+            needs_confirmation(&hosted, &shared),
+            "a session printing now is working, whatever its transcript's age"
+        );
         hosted.kill_all();
     }
 
