@@ -166,6 +166,15 @@ from their npm tarballs (each tarball checked against the registry's `dist.integ
   the window needs no `withGlobalTauri`. `tslib.es6.js` is Microsoft's tslib (0BSD, its notice is the file's own
   header). Tarball `sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==`
   (sha256 `ea354409df3dcc473395111a5f6bf0031c8444cf827604515169aa3af5e9357a`).
+- **@xterm/xterm** 6.0.0 and **@xterm/addon-fit** 0.11.0 (npm `latest`): MIT, https://github.com/xtermjs/xterm.js
+  (`xterm.mjs` and `xterm.css` from `lib/` and `css/`, `addon-fit.mjs` from `lib/`, all unmodified; `LICENSE-xterm` is
+  xterm's own MIT text, and the addon's differs only in its copyright line, "Copyright (c) 2019, The xterm.js
+  authors"). `xterm.d.mts` and `addon-fit.d.mts` are the packages' `typings/*.d.ts` without their
+  `declare module '...'` wrapper, and the addon's import of `@xterm/xterm` pointed at `./xterm.mjs`, so `tsc` types
+  `session-pane.js`'s imports. Both modules are plain ES modules with no imports. `session-pane.js` draws a hosted
+  session's terminal with them, and `index.html` links `xterm.css`. Tarballs `xterm-xterm-6.0.0.tgz` (sha256
+  `908e66e04af6c8dc6b00dd3b54de088e2e81e5ed866284fd6c2fb3c2d1c7a3f6`) and `xterm-addon-fit-0.11.0.tgz` (sha256
+  `26003b4517a132b64e4ff228fd88a5fda3fff5e606c76093f6dcff772e9ecec0`).
 
 ## Night City (dead-skills)
 
