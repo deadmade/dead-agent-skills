@@ -10,8 +10,8 @@ const ROOT = join(import.meta.dirname, '..');
 test('a GROUPS folder is replaced by its subfolders', () => {
   const fx = mkdtempSync(join(tmpdir(), 'pd-'));
   for (const d of ['a', 'default', 'opt-in/x', 'opt-in/y', 'shared/w']) {
-    mkdirSync(join(fx, 'plugins', d, '.claude-plugin'), { recursive: true });
-    writeFileSync(join(fx, 'plugins', d, '.claude-plugin', 'plugin.json'), '{}');
+    mkdirSync(join(fx, 'plugins', d), { recursive: true });
+    writeFileSync(join(fx, 'plugins', d, 'plugin.json'), '{}');
   }
   assert.deepEqual(pluginDirs(fx), [
     'plugins/a',
@@ -25,8 +25,8 @@ test('a GROUPS folder is replaced by its subfolders', () => {
 test('a GROUPS folder can hold another one', () => {
   const fx = mkdtempSync(join(tmpdir(), 'pd-'));
   for (const d of ['opt-in/x', 'opt-in/mcp/m', 'opt-in/implementation/i']) {
-    mkdirSync(join(fx, 'plugins', d, '.claude-plugin'), { recursive: true });
-    writeFileSync(join(fx, 'plugins', d, '.claude-plugin', 'plugin.json'), '{}');
+    mkdirSync(join(fx, 'plugins', d), { recursive: true });
+    writeFileSync(join(fx, 'plugins', d, 'plugin.json'), '{}');
   }
   assert.deepEqual(pluginDirs(fx), ['plugins/opt-in/implementation/i', 'plugins/opt-in/mcp/m', 'plugins/opt-in/x']);
 });
@@ -39,8 +39,8 @@ test('the real repo lists md-pane but not the grouping folder', () => {
 
 test('a folder without a plugin manifest is skipped, like an old group left behind by ignored build output', () => {
   const fx = mkdtempSync(join(tmpdir(), 'pd-'));
-  mkdirSync(join(fx, 'plugins', 'a', '.claude-plugin'), { recursive: true });
-  writeFileSync(join(fx, 'plugins', 'a', '.claude-plugin', 'plugin.json'), '{}');
+  mkdirSync(join(fx, 'plugins', 'a'), { recursive: true });
+  writeFileSync(join(fx, 'plugins', 'a', 'plugin.json'), '{}');
   mkdirSync(join(fx, 'plugins', 'mods', 'tui-review', 'brv', 'target'), { recursive: true });
   mkdirSync(join(fx, 'plugins', 'shared', 'gone'), { recursive: true });
   assert.deepEqual(pluginDirs(fx), ['plugins/a']);

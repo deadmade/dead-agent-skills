@@ -16,61 +16,61 @@
     {
       "name": "dead-skills",
       "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus core plugins from claude-plugins-official as dependencies.",
-      "source": "./portable/claude-code/plugins/dead-skills",
+      "source": "./.claude-plugin/dead-skills",
       "category": "productivity"
     },
     {
       "name": "flows",
       "description": "Conductor skills with approval gates and resumable state: build, audit, review, verify, integrate and learn. Includes the writing skill, copyedit pass and skill packs; Claude Code also runs the prose-check hook.",
-      "source": "./portable/claude-code/plugins/flows",
+      "source": "./.claude-plugin/flows",
       "category": "development"
     },
     {
       "name": "graphify",
       "description": "Graphify: turn a codebase, docs and papers into a queryable knowledge graph (/graphify), plus hooks that nudge Claude to query the graph before reading files. Needs the graphify CLI (uv tool install graphifyy). Vendored from Graphify-Labs/graphify, synced weekly.",
-      "source": "./portable/claude-code/plugins/graphify",
+      "source": "./.claude-plugin/graphify",
       "category": "development"
     },
     {
       "name": "hallmark",
       "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark, synced weekly.",
-      "source": "./portable/claude-code/plugins/hallmark",
+      "source": "./.claude-plugin/hallmark",
       "category": "development"
     },
     {
       "name": "rust-skills",
       "description": "Apollo GraphQL's Rust best practices handbook as a skill. Vendored from apollographql/skills, synced weekly.",
-      "source": "./portable/claude-code/plugins/rust-skills",
+      "source": "./.claude-plugin/rust-skills",
       "category": "development"
     },
     {
       "name": "csharp-skills",
       "description": "Microsoft's .NET skills (dotnet/skills) behind six C#-only router skills. Vendored from dotnet/skills, synced weekly.",
-      "source": "./portable/claude-code/plugins/csharp-skills",
+      "source": "./.claude-plugin/csharp-skills",
       "category": "development"
     },
     {
       "name": "postgres",
       "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
-      "source": "./portable/claude-code/plugins/postgres",
+      "source": "./.claude-plugin/postgres",
       "category": "development"
     },
     {
       "name": "web-mcp",
       "description": "Web research tools for Claude: search (Google, Bing, DuckDuckGo and Brave read in web-mcp's own browser, paper APIs plus Google Scholar and Semantic Scholar, ranked with BM25), fetch (whole pages as markdown), browser (agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records), all archived in .web/. Needs the web-mcp binary and agent-browser.",
-      "source": "./portable/claude-code/plugins/web-mcp",
+      "source": "./.claude-plugin/web-mcp",
       "category": "development"
     },
     {
       "name": "mcp-github",
       "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions, code search). Opt-in per machine; needs a GitHub PAT.",
-      "source": "./portable/claude-code/plugins/mcp-github",
+      "source": "./.claude-plugin/mcp-github",
       "category": "productivity"
     },
     {
       "name": "mcp-azure",
       "description": "Azure DevOps Server tools through the ado-mcp release binary: pull requests, work items, pipelines, search, wikis and repository files. Self-hosted, PAT authentication; opt-in.",
-      "source": "./portable/claude-code/plugins/mcp-azure",
+      "source": "./.claude-plugin/mcp-azure",
       "category": "productivity"
     },
     {
@@ -85,37 +85,37 @@
     {
       "name": "nix-lsp",
       "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
-      "source": "./portable/claude-code/plugins/nix-lsp",
+      "source": "./.claude-plugin/nix-lsp",
       "category": "development"
     },
     {
       "name": "tui-review",
       "description": "/tui-review: a fast diff pane for the current branch, next to the chat, so you can ask Claude about what you read. Needs the tui-review binary.",
-      "source": "./portable/claude-code/plugins/tui-review",
+      "source": "./.claude-plugin/tui-review",
       "category": "development"
     },
     {
       "name": "md-pane",
       "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal).",
-      "source": "./portable/claude-code/plugins/md-pane",
+      "source": "./.claude-plugin/md-pane",
       "category": "productivity"
     },
     {
       "name": "headroom-trim",
       "description": "Shrinks every tool result with headroom's no-ML lossy compression before Claude reads it, through a local trim server that runs offline. Needs uv, which the installer downloads. Opt-in.",
-      "source": "./portable/claude-code/plugins/headroom-trim",
+      "source": "./.claude-plugin/headroom-trim",
       "category": "development"
     },
     {
       "name": "flow-cockpit",
       "description": "Teaches Claude to write and change the flow cockpit's views: the TypeScript views of the window that shows your flow runs, audits and Claude sessions (Linux from the flake, Windows from the installer). Also installs hooks that record questions, permission prompts and agent starts and stops per session into a local capture folder, which only the window reads. Opt-in.",
-      "source": "./portable/claude-code/plugins/flow-cockpit",
+      "source": "./.claude-plugin/flow-cockpit",
       "category": "development"
     },
     {
       "name": "agent-review",
       "description": "Checks agent work through verified artifacts, independent extractions and cold reviews. Used by the default bundle and flows.",
-      "source": "./portable/claude-code/plugins/agent-review",
+      "source": "./.claude-plugin/agent-review",
       "category": "development"
     }
   ]

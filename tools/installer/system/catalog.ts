@@ -5,7 +5,7 @@ import { selectTarget, type PluginDefinition } from '../core/catalog.ts';
 
 // The installed loader reads only shipped data, never authored plugin directories.
 export function readCatalog(root: string): PluginDefinition[] {
-  const value: unknown = JSON.parse(readFileSync(join(root, 'catalog/plugins.json'), 'utf8'));
+  const value: unknown = JSON.parse(readFileSync(join(root, 'plugins/catalog.json'), 'utf8'));
   const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
   const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every((s) => typeof s === 'string');
   const path = (v: unknown): v is string =>
@@ -23,8 +23,7 @@ export function readCatalog(root: string): PluginDefinition[] {
       !object(entry) ||
       typeof entry.name !== 'string' ||
       !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.name) ||
-      typeof entry.description !== 'string' ||
-      !entry.description.trim() ||
+      (entry.description !== undefined && (typeof entry.description !== 'string' || !entry.description.trim())) ||
       !(
         path(entry.source) ||
         (object(entry.source) &&
@@ -38,9 +37,7 @@ export function readCatalog(root: string): PluginDefinition[] {
       !strings(entry.targets) ||
       !entry.targets.length ||
       !entry.targets.every(target) ||
-      !object(entry.overlays) ||
-      !Object.entries(entry.overlays).every(([host, files]) => target(host) && paths(files)) ||
-      (entry.hooks !== undefined && !path(entry.hooks))
+      false
     )
       throw new Error('Invalid plugin catalog definition');
   }

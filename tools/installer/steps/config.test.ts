@@ -5,7 +5,7 @@ import { failures } from '../context.ts';
 import { type Marketplace } from '../core/plugins.ts';
 const id = 'mcp-azure@dead-claude-skills';
 const manifest: Marketplace = {
-  plugins: [{ name: 'mcp-azure', description: '', source: './plugins/opt-in/mcp/mcp-azure' }],
+  plugins: [{ name: 'mcp-azure', description: '', source: './.claude-plugin/mcp-azure' }],
 };
 
 test('self configuration skips complete settings, hands off unsupported installs and collects secrets separately', async () => {

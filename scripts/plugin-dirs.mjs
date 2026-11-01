@@ -1,5 +1,6 @@
 // Plugin folders as repo-relative `/` paths. A GROUPS folder holds plugins (or another GROUPS folder) one level down
 // and is not one itself.
+// A plugin's neutral manifest is plugins/<dir>/plugin.json.
 // A folder without a manifest is skipped: a checkout keeps ignored build output in folders a move left behind.
 import { existsSync, readdirSync } from 'node:fs';
 
@@ -13,6 +14,6 @@ export function pluginDirs(root = '.') {
   const expand = (p) => (GROUPS.includes(p.slice('plugins/'.length)) ? subdirs(p).flatMap(expand) : [p]);
   return subdirs('plugins')
     .flatMap(expand)
-    .filter((p) => existsSync(`${root}/${p}/.claude-plugin/plugin.json`))
+    .filter((p) => existsSync(`${root}/${p}/plugin.json`))
     .sort();
 }

@@ -4,7 +4,7 @@ import { selectedAgents } from './agents.ts';
 import { portableSelection } from './catalog.ts';
 import { readCatalog } from '../system/catalog.ts';
 import { resolve } from 'node:path';
-const definitions = readCatalog(resolve(import.meta.dirname, '../..'));
+const definitions = readCatalog(resolve(import.meta.dirname, '../../..'));
 import { codexPlan, installedCodex, managedRules, mcpEnvironment } from './codex.ts';
 
 test('host selection is explicit, validated and deduplicated', () => {

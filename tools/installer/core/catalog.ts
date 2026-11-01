@@ -1,27 +1,15 @@
-import { AGENTS, type AgentId } from './agents.ts';
+import type { AgentId } from './agents.ts';
 
 export interface PluginDefinition {
   name: string;
-  description: string;
+  description?: string;
   source: string | { source: 'url'; url: string };
   resources: string[];
   dependencies: string[];
   targets: AgentId[];
-  // Paths relative to source; native manifests retain host-specific dependencies.
-  // In particular, flows' generated Claude manifest remains owned by uses.json.
-  overlays: Partial<Record<AgentId, string[]>>;
-  hooks?: string;
-}
-export interface HookDefinition {
-  event: 'session.started' | 'turn.finished' | 'permission.requested' | 'question.asked' | 'notification.received';
-  handler: string;
-  required: boolean;
-  background: boolean;
-  timeoutSeconds: number;
 }
 export interface CapabilityDiagnostic {
   target: AgentId;
-  event?: HookDefinition['event'];
   plugin?: string;
   message: string;
 }
@@ -77,22 +65,4 @@ export function portableSelection(definitions: PluginDefinition[], selected: str
     entry.dependencies.forEach((dep) => result.add(dep));
   }
   return [...result];
-}
-
-export function selectHooks(
-  hooks: HookDefinition[],
-  target: AgentId,
-): { hooks: HookDefinition[]; diagnostics: CapabilityDiagnostic[] } {
-  const capabilities = AGENTS.find((a) => a.id === target)!.hooks;
-  const selected: HookDefinition[] = [],
-    diagnostics: CapabilityDiagnostic[] = [];
-  for (const hook of hooks) {
-    if (capabilities[hook.event]) selected.push(hook);
-    else {
-      const message = `${hook.required ? 'Required' : 'Optional'} hook ${hook.event} is unavailable on ${target}`;
-      if (hook.required) throw new Error(message);
-      diagnostics.push({ target, event: hook.event, message });
-    }
-  }
-  return { hooks: selected, diagnostics };
 }

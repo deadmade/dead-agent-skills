@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startupRules } from './rules.mjs';
-import { effectiveGlobalInstructions } from './runtime/codex.mjs';
+import { effectiveGlobalInstructions } from '../../../tools/harness-compiler/src/runtime/codex.mjs';
 const markers = { start: '<!-- dead-agent-skills:start -->', end: '<!-- dead-agent-skills:end -->' };
 const block = `${markers.start}\npolicy\n${markers.end}`;
 test('fresh startup supplies packaged context; active owned block suppresses duplication', () => {

@@ -30,7 +30,7 @@ The Claude catalog is `.claude-plugin/marketplace.json`; the Codex catalog is `.
 They have separate plugin selections and host-specific packages. The repository still has its original GitHub name;
 Claude's marketplace/plugin identifiers remain stable for existing users.
 
-Native packages are checked in under `portable/plugins/` (Codex) and `portable/claude-code/plugins/` (Claude Code), including skill packs, reviewer briefs, C# libraries and licenses.
+Native packages are checked in under `.agents/plugins/` (Codex) and `.claude-plugin/` (Claude Code), including skill packs, reviewer briefs, C# libraries and licenses.
 They install directly from the Git marketplace. Codex does not apply Claude's plugin dependency declarations, so
 install the companion plugins shown above for flows. Flows also document fallbacks when an integration is missing.
 Standalone options include hallmark, Rust, C# and Postgres skills, plus MCP setup plugins for GitHub, Azure and
@@ -101,12 +101,12 @@ and `git push --follow-tags origin main`. The tag builds the installer and the b
 release they're downloaded from. From a checkout,
 `npm ci` once, then `node tools/installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.
 
-Author plugins in `catalog/plugins.json` and their source resources under `plugins/`. The catalog declares shared
-resources, dependencies, targets and native overlays; default shared events live in `plugins/default/hooks/shared.json`.
+Author plugins in `plugins/catalog.json` and their source resources under `plugins/`. The catalog declares shared
+resources, dependencies, targets and native overlays; hooks use neutral events in each plugin's `hooks/hooks.json`.
 Run `npm run build:harnesses`, review both native distributions and root catalog changes, then include them in the
-same commit as the source. Never edit `portable/` or the generated source `themes/night-city.json` by hand.
+same commit as the source. Never edit `.claude-plugin/` or `.agents/plugins/` by hand.
 `npm run check:harnesses` rebuilds in a temporary directory and detects missing, changed and extra outputs without
-rewriting your checkout. `build:codex` and `check:codex` remain compatibility aliases. Vendoring and release scripts
+rewriting your checkout. Vendoring and release scripts
 regenerate both targets; CI checks freshness. `npm pack` checks freshness and compiles the optional installer.
 
 Required unsupported capabilities fail generation; optional unsupported events have diagnostics and are omitted.

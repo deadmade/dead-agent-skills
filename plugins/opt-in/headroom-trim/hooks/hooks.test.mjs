@@ -4,30 +4,26 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
 const config = JSON.parse(readFileSync(new URL('./hooks.json', import.meta.url), 'utf8'));
+const byEvent = (event) => config.hooks.filter((h) => h.event === event);
 
-test('SessionStart runs the launcher as one exec-form command with the port', () => {
-  const entries = config.hooks.SessionStart;
+test('session start runs the launcher with the port', () => {
+  const entries = byEvent('session.started');
   assert.equal(entries.length, 1);
-  assert.deepEqual(entries[0].hooks, [
-    { type: 'command', command: 'node', args: ['${CLAUDE_PLUGIN_ROOT}/hooks/launch.mjs', '47811'] },
-  ]);
+  assert.equal(entries[0].script, 'hooks/launch.mjs');
+  assert.deepEqual(entries[0].args, ['47811']);
 });
 
-test('PostToolUse posts every tool result to the trim server on the same port, 5 s, no onFailure', () => {
-  const entries = config.hooks.PostToolUse;
+test('every tool result is posted to the trim server on the same port, 5 s', () => {
+  const entries = byEvent('tool.completed');
   assert.equal(entries.length, 1);
-  assert.equal(entries[0].matcher, '*');
-  assert.deepEqual(entries[0].hooks, [{ type: 'http', url: 'http://127.0.0.1:47811/hook', timeout: 5 }]);
-  assert.equal(config.hooks.SessionStart[0].hooks[0].args[1], '47811');
+  assert.deepEqual(entries[0].tools, ['*']);
+  assert.equal(entries[0].http, 'http://127.0.0.1:47811/hook');
+  assert.equal(entries[0].timeoutSeconds, 5);
 });
 
 test('every script hooks.json runs exists', () => {
   const root = fileURLToPath(new URL('..', import.meta.url));
-  const args = config.hooks.SessionStart.flatMap((e) => e.hooks.flatMap((h) => h.args));
-  assert.ok(args.length > 0);
-  for (const arg of args.filter((a) => a.startsWith('$'))) {
-    assert.match(arg, /^\$\{CLAUDE_PLUGIN_ROOT\}\//);
-    const path = arg.replace('${CLAUDE_PLUGIN_ROOT}', root);
-    assert.ok(existsSync(path), path);
-  }
+  const scripts = config.hooks.map((h) => h.script).filter(Boolean);
+  assert.ok(scripts.length > 0);
+  for (const script of scripts) assert.ok(existsSync(root + script), script);
 });

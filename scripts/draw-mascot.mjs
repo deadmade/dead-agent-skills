@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
 
 const PLUGINS = join(import.meta.dirname, '..', 'plugins');
-export const ASSETS = join(PLUGINS, 'default', 'assets');
+export const ASSETS = join(import.meta.dirname, '..', 'plugins', 'default', 'assets');
 export const SIZE = 64;
 export const SCALE = 8;
 

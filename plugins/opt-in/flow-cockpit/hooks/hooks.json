@@ -1,47 +1,71 @@
 {
   "description": "Watch only: records questions, permission prompts, agents starting and stopping and turns ending into a capture file per session, for the flow cockpit. Prints nothing and decides nothing.",
-  "hooks": {
-    "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }] }
-    ],
-    "SessionEnd": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }] }
-    ],
-    "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }] }
-    ],
-    "Stop": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }] }
-    ],
-    "SubagentStart": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }] }
-    ],
-    "SubagentStop": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }] }
-    ],
-    "Notification": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }] }
-    ],
-    "PermissionRequest": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }] }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/capture.mjs\"", "async": true }]
-      }
-    ]
-  }
+  "hooks": [
+    {
+      "event": "session.started",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "session.ended",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "prompt.submitted",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "turn.finished",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "subagent.started",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "subagent.stopped",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "notification.any",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "permission.prompted",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "question.asked",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "question.answered",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "question.failed",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    }
+  ]
 }

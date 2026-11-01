@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 // Each flows conductor lists the skills, agents and tools it runs in its uses.json ({ plugin: [names] }).
-// From those lists come flows' plugin.json dependencies and the tree in its README; check-repo fails on drift.
+// From those lists come flows' dependencies (catalog and plugin.json) and the tree in its README; check-repo fails on drift.
 // Run directly to rewrite both.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -52,7 +52,7 @@ export const packs = (root) =>
 // marketplace: the parsed marketplace.json. Returns problems as strings.
 export function checkUses(root, marketplace) {
   const problems = [];
-  const definitions = JSON.parse(readFileSync(join(root, 'catalog/plugins.json'), 'utf8'));
+  const definitions = JSON.parse(readFileSync(join(root, 'plugins/catalog.json'), 'utf8'));
   const packNames = packs(root);
   const skills = flowsSkills(root);
   const dir = join(root, FLOWS, 'skills');
@@ -98,8 +98,11 @@ export function checkUses(root, marketplace) {
           ? join(root, entry.source)
           : undefined;
       const checkable = dir && ['skills', 'agents', 'workflows'].some((d) => existsSync(join(dir, d)));
+      const manifestFile = dir && join(dir, 'plugin.json');
       const mcp =
-        dir && existsSync(join(dir, '.mcp.json')) ? Object.keys(JSON.parse(readFileSync(join(dir, '.mcp.json')))) : [];
+        manifestFile && existsSync(manifestFile)
+          ? Object.keys(JSON.parse(readFileSync(manifestFile, 'utf8')).mcpServers ?? {})
+          : [];
       for (const name of names) {
         const found =
           mcp.includes(name) ||
@@ -204,6 +207,33 @@ export function checkPackPaths(root) {
   return problems;
 }
 
+// What flows depends on now: its catalog entry's plugins of this repository plus the external plugins of its
+// neutral plugin.json, as `name` or `name@marketplace`, sorted.
+export function currentDeps(root) {
+  const catalog = JSON.parse(readFileSync(join(root, 'plugins/catalog.json'), 'utf8'));
+  const internal = catalog.find((p) => p.name === 'flows')?.dependencies ?? [];
+  const manifest = JSON.parse(readFileSync(join(root, FLOWS, 'plugin.json'), 'utf8'));
+  const external = (manifest.dependencies ?? []).filter((d) => d.marketplace).map((d) => `${d.name}@${d.marketplace}`);
+  return [...new Set([...internal, ...external])].sort();
+}
+
+// Rewrites flows' dependencies from the conductors: official plugins into plugin.json, the rest into the catalog.
+export function writeDeps(root, expected) {
+  const external = expected
+    .filter((d) => d.includes('@'))
+    .map((d) => ({ name: d.split('@')[0], marketplace: d.split('@')[1] }));
+  const manifestPath = join(root, FLOWS, 'plugin.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  // Claude-only extras (no marketplace) stay as the author wrote them.
+  manifest.dependencies = [...external, ...(manifest.dependencies ?? []).filter((d) => !d.marketplace)];
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+  const catalogPath = join(root, 'plugins/catalog.json');
+  const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
+  const flows = catalog.find((p) => p.name === 'flows');
+  flows.dependencies = expected.filter((d) => !d.includes('@'));
+  writeFileSync(catalogPath, JSON.stringify(catalog, null, 2) + '\n');
+}
+
 // packNames: packs(root); flows carries those and its own skills, so they are never a dependency.
 export const expectedDeps = (all, packNames) =>
   [...new Set(Object.values(all).flatMap((uses) => Object.keys(uses ?? {})))]
@@ -239,13 +269,10 @@ export function withTree(readme, tree) {
 if (import.meta.main ?? process.argv[1] === import.meta.filename) {
   const root = join(import.meta.dirname, '..');
   const all = readUses(root);
-  const manifest = join(root, FLOWS, '.claude-plugin', 'plugin.json');
-  const json = JSON.parse(readFileSync(manifest, 'utf8'));
-  json.dependencies = expectedDeps(all, packs(root));
-  writeFileSync(manifest, JSON.stringify(json, null, 2) + '\n');
+  writeDeps(root, expectedDeps(all, packs(root)));
   const readmePath = join(root, FLOWS, 'README.md');
   const readme = withTree(readFileSync(readmePath, 'utf8'), renderTree(all));
   if (!readme) throw new Error(`${readmePath}: no ${START} … ${END} block`);
   writeFileSync(readmePath, readme);
-  execFileSync(process.execPath, [join(root, 'scripts/build-harnesses.mjs')], { stdio: 'inherit' });
+  execFileSync(process.execPath, [join(root, 'tools/harness-compiler/src/cli.ts'), 'build'], { stdio: 'inherit' });
 }

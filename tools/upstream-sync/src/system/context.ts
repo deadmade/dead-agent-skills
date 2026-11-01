@@ -5,8 +5,10 @@ import { pinFrom } from '../text.ts';
 import type { SyncContext } from '../types.ts';
 
 export type ProcessRunner = (program: string, args: string[], cwd: string) => string;
+// Git variables (GIT_INDEX_FILE inside a commit hook, GIT_DIR, ...) point at the caller's repository, not at cwd.
+const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
 export const execute: ProcessRunner = (program, args, cwd) =>
-  execFileSync(program, args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+  execFileSync(program, args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: cleanEnv() }).trim();
 
 export function createContext(
   root: string,

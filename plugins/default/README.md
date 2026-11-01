@@ -3,7 +3,7 @@
 The default bundle, on every machine:
 
 - **Global rules**: `rules.md`, added to the context at session start.
-- **Context7** (`.mcp.json`): up-to-date library docs.
+- **Context7**: up-to-date library docs.
 - **Night City**: the theme and its mod, below.
 - **Notifications**: a desktop popup when a turn ends or the harness reports a supported waiting event, below.
 - The core plugins as dependencies: claude-code-setup, claude-md-management, security-guidance and claude-security.
@@ -76,9 +76,9 @@ monitor) and come back when it's your move.
 
 It fires on:
 
-- a finished turn of the main agent (`Stop`): a Night City line ("Come look at your Agent") and the first line of Claude's answer;
-- a permission prompt or an MCP elicitation (`Notification`): a Night City line ("Songbird requests your help") and Claude Code's message;
-- a question from Claude (`PreToolUse` on `AskUserQuestion`, which raises no notification of its own): a waiting line and the
+- a finished turn of the main agent (`turn.finished`): a Night City line ("Come look at your Agent") and the first line of Claude's answer;
+- a permission prompt or an MCP elicitation (`permission.requested`): a Night City line ("Songbird requests your help") and Claude Code's message;
+- a question from Claude (`question.asked`, which raises no notification of its own): a waiting line and the
   question.
 
 The popup comes from Onibi, Night City's pixel-art netrunner: her face is the icon (`icon.png`, a brightened crop
@@ -107,25 +107,22 @@ Talking to the notification daemon directly means tmux needs no `allow-passthrou
 (`async`), so a slow PowerShell start doesn't hold up the turn. Claude's text reaches the notifier as an argument or
 an environment variable, never as script source.
 
-### Claude Code's own notification
+### The agent's own notification
 
-The installer sets `"preferredNotifChannel": "notifications_disabled"` in `~/.claude/settings.json`, so Claude Code's
-own notification doesn't double up. Installed by hand, set it yourself.
+If the agent has a built-in desktop notification, turn it off so it doesn't double up with this one. The installer does
+this where it can.
 
-## Native packages and trust
+## Hooks and the theme
 
-The neutral catalog generates this bundle for Claude Code and Codex. Shared declarations in `hooks/shared.json`
-register small packaged adapters that decode native input, run rules/notification behavior and encode native context.
-Claude handles notification permission/elicitation signals and AskUserQuestion; Codex maps PermissionRequest and
-request_user_input separately and omits the optional generic notification event. Most waiting-event fixtures remain
-documentation-derived; live native trust/execution is pending. No transcript parsing is required.
+`hooks/hooks.json` declares the hooks in neutral events (`session.started`, `turn.finished`, `permission.requested`,
+`question.asked`, `notification.received`). Each distribution maps them to the events its agent supports and drops the
+rest, so a missing optional event is only reported at build time. Small packaged adapters decode the agent's input, run
+the rules or notification behavior and encode the agent's context. No transcript parsing is required. Node must be on
+PATH.
 
-Review Codex hook trust and verify a fresh session before accepting installer cleanup of an old managed instructions
-block. A matching runtime receipt plus explicit verification is required; unrelated or changed instructions stay.
-Fresh installs receive rules through startup hooks rather than a second global block. Node must be on PATH.
+Fresh installs receive the rules through the start-of-session hook rather than a second global block. Unrelated or
+changed global instructions stay untouched.
 
-The authored Night City palette is `themes/palette.json`. Run `setup-night-city` in Codex to copy the packaged
-`themes/night-city.tmTheme` safely into `$CODEX_HOME/themes/`, then select it using `/theme`. Existing differing files
-are preserved. Codex theme setup never recolors the terminal. Claude's module effects above are native extensions.
-Native picker/visual checks and Windows acceptance remain pending; generated theme tests establish format/palette,
-not visual acceptance. Contributors run `npm run build:harnesses` and review both outputs before committing.
+The Night City palette is `themes/palette.json`; each distribution generates the theme format its agent reads, plus a
+`setup-night-city` skill that says how to select it. Agent-specific effects (spinner words, shimmer, UI mods) exist only
+where the agent supports them. Contributors run `npm run build:harnesses` and review every output before committing.

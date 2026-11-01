@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { optIns, manifestPath, BUNDLE, type Marketplace, type PluginJson } from './plugins.ts';
 import { dcgCommand, CATEGORIES, TOGGLES, categorize, unavailable } from './options.ts';
 
-const json = (p: string) => JSON.parse(readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'));
+const json = (p: string) => JSON.parse(readFileSync(new URL(`../../../${p}`, import.meta.url), 'utf8'));
 const marketplace: Marketplace = json('.claude-plugin/marketplace.json');
 const bundle: PluginJson & { dependencies: string[] } = json(manifestPath(marketplace, BUNDLE)!);
 const M = 'dead-claude-skills';

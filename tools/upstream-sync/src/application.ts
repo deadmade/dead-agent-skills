@@ -20,17 +20,11 @@ export function source(root: string, name: string): Source {
   const all = sources(root);
   const found = all.find((s) => s.name === name);
   if (!found) throw new Error(`unknown source ${name}; one of ${all.map((s) => s.name).join(', ')}`);
-  if (!existsSync(join(root, 'catalog/plugins.json'))) return found;
+  if (!existsSync(join(root, 'plugins/catalog.json'))) return found;
   // Generated distributions travel with every upstream change, including previews and sync PRs.
   return {
     ...found,
-    paths: [
-      ...found.paths,
-      'portable',
-      '.agents/plugins/marketplace.json',
-      '.claude-plugin/marketplace.json',
-      'plugins/default/themes/night-city.json',
-    ],
+    paths: [...found.paths, '.claude-plugin', '.agents/plugins'],
   };
 }
 export function artifactDirectory(name: string): string {
@@ -53,8 +47,8 @@ export function sync(
     throw new Error('--ref requires pstack-picks and a full 40-character commit');
   const context = createContext(root, temporary, spec.argument, ref, runner, log);
   const result = spec.adapter(context);
-  if (existsSync(join(root, 'catalog/plugins.json'))) {
-    const output = runner(process.execPath, [join(root, 'scripts/build-harnesses.mjs')], root);
+  if (existsSync(join(root, 'plugins/catalog.json'))) {
+    const output = runner(process.execPath, [join(root, 'tools/harness-compiler/src/cli.ts'), 'build'], root);
     if (output) log(output);
   }
   const values = spec.check(result.values);

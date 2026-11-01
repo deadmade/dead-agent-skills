@@ -66,7 +66,7 @@ In the scoped docs, check what can be checked by running something:
   Run a documented command only when it's read-only or the repo's own check; never one that installs, deletes,
   pushes or publishes.
 - **Versions and names:** versions, plugin and package names, env vars and config keys match their source.
-- **Claude Code plugin manifests:** `claude plugin validate <plugin folder>`, when `claude` is on PATH.
+- **Plugin manifests:** the host's plugin validator on the plugin folder, when the host provides one.
 
 ## Phase 5: Prose
 

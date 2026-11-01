@@ -5,7 +5,7 @@ The coding agent proposes and recommends; the user decides.
 
 ## Host capabilities
 
-These rules apply to Claude Code and Codex. Use the current host's native tools for reading files,
+These rules apply to every supported coding agent. Use the current host's native tools for reading files,
 tracking tasks, asking the user, and dispatching subagents. Tool availability is determined by the
 current session, not by product name. If subagents are unavailable, skip every subagent-only step,
 including reviewer dispatch; do not replace it with a sequential review in the main session. Record
@@ -16,7 +16,7 @@ Where these rules override a sentence of a pack, or paste a section of one, a ma
 `<!-- overrides <pack>/<path inside the pack>: "<sentence>" -->`. `npm test` fails when the pack no longer holds the
 sentence, so an upstream change to an overridden or pasted rule is noticed at its sync.
 
-Read the adapter for the current host: [Claude Code](hosts/claude-code.md) or [Codex](hosts/codex.md).
+Read the adapter for the current host: [host.md](host.md).
 `<flow-root>` is the folder containing this `references/` directory. `<skill-dir>` is the directory
 of the SKILL.md currently being followed. Resolve resource paths relative to their containing document,
 never the shell working directory. A pack's own host variables mean that pack's directory as described below.

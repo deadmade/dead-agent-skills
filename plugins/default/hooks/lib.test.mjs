@@ -12,7 +12,8 @@ test('normalized policy skips continuation, child completion and headless events
   assert.equal(shouldNotify({ kind: 'turn.finished', agentId: 'a1', interactive: true }), false);
   assert.equal(shouldNotify({ interactive: false }), false);
   assert.equal(shouldNotify({ kind: 'turn.finished', interactive: true }), true);
-  for (const kind of ['permission.requested', 'question.asked']) assert.equal(shouldNotify({ kind, agentId: 'a1', interactive: true }), true);
+  for (const kind of ['permission.requested', 'question.asked'])
+    assert.equal(shouldNotify({ kind, agentId: 'a1', interactive: true }), true);
 });
 
 test('tmux focus needs active pane, active window and a focused client', () => {
@@ -161,14 +162,4 @@ test('tmux is asked for our pane and every client of its session', () => {
     '-F',
     '#{client_flags}',
   ]);
-});
-
-test('compatibility entry diagnoses malformed input without control output', () => {
-  const script = fileURLToPath(new URL('./notify.mjs', import.meta.url));
-  for (const input of ['not json', '{}']) {
-    const r = spawnSync(process.execPath, [script], { input, env: { ...process.env, PATH: '' }, timeout: 10000 });
-    assert.equal(r.status, 1, String(r.stderr));
-    assert.equal(String(r.stdout), '');
-    assert.match(String(r.stderr), /hook:/);
-  }
 });

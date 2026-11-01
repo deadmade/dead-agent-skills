@@ -28,7 +28,7 @@ import {
   type PluginJson,
 } from './plugins.ts';
 
-const json = (p: string) => JSON.parse(readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'));
+const json = (p: string) => JSON.parse(readFileSync(new URL(`../../../${p}`, import.meta.url), 'utf8'));
 const marketplace: Marketplace = json('.claude-plugin/marketplace.json');
 const bundle: PluginJson & { dependencies: string[] } = json(manifestPath(marketplace, BUNDLE)!);
 const M = 'dead-claude-skills';
@@ -69,9 +69,9 @@ test('bundle ids resolve bare names to our marketplace; flows carries the packs,
 });
 
 test('token plugins', () => {
-  assert.equal(needsToken(json('plugins/opt-in/mcp/mcp-github/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/shared/graphify/.claude-plugin/plugin.json')), false);
+  assert.equal(needsToken(json('.claude-plugin/mcp-github/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('.claude-plugin/mcp-azure/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('.claude-plugin/graphify/.claude-plugin/plugin.json')), false);
 });
 
 test('select installs, deselect uninstalls, token plugins hand off', () => {
@@ -144,7 +144,7 @@ test('withDependencies adds opt-in dependencies transitively, once, and nothing 
 });
 
 test("flows' dependencies are marketplace or official plugins", () => {
-  const flows = json('plugins/flows/.claude-plugin/plugin.json').dependencies.map(idOf);
+  const flows = json('.claude-plugin/flows/.claude-plugin/plugin.json').dependencies.map(idOf);
   for (const id of flows) {
     const [name, from] = id.split('@');
     assert.ok(from === O || marketplace.plugins.some((p) => p.name === name), id);
@@ -264,7 +264,7 @@ test('trimServerEnv drops UV_*, PYTHON* and VIRTUAL_ENV from the shell, then add
 
 test('trimServerPort: the hook port of the installed copy, undefined when not installed or unreadable', () => {
   const installed = { plugins: { 'headroom-trim@m': [{ scope: 'user', installPath: '/ht' }] } };
-  const hooks = json('plugins/opt-in/headroom-trim/hooks/hooks.json');
+  const hooks = json('.claude-plugin/headroom-trim/hooks/hooks.json');
   const read = (p: string) => (p === join('/ht', 'hooks', 'hooks.json') ? hooks : undefined);
   assert.equal(trimServerPort(installed, 'headroom-trim@m', read), 47811);
   assert.equal(trimServerPort(installed, 'other@m', read), undefined);
@@ -282,7 +282,7 @@ test('pluginDataDir replaces @ with - in the id', () => {
 });
 
 test('hookPort reads the PostToolUse http hook url of the real hooks.json', () => {
-  assert.equal(hookPort(json('plugins/opt-in/headroom-trim/hooks/hooks.json')), 47811);
+  assert.equal(hookPort(json('.claude-plugin/headroom-trim/hooks/hooks.json')), 47811);
   assert.equal(hookPort({}), undefined);
   assert.equal(hookPort({ hooks: { PostToolUse: [{ hooks: [{ type: 'http', url: 'nope' }] }] } }), undefined);
 });

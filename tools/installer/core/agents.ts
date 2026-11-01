@@ -1,5 +1,4 @@
-// Host metadata and native event capabilities. Plugin definitions live in catalog/plugins.json.
-import type { HookDefinition } from './catalog.ts';
+// Host metadata. Plugin definitions live in plugins/catalog.json; native event mappings belong to the harness compiler.
 
 export type AgentId = 'claude-code' | 'codex';
 export interface AgentAdapter {
@@ -8,7 +7,6 @@ export interface AgentAdapter {
   binary: string;
   configEnv: string;
   configDir: string;
-  hooks: Partial<Record<HookDefinition['event'], { event: string; matcher?: string }>>;
 }
 export const AGENTS: AgentAdapter[] = [
   {
@@ -17,13 +15,6 @@ export const AGENTS: AgentAdapter[] = [
     binary: 'claude',
     configEnv: 'CLAUDE_CONFIG_DIR',
     configDir: '.claude',
-    hooks: {
-      'session.started': { event: 'SessionStart' },
-      'turn.finished': { event: 'Stop' },
-      'permission.requested': { event: 'Notification', matcher: '^permission_prompt$' },
-      'question.asked': { event: 'PreToolUse', matcher: '^AskUserQuestion$' },
-      'notification.received': { event: 'Notification', matcher: '^elicitation_dialog$' },
-    },
   },
   {
     id: 'codex',
@@ -31,12 +22,6 @@ export const AGENTS: AgentAdapter[] = [
     binary: 'codex',
     configEnv: 'CODEX_HOME',
     configDir: '.codex',
-    hooks: {
-      'session.started': { event: 'SessionStart' },
-      'turn.finished': { event: 'Stop' },
-      'permission.requested': { event: 'PermissionRequest' },
-      'question.asked': { event: 'PreToolUse', matcher: '^request_user_input$' },
-    },
   },
 ];
 export const CODEX_MARKETPLACE = 'dead-agent-skills';

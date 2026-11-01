@@ -1,18 +1,20 @@
-// Repo checks for the pre-commit hook: every plugin manifest validates, the marketplace and the dead-skills
-// bundle agree on the plugin list, and everything carries package.json's version. Skips `claude plugin validate` when claude isn't on PATH
-// (nix flake check sandbox, CI).
-import { checkHarnesses } from './check-harnesses.mjs';
+// Repo checks for the pre-commit hook: the neutral plugin definitions validate and compile, the generated
+// distributions are current, and everything carries package.json's version. Skips `claude plugin validate` when claude
+// isn't on PATH (nix flake check sandbox, CI).
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { check } from '../tools/harness-compiler/src/emit/commands.ts';
+import { loadPlugins, selectTarget } from '../tools/harness-compiler/src/load.ts';
+import { TARGETS } from '../tools/harness-compiler/src/targets/index.ts';
 import {
   checkOverrides,
   checkPackPaths,
   checkTemplates,
   checkUses,
+  currentDeps,
   expectedDeps,
   FLOWS,
-  PACKS,
   packs,
   readUses,
   renderTree,
@@ -23,18 +25,36 @@ import { pluginDirs as findPluginDirs } from './plugin-dirs.mjs';
 process.chdir(join(import.meta.dirname, '..'));
 
 const MARKETPLACE = '.claude-plugin/marketplace.json';
-const BUNDLE = 'plugins/default/.claude-plugin/plugin.json';
-const problems = checkHarnesses(process.cwd());
+const problems = [];
 const pluginDirs = findPluginDirs();
 
-// --- claude plugin validate ---
-for (const target of [
-  '.',
-  ...pluginDirs.map((d) => d + '/'),
-  ...JSON.parse(readFileSync('.claude-plugin/marketplace.json', 'utf8'))
-    .plugins.filter((p) => typeof p.source === 'string')
-    .map((p) => p.source),
-]) {
+// --- neutral definitions: catalog, plugin.json and hooks parse, and each target's dependency closure holds ---
+let plugins = [];
+try {
+  plugins = loadPlugins('.');
+  for (const target of TARGETS) selectTarget(plugins, target.id);
+} catch (error) {
+  problems.push(`harness-compiler validate: ${error.message}`);
+}
+// --- generated distributions and marketplaces are current ---
+try {
+  problems.push(...check('.').map((p) => `${p} (run npm run build:harnesses)`));
+} catch (error) {
+  problems.push(`harness-compiler check: ${error.message}`);
+}
+// Hook point: also run `harness-compiler lint` once that subcommand exists.
+if (
+  spawnSync(process.execPath, ['tools/harness-compiler/src/cli.ts', 'help'], { encoding: 'utf8' }).stderr.includes(
+    'lint',
+  )
+) {
+  const r = spawnSync(process.execPath, ['tools/harness-compiler/src/cli.ts', 'lint'], { encoding: 'utf8' });
+  if (r.status !== 0) problems.push(`harness-compiler lint failed:\n${r.stdout}${r.stderr}`);
+}
+
+// --- claude plugin validate, on what Claude Code actually loads: the generated tree ---
+const market = JSON.parse(readFileSync(MARKETPLACE, 'utf8'));
+for (const target of ['.', ...market.plugins.filter((p) => typeof p.source === 'string').map((p) => p.source)]) {
   const r = spawnSync('claude', ['plugin', 'validate', target], { encoding: 'utf8' });
   if (r.error?.code === 'ENOENT') {
     console.log('claude not on PATH: skipping claude plugin validate');
@@ -43,31 +63,24 @@ for (const target of [
   if (r.status !== 0) problems.push(`claude plugin validate ${target} failed:\n${r.stdout}${r.stderr}`);
 }
 
-// --- marketplace <-> bundle <-> plugins/ ---
-const { plugins: market, allowCrossMarketplaceDependenciesOn: crossAllowed = [] } = JSON.parse(
-  readFileSync(MARKETPLACE, 'utf8'),
-);
-const deps = JSON.parse(readFileSync(BUNDLE, 'utf8')).dependencies;
-
-for (const dep of deps) {
-  const [name, from] = dep.split('@');
-  if (from) {
-    // Anthropic's own plugins come straight from their marketplace, which must be allowlisted to auto-install.
-    if (!crossAllowed.includes(from))
-      problems.push(`${BUNDLE}: dependency ${dep} needs ${from} in allowCrossMarketplaceDependenciesOn`);
-  } else if (!market.some((p) => p.name === name))
-    problems.push(`${BUNDLE}: dependency ${dep} is not in ${MARKETPLACE}`);
+// --- the Claude marketplace lists exactly the catalog's Claude plugins, and cross-marketplace dependencies are allowed ---
+const crossAllowed = market.allowCrossMarketplaceDependenciesOn ?? [];
+for (const plugin of plugins) {
+  for (const dep of plugin.manifest?.dependencies ?? [])
+    if (
+      dep.marketplace &&
+      (!dep.targets || dep.targets.includes('claude-code')) &&
+      !crossAllowed.includes(dep.marketplace)
+    )
+      problems.push(
+        `${plugin.name}: dependency ${dep.name}@${dep.marketplace} needs ${dep.marketplace} in allowCrossMarketplaceDependenciesOn`,
+      );
 }
-for (const { source } of market) {
-  if (typeof source === 'string' && !existsSync(join(source, '.claude-plugin', 'plugin.json'))) {
-    problems.push(`${MARKETPLACE}: ${source} has no .claude-plugin/plugin.json`);
-  }
-}
-const definitions = JSON.parse(readFileSync('catalog/plugins.json', 'utf8'));
-for (const dir of pluginDirs) {
-  if (!definitions.some((p) => p.source === dir && market.some((entry) => entry.name === p.name)))
-    problems.push(`${dir} is not listed in ${MARKETPLACE}`);
-}
+const listed = new Set(market.plugins.map((p) => p.name));
+for (const plugin of plugins.filter((p) => p.targets.includes('claude-code')))
+  if (!listed.has(plugin.name)) problems.push(`${MARKETPLACE}: ${plugin.name} is missing`);
+for (const dir of pluginDirs)
+  if (!plugins.some((p) => p.source === dir)) problems.push(`${dir} is not listed in plugins/catalog.json`);
 
 // --- flows: each conductor's uses.json, and what is generated from them (scripts/flows-uses.mjs) ---
 problems.push(
@@ -77,20 +90,18 @@ problems.push(
   ...checkTemplates('.'),
 );
 const uses = readUses('.');
-const flowsManifest = `${FLOWS}/.claude-plugin/plugin.json`;
 const regen = 'run node scripts/flows-uses.mjs';
-if (
-  JSON.stringify(JSON.parse(readFileSync(flowsManifest, 'utf8')).dependencies) !==
-  JSON.stringify(expectedDeps(uses, packs('.')))
-)
-  problems.push(`${flowsManifest}: dependencies differ from the conductors' uses.json: ${regen}`);
+if (JSON.stringify(currentDeps('.')) !== JSON.stringify(expectedDeps(uses, packs('.'))))
+  problems.push(
+    `${FLOWS}/plugin.json and plugins/catalog.json: flows dependencies differ from the conductors' uses.json: ${regen}`,
+  );
 // A Windows checkout has CRLF; the generated tree is LF.
 const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8').replace(/\r\n/g, '\n');
 if (withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
   problems.push(`${FLOWS}/README.md: uses tree is stale: ${regen}`);
 
-// --- one version: package.json and its lock, marketplace metadata.version, every local plugin.json (flows' packs too)
-// and each Rust crate (scripts/release.mjs) ---
+// --- one version: package.json and its lock, the marketplace metadata.version and each Rust crate
+// (scripts/release.mjs). Plugin manifests take the version when they are generated. ---
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
 for (const [where, v] of [
@@ -98,14 +109,8 @@ for (const [where, v] of [
   ['packages[""].version', lock.packages?.['']?.version],
 ])
   if (v !== version) problems.push(`package-lock.json: ${where} is ${v}, package.json has ${version}`);
-const marketVersion = JSON.parse(readFileSync(MARKETPLACE, 'utf8')).metadata?.version;
-if (marketVersion !== version)
-  problems.push(`${MARKETPLACE}: metadata.version is ${marketVersion}, package.json has ${version}`);
-for (const dir of [...pluginDirs, ...packs('.').map((p) => `${PACKS}/${p}`)]) {
-  const manifest = join(dir, '.claude-plugin', 'plugin.json');
-  const v = existsSync(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).version;
-  if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);
-}
+if (market.metadata?.version !== version)
+  problems.push(`${MARKETPLACE}: metadata.version is ${market.metadata?.version}, package.json has ${version}`);
 const CRATES = [
   { cargo: 'crates/tui-review/Cargo.toml', lock: 'crates/tui-review/Cargo.lock', name: 'tui-review' },
   { cargo: 'crates/web-mcp/Cargo.toml', lock: 'crates/web-mcp/Cargo.lock', name: 'web-mcp' },

@@ -1,7 +1,7 @@
 # dead-agent-skills
 
 Personal skills, flows and MCP integrations for Claude Code and Codex. The native marketplaces
-(`.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`) load checked-in packages from `portable/`;
+(`.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`) sit beside the checked-in packages they load (`.claude-plugin/<name>/` and `.agents/plugins/<name>/`);
 authored plugins live under `plugins/`, grouped by install layer. The optional npx installer in `tools/installer/` sets up a machine from them. README.md is the user-facing description;
 keep it, plugin READMEs and plugin/marketplace `description`s true to what the code does.
 
@@ -308,19 +308,30 @@ required checks with the admin bypass.
 
 ## Multiple agents
 
-`catalog/plugins.json` is the authored neutral catalog, loaded by `tools/installer/system/catalog.ts`;
-`tools/installer/core/agents.ts` declares host capabilities. `tools/installer/system/packages.ts` generates both native distributions
-without changing vendored sources. Author → `npm run build:harnesses` → review generated changes → commit source and
-outputs together. `npm run check:harnesses` and prepack compare all owned outputs without rewriting them.
-`build:codex`/`check:codex` remain compatibility aliases. Native source manifests are development overlays, not the
-marketplace distribution. Add future targets through catalog capability, package, runtime and theme adapters; shared
-handlers must not learn native event or manifest shapes.
-`tools/installer/steps/codex.ts` uses Codex's native plugin and MCP commands, respecting CODEX_HOME.
+`plugins/` is agent-neutral: no `.claude-plugin`, `.codex-plugin`, `.mcp.json`, native hook files, install instructions
+or harness paths. Each plugin has a neutral `plugin.json` (description, author, dependencies, `config`, `mcpServers`,
+`lsp`, `themes`, `extensions`, `hooks`) and a neutral `hooks/hooks.json` (events such as `session.started`,
+`tool.completed`; tools such as `file.write`). `plugins/catalog.json` lists the plugins, their source, resources,
+dependencies and targets. UI mods (TypeScript against Claude's UI engine) stay in their plugin and are declared in `plugin.json` as an
+`extensions` entry; a harness that cannot run them gets a build warning and the mod is left out of its package.
+
+`tools/harness-compiler/` is the one tool that turns these sources into `.agents/plugins/` (Codex) and
+`.claude-plugin/` plus both marketplaces: `schema/` validates, `load.ts` builds the plugin list, `targets/<id>.ts`
+is one emitter per harness (event and tool maps, manifest, MCP, LSP, theme, marketplace), `transforms/` rewrites shipped
+Markdown per target (`rules.ts` holds the per-file edits for vendored text), `templates/` holds all harness-specific
+prose, `runtime/` is the shared hook runner copied into packages. Adding a harness is one new `targets/` file.
+Commands: `npm run build:harnesses` (`harness-compiler build`), `npm run check:harnesses` (`check`, no rewriting),
+`harness-compiler validate` and `lint` (fails when `plugins/` carries harness-specific files or wording outside
+`src/lint-allowlist.json`). Author → build → review generated changes → commit sources and outputs together.
+Shared handlers must not learn native event or manifest shapes. Required unsupported hooks fail the build; optional ones
+are reported and omitted. Never edit `.claude-plugin/` or `.agents/plugins/` by hand.
+`tools/installer/core/agents.ts` holds host metadata for the installer; `tools/installer/steps/codex.ts` uses Codex's
+native plugin and MCP commands, respecting CODEX_HOME.
 Keep Claude marketplace IDs and the legacy executable alias stable. The GitHub repository still has its old name.
-Flow behavior is shared; host-specific mappings live under `plugins/flows/references/hosts/`.
+Flow behavior is shared; the host mapping reference is generated per target from `tools/harness-compiler/src/templates/hosts/`.
 Unavailable subagents mean skipped steps, never sequential replacements or successful check claims.
 
 Both native marketplaces must work directly from a fresh clone, without the installer or a build.
-`portable/` contains generated, checked-in packages for both harnesses; change sources and regenerate it rather than editing
+`.agents/plugins/` and `.claude-plugin/` contain generated, checked-in packages; change sources and regenerate it rather than editing
 those copies. Repository checks compare the committed distribution with a fresh build. Sync PRs include the
 regenerated distribution, and releases regenerate it after bumping source versions.

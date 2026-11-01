@@ -12,10 +12,10 @@ import {
   afterPrompts,
 } from './config.ts';
 const M = 'dead-claude-skills';
-const json = (path: string) => JSON.parse(readFileSync(resolve(import.meta.dirname, '../..', path), 'utf8'));
+const json = (path: string) => JSON.parse(readFileSync(resolve(import.meta.dirname, '../../..', path), 'utf8'));
 test('mcp-azure asks for its settings itself, in manifest order, without its binary path', () => {
   assert.deepEqual(SELF_CONFIGURED, ['mcp-azure']);
-  const { userConfig } = json('plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json');
+  const { userConfig } = json('.claude-plugin/mcp-azure/.claude-plugin/plugin.json');
   const prompts = configPrompts(userConfig, 'binPath', ['ado_org_url']);
   assert.deepEqual(
     prompts.map((p) => p.key),
@@ -36,7 +36,7 @@ test('mcp-azure asks for its settings itself, in manifest order, without its bin
 });
 
 test('configValues trims answers, keeps saved values on empty and names what is missing', () => {
-  const { userConfig } = json('plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json');
+  const { userConfig } = json('.claude-plugin/mcp-azure/.claude-plugin/plugin.json');
   const url = 'https://tfs.example/tfs/Coll';
   const unsaved = configPrompts(userConfig, 'binPath', []);
   assert.deepEqual(configValues(unsaved, { ado_org_url: ` ${url} `, ado_pat: '' }), {

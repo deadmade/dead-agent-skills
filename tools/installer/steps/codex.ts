@@ -132,13 +132,13 @@ export async function applyCodex(io: CodexIO = {}) {
     VERSION,
     previous,
   );
-  const source = io.source ?? join(PKG, 'portable');
+  const source = io.source ?? PKG;
   if (!existsSync(join(source, '.agents/plugins/marketplace.json')))
-    throw new Error('Codex packages are missing; run npm run build:codex from the checkout');
+    throw new Error('Codex packages are missing; run npm run build:harnesses from the checkout');
   const catalog = join(base, `marketplace-${VERSION}`);
   if (existsSync(catalog) && lstatSync(catalog).isSymbolicLink())
     throw new Error(`${catalog} is a symlink; left unchanged`);
-  cpSync(source, catalog, { recursive: true });
+  cpSync(join(source, '.agents'), join(catalog, '.agents'), { recursive: true });
   run('plugin', 'marketplace', 'add', catalog);
 
   const mcp = [...(previous?.mcp ?? [])];
@@ -229,7 +229,7 @@ export async function applyCodex(io: CodexIO = {}) {
       'Optional: ADO_PROJECT_DIR overrides the repository used for project detection.',
     ]);
   }
-  const packaged = join(catalog, 'plugins/dead-skills');
+  const packaged = join(catalog, '.agents/plugins/dead-skills');
   const theme = installCodexTheme(home, join(packaged, 'themes/night-city.tmTheme'));
   note('Codex Night City', [
     theme.conflict

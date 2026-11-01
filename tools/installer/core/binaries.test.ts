@@ -21,7 +21,7 @@ import {
 } from './binaries.ts';
 import { unavailable } from './options.ts';
 
-const json = (p: string) => JSON.parse(readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'));
+const json = (p: string) => JSON.parse(readFileSync(new URL(`../../../${p}`, import.meta.url), 'utf8'));
 
 test('missing binaries per OS', () => {
   const none = () => false;
@@ -73,10 +73,10 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'tui-review', key: 'binPath' });
   assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
   const dirs: Record<string, string> = {
-    'tui-review': 'plugins/shared/tui-review',
-    'web-mcp': 'plugins/shared/web-mcp',
-    'mcp-azure': 'plugins/opt-in/mcp/mcp-azure',
-    'flow-cockpit': 'plugins/opt-in/flow-cockpit',
+    'tui-review': '.claude-plugin/tui-review',
+    'web-mcp': '.claude-plugin/web-mcp',
+    'mcp-azure': '.claude-plugin/mcp-azure',
+    'flow-cockpit': '.claude-plugin/flow-cockpit',
   };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
     assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
@@ -113,13 +113,13 @@ test('flow-cockpit has a pinned linux hint', () => {
 
 // The hint names the flake's package: the output the installer points Linux users at must exist.
 test('the flake has the flow-cockpit package the linux hint runs', () => {
-  const flake = readFileSync(new URL('../../flake.nix', import.meta.url), 'utf8');
+  const flake = readFileSync(new URL('../../../flake.nix', import.meta.url), 'utf8');
   assert.match(flake, /^\s+flow-cockpit = pkgs\.rustPlatform\.buildRustPackage/m);
 });
 
 // The installer downloads the name crates-build.yml uploads: the same target and the same file name.
 test('crates-build.yml packs the zip binAsset downloads', () => {
-  const yml = readFileSync(new URL('../../.github/workflows/crates-build.yml', import.meta.url), 'utf8');
+  const yml = readFileSync(new URL('../../../.github/workflows/crates-build.yml', import.meta.url), 'utf8');
   assert.match(yml, /crate: \[.*flow-cockpit.*\]/);
   assert.match(yml, /target: x86_64-pc-windows-msvc/);
   assert.match(yml, /name=flow-cockpit-\$TARGET/);
@@ -143,7 +143,7 @@ test('binAdvice: rerun for the flow cockpit, build for the others', () => {
 });
 
 test('tui-review versions match the release the installer fetches', () => {
-  const cargo = readFileSync(new URL('../../crates/tui-review/Cargo.toml', import.meta.url), 'utf8');
+  const cargo = readFileSync(new URL('../../../crates/tui-review/Cargo.toml', import.meta.url), 'utf8');
   assert.equal(/^version = "(.+)"/m.exec(cargo)![1], json('package.json').version);
 });
 

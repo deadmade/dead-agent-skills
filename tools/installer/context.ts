@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { confirm, log } from './ui/ui.ts';
 import { paint } from './ui/view.ts';
 
-export const PKG = join(import.meta.dirname, '..');
+export const PKG = join(import.meta.dirname, '..', '..');
 export const ASSETS = join(import.meta.dirname, 'assets');
 export const CONFIG = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
 export const SETTINGS = join(CONFIG, 'settings.json');

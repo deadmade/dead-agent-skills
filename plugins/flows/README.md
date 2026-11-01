@@ -143,9 +143,9 @@ copyedit that revises a document by it before a gate.
 ## Packs
 
 flows carries the skill packs its conductors run, in `packs/`: superpowers, ponytail, mattpocock-picks, pstack-picks,
-tob-picks, paper-lookup and security-audit, each written there by its `tools/upstream-sync/src/adapters/*.ts`. Claude Code scans only a plugin's root
+tob-picks, paper-lookup and security-audit, each written there by its `tools/upstream-sync/src/adapters/*.ts`. The agent scans only a plugin's root
 `skills/`, `agents/` and `hooks/hooks.json`, so nothing under `packs/` loads on its own; the conductors read a pack's
-skills by path (`${CLAUDE_PLUGIN_ROOT}/packs`). tob's spec checker is flows' own agent (`agents/spec-compliance-checker.md`),
+skills by path (`${PLUGIN_ROOT}/packs`). tob's spec checker is flows' own agent (`agents/spec-compliance-checker.md`),
 since a pack's agents don't load. `/self-review` vendors its passes too, from claude-plugins-official's code-review
 and pr-review-toolkit and from mattpocock's code-review (`skills/self-review/references/upstream/` and the other five
 `agents/`, written by `tools/upstream-sync/src/adapters/self-review.ts`). Where a conductor changes a pack's rule it quotes the sentence it overrides in an
@@ -156,18 +156,16 @@ a pack, follow [docs/vendor-a-pack.md](../../docs/vendor-a-pack.md).
 
 Pick it in the installer (see the [main README](../../README.md)), which also installs its dependencies.
 
-## Claude Code and Codex
+## Supported agents
 
-The same conductors and flow-state documents work in both agents. The repository ships checked-in native packages for both targets with
-all pack resources; only conductor skills are discovered automatically. Host-specific tool mappings live in
-`references/hosts/`, and cross-package lookups are described in `references/resource-index.md`.
+The same conductors and flow-state documents work in every supported coding agent. Each distribution carries all pack
+resources; only conductor skills are discovered automatically. The host-specific tool mapping ships as
+`references/host.md` in each distribution, and cross-package lookups are described in `references/resource-index.md`.
 If a session cannot launch subagents, skip those steps and record them as not checked. Keep approval gates.
-Verification offers a diff walkthrough; tui-review is a separate optional Claude Code tool.
+Verification offers a diff walkthrough; tui-review is a separate optional tool.
 
-Install directly without the installer: add `deadmade/dead-claude-skills` as a marketplace in the current host,
-then install flows from `dead-claude-skills` (Claude Code) or `dead-agent-skills` (Codex). Codex companion plugins
-and native MCP setup commands are listed in the repository README and the Codex flows package README.
+Install instructions are generated with each distribution and listed in the repository README.
 
 Author conductors here; `node scripts/flows-uses.mjs` regenerates dependencies, the tree and native packages.
 `npm run build:harnesses` refreshes all outputs, and `npm run check:harnesses` verifies freshness without writes.
-Claude-only engine modules stay out of Codex. Unavailable subagents remain skipped, never claimed successful.
+Unavailable subagents remain skipped, never claimed successful.

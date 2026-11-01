@@ -8,6 +8,7 @@ import {
   checkPackPaths,
   checkTemplates,
   checkUses,
+  currentDeps,
   expectedDeps,
   packs,
   readUses,
@@ -30,8 +31,8 @@ function repo(uses, skillText = conductor('how reviewer docs search general-purp
   if (uses !== undefined) put('plugins/flows/skills/fix/uses.json', JSON.stringify(uses));
   put('plugins/picks/skills/how/SKILL.md', '');
   put('plugins/picks/agents/reviewer.md', '');
-  put('plugins/picks/.mcp.json', JSON.stringify({ docs: { type: 'http' } }));
-  put('plugins/web/.mcp.json', '{}');
+  put('plugins/picks/plugin.json', JSON.stringify({ mcpServers: { docs: { url: 'https://x.invalid' } } }));
+  put('plugins/web/plugin.json', '{}');
   put('plugins/flows/packs/superpowers/skills/writing-plans/SKILL.md', '');
   return fx;
 }
@@ -45,12 +46,12 @@ function fixture(uses, skillText, files) {
     ],
   };
   const fx = repo(uses, skillText, files);
-  mkdirSync(join(fx, 'catalog'), { recursive: true });
-  writeFileSync(join(fx, 'catalog/plugins.json'), JSON.stringify(marketplace.plugins));
+  mkdirSync(join(fx, 'plugins'), { recursive: true });
+  writeFileSync(join(fx, 'plugins/catalog.json'), JSON.stringify(marketplace.plugins));
   return checkUses(fx, {
     plugins: marketplace.plugins.map((p) => ({
       ...p,
-      source: typeof p.source === 'string' ? './portable/claude-code/plugins/' + p.name : p.source,
+      source: typeof p.source === 'string' ? './.claude-plugin/' + p.name : p.source,
     })),
   });
 }
@@ -153,8 +154,7 @@ test('withTree replaces only the marked block, and refuses a README without one'
 test('the real conductors pass, and flows depends on exactly what they use', () => {
   const marketplace = JSON.parse(readFileSync(join(ROOT, '.claude-plugin/marketplace.json'), 'utf8'));
   assert.deepEqual(checkUses(ROOT, marketplace), []);
-  const deps = JSON.parse(readFileSync(join(ROOT, 'plugins/flows/.claude-plugin/plugin.json'), 'utf8')).dependencies;
-  assert.deepEqual(deps, expectedDeps(readUses(ROOT), packs(ROOT)));
+  assert.deepEqual(currentDeps(ROOT), expectedDeps(readUses(ROOT), packs(ROOT)));
   assert.deepEqual(checkOverrides(ROOT), []);
   assert.deepEqual(checkPackPaths(ROOT), []);
 });

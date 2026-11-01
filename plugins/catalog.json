@@ -1,0 +1,125 @@
+[
+  {
+    "name": "dead-skills",
+    "source": "plugins/default",
+    "resources": ["rules.md", "icon.png", "hooks/rules.mjs", "hooks/lib.mjs"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "flows",
+    "source": "plugins/flows",
+    "resources": ["skills", "references", "packs", "agents", "hooks/prose.mjs"],
+    "dependencies": ["dead-skills", "graphify", "web-mcp"],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "graphify",
+    "source": "plugins/shared/graphify",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "hallmark",
+    "source": "plugins/opt-in/hallmark",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "rust-skills",
+    "source": "plugins/opt-in/implementation/rust-skills",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "csharp-skills",
+    "source": "plugins/opt-in/implementation/csharp-skills",
+    "resources": ["skills", "library"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "postgres",
+    "source": "plugins/opt-in/implementation/postgres",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "web-mcp",
+    "source": "plugins/shared/web-mcp",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "mcp-github",
+    "source": "plugins/opt-in/mcp/mcp-github",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "mcp-azure",
+    "source": "plugins/opt-in/mcp/mcp-azure",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "atlassian",
+    "description": "Atlassian MCP integration for Jira and Confluence.",
+    "source": {
+      "source": "url",
+      "url": "https://github.com/atlassian/atlassian-mcp-server.git"
+    },
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
+    "name": "nix-lsp",
+    "source": "plugins/opt-in/implementation/nix-lsp",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code"]
+  },
+  {
+    "name": "tui-review",
+    "source": "plugins/shared/tui-review",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code"]
+  },
+  {
+    "name": "md-pane",
+    "source": "plugins/opt-in/md-pane",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code"]
+  },
+  {
+    "name": "headroom-trim",
+    "source": "plugins/opt-in/headroom-trim",
+    "resources": ["server"],
+    "dependencies": [],
+    "targets": ["claude-code"]
+  },
+  {
+    "name": "flow-cockpit",
+    "source": "plugins/opt-in/flow-cockpit",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code"]
+  },
+  {
+    "name": "agent-review",
+    "source": "plugins/shared/agent-review",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code"]
+  }
+]

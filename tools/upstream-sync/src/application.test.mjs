@@ -129,7 +129,7 @@ test('Rust adapter copies and rewrites from a local upstream and is idempotent',
   const target = fixture(t);
   const dest = 'plugins/opt-in/implementation/rust-skills';
   target.write('.claude-plugin/marketplace.json', '{}');
-  target.write(`${dest}/.claude-plugin/plugin.json`, '{}');
+  target.write(`${dest}/plugin.json`, '{}');
   target.write(`${dest}/UPSTREAM`, 'old\n');
   target.commit();
   const runner = (program, args, cwd) =>
@@ -266,7 +266,7 @@ test('Postgres adapter records both local upstream revisions and preserves NOTIC
   }
   const dest = 'plugins/opt-in/implementation/postgres';
   target.write('.claude-plugin/marketplace.json', '{}');
-  target.write(`${dest}/.claude-plugin/plugin.json`, '{}');
+  target.write(`${dest}/plugin.json`, '{}');
   for (const name of [a, b]) target.write(`${dest}/skills/${name}/UPSTREAM`, 'old\n');
   target.commit();
   const runner = (program, args, cwd) =>
@@ -294,7 +294,7 @@ test('Postgres adapter records both local upstream revisions and preserves NOTIC
   assert.equal(readFileSync(join(target.repo, dest, `skills/${b}/NOTICE`), 'utf8'), 'notice');
 });
 
-test('release adapter vendors a local stable tag, preserves repo version and reports upstream notes', (t) => {
+test('release adapter vendors a local stable tag, carries no manifest and reports upstream notes', (t) => {
   const upstream = fixture(t),
     target = fixture(t);
   upstream.write('.claude-plugin/plugin.json', JSON.stringify({ name: 'superpowers', version: '1.2.3' }));
@@ -326,24 +326,16 @@ test('release adapter vendors a local stable tag, preserves repo version and rep
   );
   assert.equal(result.title, 'Sync superpowers to v1.2.3');
   assert.match(result.body, /Upstream notes/);
-  assert.equal(
-    JSON.parse(readFileSync(join(target.repo, dest, '.claude-plugin/plugin.json'), 'utf8')).version,
-    '0.6.0',
-  );
+  assert.equal(existsSync(join(target.repo, dest, '.claude-plugin')), false, 'a pack carries no manifest');
+  assert.equal(existsSync(join(target.repo, dest, 'plugin.json')), false);
   assert.equal(readFileSync(join(target.repo, dest, 'hooks/session-start'), 'utf8'), 'hook\n');
 });
 
 test('native distributions rebuild before validation and are included in sync paths', (t) => {
   const f = fixture(t);
-  f.write('catalog/plugins.json', '[]');
+  f.write('plugins/catalog.json', '[]');
   const spec = source(f.repo, 'rust-skills');
-  for (const path of [
-    'portable',
-    '.agents/plugins/marketplace.json',
-    '.claude-plugin/marketplace.json',
-    'plugins/default/themes/night-city.json',
-  ])
-    assert.ok(spec.paths.includes(path), path);
+  for (const path of ['.claude-plugin', '.agents/plugins']) assert.ok(spec.paths.includes(path), path);
   const order = [];
   const result = sync(
     f.repo,
@@ -362,7 +354,7 @@ test('native distributions rebuild before validation and are included in sync pa
     undefined,
     (program, args, cwd) => {
       assert.equal(program, process.execPath);
-      assert.deepEqual(args, [join(f.repo, 'scripts/build-harnesses.mjs')]);
+      assert.deepEqual(args, [join(f.repo, 'tools/harness-compiler/src/cli.ts'), 'build']);
       assert.equal(cwd, f.repo);
       order.push('build');
       return 'optional capability omitted';

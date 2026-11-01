@@ -1,13 +1,12 @@
-// Cuts a release: one version for package.json (and its lock), the marketplace, every local plugin, flows' packs and
-// both crates, committed and tagged vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which
-// builds the installer, tui-review and web-mcp and publishes the GitHub release. Claude Code only offers plugin
+// Cuts a release: one version for package.json (and its lock) and both crates; the plugin manifests and marketplaces
+// are generated from it (tools/harness-compiler). Committed and tagged vX.Y.Z on main. Pushing the tag runs
+// .github/workflows/release.yml, which builds the installer, tui-review and web-mcp and publishes the GitHub release. Claude Code only offers plugin
 // updates when this version changes. --detach commits off main instead, leaving the branch where it was: release.yml
 // does that for the patch it cuts on every merge to main.
 // Usage: npm run release -- patch|minor|major|X.Y.Z [--detach]
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PACKS, packs } from './flows-uses.mjs';
 import { pathToFileURL } from 'node:url';
 // The version a release gets: `bump` (patch, minor, major or X.Y.Z) applied to the highest of package.json's version
 // and the vX.Y.Z tags. A release cut on every merge to main stamps its commit off main, so main's package.json lags
@@ -28,8 +27,6 @@ export function nextVersion(current, tags, bump) {
     bump;
   return /^\d+\.\d+\.\d+$/.test(next ?? '') ? next : undefined;
 }
-
-import { pluginDirs } from './plugin-dirs.mjs';
 
 function main() {
   process.chdir(join(import.meta.dirname, '..'));
@@ -68,10 +65,6 @@ function main() {
     ['package.json', json],
     ['package-lock.json', json],
     ['package-lock.json', /^( {6}"version": )"[^"]*"/m],
-    ...[...pluginDirs(), ...packs('.').map((p) => `${PACKS}/${p}`)].map((p) => [
-      `${p}/.claude-plugin/plugin.json`,
-      json,
-    ]),
     ...[
       ['crates/tui-review', 'tui-review'],
       ['crates/web-mcp', 'web-mcp'],
@@ -83,22 +76,14 @@ function main() {
       [`${dir}/Cargo.lock`, new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm')],
     ]),
   ];
-  const files = [
-    ...new Set([
-      ...bumps.map(([f]) => f),
-      'portable',
-      '.agents/plugins/marketplace.json',
-      '.claude-plugin/marketplace.json',
-      'plugins/default/themes/night-city.json',
-    ]),
-  ];
+  const files = [...new Set([...bumps.map(([f]) => f), '.claude-plugin', '.agents/plugins'])];
   for (const [f, version] of bumps) {
     const text = readFileSync(f, 'utf8');
     if (!version.test(text)) die(`${f} has no version to bump`);
     writeFileSync(f, text.replace(version, `$1"${next}"`));
   }
 
-  if (!run(process.execPath, ['scripts/build-harnesses.mjs']) || !run('npm', ['test'])) {
+  if (!run(process.execPath, ['tools/harness-compiler/src/cli.ts', 'build']) || !run('npm', ['test'])) {
     git('checkout', '--', ...files);
     die('checks failed, versions reverted');
   }

@@ -186,7 +186,7 @@ A runtime record tying startup rule handling to exact packaged rules/adapter byt
 source. It supports migration checks; installation alone is not hook trust or consent to remove instructions.
 
 **Owned generated output**:
-Both native distributions under `portable/`, both root marketplaces and the Claude theme rendered from the shared
+Both native distributions (`.agents/plugins/` and `.claude-plugin/`), both root marketplaces and the Claude theme rendered from the shared
 palette. Author sources, rebuild, review and commit outputs together; freshness checks do not rewrite them.
 **View**:
 One screen or tab of the flow cockpit: a TypeScript file that `export default`s a `View`, drawn by the window.

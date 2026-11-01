@@ -61,7 +61,7 @@ export function sources(ROOT: string): Source[] {
     paths: [`plugins/flows/packs/${name}`],
     bodyFrom: 'adapter',
     check: (out) => {
-      json(`plugins/flows/packs/${name}/.claude-plugin/plugin.json`);
+      json();
       assert(out.tag, 'release adapter reported no tag');
       return { tag: out.tag };
     },
@@ -110,7 +110,7 @@ export function sources(ROOT: string): Source[] {
       bodyFrom: 'report',
       check: () => {
         const d = 'plugins/opt-in/implementation/csharp-skills';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json(`${d}/plugin.json`);
         count('router skills', skillCount(`${d}/skills`), 6);
         const library = skillCount(`${d}/library`);
         assert(library >= 90, `expected at least 90 library skills, found ${library}`);
@@ -131,7 +131,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/shared/graphify'],
       check: () => {
         const d = 'plugins/shared/graphify';
-        json(`${d}/.claude-plugin/plugin.json`, `${d}/hooks/hooks.json`);
+        json(`${d}/plugin.json`, `${d}/hooks/hooks.json`);
         exists(`${d}/skills/graphify/SKILL.md`);
         const refs = readdirSync(join(ROOT, d, 'skills/graphify/references')).filter((f) => f.endsWith('.md'));
         count('graphify references', refs.length, 8);
@@ -145,7 +145,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/opt-in/hallmark/skills/hallmark'],
       check: () => {
         const d = 'plugins/opt-in/hallmark';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json(`${d}/plugin.json`);
         const head = read(`${d}/skills/hallmark/SKILL.md`).split('\n').slice(0, 10);
         assert(
           head.some((l) => l.startsWith('description: "WEB FRONTEND ONLY:')),
@@ -161,7 +161,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/flows/packs/mattpocock-picks'],
       check: () => {
         const d = 'plugins/flows/packs/mattpocock-picks';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json();
         count('mattpocock-picks skills', skillCount(`${d}/skills`), 13);
         return { sha: upstream(`${d}/UPSTREAM`) };
       },
@@ -181,7 +181,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/flows/packs/paper-lookup/skills/paper-lookup'],
       check: () => {
         const d = 'plugins/flows/packs/paper-lookup';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json();
         exists(`${d}/skills/paper-lookup/SKILL.md`, { nonEmpty: true });
         assert(
           !read(`${d}/skills/paper-lookup/SKILL.md`).includes('Citing Scientific Agent Skills'),
@@ -198,7 +198,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/opt-in/implementation/postgres'],
       check: () => {
         const d = 'plugins/opt-in/implementation/postgres';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json(`${d}/plugin.json`);
         exists(`${d}/skills/postgres-best-practices/SKILL.md`, { nonEmpty: true });
         exists(`${d}/skills/postgres-database-migration/SKILL.md`, { nonEmpty: true });
         return {
@@ -221,7 +221,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/flows/packs/pstack-picks'],
       check: () => {
         const d = 'plugins/flows/packs/pstack-picks';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json();
         count('pstack-picks skills', skillCount(`${d}/skills`), 16);
         exists(`${d}/agents/comment-sicko.md`);
         return { sha: upstream(`${d}/UPSTREAM`) };
@@ -251,7 +251,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/opt-in/implementation/rust-skills'],
       check: () => {
         const d = 'plugins/opt-in/implementation/rust-skills';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json(`${d}/plugin.json`);
         assert(
           /^paths:/m.test(read(`${d}/skills/rust-best-practices/SKILL.md`)),
           'rust-best-practices SKILL.md has no paths:',
@@ -267,7 +267,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/flows/packs/security-audit'],
       check: () => {
         const d = 'plugins/flows/packs/security-audit';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json();
         exists(`${d}/skills/security-audit/SKILL.md`, { nonEmpty: true });
         return { sha: upstream(`${d}/UPSTREAM`) };
       },
@@ -279,7 +279,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/flows/skills/self-review', 'plugins/flows/agents'],
       check: () => {
         const s = 'plugins/flows/skills/self-review';
-        json('plugins/flows/.claude-plugin/plugin.json');
+        json('plugins/flows/plugin.json');
         const ours = readdirSync(join(ROOT, 'plugins/flows/agents')).filter(
           (f) => f.endsWith('.md') && read(`plugins/flows/agents/${f}`).includes('by scripts/sync-self-review.mjs.'),
         );
@@ -312,7 +312,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/flows/packs/tob-picks', 'plugins/flows/agents/spec-compliance-checker.md'],
       check: () => {
         const d = 'plugins/flows/packs/tob-picks';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json();
         count('tob-picks skills', skillCount(`${d}/skills`), 4);
         return { sha: upstream(`${d}/UPSTREAM`) };
       },
@@ -332,7 +332,7 @@ export function sources(ROOT: string): Source[] {
       paths: ['plugins/shared/agent-review'],
       check: () => {
         const d = 'plugins/shared/agent-review';
-        json(`${d}/.claude-plugin/plugin.json`);
+        json(`${d}/plugin.json`);
         exists(`${d}/skills/agent-review/SKILL.md`, { nonEmpty: true });
         assert(
           read(`${d}/skills/agent-review/SKILL.md`).includes('disable-model-invocation: true'),

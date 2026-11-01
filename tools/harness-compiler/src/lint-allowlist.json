@@ -1,0 +1,46 @@
+[
+  {
+    "path": "plugins/flows/packs",
+    "reason": "Vendored skill packs synced from upstream (superpowers, ponytail, pstack-picks, ...); text stays byte-identical and the compiler strips other agents' install text per distribution (src/transforms/rules.ts)"
+  },
+  {
+    "path": "plugins/opt-in/implementation/csharp-skills",
+    "reason": "Vendored from dotnet/skills; synced weekly, rewritten per distribution by src/transforms/rules.ts"
+  },
+  {
+    "path": "plugins/opt-in/hallmark",
+    "reason": "Vendored from nutlope/hallmark; synced weekly, rewritten per distribution by src/transforms/rules.ts"
+  },
+  {
+    "path": "plugins/shared/agent-review",
+    "reason": "Vendored from captivus/agent-review; its tool notes cover several agents by design"
+  },
+  {
+    "path": "plugins/shared/graphify",
+    "reason": "Vendored from Graphify-Labs/graphify; synced weekly"
+  },
+  {
+    "path": "plugins/opt-in/headroom-trim",
+    "reason": "Claude Code-only plugin: the launcher and its docs read Claude's plugin environment and bin folder"
+  },
+  {
+    "path": "plugins/flows/skills/writing/tests/writing-skill.test.mjs",
+    "reason": "Repository test that reads the generated Claude marketplace at the repository root"
+  },
+  {
+    "path": "plugins/default/tsconfig.json",
+    "reason": "UI mod source: TypeScript written against Claude's UI engine, declared in plugin.json `extensions`; the compiler leaves it out of other harnesses' packages"
+  },
+  {
+    "path": "plugins/opt-in/md-pane/tsconfig.json",
+    "reason": "UI mod source: TypeScript written against Claude's UI engine, declared in plugin.json `extensions`; the compiler leaves it out of other harnesses' packages"
+  },
+  {
+    "path": "plugins/opt-in/md-pane/hooks/paths.test.ts",
+    "reason": "UI mod source: TypeScript written against Claude's UI engine, declared in plugin.json `extensions`; the compiler leaves it out of other harnesses' packages"
+  },
+  {
+    "path": "plugins/shared/tui-review/tsconfig.json",
+    "reason": "UI mod source: TypeScript written against Claude's UI engine, declared in plugin.json `extensions`; the compiler leaves it out of other harnesses' packages"
+  }
+]

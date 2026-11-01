@@ -81,7 +81,7 @@ auto and bypass modes, and allow rules don't skip it. In `dontAsk` mode writes a
 ## Install
 
 The installer, with mcp-azure ticked, asks for the collection URL (e.g. `https://tfs.company/tfs/DefaultCollection`)
-and the PAT (hidden) unless both are saved already, installs the plugin, downloads `ado-mcp` to `~/.claude/bin` and saves it all, `binPath`
+and the PAT (hidden) unless both are saved already, installs the plugin, downloads `ado-mcp` to its `bin` folder and saves it all, `binPath`
 included. Enter keeps a value already saved. On a Claude Code older than 2.1.285, or without a PAT, it prints what to
 set instead: configure the plugin in Claude Code, then run the installer again.
 

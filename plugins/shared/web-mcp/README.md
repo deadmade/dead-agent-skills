@@ -80,7 +80,7 @@ or set its path with `/plugin configure web-mcp`.
 - **A browser**: found as described above; the installer needs no Docker. If you accept the `web-builtins-off`
   toggle, WebSearch and WebFetch are denied, but only once the window can open (see above).
 - **agent-browser** (for `browser` and `fetch`'s fallback): a current one on PATH is used as is. Otherwise the
-  installer keeps its own copy in `~/.claude/bin`: upstream's release binary for the version pinned in
+  installer keeps its own copy in its `bin` folder: upstream's release binary for the version pinned in
   `tools/installer/assets/agent-browser.json` (checked against the sha256 pinned there; the weekly `sync.yml` bumps both),
   downloaded when missing or older (on Linux a download also offers `--with-deps`, which runs sudo). Either way it runs
   `agent-browser install` for the browser on every run, so a failed browser download is retried, and `agentBrowserPath`
@@ -109,7 +109,6 @@ Environment variables, set in `.mcp.json`: `WEB_MCP_PROJECT_DIR` (where `.web/` 
   each run their own server, so they double them.
 - Pages that hide text in inactive tabs (some docs sites) can lose that text in extraction.
 
-Native packages for Claude Code and Codex are generated from the shared catalog. Codex ships a setup skill with
-`codex mcp add` instructions; installing that skill does not register a global server. Place the release `web-mcp`
-binary on PATH or use an absolute path, and install agent-browser for browser/search. The optional installer handles
-these paths. Credentials and native MCP configuration remain owned by the harness.
+Place the release `web-mcp` binary on PATH or use an absolute path, and install agent-browser for browser/search. The
+optional installer handles these paths. Credentials and MCP configuration remain owned by the agent; each distribution
+carries the setup steps for its agent.

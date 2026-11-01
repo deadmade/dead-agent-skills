@@ -9,7 +9,7 @@ from small binary chunk files the binary writes to disk, so a 100k-line PR costs
 Pick it in the installer (see the [main README](../../../README.md)).
 
 It needs the `tui-review` binary. The installer (`npx --allow-git=root github:deadmade/dead-claude-skills#semver:*`) downloads the build for your machine
-into `~/.claude/bin` and sets the plugin's `binPath`, unless a `tui-review` is already on PATH. By hand: unpack the `tui-review-*`
+into its `bin` folder and sets the plugin's `binPath`, unless a `tui-review` is already on PATH. By hand: unpack the `tui-review-*`
 archive for your platform from the [releases](https://github.com/deadmade/dead-claude-skills/releases), or build it,
 and put it on PATH or set its path with `/plugin configure tui-review`:
 
@@ -90,13 +90,13 @@ Reviews are cached in `<git common dir>/tui-review/` (shared by a repo's worktre
     cargo clippy --all-targets && cargo test && cargo bench
     cargo test --release --test perf -- --ignored --nocapture   # speed and memory budgets on a large fixture repo
     cargo run --release -- gen --out /tmp/tui-review-fixture && node ../../plugins/shared/tui-review/tests/make-fixture.mjs /tmp/tui-review-fixture
-    cd .. && claude plugin test .                    # format contract, pane, speed budgets
+    cd .. && <the host's plugin test command> .       # format contract, pane, speed budgets
 
 Plugin tests have no file system, so `tests/make-fixture.mjs` turns `tui-review gen` output into `tests/fixture.gen.ts`
 (not committed). The tests read the real Rust output, so they also hold the TypeScript reader to the Rust writer.
 The cache layout is documented in `crates/tui-review/src/format.rs`.
 
 tui-review ships with the repo's releases (see the main README): `npm run release` bumps `crates/tui-review/Cargo.toml`, `Cargo.lock` and
-`.claude-plugin/plugin.json` with everything else (a test checks they match), and the tag's `release.yml` runs
+the plugin manifest with everything else (a test checks they match), and the tag's `release.yml` runs
 `.github/workflows/crates-build.yml`, which builds Windows and Linux (static), x64 only. Run
 `crates-build.yml` by hand to build without releasing.

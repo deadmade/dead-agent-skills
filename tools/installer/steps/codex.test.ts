@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { applyCodex, type CodexIO } from './codex.ts';
-import { buildPackages } from '../system/packages.ts';
+import { buildTree } from '../../harness-compiler/src/emit/build.ts';
 import { VERSION, failures } from '../context.ts';
 
 function fixture() {
@@ -13,7 +13,7 @@ function fixture() {
   const home = join(temp, 'home with spaces'),
     source = join(temp, 'source');
   mkdirSync(home);
-  buildPackages(resolve(import.meta.dirname, '../..'), source);
+  buildTree(resolve(import.meta.dirname, '../../..'), source);
   const calls: string[][] = [];
   let installed: string[] = [];
   let selected = ['postgres'];
@@ -216,7 +216,7 @@ for (const change of [
     const f = fixture();
     try {
       const hash = (s: string | Buffer) => createHash('sha256').update(s).digest('hex');
-      const pkg = join(f.source, 'plugins/dead-skills');
+      const pkg = join(f.source, '.agents/plugins/dead-skills');
       const rules = readFileSync(join(pkg, 'rules.md'), 'utf8').trim();
       const file = join(f.home, 'AGENTS.md');
       const block = `<!-- dead-agent-skills:start -->\n${rules}\n<!-- dead-agent-skills:end -->`;
@@ -254,7 +254,7 @@ for (const change of [
         }
         if (change === 'override') writeFileSync(join(f.home, 'AGENTS.override.md'), 'new source');
         if (change === 'package')
-          writeFileSync(join(base, `marketplace-${VERSION}/plugins/dead-skills/rules.md`), 'changed');
+          writeFileSync(join(base, `marketplace-${VERSION}/.agents/plugins/dead-skills/rules.md`), 'changed');
         return change !== 'decline';
       };
       await applyCodex(f.io);
@@ -277,7 +277,7 @@ test('fresh setup leaves global instructions absent and installs packaged theme'
     assert.equal(existsSync(join(f.home, 'AGENTS.md')), false);
     assert.equal(
       readFileSync(join(f.home, 'themes/night-city.tmTheme'), 'utf8'),
-      readFileSync(join(f.source, 'plugins/dead-skills/themes/night-city.tmTheme'), 'utf8'),
+      readFileSync(join(f.source, '.agents/plugins/dead-skills/themes/night-city.tmTheme'), 'utf8'),
     );
   } finally {
     f.close();

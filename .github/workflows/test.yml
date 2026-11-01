@@ -51,14 +51,14 @@ jobs:
         run: |
           npm pack
           tar -tzf dead-agent-skills-*.tgz > packed.txt
-          grep -qx package/catalog/plugins.json packed.txt
-          grep -qx package/portable/claude-code/plugins/dead-skills/.claude-plugin/plugin.json packed.txt
+          grep -qx package/plugins/catalog.json packed.txt
+          grep -qx package/.claude-plugin/dead-skills/.claude-plugin/plugin.json packed.txt
           grep -qx package/tools/installer/install.js packed.txt
           grep -qx package/tools/installer/assets/agent-browser.json packed.txt
           grep -qx package/tools/installer/assets/uv.json packed.txt
           grep -qx package/tools/installer/system/proc.js packed.txt
-          grep -qx package/portable/.agents/plugins/marketplace.json packed.txt
-          grep -qx package/portable/plugins/flows/.codex-plugin/plugin.json packed.txt
+          grep -qx package/.agents/plugins/marketplace.json packed.txt
+          grep -qx package/.agents/plugins/flows/.codex-plugin/plugin.json packed.txt
           if grep -q '\.test\.js$' packed.txt; then exit 1; fi
           set +e
           out=$(npx --yes ./dead-agent-skills-*.tgz < /dev/null 2>&1)

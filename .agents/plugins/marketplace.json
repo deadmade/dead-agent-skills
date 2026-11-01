@@ -8,7 +8,7 @@
       "name": "dead-skills",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/dead-skills"
+        "path": "./.agents/plugins/dead-skills"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -20,7 +20,7 @@
       "name": "flows",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/flows"
+        "path": "./.agents/plugins/flows"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -32,7 +32,7 @@
       "name": "graphify",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/graphify"
+        "path": "./.agents/plugins/graphify"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -44,7 +44,7 @@
       "name": "hallmark",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/hallmark"
+        "path": "./.agents/plugins/hallmark"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -56,7 +56,7 @@
       "name": "rust-skills",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/rust-skills"
+        "path": "./.agents/plugins/rust-skills"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -68,7 +68,7 @@
       "name": "csharp-skills",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/csharp-skills"
+        "path": "./.agents/plugins/csharp-skills"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -80,7 +80,7 @@
       "name": "postgres",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/postgres"
+        "path": "./.agents/plugins/postgres"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -92,7 +92,7 @@
       "name": "web-mcp",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/web-mcp"
+        "path": "./.agents/plugins/web-mcp"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -104,7 +104,7 @@
       "name": "mcp-github",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/mcp-github"
+        "path": "./.agents/plugins/mcp-github"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -116,7 +116,7 @@
       "name": "mcp-azure",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/mcp-azure"
+        "path": "./.agents/plugins/mcp-azure"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -128,7 +128,7 @@
       "name": "atlassian",
       "source": {
         "source": "local",
-        "path": "./portable/plugins/atlassian"
+        "path": "./.agents/plugins/atlassian"
       },
       "policy": {
         "installation": "AVAILABLE",

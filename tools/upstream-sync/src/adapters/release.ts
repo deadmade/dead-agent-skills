@@ -1,5 +1,5 @@
 // Vendor an upstream Claude Code plugin into plugins/flows/packs/<name>/ at upstream's newest stable vX.Y.Z tag, unchanged
-// but for plugin.json's version (ours: everything ships as one version). Upstreams also ship adapters for other hosts;
+// and without a manifest (a pack is a plain resource folder; the compiler never loads it as a plugin). Upstreams also ship adapters for other hosts;
 // only what Claude Code loads is copied. Idempotent: re-running against the same tag gives no diff.
 // Invoked through: npm run sync -- apply <name>
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -151,9 +151,8 @@ export function run(ctx: SyncContext): AdapterResult {
   }));
   const compare = range.old && `https://github.com/${repo}/compare/${range.old}...${latest.tag}`;
   rmSync(dest, { recursive: true, force: true });
-  mkdirSync(join(dest, '.claude-plugin'), { recursive: true });
-  const { version } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
-  writeFileSync(join(dest, '.claude-plugin', 'plugin.json'), JSON.stringify({ ...manifest, version }, null, 2) + '\n');
+  // A pack is a plain resource folder: no manifest. The upstream manifest only guides what is copied.
+  mkdirSync(dest, { recursive: true });
   cpSync(join(up, 'hooks'), join(dest, 'hooks'), {
     recursive: true,
     filter: (src) => !otherHosts.some((f) => src === join(up, 'hooks', f)),
