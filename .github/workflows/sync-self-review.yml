@@ -43,5 +43,6 @@ jobs:
 
             cc @deadmade
           add-paths: |
+            portable/
             plugins/flows/skills/self-review
             plugins/flows/agents

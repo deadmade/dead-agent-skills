@@ -18,7 +18,7 @@ import { claude, errCode, startSync, which } from '../system/proc.ts';
 import { log, progress } from '../ui/ui.ts';
 import { BIN_DIR, WEB_MCP } from './binaries.ts';
 
-export async function installAgentBrowser(): Promise<{ path?: string; works: boolean }> {
+export async function installAgentBrowser(binDir = BIN_DIR): Promise<{ path?: string; works: boolean }> {
   const pin: AgentBrowserPin = readJson(join(ASSETS, 'agent-browser.json'));
   const pinned = pin.upstream ?? '';
   const key = `${process.platform}-${process.arch}`;
@@ -27,7 +27,7 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
     return r.status === 0 ? agentBrowserVersion(r.stdout) : undefined;
   };
   const asset = agentBrowserAsset(process.platform, process.arch, pin);
-  const bin = asset && join(BIN_DIR, asset.exe);
+  const bin = asset && join(binDir, asset.exe);
   const ours = bin && versionOf(bin);
   const theirs = which('agent-browser');
   const plan = agentBrowserPlan({
@@ -48,7 +48,9 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
   let deps = false;
   if (plan.download !== 'skip') {
     const what = plan.download === 'install' ? 'Download' : `Upgrade ${ours} to`;
-    if (!(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))) {
+    if (
+      !(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))
+    ) {
       done.push('agent-browser: install skipped by you');
       return { works: false };
     }

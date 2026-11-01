@@ -11,9 +11,9 @@ feature-flow with research as the ground: every design choice cites papers, the 
 change and by how much, and the feature is measured against that before it is finished. Claude proposes and
 recommends; the user decides.
 
-Read feature-flow first: `${CLAUDE_SKILL_DIR}/../feature-flow/SKILL.md` (below: **FF**). Its rules for the whole run
+Read feature-flow first: `<skill-dir>/../feature-flow/SKILL.md` (below: **FF**). Its rules for the whole run
 apply here unchanged (todo list, handoff override, gates, skips, the seam question, deviations, commits). This file
-only says what differs. Packs: `${CLAUDE_PLUGIN_ROOT}/packs`, for FF's pack skills as well.
+only says what differs. Packs: `<flow-root>/packs`, for FF's pack skills as well.
 
 | Phase        | Runs                                                                     | Output                                          |
 | ------------ | ------------------------------------------------------------------------ | ----------------------------------------------- |
@@ -45,8 +45,8 @@ only says what differs. Packs: `${CLAUDE_PLUGIN_ROOT}/packs`, for FF's pack skil
 - **With an argument, an existing run's slug** (`docs/features/<arg>/flow.md` exists in the repository root or a
   worktree under `.worktrees/*/` or `.claude/worktrees/*/`): read the newest copy. Not `flow: research` → say which
   conductor it belongs to and stop. `phase: done` → say it's done and ask what to do. When the newest copy is in
-  a worktree, work in that worktree (EnterWorktree with its path) and write that copy; if the switch is refused
-  (EnterWorktree only switches into `.claude/worktrees/` from inside another worktree), say so and ask the user to
+  a worktree, work in that worktree (the host worktree tool, or run commands with that worktree as their working directory) and write that copy; if the switch is refused
+  (the host cannot switch its working directory), say so and ask the user to
   start the session in that worktree. Then continue at its phase, as "Without one" does. Never create a flow.md over
   an existing one.
 - **With an argument, anything else:** derive a kebab-case slug, create `docs/features/<slug>/flow.md` from the
@@ -58,8 +58,8 @@ only says what differs. Packs: `${CLAUDE_PLUGIN_ROOT}/packs`, for FF's pack skil
 
 FF Phase 1, and in the same message start a third background `general-purpose` agent with the prompt in
 [references/literature.md](references/literature.md); in that prompt, paper-lookup is
-`${CLAUDE_PLUGIN_ROOT}/packs/paper-lookup/skills/paper-lookup/SKILL.md`, read by path, and its strength column follows
-`${CLAUDE_PLUGIN_ROOT}/packs/pstack-picks/skills/why/references/epistemics.md`. Write its evidence table into flow.md
+`<flow-root>/packs/paper-lookup/skills/paper-lookup/SKILL.md`, read by path, and its strength column follows
+`<flow-root>/packs/pstack-picks/skills/why/references/epistemics.md`. Write its evidence table into flow.md
 under **Evidence** when it lands. If the literature is thin or contradicts itself, say so; that is a finding, not a
 reason to pad.
 

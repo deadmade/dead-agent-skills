@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { claude, onPath, safeArg, startSync, which } from './proc.ts';
+import { claude, cmdArg, onPath, safeArg, startSync, which } from './proc.ts';
 
 const M = 'dead-claude-skills';
 const WIN = process.platform === 'win32';
@@ -84,4 +84,15 @@ test('startSync runs a shim in a folder with spaces, passes its args, and warns 
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), '--allow-remote=root https://example.com/v1.2.3/installer.tgz');
   assert.doesNotMatch(r.stderr, /DEP0190/);
+});
+
+test('Windows command arguments support paths and reject expansion or shell syntax', () => {
+  assert.equal(cmdArg('C:\\Program Files\\Codex'), '"C:\\Program Files\\Codex"');
+  assert.equal(
+    cmdArg('WEB_MCP_AGENT_BROWSER=C:\\My Tools\\browser.exe'),
+    '"WEB_MCP_AGENT_BROWSER=C:\\My Tools\\browser.exe"',
+  );
+  assert.equal(cmdArg('--json'), '--json');
+  for (const value of ['a&b', '%PATH%', '!value!', 'a"b', 'a|b', 'a\nnext', '^escape'])
+    assert.throws(() => cmdArg(value));
 });

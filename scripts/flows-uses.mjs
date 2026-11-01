@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 // Each flows conductor lists the skills, agents and tools it runs in its uses.json ({ plugin: [names] }).
 // From those lists come flows' plugin.json dependencies and the tree in its README; check-repo fails on drift.
 // Run directly to rewrite both.
@@ -39,6 +40,7 @@ export const packs = (root) =>
 // marketplace: the parsed marketplace.json. Returns problems as strings.
 export function checkUses(root, marketplace) {
   const problems = [];
+  const definitions = JSON.parse(readFileSync(join(root, 'catalog/plugins.json'), 'utf8'));
   const packNames = packs(root);
   for (const [conductor, uses] of Object.entries(readUses(root))) {
     const at = `${FLOWS}/skills/${conductor}/uses.json`;
@@ -58,7 +60,7 @@ export function checkUses(root, marketplace) {
         continue;
       }
       const pack = packNames.includes(plugin);
-      const entry = marketplace.plugins.find((p) => p.name === plugin);
+      const entry = definitions.find((p) => p.name === plugin);
       if (!pack && !entry && plugin !== BUILTIN && !plugin.endsWith(`@${OFFICIAL}`)) {
         problems.push(`${at}: ${plugin} is not a plugin of this marketplace, a pack, …@${OFFICIAL} or ${BUILTIN}`);
         continue;
@@ -120,7 +122,7 @@ export function checkOverrides(root) {
 // Every `<packs>/…` or `${CLAUDE_PLUGIN_ROOT}/packs/…` path a conductor names must exist. A path ends at whitespace,
 // a backtick, a quote or a bracket; one with a placeholder (`<pack>`, `…`, `*`) is skipped.
 // shortcut: bare names (`references/x.md`) and paths broken across a line aren't seen; name the full pack path instead.
-const PACK_PATH = /(?:\$\{CLAUDE_PLUGIN_ROOT\}\/packs|<packs>)\/([^\s`'"()[\]]+)/g;
+const PACK_PATH = /(?:\$\{CLAUDE_PLUGIN_ROOT\}\/packs|<flow-root>\/packs|<packs>)\/([^\s`'"()[\]]+)/g;
 export function checkPackPaths(root) {
   const problems = [];
   for (const file of conductorDocs(root)) {
@@ -180,4 +182,5 @@ if (import.meta.main ?? process.argv[1] === import.meta.filename) {
   const readme = withTree(readFileSync(readmePath, 'utf8'), renderTree(all));
   if (!readme) throw new Error(`${readmePath}: no ${START} … ${END} block`);
   writeFileSync(readmePath, readme);
+  execFileSync(process.execPath, [join(root, 'scripts/build-harnesses.mjs')], { stdio: 'inherit' });
 }

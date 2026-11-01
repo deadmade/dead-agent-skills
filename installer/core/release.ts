@@ -5,7 +5,7 @@ export const MARKETPLACE = 'dead-claude-skills';
 
 // Our marketplace at the release tag of the installer that runs, so the plugins always match it: updating means
 // running a newer installer. As `claude plugin marketplace add` takes it, and as its settings entry.
-const REPO = 'deadmade/dead-claude-skills';
+export const REPO = 'deadmade/dead-claude-skills';
 export const marketplaceArg = (version: string) => `${REPO}@v${version}`;
 export const marketplaceSource = (version: string) => ({ source: 'github', repo: REPO, ref: `v${version}` });
 

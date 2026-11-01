@@ -37,4 +37,6 @@ jobs:
             https://github.com/nutlope/hallmark/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/opt-in/hallmark/skills/hallmark
+          add-paths: |
+            plugins/opt-in/hallmark/skills/hallmark
+            portable/

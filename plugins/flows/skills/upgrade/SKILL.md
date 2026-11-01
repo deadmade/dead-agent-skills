@@ -16,7 +16,7 @@ argument-hint: '<package>[@version]'
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: `docs/features/<slug>/flow.md` from
 [build-template.md](../../references/build-template.md), `flow: upgrade`, slug `upgrade-<package>`, phases
-`research | impact | bump | finish | done`. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack is its `pstack-picks`
+`research | impact | bump | finish | done`. Packs: `<flow-root>/packs` (pstack is its `pstack-picks`
 folder).
 
 ## Start or resume
@@ -41,7 +41,7 @@ user approves; with more than two affected areas, also the execution method, as 
 
 ## Phase 3: Bump
 
-More than two affected areas: run implement's Execute (`${CLAUDE_SKILL_DIR}/../implement/SKILL.md`, Phase 3) on the
+More than two affected areas: run implement's Execute (`<skill-dir>/../implement/SKILL.md`, Phase 3) on the
 approved plan, then come back for Phase 4. Otherwise, here: bump with the repo's package manager so the lockfile
 follows. Run the suite. Per breaking change that hits: fix it per plan with superpowers `test-driven-development`;
 where no test covers the changed behaviour, write one that fails on the old usage first. Replace deprecated calls only

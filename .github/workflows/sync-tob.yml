@@ -72,5 +72,6 @@ jobs:
 
             cc @deadmade
           add-paths: |
+            portable/
             plugins/flows/packs/tob-picks
             plugins/flows/agents/spec-compliance-checker.md

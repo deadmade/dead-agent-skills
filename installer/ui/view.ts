@@ -315,7 +315,7 @@ function startScreen(s: State, data: Data, { columns, rows: height }: Size) {
   const focus = at('updates') ? body.length - 1 : 1 + (focused?.kind === 'page' ? focused.i : 0);
   return [
     ...frame(
-      `${paint(['bold', 'magenta'], 'dead-claude-skills')} ${data.version}`,
+      `${paint(['bold', 'magenta'], 'dead-agent-skills')} ${data.version}`,
       scroll(body, focus, Math.max(1, height - 4)),
       { columns },
     ),

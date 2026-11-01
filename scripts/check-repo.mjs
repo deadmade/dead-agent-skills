@@ -1,6 +1,7 @@
 // Repo checks for the pre-commit hook: every plugin manifest validates, the marketplace and the dead-skills
 // bundle agree on the plugin list, and everything carries package.json's version. Skips `claude plugin validate` when claude isn't on PATH
 // (nix flake check sandbox, CI).
+import { checkHarnesses } from './check-harnesses.mjs';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,11 +23,17 @@ process.chdir(join(import.meta.dirname, '..'));
 
 const MARKETPLACE = '.claude-plugin/marketplace.json';
 const BUNDLE = 'plugins/default/.claude-plugin/plugin.json';
-const problems = [];
+const problems = checkHarnesses(process.cwd());
 const pluginDirs = findPluginDirs();
 
 // --- claude plugin validate ---
-for (const target of ['.', ...pluginDirs.map((d) => d + '/')]) {
+for (const target of [
+  '.',
+  ...pluginDirs.map((d) => d + '/'),
+  ...JSON.parse(readFileSync('.claude-plugin/marketplace.json', 'utf8'))
+    .plugins.filter((p) => typeof p.source === 'string')
+    .map((p) => p.source),
+]) {
   const r = spawnSync('claude', ['plugin', 'validate', target], { encoding: 'utf8' });
   if (r.error?.code === 'ENOENT') {
     console.log('claude not on PATH: skipping claude plugin validate');
@@ -55,8 +62,10 @@ for (const { source } of market) {
     problems.push(`${MARKETPLACE}: ${source} has no .claude-plugin/plugin.json`);
   }
 }
+const definitions = JSON.parse(readFileSync('catalog/plugins.json', 'utf8'));
 for (const dir of pluginDirs) {
-  if (!market.some((p) => p.source === `./${dir}`)) problems.push(`${dir} is not listed in ${MARKETPLACE}`);
+  if (!definitions.some((p) => p.source === dir && market.some((entry) => entry.name === p.name)))
+    problems.push(`${dir} is not listed in ${MARKETPLACE}`);
 }
 
 // --- flows: each conductor's uses.json, and what is generated from them (scripts/flows-uses.mjs) ---

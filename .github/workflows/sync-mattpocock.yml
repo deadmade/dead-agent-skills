@@ -71,4 +71,6 @@ jobs:
             https://github.com/mattpocock/skills/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/flows/packs/mattpocock-picks
+          add-paths: |
+            plugins/flows/packs/mattpocock-picks
+            portable/

@@ -25,10 +25,10 @@ const MAX = 120;
 
 // Continuations, headless runs (-p and the SDKs report sdk-*) and a teammate's end of turn stay quiet; a subagent
 // blocked on a permission or a question still notifies, since it blocks the user too.
-export const shouldNotify = (input, env) =>
-  !input.stop_hook_active &&
-  !(input.hook_event_name === 'Stop' && input.agent_id !== undefined) &&
-  !env.CLAUDE_CODE_ENTRYPOINT?.startsWith('sdk');
+export const shouldNotify = (input) =>
+  !input.continuation &&
+  !(input.kind === 'turn.finished' && input.agentId !== undefined) &&
+  input.interactive !== false;
 
 // Line 1: our pane's #{pane_active}#{window_active}; then #{client_flags} for each client on the session.
 export function tmuxFocused(output) {
@@ -44,16 +44,9 @@ function firstLine(text) {
 }
 
 export function message(input, { pick }) {
-  const done = input.hook_event_name === 'Stop';
+  const done = input.kind === 'turn.finished';
   const status = pick(done ? DONE : WAITING);
-  const detail = firstLine(
-    done
-      ? input.last_assistant_message
-      : input.hook_event_name === 'PreToolUse'
-        ? input.tool_input?.questions?.[0]?.question
-        : input.message,
-  );
-  return { title: basename(input.cwd ?? process.cwd()), status, detail };
+  return { title: basename(input.cwd ?? process.cwd()), status, detail: firstLine(input.detail) };
 }
 
 export const TMUX_ARGV = (pane) => [
@@ -154,10 +147,9 @@ function run(argv, env) {
 
 const ICON = join(import.meta.dirname, '..', 'icon.png');
 
-export async function main({ stdin, env, platform }) {
+export async function main({ input, env, platform }) {
   try {
-    const input = JSON.parse(stdin);
-    if (!shouldNotify(input, env)) return;
+    if (!shouldNotify(input)) return;
     if (platform !== 'win32' && env.TMUX_PANE) {
       // A failing tmux counts as not focused: better a popup too many than a missed one.
       const focused = await run(TMUX_ARGV(env.TMUX_PANE), env).then(tmuxFocused, () => false);

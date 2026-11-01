@@ -5,7 +5,7 @@ The default bundle, on every machine:
 - **Global rules**: `rules.md`, added to the context at session start.
 - **Context7** (`.mcp.json`): up-to-date library docs.
 - **Night City**: the theme and its mod, below.
-- **Notifications**: a desktop popup when a turn ends or Claude waits for you, below.
+- **Notifications**: a desktop popup when a turn ends or the harness reports a supported waiting event, below.
 - The core plugins as dependencies: claude-code-setup, claude-md-management, security-guidance and claude-security.
 
 It no longer depends on superpowers, ponytail or code-review. superpowers and ponytail are skill packs inside the
@@ -23,7 +23,7 @@ peach inline code and permission prompts, soft teal suggestions and bash, muted 
 the notifications and the installer's screens use the same palette. Pick it in `/theme` (Claude Code does not let a plugin
 select a custom theme).
 
-Beyond the theme:
+Claude-only additions beyond the theme:
 
 - While Night City is the selected theme, the terminal's own background turns the theme's dusk indigo, so
   the empty space matches (OSC 11, reset when Claude exits or you pick another theme). Linux; Windows
@@ -111,3 +111,21 @@ an environment variable, never as script source.
 
 The installer sets `"preferredNotifChannel": "notifications_disabled"` in `~/.claude/settings.json`, so Claude Code's
 own notification doesn't double up. Installed by hand, set it yourself.
+
+## Native packages and trust
+
+The neutral catalog generates this bundle for Claude Code and Codex. Shared declarations in `hooks/shared.json`
+register small packaged adapters that decode native input, run rules/notification behavior and encode native context.
+Claude handles notification permission/elicitation signals and AskUserQuestion; Codex maps PermissionRequest and
+request_user_input separately and omits the optional generic notification event. Most waiting-event fixtures remain
+documentation-derived; live native trust/execution is pending. No transcript parsing is required.
+
+Review Codex hook trust and verify a fresh session before accepting installer cleanup of an old managed instructions
+block. A matching runtime receipt plus explicit verification is required; unrelated or changed instructions stay.
+Fresh installs receive rules through startup hooks rather than a second global block. Node must be on PATH.
+
+The authored Night City palette is `themes/palette.json`. Run `setup-night-city` in Codex to copy the packaged
+`themes/night-city.tmTheme` safely into `$CODEX_HOME/themes/`, then select it using `/theme`. Existing differing files
+are preserved. Codex theme setup never recolors the terminal. Claude's module effects above are native extensions.
+Native picker/visual checks and Windows acceptance remain pending; generated theme tests establish format/palette,
+not visual acceptance. Contributors run `npm run build:harnesses` and review both outputs before committing.

@@ -16,7 +16,7 @@ Reading an explanation isn't understanding. This flow maps the ground, then make
 | 3 Lesson | mattpocock `teach`, learning style | the user did the key parts       |
 | 4 Keep   | mattpocock `domain-modeling`       | terms in `GLOSSARY.md`           |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `<flow-root>/packs` (pstack
 and mattpocock are its `-picks` folders). No state file; one lesson per run. The real tree is never edited here: a
 change the user wants for real stops the lesson and goes to a build flow, with the map and the why as its input.
 

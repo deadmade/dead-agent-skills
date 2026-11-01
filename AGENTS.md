@@ -1,0 +1,173 @@
+# dead-agent-skills
+
+Personal skills, flows and MCP integrations for Claude Code and Codex. The Claude Code marketplace (`.claude-plugin/marketplace.json`, one plugin per folder under `plugins/`, grouped by install layer)
+plus the Codex marketplace (`.agents/plugins/marketplace.json`), checked-in native packages in `portable/plugins/` (Codex) and `portable/claude-code/plugins/` (Claude) and the npx installer in `installer/` that sets up a machine from it. README.md is the user-facing description;
+keep it, plugin READMEs and plugin/marketplace `description`s true to what the code does.
+
+The default branch is `main`. Feature branches and PRs target `main`; releases are cut from `main`.
+
+## Layout
+
+- `installer/`: TypeScript, by layer. `install.ts` is the entry point and only runs the flow (read state, screens, steps,
+  summary); `context.ts` holds the shared paths, version and summary lines; `core/` the pure decisions by topic
+  (`settings`, `plugins`, `binaries`, `options`, `release`); `system/` everything that touches the OS (file writes and
+  clean-slate backup/delete, processes, downloads); `steps/` one file per thing the installer
+  applies; `ui/` the screens; `assets/` the shipped configs and pins. No runtime npm dependencies: Node's standard library
+  only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
+  `core/` or `system/` with a test next to it, not into `install.ts` or a step. Programs start through `system/proc.ts`
+  (`which`, `start`/`startSync`), never by bare name: on Windows that searches the current folder first, and a `.cmd`
+  shim needs cmd.exe. Node runs the `.ts` files as they are
+  (type stripping; Node 26+, `engines`), so only erasable syntax: no `enum`, `namespace` or parameter properties
+  (`erasableSyntaxOnly`), and imports name the `.ts` file. Node won't strip types under `node_modules`, so npx can't run them: `release.yml` packs the installer
+  (`npm pack`, whose `prepack` runs `tsc` and writes `installer/**/*.js`, gitignored) as `installer.tgz` on the release, and
+  users run `npx --allow-remote=root <release>/latest/download/installer.tgz` (npm 12 refuses tarball URLs without the
+  flag). npx caches by URL and keeps running the first installer it fetched (`--prefer-online` too), so each run reads
+  the tag `latest/` redirects to and, when it is newer, hands over to that release's versioned URL (`newerInstaller`).
+- `plugins/` is grouped by how a plugin gets installed: `default/` (the bundle, dead-skills, on every machine),
+  `flows` (the conductors), both plain plugins at the top, then `shared/` (what flows pulls in) and `opt-in/` (extras
+  nothing else depends on; `opt-in/mcp/` holds the MCP configs, `opt-in/implementation/` the language, database and LSP
+  plugins). `shared`, `opt-in` and its two subfolders are `GROUPS` folders (`scripts/plugin-dirs.mjs`, which nests them):
+  each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; tui-review and web-mcp
+  are also offered on their own but live in `shared/`. Moving a folder doesn't touch installs (they key on the
+  plugin `name`); renaming a plugin does.
+- `crates/`: the two Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`) and `web-mcp` (web-mcp's server). Each keeps its own
+  `Cargo.lock`; nothing in the plugins reaches into them at runtime.
+- `plugins/default/`: the dead-skills bundle. Its `dependencies` are the core plugins; itself it carries the global rules
+  (`rules.md`, a SessionStart hook), Context7 (`.mcp.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
+  their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id
+  (`custom:dead-skills:night-city`: a plugin theme's id carries the plugin name).
+- Night City (`plugins/default/`): a shared palette (`themes/palette.json`), generated Claude theme (`themes/night-city.json`), Codex `.tmTheme` and a Claude mod (`hooks/`). It is the house
+  look: tui-review's `hooks/theme.ts`, notify's wording and the installer's `paint` (`ui/view.ts`) use its palette, with no
+  stock fallback. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
+  highlighting off. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
+  Code otherwise draws in 256 colours and the theme's indigos turn grey.
+  The ccstatusline toggle writes `installer/assets/ccstatusline-night-city.json` (`ccstatusline.json`, the old stock config, is
+  kept only so the installer recognises and replaces it):
+  Powerline (needs a Nerd Font), and since Powerline mode draws a gradient in its first colour only, the ナイトシティ
+  sign is one widget per glyph. Nothing draws above the prompt now: ponytail's band is vendored but never loads, and the flows band and
+  Onibi's visits were removed in commit c2032c1, "Vendor ponytail v5 and make its band the only one
+  above the prompt (#66)" (revert it to bring them back; its CLAUDE.md and README edits will conflict). Its mascot PNGs (`assets/`) are generated by `scripts/draw-mascot.mjs`; never edit them by
+  hand.
+- `plugins/opt-in/mcp/mcp-github/`, `plugins/opt-in/mcp/mcp-azure/`: MCP server configs only.
+- `plugins/flows/`: the conductor skills (`/feature-flow`, `/research-flow`, `/implement`, `/fix-flow`, `/upgrade`,
+  `/test-audit`, `/doc-audit`, `/harden`, `/self-review`, `/verify`, `/integrate`, `/understand`, `/learn`). Each runs other plugins' skills in order;
+  the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
+  plugin, audit scope and report format) live once in `references/flow-rules.md`, so a SKILL.md only says what it runs.
+  Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/verify` → `/doc-audit branch`). Each
+  conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
+  tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. `/self-review`
+  was a plugin of its own until 0.5.0; its skill and its five agents (`agents/`, next to tob's checker) now ship in
+  flows, so its agents are `flows:pr-test-analyzer` and so on, and the installer keeps flows on a machine that had it.
+- `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
+  share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
+  together.
+- `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `crates/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
+  x64 only, like tui-review's binary (`build-web-mcp.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
+  `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
+  feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
+  release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `sync-agent-browser.yml`, which imports
+  `AGENT_BROWSER_FILES` from `core/binaries.ts`). Unless a current one is on PATH, the installer keeps its own copy in
+  `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
+  pin); either way it sets `agentBrowserPath` to the one in use (`agentBrowserPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
+  (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
+  `search` reads Google, Bing, DuckDuckGo and Brave (papers: Google Scholar and Semantic Scholar too) in its own browser (browser first found of `WEB_MCP_CHROME`, Chrome for Testing from `agent-browser install`, `helium`, `chromium`; never branded Chrome), one profile per engine under `WEB_MCP_SEARCH_DIR` (default the data dir, no temp fallback), with Consent-O-Matic (downloaded on the first search, not vendored; THIRD_PARTY.md) except for Bing. Windows closes each search browser after its search. A blocked engine rests 30 min. No passage index: ranking is BM25 over each search's own pages. Engine parsers test against captured result pages in `crates/web-mcp/tests/fixtures/engines/`; Google's and Semantic Scholar's aren't captured yet, so their tests are `#[ignore]`d until they are.
+- `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
+  `scripts/sync-*.mjs`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
+  plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
+  (`${CLAUDE_PLUGIN_ROOT}/packs`), and the installer retires old installs of them and checks none remains
+  (`stillInstalled`). The folder list is the source of truth, not this file. tob's spec checker ships as flows' own agent,
+  `plugins/flows/agents/spec-compliance-checker.md` (vendored by `sync-tob`), because a pack's agents don't load.
+  Where a conductor changes a pack's rule it quotes the sentence in an `<!-- overrides <pack>/<path>: "..." -->`
+  marker in flows' own `.md` files; `checkOverrides` (`scripts/flows-uses.mjs`, run by check-repo and by every pack
+  sync before its PR) fails when the quoted sentence is gone. `docs/vendor-a-pack.md` is the checklist for a new pack.
+- `plugins/flows/packs/ponytail/`, `plugins/flows/packs/superpowers/`: vendored unchanged from upstream's newest stable release
+  (`scripts/sync-release.mjs <name>`, `sync-release.yml`, ADR 0002): ponytail's skills and its
+  SessionStart/SubagentStart/UserPromptSubmit hooks and band mod (the hooks and band don't load); superpowers' skills and SessionStart hook (its
+  `run-hook.cmd` and `session-start` stay LF via `.gitattributes`). Other hosts' adapters are left out. The sync PR
+  carries upstream's release notes, and the sync fails on a `plugin.json` component or default folder it doesn't know.
+- `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
+  `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
+  only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
+- Notifications (`plugins/default/`, formerly the notify plugin): `hooks/shared.json` declares observational events; generated native registrations launch packaged `hooks/runtime/run.mjs` with explicit harness/event/handler identity, async. Rules use `hooks/rules.mjs`; notifications use shared `hooks/lib.mjs`. Logic and tests in `hooks/lib.mjs`; Linux
+  talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
+  sets `preferredNotifChannel: "notifications_disabled"`.
+- `plugins/opt-in/implementation/rust-skills/`, `plugins/opt-in/implementation/csharp-skills/`: vendored (`sync-rust.mjs`, `sync-csharp.mjs`). `paths:` frontmatter doesn't
+  gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an
+  unscanned `library/`; the router reads library files via the installer's `Read(~/.claude/plugins/**)` rule (without
+  the installer users get a permission prompt).
+- `plugins/opt-in/implementation/postgres/`: a database plugin. It vendors
+  Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its
+  own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
+- `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
+  `sync-release.mjs` (vendors ponytail and superpowers releases, writes the PR's release notes), `draw-mascot.mjs` (Onibi, Night City's pixel-art mascot, also notify's `icon.png`).
+
+Atlassian is the only url-sourced marketplace entry, deliberately unpinned. The installer would read a pinned url
+entry's version from its `ref` (`shippedVersions`).
+
+## Vendored content: don't edit
+
+These are copied from upstream by `scripts/sync-*.mjs` (weekly workflows open the PRs) and overwritten on every
+sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0), `plugins/flows/agents/`,
+`plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
+`plugins/flows/skills/self-review/references/upstream/` with its `LICENSE` and `LICENSE-MIT`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
+When what's vendored or its license changes, update THIRD_PARTY.md.
+
+## Versions and releases
+
+Everything ships as one version: `package.json` and `package-lock.json`, the marketplace's `metadata.version`, every
+plugin's `.claude-plugin/plugin.json`, both crates' `Cargo.toml`/`Cargo.lock` and the installer URL in README.md.
+`check-repo.mjs` fails on drift. Never bump by hand:
+
+    npm run release -- patch      # on main, clean tree; bumps, runs npm test, commits and tags
+    git push --follow-tags origin main
+
+The `v*` tag runs `release.yml`, which packs the installer (`installer.tgz`), builds tui-review and web-mcp and
+publishes the GitHub release npx and the installer download from. Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
+plugins of ours that the manifest no longer lists.
+
+## Checks
+
+- `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs`
+  (`claude plugin validate` is skipped when `claude` isn't on PATH). The installer tests run with a line-coverage floor
+  (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `installer/modules.test.ts`
+  loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
+  not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
+- `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `installer/` (sources and tests, strict).
+- tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
+- web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
+- tui-review mod tests need a generated fixture first, from `crates/tui-review`:
+  `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
+  `plugins/shared/tui-review`.
+- mod tests: `claude plugin test .` in `plugins/default` and `plugins/opt-in/md-pane`.
+  `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
+  writes them when it loads the mod).
+- The quote check: `npm test` (check-repo) fails when a sentence an `overrides` marker quotes is gone from its pack.
+  Run it after a pack sync and fix the marker or the conductor text in the same PR.
+- `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
+  check-repo, installer and scripts tests, end-of-file; vendored paths excluded). Enter it from the repo root only:
+  started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or
+  `plugins/flows/agents/` needs `nix develop` re-entered once to pick up their excludes.
+- `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
+
+CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
+PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml` on PRs touching the workflow and from `release.yml`; `sync-*.yml`
+weekly.
+
+## Multiple agents
+
+`catalog/plugins.json` is the authored neutral catalog, loaded by `installer/system/catalog.ts`;
+`installer/core/agents.ts` declares host capabilities. `installer/system/packages.ts` generates both native distributions
+without changing vendored sources. Author → `npm run build:harnesses` → review generated changes → commit source and
+outputs together. `npm run check:harnesses` and prepack compare all owned outputs without rewriting them.
+`build:codex`/`check:codex` remain compatibility aliases. Native source manifests are development overlays, not the
+marketplace distribution. Add future targets through catalog capability, package, runtime and theme adapters; shared
+handlers must not learn native event or manifest shapes.
+`installer/steps/codex.ts` uses Codex's native plugin and MCP commands, respecting CODEX_HOME.
+Keep Claude marketplace IDs and the legacy executable alias stable. The GitHub repository still has its old name.
+Flow behavior is shared; host-specific mappings live under `plugins/flows/references/hosts/`.
+Unavailable subagents mean skipped steps, never sequential replacements or successful check claims.
+
+Both native marketplaces must work directly from a fresh clone, without the installer or a build.
+`portable/` contains generated, checked-in packages for both harnesses; change sources and regenerate it rather than editing
+those copies. Repository checks compare the committed distribution with a fresh build. Sync PRs include the
+regenerated distribution, and releases regenerate it after bumping source versions.

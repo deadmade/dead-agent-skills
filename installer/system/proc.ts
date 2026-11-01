@@ -33,10 +33,16 @@ export function which(bin: string) {
 
 export const onPath = (bin: string) => which(bin) !== undefined;
 
-// A .cmd or .bat runs through cmd.exe as one command line: the path quoted (spaces), the args safeArg-checked. Node wraps
+// A .cmd or .bat runs through cmd.exe as one command line: the path quoted (spaces), the args quoted and checked for cmd expansion. Node wraps
 // it as cmd.exe /d /s /c "…", and an args array with shell: true is deprecated (DEP0190).
 const viaCmd = (file: string) => WIN && /\.(cmd|bat)$/i.test(file);
-const commandLine = (file: string, args: string[]) => [`"${file}"`, ...args.map(safeArg)].join(' ');
+// npm shims need quoted Windows paths and env assignments; reject cmd expansion and control syntax.
+export function cmdArg(value: string) {
+  if (/["%!&|<>^\r\n]/.test(value)) throw new Error('refusing unsafe Windows command argument');
+  if (/^[a-z0-9@.:=/_-]+$/i.test(value)) return value;
+  return `"${value.replace(/(\\+)$/, '$1$1')}"`;
+}
+const commandLine = (file: string, args: string[]) => [cmdArg(file), ...args.map(cmdArg)].join(' ');
 
 // file: a full path, from which() or our own.
 export const start = (file: string, args: string[], opts: SpawnOptions = {}) =>

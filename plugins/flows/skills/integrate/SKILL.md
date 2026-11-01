@@ -18,7 +18,7 @@ them.
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: the caller's
 `docs/features/<slug>/flow.md` when there is one (standalone: none), with `phase:` `commit | pr | ci | done`
-recorded in it. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack is its `pstack-picks` folder).
+recorded in it. Packs: `<flow-root>/packs` (pstack is its `pstack-picks` folder).
 
 **Never** run `git push` or a `gh` command that writes (`gh pr create`, `gh pr merge`, …), and never push a CI fix:
 the owner's sandbox and hooks block them, and pushing is the owner's call. Hand each to the user as a `!` line to type.

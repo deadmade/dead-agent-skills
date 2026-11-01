@@ -81,7 +81,7 @@ or set its path with `/plugin configure web-mcp`.
 
 ## Configuration
 
-Environment variables, set in `.mcp.json`: `CLAUDE_PROJECT_DIR` (where `.web/` lives), `WEB_MCP_AGENT_BROWSER` (the `agentBrowserPath` userConfig, default `agent-browser`),
+Environment variables, set in `.mcp.json`: `WEB_MCP_PROJECT_DIR` (where `.web/` lives; falls back to `CLAUDE_PROJECT_DIR`, then the server working directory), `WEB_MCP_AGENT_BROWSER` (the `agentBrowserPath` userConfig, default `agent-browser`),
 `WEB_MCP_SEARCH_DIR` and `WEB_MCP_CHROME` (see above). `WEB_MCP_ARXIV_URL`,
 `WEB_MCP_OPENALEX_URL` and `WEB_MCP_CROSSREF_URL` repoint the paper APIs (for tests); `WEB_MCP_PAPERS_MS` shortens each paper source's deadline. The lookup sources are repointed by `WEB_MCP_DOH_URL`, `WEB_MCP_RDAP_URL`, `WEB_MCP_CRTSH_URL`,
 `WEB_MCP_CDX_URL`, `WEB_MCP_WAYBACK_URL`, `WEB_MCP_INTERNETDB_URL`, `WEB_MCP_OSV_URL`, `WEB_MCP_NVD_URL`,
@@ -97,3 +97,8 @@ Environment variables, set in `.mcp.json`: `CLAUDE_PROJECT_DIR` (where `.web/` l
 - Rate limits (per API host, for example arXiv one request per 3 s) are per server process. Two sessions in one project
   each run their own server, so they double them.
 - Pages that hide text in inactive tabs (some docs sites) can lose that text in extraction.
+
+Native packages for Claude Code and Codex are generated from the shared catalog. Codex ships a setup skill with
+`codex mcp add` instructions; installing that skill does not register a global server. Place the release `web-mcp`
+binary on PATH or use an absolute path, and install agent-browser for browser/search. The optional installer handles
+these paths. Credentials and native MCP configuration remain owned by the harness.

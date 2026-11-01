@@ -37,4 +37,6 @@ jobs:
             https://github.com/apollographql/skills/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/opt-in/implementation/rust-skills
+          add-paths: |
+            plugins/opt-in/implementation/rust-skills
+            portable/

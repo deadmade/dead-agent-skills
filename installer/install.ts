@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Interactive installer for the dead-claude-skills marketplace: the flow. Decisions live in core/, the OS in system/,
 // each thing it applies in steps/.
+import { AGENTS, selectedAgents } from './core/agents.ts';
+import { applyCodex } from './steps/codex.ts';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { missingBinaries } from './core/binaries.ts';
@@ -36,6 +38,7 @@ import {
   webBuiltinsDecision,
 } from './core/settings.ts';
 import {
+  ask,
   CONFIG,
   FLAGS,
   PKG,
@@ -83,6 +86,25 @@ if (npx) {
   process.exit(startSync(npx, [...npxArgs(installerUrl(next)), ...FLAGS], { stdio: 'inherit', env }).status ?? 1);
 }
 
+let agents = selectedAgents(FLAGS);
+if (!agents) {
+  agents = [];
+  for (const host of AGENTS) {
+    if (await ask(`Configure ${host.label}?`, onPath(host.binary))) agents.push(host.id);
+  }
+}
+if (agents.includes('codex')) {
+  try {
+    await applyCodex();
+  } catch (error) {
+    failures.push(`Codex: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+if (!agents.includes('claude-code')) {
+  note('Summary', [...done, ...failures.map((f) => `ERROR: ${f}`)]);
+  process.exit(failures.length ? 1 : 0);
+}
+
 const RULES = join(CONFIG, 'rules', 'dead-claude-skills.md');
 const HANDOFF: Record<string, string[]> = {
   'mcp-github': [
@@ -96,7 +118,7 @@ const HANDOFF: Record<string, string[]> = {
   ],
 };
 
-log('info', `${paint(['bold', 'magenta'], 'dead-claude-skills')} v${VERSION}`);
+log('info', `${paint(['bold', 'magenta'], 'dead-agent-skills')} v${VERSION}`);
 
 const marketplaces: { name: string }[] = listed(
   'marketplaces',

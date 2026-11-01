@@ -22,7 +22,7 @@ Claude proposes and recommends; the user decides.
 
 ## Rules for the whole run
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack,
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `<flow-root>/packs` (pstack,
 mattpocock and tob are its `-picks` folders). Only this differs:
 
 - After every phase update `docs/features/<slug>/flow.md` (`flow: feature`, `phase:`).
@@ -35,8 +35,8 @@ mattpocock and tob are its `-picks` folders). Only this differs:
 - **With an argument, an existing run's slug** (`docs/features/<arg>/flow.md` exists in the repository root or a
   worktree under `.worktrees/*/` or `.claude/worktrees/*/`): read the newest copy. A `flow:` other than `feature` (or
   missing) → say which conductor it belongs to and stop. `phase: done` → say it's done and ask what to do. When the
-  newest copy is in a worktree, work in that worktree (EnterWorktree with its path) and write that copy; if the
-  switch is refused (EnterWorktree only switches into `.claude/worktrees/` from inside another worktree), say so and
+  newest copy is in a worktree, work in that worktree (the host worktree tool, or run commands with that worktree as their working directory) and write that copy; if the
+  switch is refused (the host cannot switch its working directory), say so and
   ask the user to start the session in that worktree. Then continue at its phase, as "Without one" does. Never create
   a flow.md over an existing one.
 - **With an argument, anything else:** derive a kebab-case slug (`checkout-webhooks`), create
@@ -138,6 +138,6 @@ Before SDD deletes its workspace, copy its ledger's `Ruling:` lines into flow.md
 
 1. Walkthrough table in flow.md: every spec goal → plan task → `file:line` → test. A goal with no code, or code with
    no goal, is a deviation: report it.
-2. Run `/verify` (read `${CLAUDE_SKILL_DIR}/../verify/SKILL.md`) on the branch, with the spec as its intent. If
+2. Run `/verify` (read `<skill-dir>/../verify/SKILL.md`) on the branch, with the spec as its intent. If
    execution ran natively (no per-task reviews), tell it so: it then also offers pstack `interrogate`.
-3. Run `/learn` (`${CLAUDE_SKILL_DIR}/../learn/SKILL.md`) on this flow. Set `phase: done`.
+3. Run `/learn` (`<skill-dir>/../learn/SKILL.md`) on this flow. Set `phase: done`.

@@ -2,6 +2,10 @@
 on-unmatched = "debug"
 # Vendored upstream files and the generated hook config: reformatting them would churn every sync.
 excludes = [
+  "portable/**",
+  ".agents/plugins/marketplace.json",
+  ".claude-plugin/marketplace.json",
+  "plugins/default/themes/night-city.json",
   "plugins/opt-in/hallmark/**",
   "plugins/flows/packs/**",
   "plugins/flows/agents/**",

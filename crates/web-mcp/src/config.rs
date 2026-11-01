@@ -42,7 +42,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Reads `CLAUDE_PROJECT_DIR`, `WEB_MCP_AGENT_BROWSER`, `WEB_MCP_SEARCH_DIR` (unset:
+    /// Reads `WEB_MCP_PROJECT_DIR` (fallback: `CLAUDE_PROJECT_DIR`, then the working directory), `WEB_MCP_AGENT_BROWSER`, `WEB_MCP_SEARCH_DIR` (unset:
     /// `$XDG_DATA_HOME/web-mcp`, `~/.local/share/web-mcp`, or `%LOCALAPPDATA%\web-mcp` on Windows) and
     /// `WEB_MCP_{ARXIV,OPENALEX,CROSSREF,DOH,RDAP,CRTSH,CDX,WAYBACK,INTERNETDB,OSV,NVD,EPSS,KEV}_URL`, each with its default, `WEB_MCP_PAPERS_MS` (8 s; shorter for
     /// tests) and `WEB_MCP_LOOKUP_MS` (unset: each lookup source's own deadline).
@@ -82,7 +82,7 @@ impl Config {
             papers_deadline: var("WEB_MCP_PAPERS_MS")
                 .and_then(|v| v.parse().ok())
                 .map_or(Duration::from_secs(8), Duration::from_millis),
-            project: var("CLAUDE_PROJECT_DIR").map_or_else(|| PathBuf::from("."), PathBuf::from),
+            project: project_dir(var("WEB_MCP_PROJECT_DIR"), var("CLAUDE_PROJECT_DIR")),
             agent_browser: var("WEB_MCP_AGENT_BROWSER").unwrap_or_else(|| "agent-browser".into()),
             search_dir: search_dir(|k| {
                 std::env::var_os(k)
@@ -91,6 +91,12 @@ impl Config {
             }),
         })
     }
+}
+
+fn project_dir(portable: Option<String>, claude: Option<String>) -> PathBuf {
+    portable
+        .or(claude)
+        .map_or_else(|| PathBuf::from("."), PathBuf::from)
 }
 
 /// Never a shared folder such as the temp dir: another user could plant the wrapper web-mcp runs there.
@@ -109,6 +115,19 @@ fn search_dir(var: impl Fn(&str) -> Option<PathBuf>) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn project_directory_is_portable_and_backwards_compatible() {
+        assert_eq!(project_dir(None, None), PathBuf::from("."));
+        assert_eq!(
+            project_dir(None, Some("legacy".into())),
+            PathBuf::from("legacy")
+        );
+        assert_eq!(
+            project_dir(Some("portable".into()), Some("legacy".into())),
+            PathBuf::from("portable")
+        );
+    }
 
     #[test]
     fn search_dir_needs_a_home() {

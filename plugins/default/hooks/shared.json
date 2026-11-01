@@ -1,0 +1,37 @@
+[
+  {
+    "event": "session.started",
+    "handler": "rules",
+    "required": true,
+    "background": false,
+    "timeoutSeconds": 10
+  },
+  {
+    "event": "turn.finished",
+    "handler": "notifications",
+    "required": true,
+    "background": true,
+    "timeoutSeconds": 10
+  },
+  {
+    "event": "permission.requested",
+    "handler": "notifications",
+    "required": false,
+    "background": true,
+    "timeoutSeconds": 10
+  },
+  {
+    "event": "question.asked",
+    "handler": "notifications",
+    "required": false,
+    "background": true,
+    "timeoutSeconds": 10
+  },
+  {
+    "event": "notification.received",
+    "handler": "notifications",
+    "required": false,
+    "background": true,
+    "timeoutSeconds": 10
+  }
+]

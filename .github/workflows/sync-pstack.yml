@@ -72,4 +72,6 @@ jobs:
             rewrites from `scripts/sync-pstack.mjs` applied and the Cursor-ism guard passing.
 
             cc @deadmade
-          add-paths: plugins/flows/packs/pstack-picks
+          add-paths: |
+            plugins/flows/packs/pstack-picks
+            portable/

@@ -17,7 +17,7 @@
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
     # Upstream files copied by scripts/sync-*.mjs: fixing them here would churn every sync PR.
-    vendored = ["^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/self-review/(LICENSE|references/upstream/)"];
+    vendored = ["^portable/" "^plugins/default/themes/night-city\\.json$" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/self-review/(LICENSE|references/upstream/)"];
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let
@@ -65,14 +65,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(\\.claude-plugin/|plugins/|crates/|scripts/check-repo\\.mjs$|package\\.json$)";
+            files = "^(catalog/|portable/|\\.agents/|\\.claude-plugin/|plugins/|crates/|scripts/check-repo\\.mjs$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|scripts/|crates/|plugins/default/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(installer/|scripts/|crates/|catalog/|portable/|plugins/default/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };

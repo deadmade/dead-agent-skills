@@ -19,7 +19,7 @@ and offer `/feature-flow` instead.
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: `docs/features/<slug>/flow.md` from
 [build-template.md](../../references/build-template.md), `flow: implement`, phases `read | plan | execute | finish |
-done`. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack and mattpocock are its `-picks` folders).
+done`. Packs: `<flow-root>/packs` (pstack and mattpocock are its `-picks` folders).
 
 ## Start or resume
 

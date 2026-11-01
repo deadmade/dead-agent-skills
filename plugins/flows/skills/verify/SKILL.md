@@ -1,6 +1,6 @@
 ---
 name: verify
-description: 'Prove a branch is ready for a PR: run the tests and checks once and read their output, /self-review the diff, /doc-audit the docs it touched, optionally /test-audit it, read it in tui-review, have you confirm or reopen the decisions the build made on its own, then give a verdict and offer how to integrate. Never opens a PR or pushes on its own. Use for /verify [base].'
+description: 'Prove a branch is ready for a PR: run the tests and checks once and read their output, /self-review the diff, /doc-audit the docs it touched, optionally /test-audit it, walk through its diff, have you confirm or reopen the decisions the build made on its own, then give a verdict and offer how to integrate. Never opens a PR or pushes on its own. Use for /verify [base].'
 disable-model-invocation: true
 argument-hint: '[base branch or commit]'
 ---
@@ -16,10 +16,10 @@ Is this branch ready for a PR? Evidence for each part of the answer, then the us
 | 3 Review | `/self-review`                                             | code findings fixed                         |
 | 4 Docs   | `/doc-audit branch`                                        | docs match the diff                         |
 | 5 Tests  | `/test-audit branch`, on the user's yes                    | test gaps filled                            |
-| 6 Read   | tui-review                                                 | the user read the diff                      |
+| 6 Read   | diff summary and walkthrough                               | the user read the diff                      |
 | 7 Decide | verdict, then superpowers `finishing-a-development-branch` | **Gate**: decisions, then what happens next |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `<flow-root>/packs` (pstack
 is its `pstack-picks` folder).
 
 ## Phase 1: Scope
@@ -67,10 +67,9 @@ pr-test-analyzer output from Phase 3, so neither runs twice.
 
 ## Phase 6: Read
 
-If the tree changed since the latest run, re-run the checks once now and read the output. Then ask the user to read the
-branch in tui-review (`/tui-review <base>`; it shows committed changes only, so say if uncommitted work is left) and
-answer their questions about it. Without tui-review: `git diff --stat <merge-base>` and offer to walk through it file
-by file.
+If the tree changed since the latest run, re-run the checks once now and read the output. Show
+`git diff --stat <merge-base>` and offer to walk through the diff file by file. Include uncommitted changes and
+identify them separately from committed changes. Answer the user's questions before continuing.
 
 ## Phase 7: Decide
 

@@ -46,4 +46,6 @@ jobs:
               https://github.com/timescale/pg-aiguide/commit/${{ steps.check.outputs.pgai }}
 
             cc @deadmade
-          add-paths: plugins/opt-in/implementation/postgres
+          add-paths: |
+            plugins/opt-in/implementation/postgres
+            portable/

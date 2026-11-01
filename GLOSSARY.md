@@ -1,8 +1,28 @@
 # dead-claude-skills
 
-A personal Claude Code plugin marketplace and the installer that sets up a machine from it.
+Personal native Claude Code and Codex marketplaces and the installer that sets up a machine from it.
 
 ## Language
+
+**Harness**:
+The coding-agent application that runs a conversation and hosts plugins, such as Claude Code or Codex.
+_Avoid_: model (the model is selected within a harness), cockpit (the separate observing app)
+
+**Plugin definition**:
+The authored description of a plugin's shared resources, behavior and integration needs across harnesses.
+_Avoid_: native manifest (a particular harness's package description)
+
+**Harness adapter**:
+The integration that translates shared plugin definitions and behavior to one harness's supported features.
+_Avoid_: plugin (the feature being integrated), harness (the application being integrated with)
+
+**Native package**:
+A plugin's distribution in the form a particular harness can install and run.
+_Avoid_: plugin definition (the shared authored description)
+
+**Native extension**:
+A plugin feature available through a particular harness's integration facilities without a shared equivalent.
+_Avoid_: fallback (a substitute for another feature)
 
 **Picks plugin**:
 A vendored plugin that carries a hand-chosen subset of one upstream's skills (`tob-picks`, `mattpocock-picks`).
@@ -91,3 +111,42 @@ _Avoid_: passage, summary
 **Search profile**:
 The browser profile web-mcp's searches run in, with cookies and settings of its own and never the user's.
 _Avoid_: session (one browser), user profile
+
+## Flow cockpit
+
+**Flow cockpit**:
+The desktop window that shows what the conductors and Claude sessions are doing, read from their documents and the
+capture. It only watches.
+_Avoid_: dashboard, board, harness
+
+**Flow run**:
+One conductor run, recorded in a `docs/features/<slug>/flow.md`, from its start to `phase: done`.
+_Avoid_: run (alone; a web-mcp run is something else), flow (alone; that's the conductor), ticket
+
+**Audit**:
+One `docs/audits/<date>-<flow>-<scope>.md` report written by `/test-audit`, `/doc-audit` or `/harden`.
+_Avoid_: audit run, report (alone)
+
+**Claude session**:
+One Claude Code conversation together with the subagents it starts.
+_Avoid_: session (alone; a web-mcp session is a browser), chat
+
+**Loose session**:
+A Claude session that belongs to no flow run or audit.
+_Avoid_: orphan session, ad-hoc session
+
+**Capture**:
+The record of what one Claude session did, written event by event by the flow-cockpit plugin's hooks.
+_Avoid_: log, telemetry, trace
+
+**Capability diagnostic**:
+A target-specific explanation of an optional feature omitted during package generation. Required unsupported
+features fail the build; matching event names alone do not establish support.
+
+**Rules receipt**:
+A runtime record tying startup rule handling to exact packaged rules/adapter bytes, version and effective instruction
+source. It supports migration checks; installation alone is not hook trust or consent to remove instructions.
+
+**Owned generated output**:
+Both native distributions under `portable/`, both root marketplaces and the Claude theme rendered from the shared
+palette. Author sources, rebuild, review and commit outputs together; freshness checks do not rewrite them.

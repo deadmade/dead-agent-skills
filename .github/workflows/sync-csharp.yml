@@ -52,4 +52,6 @@ jobs:
           commit-message: 'Sync csharp-skills to ${{ steps.check.outputs.sha }}'
           title: 'Sync csharp-skills to ${{ steps.check.outputs.sha }}'
           body-path: /tmp/csharp-pr-body.md
-          add-paths: plugins/opt-in/implementation/csharp-skills
+          add-paths: |
+            plugins/opt-in/implementation/csharp-skills
+            portable/

@@ -35,7 +35,10 @@ function fixture(uses, skillText = 'how reviewer docs search general-purpose dee
       { name: 'remote', source: { source: 'url', url: 'https://example.invalid/remote.git' } },
     ],
   };
-  return checkUses(fx, marketplace);
+  put('catalog/plugins.json', JSON.stringify(marketplace.plugins));
+  return checkUses(fx, {
+    plugins: marketplace.plugins.map((p) => ({ ...p, source: './portable/claude-code/plugins/' + p.name })),
+  });
 }
 
 test('a valid map has no problems: local skill and agent, MCP tool, url plugin, official, builtin', () => {

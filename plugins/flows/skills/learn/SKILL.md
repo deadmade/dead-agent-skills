@@ -16,7 +16,7 @@ again, and drops the rest.
 | 2 Sort   | each to one home                                                          | proposed entries. **Gate** |
 | 3 Write  | `revise-claude-md`, `domain-modeling`, `writing-skills`, a solutions note | entries written            |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `<flow-root>/packs` (pstack
 and mattpocock are its `-picks` folders).
 
 ## Phase 1: Gather
@@ -35,14 +35,14 @@ what was done.
 
 Each lesson gets one home:
 
-| Home                       | When                                                                                 | Through                                 |
-| -------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------- |
-| CLAUDE.md                  | an instruction a future session must follow in this repo (a command, a trap, a rule) | `claude-md-management:revise-claude-md` |
-| `GLOSSARY.md`              | a domain term or relationship got settled                                            | mattpocock `domain-modeling`            |
-| `docs/adr/`                | a decision that is hard to reverse, surprising without context, and a real trade-off | mattpocock `domain-modeling`            |
-| `docs/solutions/<slug>.md` | a solved problem someone may hit again                                               | the format below                        |
-| a skill or conductor       | a skill or conductor behaved wrong or left a step out                                | superpowers `writing-skills`            |
-| Claude's memory            | about the user or how they like to work, not about the repo                          | the memory directory                    |
+| Home                         | When                                                                                 | Through                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| AGENTS.md / CLAUDE.md        | an instruction a future session must follow in this repo (a command, a trap, a rule) | host instruction-file procedure (`claude-md-management:revise-claude-md` when available) |
+| `GLOSSARY.md`                | a domain term or relationship got settled                                            | mattpocock `domain-modeling`                                                             |
+| `docs/adr/`                  | a decision that is hard to reverse, surprising without context, and a real trade-off | mattpocock `domain-modeling`                                                             |
+| `docs/solutions/<slug>.md`   | a solved problem someone may hit again                                               | the format below                                                                         |
+| a skill or conductor         | a skill or conductor behaved wrong or left a step out                                | superpowers `writing-skills`                                                             |
+| host memory (when available) | about the user or how they like to work, not about the repo                          | the memory directory                                                                     |
 
 Present them as one numbered list: the lesson in one line, its home, and the exact text to write. Recommend dropping
 weak ones; three good entries beat ten. **Gate:** the user picks.

@@ -102,6 +102,9 @@ export function finish(label, sha, upstreamFile, dir) {
   const changed = git('-C', ROOT, 'status', '--porcelain', '--', ...[dir].flat(), `:(exclude)${rel}`) !== '';
   if (changed) writeFileSync(upstreamFile, sha + '\n');
   else git('-C', ROOT, 'checkout', '--', rel);
+  if (changed) {
+    execFileSync(process.execPath, [join(ROOT, 'scripts/build-harnesses.mjs')], { stdio: 'inherit' });
+  }
   console.log(changed ? `${label} synced to ${sha} (changed)` : `${label} unchanged at ${sha} (no vendored changes)`);
 }
 

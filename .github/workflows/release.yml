@@ -23,8 +23,10 @@ jobs:
         with:
           node-version: 26
 
-      - name: Repo checks and tests
-        run: npm test
+      - name: Native distribution freshness and tests
+        run: |
+          npm run check:harnesses
+          npm test
 
   tui-review:
     uses: ./.github/workflows/build-tui-review.yml
@@ -55,7 +57,7 @@ jobs:
         run: |
           npm ci
           npm pack --pack-destination dist
-          mv dist/dead-claude-skills-*.tgz dist/installer.tgz
+          mv dist/dead-agent-skills-*.tgz dist/installer.tgz
 
       - name: Publish release
         env:

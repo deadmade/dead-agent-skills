@@ -19,7 +19,7 @@ No fix before the cause is known and agreed, and no fix without a test that fail
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: `docs/features/<slug>/flow.md` from
 [build-template.md](../../references/build-template.md), `flow: fix`, phases `reproduce | ground | cause | fix |
-finish | done`. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack is its `pstack-picks` folder).
+finish | done`. Packs: `<flow-root>/packs` (pstack is its `pstack-picks` folder).
 
 ## Start or resume
 

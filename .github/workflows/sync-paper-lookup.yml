@@ -42,4 +42,6 @@ jobs:
             https://github.com/K-Dense-AI/scientific-agent-skills/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/flows/packs/paper-lookup/skills/paper-lookup
+          add-paths: |
+            plugins/flows/packs/paper-lookup/skills/paper-lookup
+            portable/

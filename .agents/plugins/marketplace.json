@@ -1,0 +1,140 @@
+{
+  "name": "dead-agent-skills",
+  "interface": {
+    "displayName": "dead-agent-skills"
+  },
+  "plugins": [
+    {
+      "name": "dead-skills",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/dead-skills"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "flows",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/flows"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "graphify",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/graphify"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "hallmark",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/hallmark"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "rust-skills",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/rust-skills"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "csharp-skills",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/csharp-skills"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "postgres",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/postgres"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "web-mcp",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/web-mcp"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "mcp-github",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/mcp-github"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "mcp-azure",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/mcp-azure"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "atlassian",
+      "source": {
+        "source": "local",
+        "path": "./portable/plugins/atlassian"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

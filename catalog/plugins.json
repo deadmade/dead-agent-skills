@@ -1,0 +1,167 @@
+[
+  {
+    "name": "dead-skills",
+    "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus core plugins from claude-plugins-official as dependencies.",
+    "source": "plugins/default",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [
+        ".claude-plugin/plugin.json",
+        "hooks/register.tsx",
+        "hooks/background.ts",
+        "hooks/words.ts",
+        "themes",
+        "assets",
+        "icon.png",
+        ".mcp.json"
+      ]
+    },
+    "hooks": "hooks/shared.json"
+  },
+  {
+    "name": "flows",
+    "description": "Conductor skills: each runs the skills this marketplace ships, in order, with approval gates and a state file to resume from. Build (/feature-flow, /research-flow, /implement, /fix-flow, /upgrade), check (/test-audit, /doc-audit, /harden, /self-review, /verify), understand (/understand) and keep the lessons (/learn). Installing it installs every plugin its conductors use.",
+    "source": "plugins/flows",
+    "resources": ["skills", "references", "packs", "agents"],
+    "dependencies": ["dead-skills", "graphify", "web-mcp"],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json"]
+    }
+  },
+  {
+    "name": "graphify",
+    "description": "Graphify: turn a codebase, docs and papers into a queryable knowledge graph (/graphify), plus hooks that nudge Claude to query the graph before reading files. Needs the graphify CLI (uv tool install graphifyy). Vendored from Graphify-Labs/graphify, synced weekly.",
+    "source": "plugins/shared/graphify",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json", "hooks"]
+    }
+  },
+  {
+    "name": "hallmark",
+    "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark, synced weekly.",
+    "source": "plugins/opt-in/hallmark",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json"]
+    }
+  },
+  {
+    "name": "rust-skills",
+    "description": "Apollo GraphQL's Rust best practices handbook as a skill. Vendored from apollographql/skills, synced weekly.",
+    "source": "plugins/opt-in/implementation/rust-skills",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json"]
+    }
+  },
+  {
+    "name": "csharp-skills",
+    "description": "Microsoft's .NET skills (dotnet/skills) behind six C#-only router skills. Vendored from dotnet/skills, synced weekly.",
+    "source": "plugins/opt-in/implementation/csharp-skills",
+    "resources": ["skills", "library"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json"]
+    }
+  },
+  {
+    "name": "postgres",
+    "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
+    "source": "plugins/opt-in/implementation/postgres",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json"]
+    }
+  },
+  {
+    "name": "web-mcp",
+    "description": "Web research tools for Claude: search (Google, Bing, DuckDuckGo and Brave read in web-mcp's own browser, paper APIs plus Google Scholar and Semantic Scholar, ranked with BM25), fetch (whole pages as markdown), browser (agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records), all archived in .web/. Needs the web-mcp binary and agent-browser.",
+    "source": "plugins/shared/web-mcp",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json", ".mcp.json"]
+    }
+  },
+  {
+    "name": "mcp-github",
+    "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions, code search). Opt-in per machine; needs a GitHub PAT.",
+    "source": "plugins/opt-in/mcp/mcp-github",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json", ".mcp.json"]
+    }
+  },
+  {
+    "name": "mcp-azure",
+    "description": "Azure DevOps Server MCP server (self-hosted, PAT auth). Opt-in per machine; configure with /plugin configure.",
+    "source": "plugins/opt-in/mcp/mcp-azure",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json", ".mcp.json"]
+    }
+  },
+  {
+    "name": "atlassian",
+    "description": "Atlassian MCP integration for Jira and Confluence.",
+    "source": {
+      "source": "url",
+      "url": "https://github.com/atlassian/atlassian-mcp-server.git"
+    },
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"],
+    "overlays": {}
+  },
+  {
+    "name": "nix-lsp",
+    "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
+    "source": "plugins/opt-in/implementation/nix-lsp",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json", ".lsp.json"]
+    }
+  },
+  {
+    "name": "tui-review",
+    "description": "/tui-review: a fast diff pane for the current branch, next to the chat, so you can ask Claude about what you read. Needs the tui-review binary.",
+    "source": "plugins/shared/tui-review",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json", "hooks", "types"]
+    }
+  },
+  {
+    "name": "md-pane",
+    "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal).",
+    "source": "plugins/opt-in/md-pane",
+    "resources": [],
+    "dependencies": [],
+    "targets": ["claude-code"],
+    "overlays": {
+      "claude-code": [".claude-plugin/plugin.json", "hooks", "types"]
+    }
+  }
+]

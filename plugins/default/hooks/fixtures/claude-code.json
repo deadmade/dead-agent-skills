@@ -1,0 +1,114 @@
+[
+  {
+    "provenance": "documentation-derived",
+    "kind": "session.started",
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "SessionStart",
+      "source": "startup"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": "turn.finished",
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "Stop",
+      "stop_hook_active": false,
+      "last_assistant_message": "Finished."
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": "question.asked",
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "PreToolUse",
+      "tool_name": "AskUserQuestion",
+      "tool_input": {
+        "questions": [
+          {
+            "question": "Which database?"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": "permission.requested",
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "Notification",
+      "notification_type": "permission_prompt",
+      "message": "Approval requested for network access"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": "notification.received",
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "Notification",
+      "notification_type": "elicitation_dialog",
+      "message": "Server requests input"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": null,
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "PermissionRequest",
+      "tool_name": "Bash"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": null,
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "Notification",
+      "notification_type": "idle_prompt",
+      "message": "Idle"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": null,
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "Notification",
+      "notification_type": "permission_prompt_extra"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": null,
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "PreToolUse",
+      "tool_name": "other_tool"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": null,
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "SubagentStop",
+      "agent_id": "child",
+      "stop_hook_active": false
+    }
+  }
+]

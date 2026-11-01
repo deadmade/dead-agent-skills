@@ -1,0 +1,8 @@
+{
+  "claude-security@claude-plugins-official": ["claude-security"],
+  "tob-picks": ["sharp-edges"],
+  "ponytail": ["ponytail-audit", "ponytail-review"],
+  "mattpocock-picks": ["improve-codebase-architecture", "grilling"],
+  "pstack-picks": ["principle-boundary-discipline"],
+  "superpowers": ["test-driven-development"]
+}

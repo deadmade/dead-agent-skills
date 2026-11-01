@@ -59,3 +59,12 @@ test('stableTags is empty without a stable tag', () => {
   assert.deepEqual(stableTags(lsRemote([[sha('c'), 'refs/tags/v8.0.0-rc.1']])), []);
   assert.deepEqual(stableTags(''), []);
 });
+
+test('changed sync records upstream before rebuilding both native distributions', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('./sync-lib.mjs', import.meta.url), 'utf8');
+  const finish = source.slice(source.indexOf('export function finish('), source.indexOf('// Insert a `paths:`'));
+  assert.ok(finish.indexOf("writeFileSync(upstreamFile, sha + '\\n')") < finish.indexOf('scripts/build-harnesses.mjs'));
+  assert.match(finish, /if \(changed\) \{\s*execFileSync\(process.execPath/);
+  assert.doesNotMatch(finish, /build-codex/);
+});

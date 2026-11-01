@@ -43,7 +43,6 @@ const bumps = [
   ['package.json', json],
   ['package-lock.json', json],
   ['package-lock.json', /^( {6}"version": )"[^"]*"/m],
-  ['.claude-plugin/marketplace.json', json],
   ...[...pluginDirs(), ...packs('.').map((p) => `${PACKS}/${p}`)].map((p) => [`${p}/.claude-plugin/plugin.json`, json]),
   ...[
     ['crates/tui-review', 'tui-review'],
@@ -53,14 +52,22 @@ const bumps = [
     [`${dir}/Cargo.lock`, new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm')],
   ]),
 ];
-const files = [...new Set(bumps.map(([f]) => f))];
+const files = [
+  ...new Set([
+    ...bumps.map(([f]) => f),
+    'portable',
+    '.agents/plugins/marketplace.json',
+    '.claude-plugin/marketplace.json',
+    'plugins/default/themes/night-city.json',
+  ]),
+];
 for (const [f, version] of bumps) {
   const text = readFileSync(f, 'utf8');
   if (!version.test(text)) die(`${f} has no version to bump`);
   writeFileSync(f, text.replace(version, `$1"${next}"`));
 }
 
-if (!run('npm', ['test'])) {
+if (!run(process.execPath, ['scripts/build-harnesses.mjs']) || !run('npm', ['test'])) {
   git('checkout', '--', ...files);
   die('checks failed, versions reverted');
 }

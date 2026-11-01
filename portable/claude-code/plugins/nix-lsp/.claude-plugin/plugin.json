@@ -1,0 +1,10 @@
+{
+  "name": "nix-lsp",
+  "version": "0.6.0",
+  "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills"
+}
