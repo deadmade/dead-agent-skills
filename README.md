@@ -9,7 +9,7 @@ The default bundle, **[dead-skills](plugins/default/README.md)**, pulls in claud
 claude-security, and itself carries Context7, Night City (a
 toned-down synthwave theme that everything else here is painted in), desktop notifications when a turn ends or Claude
 waits for you, and my global rules. Everything else is opt-in: language
-servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
+servers, language and database skills (rust, csharp, postgres), integrations (GitHub, [Azure DevOps Server](plugins/opt-in/mcp/mcp-azure/README.md), Atlassian), skill packs
 like hallmark and graphify, and tools such as
 [tui-review](plugins/shared/tui-review/README.md), [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
 Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search read in one browser window of its own, page fetching,

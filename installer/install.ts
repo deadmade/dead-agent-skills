@@ -3,6 +3,8 @@
 // each thing it applies in steps/.
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { SELF_CONFIGURED } from './core/config.ts';
+import { collectConfig } from './steps/config.ts';
 import { missingBinaries } from './core/binaries.ts';
 import { HINTS, TOGGLES, categorize, unavailable } from './core/options.ts';
 import {
@@ -51,7 +53,7 @@ import {
 } from './context.ts';
 import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
 import { HEADROOM_TRIM, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
-import { FLOW_COCKPIT, TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
+import { MCP_AZURE, FLOW_COCKPIT, TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
 import { applyDcg } from './steps/dcg.ts';
@@ -91,9 +93,9 @@ const HANDOFF: Record<string, string[]> = {
     'with the repository permissions Claude should have.',
   ],
   'mcp-azure': [
-    'Needs the collection URL (e.g. https://tfs.company/tfs/DefaultCollection), a PAT with Code (Read),',
-    'Work Items (Read & Write), Build (Read), Wiki (Read), the REST API version (2022 → 7.0, 2020 → 6.0,',
-    '2019 → 5.0) and optionally a default project.',
+    'Needs the collection URL (e.g. https://tfs.company/tfs/DefaultCollection), a PAT with Code (Read & Write),',
+    'Work Items (Read & Write), Build (Read & Execute), Project and Team (Read), Wiki (Read), Test Management (Read).',
+    'Then run this installer again: it downloads the ado-mcp binary.',
   ],
 };
 
@@ -113,7 +115,9 @@ const rows = Array.isArray(plugins) ? plugins : (plugins.installed ?? []);
 const manifest: Marketplace = readJson(join(PKG, '.claude-plugin', 'marketplace.json'));
 const bundle: PluginJson & { dependencies: string[] } = readJson(join(PKG, manifestPath(manifest, BUNDLE)!));
 const opts = optIns(manifest, bundle);
+const selfConfigured = (id: string) => SELF_CONFIGURED.includes(nameOf(id));
 const tokenPlugins = opts.filter((id) => {
+  if (selfConfigured(id)) return false;
   const path = manifestPath(manifest, id);
   return needsToken((path && tryJson(join(PKG, path))) || {});
 });
@@ -166,6 +170,7 @@ function option(key: string) {
   const name = nameOf(key);
   const notes = [
     tokenPlugins.includes(key) && 'token entered in Claude Code',
+    selfConfigured(key) && 'asks for the token',
     key.endsWith(`@${OFFICIAL}`) && `from ${OFFICIAL}`,
     deps[key] && `brings ${deps[key].length} plugins`,
     ...Object.keys(deps)
@@ -232,7 +237,8 @@ const strip = clean || on('strip-defaults');
 
 const removed = await removeForeign({ strip, installedIds, managed, marketplaces });
 
-const selected = withDependencies([BUNDLE_ID, ...opts.filter(on)], (id) => deps[id], opts);
+const wantedIds = withDependencies([BUNDLE_ID, ...opts.filter(on)], (id) => deps[id], opts);
+const { selected, selfValues, selfHandoff } = await collectConfig(wantedIds, installedIds, manifest);
 const plan = planPlugins(
   selected,
   installedIds.filter((id) => [BUNDLE_ID, ...opts].includes(id)),
@@ -257,6 +263,7 @@ await applyPlugins({
 });
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
+if (selected.includes(MCP_AZURE)) await applyBin('mcp-azure', MCP_AZURE, process.platform, process.arch, selfValues[MCP_AZURE]);
 if (selected.includes(FLOW_COCKPIT)) await applyBin('flow-cockpit', FLOW_COCKPIT);
 
 // The built-in web tools are denied only once web-mcp's browser window can open.
@@ -295,7 +302,7 @@ note('Summary', [
   `marketplace autoUpdate (known_marketplaces.json): ${autoUpdate ?? 'not set'}`,
   ...(clean ? [`restore the backup: ${restoreHint(process.platform, backupDir!, CONFIG)}`] : []),
 ]);
-for (const id of plan.handoff) {
+for (const id of [...plan.handoff, ...selfHandoff]) {
   note(`${nameOf(id)}: run this in Claude Code, it asks for the token`, [
     `/plugin install ${id}`,
     ...(HANDOFF[nameOf(id)] ?? []),

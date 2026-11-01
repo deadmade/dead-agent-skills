@@ -1,0 +1,110 @@
+{
+  "id": 123,
+  "rev": 7,
+  "fields": {
+    "System.TeamProject": "My Proj",
+    "System.WorkItemType": "Bug",
+    "System.State": "Active",
+    "System.Title": "Login fails behind the proxy",
+    "System.AssignedTo": {
+      "displayName": "Jane Roe",
+      "uniqueName": "CORP\\jroe",
+      "id": "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02"
+    },
+    "System.AreaPath": "My Proj\\Web",
+    "System.IterationPath": "My Proj\\Sprint 12",
+    "System.Description": "<div>Open the <b>login</b> page&nbsp;behind the proxy.</div><div>It times out.</div>",
+    "Microsoft.VSTS.Common.AcceptanceCriteria": "<ul><li>Login works behind the proxy</li><li>No retry loop</li></ul>"
+  },
+  "relations": [
+    {
+      "rel": "System.LinkTypes.Hierarchy-Reverse",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/100",
+      "attributes": { "isLocked": false, "name": "Parent" }
+    },
+    {
+      "rel": "System.LinkTypes.Hierarchy-Forward",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/124",
+      "attributes": { "isLocked": false, "name": "Child" }
+    },
+    {
+      "rel": "System.LinkTypes.Hierarchy-Forward",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/125",
+      "attributes": { "isLocked": false, "name": "Child" }
+    },
+    {
+      "rel": "System.LinkTypes.Related",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/99",
+      "attributes": { "isLocked": false, "name": "Related" }
+    },
+    {
+      "rel": "ArtifactLink",
+      "url": "vstfs:///Git/PullRequestId/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2F3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2F412",
+      "attributes": { "name": "Pull Request" }
+    },
+    {
+      "rel": "ArtifactLink",
+      "url": "vstfs:///Git/Commit/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2F3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2F2d9e7b10aa",
+      "attributes": { "name": "Fixed in Commit" }
+    },
+    {
+      "rel": "System.LinkTypes.Duplicate-Reverse",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/98",
+      "attributes": { "isLocked": false, "name": "Duplicate Of" }
+    },
+    {
+      "rel": "Microsoft.VSTS.Common.TestedBy-Forward",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/130",
+      "attributes": { "isLocked": false, "name": "Tested By" }
+    },
+    {
+      "rel": "System.LinkTypes.Related",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/101",
+      "attributes": { "isLocked": false, "name": "Related" }
+    },
+    {
+      "rel": "ArtifactLink",
+      "url": "vstfs:///Git/Ref/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2F3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2FGBfeature%2Fproxy-fix",
+      "attributes": { "name": "Branch" }
+    },
+    {
+      "rel": "Hyperlink",
+      "url": "http://blogs.example/proxy-notes.aspx",
+      "attributes": {
+        "authorizedDate": "2026-03-05T10:00:00Z",
+        "id": 65275,
+        "resourceCreatedDate": "2026-03-05T10:00:00Z",
+        "resourceModifiedDate": "2026-03-05T10:00:00Z",
+        "revisedDate": "9999-01-01T00:00:00Z"
+      }
+    },
+    {
+      "rel": "AttachedFile",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/attachments/098a279a-60b9-40a8-868b-b7fd00c0a439",
+      "attributes": {
+        "authorizedDate": "2026-03-05T10:01:00Z",
+        "id": 65276,
+        "resourceCreatedDate": "2026-03-05T10:01:00Z",
+        "resourceModifiedDate": "2026-03-05T10:01:00Z",
+        "revisedDate": "9999-01-01T00:00:00Z",
+        "resourceSize": 2048,
+        "name": "proxy.log"
+      }
+    },
+    {
+      "rel": "AttachedFile",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/attachments/1c6f0e2d-3b7a-4f9e-a1d2-5e8c9b0a7f13",
+      "attributes": {
+        "authorizedDate": "2026-03-05T10:02:00Z",
+        "id": 65277,
+        "resourceCreatedDate": "2026-03-05T10:02:00Z",
+        "resourceModifiedDate": "2026-03-05T10:02:00Z",
+        "revisedDate": "9999-01-01T00:00:00Z",
+        "resourceSize": 512,
+        "comment": "the failing request",
+        "name": "request.har"
+      }
+    }
+  ],
+  "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/123"
+}

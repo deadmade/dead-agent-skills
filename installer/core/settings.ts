@@ -12,6 +12,7 @@ export interface Settings {
     string,
     { source?: Record<string, unknown>; autoUpdate?: boolean; [key: string]: unknown }
   >;
+  pluginConfigs?: Record<string, unknown>;
   enabledPlugins?: Record<string, boolean>;
   env?: Record<string, string>;
   theme?: string;
@@ -190,6 +191,9 @@ export function resetSettings(settings: Settings, { dcg, ...toggles }: Toggles &
   const out = stripDefaults(mergeSettings({}, toggles));
   for (const [id, v] of Object.entries(settings.enabledPlugins ?? {})) {
     if ([MARKETPLACE, OFFICIAL].includes(marketOf(id))) out.enabledPlugins![id] = v;
+  }
+  for (const [id, value] of Object.entries(settings.pluginConfigs ?? {})) {
+    if ([MARKETPLACE, OFFICIAL].includes(marketOf(id))) (out.pluginConfigs ??= {})[id] = value;
   }
   const official = settings.extraKnownMarketplaces?.[OFFICIAL];
   if (official) out.extraKnownMarketplaces![OFFICIAL] = official;

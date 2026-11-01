@@ -1,0 +1,245 @@
+mod common;
+
+use std::process::{Command, Stdio};
+
+use common::{Fixture, Resp, ado};
+use serde_json::json;
+
+#[test]
+fn version_flag() {
+    let out = Command::new(env!("CARGO_BIN_EXE_ado-mcp"))
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        format!("ado-mcp {}\n", env!("CARGO_PKG_VERSION"))
+    );
+}
+
+#[test]
+fn initialize_has_instructions() {
+    let fx = Fixture::start();
+    let mcp = ado(&fx, &[]);
+    let result = &mcp.init;
+    let instructions = result["instructions"].as_str().unwrap();
+    assert!(instructions.contains("git diff"), "{instructions}");
+    assert!(instructions.contains("branch"), "{instructions}");
+    assert!(
+        instructions.starts_with(
+            "Azure DevOps Server tools: pull requests (pr_*), work items (wi_*), pipeline runs (pipeline_*), repos \
+and projects, search, wiki pages and files in any repo."
+        ),
+        "{instructions}"
+    );
+    assert!(
+        instructions.contains(
+            "(wi_view takes the work item's own, wi_update needs none, and search without project and repo covers the whole collection)"
+        ),
+        "{instructions}"
+    );
+    // One line each for search, wiki and repo_file.
+    for line in [
+        "\n- search finds work items, wiki pages and code in repos that aren't cloned; for the clone itself, search locally.\n",
+        "\n- wiki reads the project's wiki pages, or lists them without path.\n",
+        "\n- repo_file reads files of repos that aren't cloned.\n",
+    ] {
+        assert!(instructions.contains(line), "{line} in {instructions}");
+    }
+    assert!(instructions.contains("the wiki tree 100"), "{instructions}");
+    assert!(
+        instructions.contains(
+            "(pass project, and repo for the pr_* tools, repo_file and code search, to override it)"
+        ),
+        "{instructions}"
+    );
+    assert!(
+        instructions
+            .contains("pipeline_view 20 issues (pipeline_log shows the failing steps' logs) and 20 failed tests."),
+        "{instructions}"
+    );
+    assert!(instructions.chars().count() < 4096);
+    assert!(result["capabilities"]["tools"].is_object(), "{result}");
+}
+
+#[test]
+fn missing_url_is_one_line() {
+    let out = Command::new(env!("CARGO_BIN_EXE_ado-mcp"))
+        .env_remove("ADO_ORG_URL")
+        .env("ADO_PAT", "test-pat")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(err.contains("/plugin configure mcp-azure"), "{err}");
+    assert!(!err.contains("test-pat"), "{err}");
+}
+
+#[test]
+fn plain_http_url_is_refused() {
+    let out = Command::new(env!("CARGO_BIN_EXE_ado-mcp"))
+        .env("ADO_ORG_URL", "http://ado.example/tfs/Coll/")
+        .env("ADO_PAT", "test-pat")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        err.contains("ADO_ORG_URL must be https (the PAT would travel in clear text)"),
+        "{err}"
+    );
+}
+
+const READS: [&str; 14] = [
+    "pipeline_log",
+    "pipeline_runs",
+    "pipeline_view",
+    "pr_files",
+    "pr_list",
+    "pr_threads",
+    "pr_view",
+    "project_list",
+    "repo_file",
+    "repo_list",
+    "search",
+    "wi_query",
+    "wi_view",
+    "wiki",
+];
+const WRITES: [&str; 12] = [
+    "pipeline_cancel",
+    "pipeline_run",
+    "pr_comment",
+    "pr_complete",
+    "pr_create",
+    "pr_reply",
+    "pr_thread_status",
+    "pr_update",
+    "pr_vote",
+    "wi_comment",
+    "wi_create",
+    "wi_update",
+];
+const PAT_LINE: &str = "Azure DevOps rejected the PAT (expired or wrong); set a new one with /plugin configure mcp-azure";
+
+#[test]
+fn tools_and_marks() {
+    let fx = Fixture::start();
+    let tools = ado(&fx, &[]).request("tools/list", json!({}))["tools"].take();
+    let tools = tools.as_array().unwrap();
+    let mut names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+    names.sort_unstable();
+    let mut all = [READS.as_slice(), WRITES.as_slice()].concat();
+    all.sort_unstable();
+    assert_eq!(names, all);
+    for t in tools {
+        let name = t["name"].as_str().unwrap();
+        let ask = &t["_meta"]["anthropic/requiresUserInteraction"];
+        let read_only = &t["annotations"]["readOnlyHint"];
+        if WRITES.contains(&name) {
+            assert!(*ask == true && read_only.is_null(), "{t}");
+        } else {
+            assert!(*read_only == true && ask.is_null(), "{t}");
+        }
+        let desc = t["description"].as_str().unwrap();
+        assert!(desc.chars().count() < 400, "{name}: {}", desc.len());
+    }
+}
+
+/// The argument texts the model reads to pick a value: what counts from 1, and what goes with `path` or without.
+#[test]
+fn argument_descriptions() {
+    let fx = Fixture::start();
+    let tools = ado(&fx, &[]).request("tools/list", json!({}))["tools"].take();
+    let arg = |tool: &str, name: &str| {
+        let t = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == tool)
+            .unwrap();
+        t["inputSchema"]["properties"][name]["description"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(
+        arg("repo_file", "start"),
+        "The 1-based line number to start at. Default 1."
+    );
+    assert_eq!(
+        arg("pr_files", "since"),
+        "Only the changes since this 1-based iteration number (`pr_view` shows the latest)."
+    );
+    assert_eq!(
+        arg("wiki", "full"),
+        "With path only: the whole page; by default it is cut at 4000 characters."
+    );
+    assert_eq!(
+        arg("wiki", "limit"),
+        "Without path only: how many pages to list. Default 100."
+    );
+}
+
+#[test]
+fn errors_are_tool_errors_without_pat() {
+    let fx = Fixture::start();
+    let denied = || vec![Resp::new(401, "text/plain", "Basic OnRlc3QtcGF0 test-pat")];
+    // The first request of each tool: project and repo are given, so no `/vsts/info`.
+    for path in [
+        "/tfs/Coll/_apis/projects/P",
+        "/tfs/Coll/P/_apis/git/repositories/R",
+        "/tfs/Coll/_apis/wit/workitems/1",
+        "/tfs/Coll/_apis/projects",
+    ] {
+        fx.route(path, denied());
+    }
+    let at = json!({"project": "P", "repo": "R", "id": 1});
+    let calls = [
+        ("pr_list", json!({})),
+        ("pr_view", json!({})),
+        ("pr_threads", json!({})),
+        ("pr_files", json!({})),
+        ("pr_create", json!({"title": "t", "branch": "b"})),
+        ("pr_update", json!({"title": "t"})),
+        ("pr_comment", json!({"text": "t"})),
+        ("pr_reply", json!({"thread": 1, "text": "t"})),
+        ("pr_thread_status", json!({"thread": 1, "status": "fixed"})),
+        ("pr_vote", json!({"vote": "approve"})),
+        ("pr_complete", json!({})),
+        ("wi_view", json!({})),
+        ("wi_query", json!({})),
+        ("wi_create", json!({"type": "Bug", "title": "t"})),
+        ("wi_update", json!({"title": "t"})),
+        ("wi_comment", json!({"text": "t"})),
+        ("pipeline_run", json!({"pipeline": "7", "branch": "b"})),
+        ("pipeline_cancel", json!({"run": 1})),
+        ("pipeline_runs", json!({})),
+        ("pipeline_view", json!({"run": 1})),
+        ("pipeline_log", json!({"run": 1})),
+        ("repo_file", json!({"path": "/a"})),
+        ("repo_list", json!({})),
+        ("project_list", json!({})),
+        ("search", json!({"kind": "code", "text": "x"})),
+        ("wiki", json!({})),
+    ];
+    let mut called: Vec<&str> = calls.iter().map(|c| c.0).collect();
+    called.sort_unstable();
+    let mut all = [READS.as_slice(), WRITES.as_slice()].concat();
+    all.sort_unstable();
+    assert_eq!(called, all);
+    let mut mcp = ado(&fx, &[]);
+    for (tool, extra) in calls {
+        let mut args = at.clone();
+        args.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        let raw = mcp.request_raw("tools/call", json!({"name": tool, "arguments": args}));
+        let r = &raw["result"];
+        assert!(r["isError"] == true, "{tool}: {raw}");
+        assert_eq!(common::text(r), PAT_LINE, "{tool}");
+        assert!(!raw.to_string().contains("test-pat"), "{tool}: {raw}");
+    }
+}

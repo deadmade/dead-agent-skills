@@ -103,6 +103,7 @@ const CRATES = [
   // A workspace: [workspace.package] carries the version; the lock lists each member.
   { cargo: 'crates/flow-cockpit/Cargo.toml', lock: 'crates/flow-cockpit/Cargo.lock', name: 'flow-cockpit-core' },
   { cargo: 'crates/flow-cockpit/Cargo.toml', lock: 'crates/flow-cockpit/Cargo.lock', name: 'flow-cockpit' },
+  { cargo: 'crates/ado-mcp/Cargo.toml', lock: 'crates/ado-mcp/Cargo.lock', name: 'ado-mcp' },
 ];
 for (const { cargo, lock, name } of CRATES) {
   const crate = /^version = "(.*)"/m.exec(readFileSync(cargo, 'utf8'))?.[1];

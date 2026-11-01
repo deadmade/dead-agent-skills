@@ -16,7 +16,7 @@ export type PluginEntry = Pick<MarketplacePlugin, 'name' | 'source'>;
 export interface PluginJson {
   version?: string;
   dependencies?: string[];
-  userConfig?: Record<string, { sensitive?: boolean }>;
+  userConfig?: Record<string, { title?: string; description?: string; sensitive?: boolean; required?: boolean }>;
 }
 // A row of `claude plugin list --json`.
 export interface PluginRow {

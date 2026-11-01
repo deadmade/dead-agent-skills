@@ -53,6 +53,7 @@ export interface BinPlugin {
 export const BIN_PLUGINS: Record<string, BinPlugin> = {
   'tui-review': { name: 'tui-review', key: 'binPath' },
   'web-mcp': { name: 'web-mcp', key: 'binPath' },
+  'mcp-azure': { name: 'ado-mcp', key: 'binPath' },
   // It links the system's GTK and WebKit on Linux, so Linux runs it from the flake, pinned to this release.
   'flow-cockpit': {
     name: 'flow-cockpit',

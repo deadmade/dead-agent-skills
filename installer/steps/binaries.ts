@@ -13,6 +13,7 @@ import { progress } from '../ui/ui.ts';
 
 export const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
 export const WEB_MCP = `web-mcp@${MARKETPLACE}`;
+export const MCP_AZURE = `mcp-azure@${MARKETPLACE}`;
 export const FLOW_COCKPIT = `flow-cockpit@${MARKETPLACE}`;
 export const BIN_DIR = join(CONFIG, 'bin');
 
@@ -24,7 +25,7 @@ function binVersionAt(name: string, path: string) {
 }
 
 // platform, arch: this machine's, passed in by tests.
-export async function applyBin(pluginName: string, plugin: string, platform = process.platform, arch = process.arch) {
+export async function applyBin(pluginName: string, plugin: string, platform = process.platform, arch = process.arch, extra: Record<string, string> = {}) {
   const { name, key, linuxHint, folder } = BIN_PLUGINS[pluginName];
   const version = VERSION;
   if (platform === 'linux' && linuxHint) return done.push(`${name}: ${linuxHint(version)}`);
@@ -36,9 +37,10 @@ export async function applyBin(pluginName: string, plugin: string, platform = pr
     version,
     supported: asset !== undefined,
   });
-  if (action === 'skip') return done.push(`${name}: using the one on PATH`);
+  if (action === 'skip') done.push(`${name}: using the one on PATH`);
+  let ours = action === 'configure';
   if (action === 'unsupported')
-    return failures.push(
+    failures.push(
       `${name}: no release build for ${platform}-${arch}${folder ? '' : `; ${binAdvice(pluginName)}`}`,
     );
   if (action === 'download') {
@@ -46,11 +48,17 @@ export async function applyBin(pluginName: string, plugin: string, platform = pr
       await downloadBin(name, asset!, bin);
       return { ok: true };
     });
-    if (!r.ok) return failures.push(`${name} ${version}: ${r.err}; ${binAdvice(pluginName)}`);
-    done.push(`installed ${name} ${version} to ${bin}`);
+    ours = r.ok;
+    if (!r.ok) failures.push(`${name} ${version}: ${r.err}; ${binAdvice(pluginName)}`);
+    else done.push(`installed ${name} ${version} to ${bin}`);
   }
-  const r = await claude(JSON.stringify({ [key]: bin }), 'plugin', 'configure', plugin, '--values-stdin');
-  if (r.ok) done.push(`${pluginName}: ${key} is ${bin}`);
+  const values = ours ? { ...extra, [key]: bin } : extra;
+  if (!Object.keys(values).length) return;
+  const r = await claude(JSON.stringify(values), 'plugin', 'configure', plugin, '--values-stdin');
+  if (r.ok) {
+    if (values[key]) done.push(`${pluginName}: ${key} is ${bin}`);
+    if (Object.keys(extra).length) done.push(`${pluginName}: saved ${Object.keys(extra).join(', ')}`);
+  } else if (Object.keys(extra).length) failures.push(`${pluginName}: could not save its settings; run /plugin configure ${plugin} in Claude Code`);
   else
     failures.push(
       `${pluginName}: could not set ${key} (${r.err}); set it to ${bin} with /plugin configure ${pluginName}`,
