@@ -1,0 +1,4 @@
+{"v":1,"ts":"2026-03-02T09:00:01.000Z","event":"PostToolUse","tool_use_id":"toolu_x"}
+{"v":1,"ts":"2026-03-02T09:00:02.000Z","event":"Stop"}
+{"v":1,"ts":"2026-03-02T09:00:03.000Z","event":"SubagentStop","agent":"a9"}
+{"v":1,"ts":"2026-03-02T09:00:04.000Z","event":"SessionEnd"}

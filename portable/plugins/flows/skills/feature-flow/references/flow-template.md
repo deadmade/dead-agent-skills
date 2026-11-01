@@ -11,6 +11,7 @@ frontmatter first.
 ---
 flow: feature
 phase: ground
+now: <one plain sentence: where the run stands and what comes next>
 ---
 
 # <Feature>: flow
@@ -21,6 +22,8 @@ phase: ground
 
 ## Artifacts
 
+- Prior art:
+
 - Spec:
 - Plan:
 - ADRs:
@@ -28,8 +31,11 @@ phase: ground
 
 ## Gates
 
+<!-- One line per gate: `- Gate <n>, <what>: <date>[, <extra>]`. The date stays empty while the gate is open; a
+reopening is appended as `Reopened <date>: <why>`. A plan gate adds `, execution: subagent-driven | native`. -->
+
 - Gate 1, spec approved:
-- Gate 2, plan approved: <date>, execution: subagent-driven | native
+- Gate 2, plan approved:
 
 ## Skipped
 
@@ -41,15 +47,16 @@ phase: ground
 
 ## Prior art
 
-<!-- Approaches found, who uses them, key sources. -->
+<!-- Approaches found, who uses them, key sources; source check: confirmed / not supported / couldn't open. -->
 
 ## Options
 
-<!-- Each decision: options offered, recommendation, what the user picked. -->
+<!-- One `### <decision>` heading per decision, then `Picked: <the choice in plain words>`; below it, the options
+offered and the recommendation. -->
 
 ## Plan review
 
-<!-- Round N: findings, the user's decision on each, what changed. -->
+<!-- Round N: findings, the user's decision on each, what changed, fix checks, fresh-eyes rounds. -->
 
 ## Tasks
 
@@ -62,8 +69,8 @@ phase: ground
 
 ## Deviations
 
-<!-- Decisions that go to the user: what, why the plan doesn't hold, options with a recommendation, the
-user's decision. -->
+<!-- Decisions that go to the user, one per `### <deviation>` heading, then `Status: open` or
+`Status: decided <date>: <what>`; below it, why the plan doesn't hold and the options with a recommendation. -->
 
 ## Walkthrough
 

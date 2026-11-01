@@ -172,10 +172,10 @@ user, and the real views are built only after they approve it.
    - global: `~/.config/flow-cockpit/views/` on Linux, `%APPDATA%\flow-cockpit\views\` on Windows;
    - per repository: `.flow-cockpit/views/`, loaded only for repositories trusted in the config;
    - settings: `config.toml` next to the global views folder (trusted repositories, hidden projects).
-   To change a built-in, the skill writes the printed copy into the global folder and edits it; the app marks replaced views,
-   deleting the copy restores the original, and app updates never touch the copies. `flow-cockpit --print-types`
-   prints the view interface and data types for views outside the repo **(review 2)**. Types are stripped on load; the
-   interface is a generated `.d.ts`. Shared building blocks: sanitised Markdown, Mermaid, diffs, stepper, cards.
+     To change a built-in, the skill writes the printed copy into the global folder and edits it; the app marks replaced views,
+     deleting the copy restores the original, and app updates never touch the copies. `flow-cockpit --print-types`
+     prints the view interface and data types for views outside the repo **(review 2)**. Types are stripped on load; the
+     interface is a generated `.d.ts`. Shared building blocks: sanitised Markdown, Mermaid, diffs, stepper, cards.
 4. **Distribution.** Linux: a package in the repo's `flake.nix` (`nix run`, or the user's system config), because a
    Tauri window links the system's GTK and WebKit and can't be a static musl download like tui-review and web-mcp.
    Windows x64: a release build the installer downloads. The installer offers the flow-cockpit plugin as opt-in on

@@ -32,7 +32,16 @@ test('packages contain their resources, attribution and only intended discovered
     assert.ok(!existsSync(join(temp, 'plugins/flows/skills/brainstorming/SKILL.md')));
     assert.ok(existsSync(join(temp, 'plugins/flows/resources/graphify/skills/graphify/SKILL.md')));
     assert.ok(existsSync(join(temp, 'plugins/csharp-skills/library/csharp-expert/SKILL.md')));
-    assert.ok(existsSync(join(temp, 'azure-mcp.mjs')));
+    assert.ok(!existsSync(join(temp, 'azure-mcp.mjs')));
+    const azureSetup = readFileSync(join(temp, 'plugins/mcp-azure/skills/setup-mcp-azure/SKILL.md'), 'utf8');
+    assert.match(azureSetup, /-- ado-mcp/);
+    assert.match(azureSetup, /ADO_ORG_URL/);
+    assert.ok(!azureSetup.includes('tiberriver'));
+    for (const name of ['headroom-trim', 'flow-cockpit', 'agent-review']) {
+      assert.ok(existsSync(join(temp, 'claude-code/plugins', name, '.claude-plugin/plugin.json')));
+      assert.ok(!existsSync(join(temp, 'plugins', name)));
+    }
+    assert.ok(existsSync(join(temp, 'claude-code/plugins/flows/hooks/prose-check.mjs')));
     assert.deepEqual(nativeMarketplace(root, 'codex', './portable/plugins').plugins[0].source, {
       source: 'local',
       path: './portable/plugins/dead-skills',
@@ -86,7 +95,11 @@ test('Claude packages preserve native extensions and configuration, and generate
       for (const name of readdirSync(join(targetRoot, 'plugins'))) {
         const packageRoot = join(targetRoot, 'plugins', name);
         for (const file of readdirSync(packageRoot, { recursive: true, encoding: 'utf8' })) {
-          if (!/^(?:hooks|types)[\\/]/.test(file) || !/\.(?:mjs|cjs|js|ts|tsx)$/.test(file)) continue;
+          if (
+            !/^(?:hooks|types|skills[\\/]writing[\\/]scripts)[\\/]/.test(file) ||
+            !/\.(?:mjs|cjs|js|ts|tsx)$/.test(file)
+          )
+            continue;
           assertImportClosure(packageRoot, join(packageRoot, file));
         }
       }

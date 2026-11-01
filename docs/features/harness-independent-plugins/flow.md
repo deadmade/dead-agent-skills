@@ -191,3 +191,25 @@ Latest unchanged-code automated evidence: build:harnesses/check:harnesses/typech
 Still required before readiness: authenticated native hook/trust and lifecycle observations, missing-Node native interpretation, native theme picker/visual acceptance and Windows observations. Isolated Codex theme profile stopped at sign-in; no native success inferred from packaged subprocess tests. Flow remains active; no final readiness or run verdict claimed. Low docs finding left for user triage: Azure description mentions Claude-only /plugin configure in Codex manifest (`docs/audits/2026-11-01-doc-audit-branch.md`).
 
 Final scoped review approved all six fixes; no residual implementation blocker. Implementation phase complete; resumed phase is verify, with native acceptance requirements still open.
+
+### Dev integration, 2026-11-01
+
+The user requested merging `dev` into the migration branch and removing unused files and folders. Checkpoint
+`b384bf6` preserves the previously uncommitted migration. The merge includes `dev` at `a1d2f85`, keeps its typed
+upstream-sync workspace, consolidated workflows, flow cockpit, writing tools and ado-mcp integration, and retains
+the migration's authored catalog and checked-in native distributions.
+
+Upstream sync now rebuilds native packages before validation and includes owned generated outputs in preview and
+PR paths. The new Claude-only plugins remain available in the Claude marketplace. The writing comparison script's
+shared prose module ships on both hosts. Codex uses the ado-mcp release binary and its `ADO_*` environment variables;
+the old Azure Node launcher and replaced sync scripts/workflows are removed. Both native distributions were regenerated.
+
+Validation: the full npm suite passed (228 installer, 184 script/hook and 54 upstream-sync tests; four Windows-only
+skips), both TypeScript checks passed, default and md-pane native mod tests passed (17 and 40), and web-mcp's two
+configuration tests passed. A focused Codex regression also covers downloading ado-mcp when it is absent from PATH.
+The installer package dry run contains 1,878 files, includes the neutral catalog and excludes the retired launcher
+and compiled tests. Existing native trust/authentication, theme visual and Windows acceptance gaps remain open.
+
+The old `.web/` research cache was moved outside the checkout to
+`/tmp/dead-agent-skills-cleanup-heukllih/web-research-cache` for recovery. Active/locked worktrees and `.superpowers/`
+recovery records were preserved. No remote branches were pushed.

@@ -1,10 +1,10 @@
 {
   "name": "mcp-azure",
   "version": "0.6.0",
-  "description": "Azure DevOps Server MCP server (self-hosted, PAT auth). Opt-in per machine; configure with /plugin configure.",
+  "description": "Azure DevOps Server tools through the ado-mcp release binary: pull requests, work items, pipelines, search, wikis and repository files. Self-hosted, PAT authentication; opt-in.",
   "interface": {
     "displayName": "mcp-azure",
-    "shortDescription": "Azure DevOps Server MCP server (self-hosted, PAT auth). Opt-in per machine; configure with /plugin c"
+    "shortDescription": "Azure DevOps Server tools through the ado-mcp release binary: pull requests, work items, pipelines, "
   },
   "skills": "./skills/"
 }

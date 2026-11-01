@@ -14,14 +14,26 @@ export const BUILTIN = 'claude-code';
 const START = '<!-- uses:start -->';
 const END = '<!-- uses:end -->';
 
+// flows' skills, split by frontmatter: conductors carry `disable-model-invocation: true`; the rest (writing) Claude
+// may load on its own.
+const flowsSkills = (root) => {
+  const dir = join(root, FLOWS, 'skills');
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.') && existsSync(join(dir, d.name, 'SKILL.md')))
+    .map((d) => d.name)
+    .sort()
+    .map((name) => {
+      const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(join(dir, name, 'SKILL.md'), 'utf8'))?.[1] ?? '';
+      return { name, conductor: /^disable-model-invocation:\s*true\s*$/m.test(front) };
+    });
+};
+
 export function readUses(root) {
   const dir = join(root, FLOWS, 'skills');
   return Object.fromEntries(
-    readdirSync(dir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
-      .map((d) => d.name)
-      .sort()
-      .map((name) => {
+    flowsSkills(root)
+      .filter((s) => s.conductor)
+      .map(({ name }) => {
         const file = join(dir, name, 'uses.json');
         return [name, existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined];
       }),
@@ -42,6 +54,14 @@ export function checkUses(root, marketplace) {
   const problems = [];
   const definitions = JSON.parse(readFileSync(join(root, 'catalog/plugins.json'), 'utf8'));
   const packNames = packs(root);
+  const skills = flowsSkills(root);
+  const dir = join(root, FLOWS, 'skills');
+  for (const d of readdirSync(dir, { withFileTypes: true }))
+    if (d.isDirectory() && !d.name.startsWith('.') && !existsSync(join(dir, d.name, 'SKILL.md')))
+      problems.push(`${FLOWS}/skills/${d.name}: no SKILL.md`);
+  for (const { name, conductor } of skills)
+    if (!conductor && existsSync(join(root, FLOWS, 'skills', name, 'uses.json')))
+      problems.push(`${FLOWS}/skills/${name}/uses.json: ${name} isn't a conductor (no disable-model-invocation: true)`);
   for (const [conductor, uses] of Object.entries(readUses(root))) {
     const at = `${FLOWS}/skills/${conductor}/uses.json`;
     const valid =
@@ -55,8 +75,14 @@ export function checkUses(root, marketplace) {
     }
     const skill = readFileSync(join(root, FLOWS, 'skills', conductor, 'SKILL.md'), 'utf8');
     for (const [plugin, names] of Object.entries(uses)) {
+      // flows' own non-conductor skills (writing) are listed under flows; other conductors aren't listed at all.
       if (plugin === 'flows') {
-        problems.push(`${at}: other conductors aren't listed`);
+        for (const name of names) {
+          const own = skills.find((s) => s.name === name);
+          if (!own) problems.push(`${at}: flows has no skill ${name}`);
+          else if (own.conductor) problems.push(`${at}: ${name} is a conductor; other conductors aren't listed`);
+          else if (!skill.includes(name)) problems.push(`${at}: ${name} isn't mentioned in ${conductor}/SKILL.md`);
+        }
         continue;
       }
       const pack = packNames.includes(plugin);
@@ -119,6 +145,45 @@ export function checkOverrides(root) {
   return problems;
 }
 
+// The parts of flow.md, plans and audit reports the flow cockpit reads: each must stay in the templates and the
+// conductor text that make a run write them.
+const TEMPLATE_FILES = [
+  `${FLOWS}/skills/feature-flow/references/flow-template.md`,
+  `${FLOWS}/skills/research-flow/references/research-template.md`,
+  `${FLOWS}/references/build-template.md`,
+];
+const RULES_FILE = `${FLOWS}/references/flow-rules.md`;
+const PLAN_FILES = ['feature-flow', 'implement', 'upgrade'].map((n) => `${FLOWS}/skills/${n}/SKILL.md`);
+const GATE_LINE = '- Gate <n>, <what>:';
+export function checkTemplates(root) {
+  const problems = [];
+  const need = (file, parts) => {
+    const text = readFileSync(join(root, file), 'utf8').replace(/\r\n/g, '\n');
+    for (const [what, has] of parts)
+      if (!(typeof has === 'string' ? text.includes(has) : has.test(text))) problems.push(`${file}: lacks ${what}`);
+  };
+  for (const file of TEMPLATE_FILES)
+    need(file, [
+      ['`now:` after `phase:` in the frontmatter', /\nphase: [^\n]*\nnow: /],
+      [`the gate line shape \`${GATE_LINE}\``, GATE_LINE],
+      ['`Picked:`', 'Picked:'],
+      ['`Status:`', 'Status: open'],
+    ]);
+  need(RULES_FILE, [
+    ['the `Waiting for you` rule', 'Waiting for you'],
+    [`the gate line shape \`${GATE_LINE}\``, GATE_LINE],
+    ['`Status: decided`', 'Status: decided'],
+    ['`Picks:`', 'Picks:'],
+    ['`Fixed <date>`', 'Fixed <date>'],
+  ]);
+  for (const file of PLAN_FILES)
+    need(file, [
+      ['`**Does:**`', '**Does:**'],
+      ['`**Depends on:**`', '**Depends on:**'],
+    ]);
+  return problems;
+}
+
 // Every `<packs>/…` or `${CLAUDE_PLUGIN_ROOT}/packs/…` path a conductor names must exist. A path ends at whitespace,
 // a backtick, a quote or a bracket; one with a placeholder (`<pack>`, `…`, `*`) is skipped.
 // shortcut: bare names (`references/x.md`) and paths broken across a line aren't seen; name the full pack path instead.
@@ -139,10 +204,10 @@ export function checkPackPaths(root) {
   return problems;
 }
 
-// packNames: packs(root); flows carries those, so they are never a dependency.
+// packNames: packs(root); flows carries those and its own skills, so they are never a dependency.
 export const expectedDeps = (all, packNames) =>
   [...new Set(Object.values(all).flatMap((uses) => Object.keys(uses ?? {})))]
-    .filter((p) => p !== BUILTIN && !packNames.includes(p))
+    .filter((p) => p !== BUILTIN && p !== 'flows' && !packNames.includes(p))
     .sort();
 
 export function renderTree(all) {

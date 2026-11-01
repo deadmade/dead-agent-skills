@@ -1,7 +1,7 @@
 {
   "name": "flows",
   "version": "0.6.0",
-  "description": "Conductor skills: each runs the skills this marketplace ships, in order, with approval gates and a state file to resume from. Build (/feature-flow, /research-flow, /implement, /fix-flow, /upgrade), check (/test-audit, /doc-audit, /harden, /self-review, /verify), understand (/understand) and keep the lessons (/learn). Installing it installs every plugin its conductors use.",
+  "description": "Conductor skills with approval gates and resumable state: build, audit, review, verify, integrate and learn. Includes the writing skill, copyedit pass and skill packs; Claude Code also runs the prose-check hook.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"

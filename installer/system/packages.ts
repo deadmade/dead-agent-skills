@@ -220,7 +220,7 @@ export function buildPackages(source: string, output: string): { diagnostics: Ca
       nativeMarketplace(source, target, './plugins'),
     );
   }
-  for (const file of ['installer/assets/azure-mcp.mjs', 'THIRD_PARTY.md'])
+  for (const file of ['THIRD_PARTY.md'])
     if (existsSync(join(source, file))) copy(join(source, file), join(output, basename(file)));
   for (const entry of readdirSync(output, { recursive: true, withFileTypes: true }))
     if (entry.isFile()) {
@@ -237,19 +237,19 @@ function integrationSetup(name: string) {
     'web-mcp': 'codex mcp add dead-agent-skills-web-mcp -- web-mcp',
     'mcp-github':
       'codex mcp add dead-agent-skills-mcp-github --url https://api.githubcopilot.com/mcp --bearer-token-env-var GITHUB_PERSONAL_ACCESS_TOKEN',
-    'mcp-azure': 'codex mcp add dead-agent-skills-mcp-azure -- npx -y @tiberriver256/mcp-server-azure-devops@0.1.47',
+    'mcp-azure': 'codex mcp add dead-agent-skills-mcp-azure -- ado-mcp',
     atlassian: 'codex mcp add dead-agent-skills-atlassian --url https://mcp.atlassian.com/v1/mcp',
   };
   let setup = `Use the native Codex CLI to configure this integration; no project installer is required.\n\n\`\`\`sh\n${commands[name]}\n\`\`\`\n\nNever paste credentials into chat or package files. Preserve an existing server with this name and ask before replacing it.`;
   if (name === 'web-mcp')
     setup +=
-      '\n\nPut the web-mcp release binary on PATH (or use its absolute path in the command). Install agent-browser separately for browser/search tools; fetch and lookup do not require it. Release binaries: https://github.com/deadmade/dead-claude-skills/releases .';
+      '\n\nPut the web-mcp release binary on PATH (or use its absolute path in the command). Install agent-browser separately for browser/search tools; fetch uses it for browser fallback; lookup works without it. Release binaries: https://github.com/deadmade/dead-claude-skills/releases .';
   if (name === 'mcp-github')
     setup +=
       '\n\nSet GITHUB_PERSONAL_ACCESS_TOKEN in the environment that starts Codex, then restart Codex. Do not put the token in the manifest.';
   if (name === 'mcp-azure')
     setup +=
-      '\n\nSet AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_PAT in the environment that starts Codex. In the native server table [mcp_servers.dead-agent-skills-mcp-azure], add env_vars = ["AZURE_DEVOPS_ORG_URL", "AZURE_DEVOPS_PAT", "AZURE_DEVOPS_DEFAULT_PROJECT", "AZURE_DEVOPS_API_VERSION"]. Set [mcp_servers.dead-agent-skills-mcp-azure.env] AZURE_DEVOPS_AUTH_METHOD = "pat" and DOTENV_CONFIG_QUIET = "true". Optional project and API-version variables use the service defaults when unset. Preserve all unrelated configuration; ask for missing non-secret preferences. Node and npx must be installed.';
+      '\n\nPut the ado-mcp release binary on PATH (or use its absolute path in the command). Set ADO_ORG_URL (the Azure DevOps Server collection URL) and ADO_PAT in the environment that starts Codex. In the native server table [mcp_servers.dead-agent-skills-mcp-azure], add env_vars = ["ADO_ORG_URL", "ADO_PAT", "ADO_PROJECT_DIR"]. ADO_PROJECT_DIR optionally overrides the repository used for project detection. Preserve all unrelated configuration; ask for missing non-secret preferences. Release binaries: https://github.com/deadmade/dead-claude-skills/releases .';
   if (name === 'atlassian')
     setup +=
       '\n\nComplete OAuth with codex mcp login dead-agent-skills-atlassian. Authentication is a separate user action.';

@@ -82,10 +82,36 @@ test('Codex configures MCP using native CLI and emits environment-based authenti
     assert.ok(f.state().selected.includes('graphify'));
     assert.ok(f.calls.some((c) => c.includes('--bearer-token-env-var')));
     assert.ok(f.calls.some((c) => c.includes('/tools/web-mcp')));
-    assert.ok(f.calls.some((c) => c.some((arg) => arg.endsWith('azure-mcp.mjs'))));
+    assert.ok(f.calls.some((c) => c.includes('/tools/ado-mcp')));
+    assert.match(
+      readFileSync(join(f.home, 'config.toml'), 'utf8'),
+      /env_vars = \["ADO_ORG_URL","ADO_PAT","ADO_PROJECT_DIR"\]/,
+    );
     f.select([]);
     await applyCodex(f.io);
     assert.ok(f.calls.some((c) => c[0] === 'mcp' && c[1] === 'remove' && c[2] === 'dead-agent-skills-web-mcp'));
+  } finally {
+    f.close();
+  }
+});
+test('Codex downloads the ado-mcp release when it is absent from PATH', async () => {
+  const f = fixture();
+  try {
+    f.select(['mcp-azure']);
+    f.io.which = (name) => (name === 'ado-mcp' ? undefined : `/tools/${name}`);
+    const downloads: string[] = [];
+    f.io.download = async (name, _asset, destination) => {
+      downloads.push(name);
+      mkdirSync(join(destination, '..'), { recursive: true });
+      writeFileSync(destination, 'binary fixture');
+    };
+    await applyCodex(f.io);
+    assert.deepEqual(downloads, ['ado-mcp']);
+    const add = f.calls.find((c) => c[0] === 'mcp' && c[1] === 'add' && c[2] === 'dead-agent-skills-mcp-azure')!;
+    assert.equal(add[3], '--');
+    assert.ok(add[4].startsWith(join(f.home, 'dead-agent-skills/bin', VERSION)));
+    assert.match(add[4], /ado-mcp(?:\.exe)?$/);
+    assert.ok(!add.some((arg) => arg.includes('npx')));
   } finally {
     f.close();
   }
@@ -172,45 +198,108 @@ test('Codex offers shared catalog choices and installs the flows dependency clos
   }
 });
 
-for (const change of ['none','append','edit','symlink','override','package','decline','stale','empty-override','shadowed','untrusted','receipt-source']) test(`migration revalidates ${change}`, async () => {
- const f=fixture();
- try {
- const hash=(s: string | Buffer)=>createHash('sha256').update(s).digest('hex');
- const pkg=join(f.source,'plugins/dead-skills');
- const rules=readFileSync(join(pkg,'rules.md'),'utf8').trim();
- const file=join(f.home,'AGENTS.md');
- const block=`<!-- dead-agent-skills:start -->\n${rules}\n<!-- dead-agent-skills:end -->`;
- writeFileSync(file,'before\n'+block+'\nafter');
- const base=join(f.home,'dead-agent-skills');mkdirSync(base);
- writeFileSync(join(base,'rules-hook.json'),JSON.stringify({packageVersion:JSON.parse(readFileSync(join(pkg,'hooks/runtime/package.json'),'utf8')).version,rulesHash:hash(rules),adapterHash:change==='stale'?'stale':hash(readFileSync(join(pkg,'hooks/runtime/codex.mjs'))),source:'agents',managedBlockPresent:true,cleanupEligible:true}));
- if(change==='untrusted')rmSync(join(base,'rules-hook.json'));
- if(change==='shadowed')writeFileSync(join(f.home,'AGENTS.override.md'),'foreign override');
- if(change==='empty-override')writeFileSync(join(f.home,'AGENTS.override.md'),'  ');
- let questions=0;
- f.io.ask=async()=>{questions++;
- if(change==='receipt-source'){const path=join(base,'rules-hook.json');writeFileSync(path,JSON.stringify({...JSON.parse(readFileSync(path,'utf8')),source:'override'}));}
- if(change==='append')writeFileSync(file,readFileSync(file,'utf8')+'\nconcurrent');
- if(change==='edit')writeFileSync(file,readFileSync(file,'utf8').replace('Commit messages','Edited messages'));
- if(change==='symlink'){rmSync(file);writeFileSync(join(f.home,'foreign'),'foreign');symlinkSync(join(f.home,'foreign'),file);}
- if(change==='override')writeFileSync(join(f.home,'AGENTS.override.md'),'new source');
- if(change==='package')writeFileSync(join(base,`marketplace-${VERSION}/plugins/dead-skills/rules.md`),'changed');
- return change!=='decline';};
- await applyCodex(f.io);
- const result=readFileSync(file,'utf8');
- if(['none','append','empty-override'].includes(change)){assert.equal(result.includes(block),false);assert.ok(result.startsWith('before\n'));if(change==='append')assert.ok(result.endsWith('concurrent'));}
- else if(change==='symlink')assert.equal(result,'foreign');else assert.ok(result.includes('<!-- dead-agent-skills:start -->'));
- if(['stale','untrusted','shadowed'].includes(change))assert.equal(questions,0);
- }finally{f.close();}
+for (const change of [
+  'none',
+  'append',
+  'edit',
+  'symlink',
+  'override',
+  'package',
+  'decline',
+  'stale',
+  'empty-override',
+  'shadowed',
+  'untrusted',
+  'receipt-source',
+])
+  test(`migration revalidates ${change}`, async () => {
+    const f = fixture();
+    try {
+      const hash = (s: string | Buffer) => createHash('sha256').update(s).digest('hex');
+      const pkg = join(f.source, 'plugins/dead-skills');
+      const rules = readFileSync(join(pkg, 'rules.md'), 'utf8').trim();
+      const file = join(f.home, 'AGENTS.md');
+      const block = `<!-- dead-agent-skills:start -->\n${rules}\n<!-- dead-agent-skills:end -->`;
+      writeFileSync(file, 'before\n' + block + '\nafter');
+      const base = join(f.home, 'dead-agent-skills');
+      mkdirSync(base);
+      writeFileSync(
+        join(base, 'rules-hook.json'),
+        JSON.stringify({
+          packageVersion: JSON.parse(readFileSync(join(pkg, 'hooks/runtime/package.json'), 'utf8')).version,
+          rulesHash: hash(rules),
+          adapterHash: change === 'stale' ? 'stale' : hash(readFileSync(join(pkg, 'hooks/runtime/codex.mjs'))),
+          source: 'agents',
+          managedBlockPresent: true,
+          cleanupEligible: true,
+        }),
+      );
+      if (change === 'untrusted') rmSync(join(base, 'rules-hook.json'));
+      if (change === 'shadowed') writeFileSync(join(f.home, 'AGENTS.override.md'), 'foreign override');
+      if (change === 'empty-override') writeFileSync(join(f.home, 'AGENTS.override.md'), '  ');
+      let questions = 0;
+      f.io.ask = async () => {
+        questions++;
+        if (change === 'receipt-source') {
+          const path = join(base, 'rules-hook.json');
+          writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, 'utf8')), source: 'override' }));
+        }
+        if (change === 'append') writeFileSync(file, readFileSync(file, 'utf8') + '\nconcurrent');
+        if (change === 'edit')
+          writeFileSync(file, readFileSync(file, 'utf8').replace('Commit messages', 'Edited messages'));
+        if (change === 'symlink') {
+          rmSync(file);
+          writeFileSync(join(f.home, 'foreign'), 'foreign');
+          symlinkSync(join(f.home, 'foreign'), file);
+        }
+        if (change === 'override') writeFileSync(join(f.home, 'AGENTS.override.md'), 'new source');
+        if (change === 'package')
+          writeFileSync(join(base, `marketplace-${VERSION}/plugins/dead-skills/rules.md`), 'changed');
+        return change !== 'decline';
+      };
+      await applyCodex(f.io);
+      const result = readFileSync(file, 'utf8');
+      if (['none', 'append', 'empty-override'].includes(change)) {
+        assert.equal(result.includes(block), false);
+        assert.ok(result.startsWith('before\n'));
+        if (change === 'append') assert.ok(result.endsWith('concurrent'));
+      } else if (change === 'symlink') assert.equal(result, 'foreign');
+      else assert.ok(result.includes('<!-- dead-agent-skills:start -->'));
+      if (['stale', 'untrusted', 'shadowed'].includes(change)) assert.equal(questions, 0);
+    } finally {
+      f.close();
+    }
+  });
+test('fresh setup leaves global instructions absent and installs packaged theme', async () => {
+  const f = fixture();
+  try {
+    await applyCodex(f.io);
+    assert.equal(existsSync(join(f.home, 'AGENTS.md')), false);
+    assert.equal(
+      readFileSync(join(f.home, 'themes/night-city.tmTheme'), 'utf8'),
+      readFileSync(join(f.source, 'plugins/dead-skills/themes/night-city.tmTheme'), 'utf8'),
+    );
+  } finally {
+    f.close();
+  }
 });
-test('fresh setup leaves global instructions absent and installs packaged theme',async()=>{const f=fixture();try{await applyCodex(f.io);assert.equal(existsSync(join(f.home,'AGENTS.md')),false);assert.equal(readFileSync(join(f.home,'themes/night-city.tmTheme'),'utf8'),readFileSync(join(f.source,'plugins/dead-skills/themes/night-city.tmTheme'),'utf8'));}finally{f.close();}});
 
-test('existing instructions and foreign configuration survive reruns',async()=>{
- const f=fixture();try{
- const config='[mcp_servers.foreign]\nurl = "https://example.com"\n';
- writeFileSync(join(f.home,'config.toml'),config);writeFileSync(join(f.home,'AGENTS.md'),'personal rules');
- f.mcp(['foreign']);await applyCodex(f.io);await applyCodex(f.io);
- assert.equal(readFileSync(join(f.home,'config.toml'),'utf8'),config);
- assert.equal(readFileSync(join(f.home,'AGENTS.md'),'utf8'),'personal rules');
- assert.equal(f.calls.some(c=>c[0]==='mcp'&&c[1]==='remove'&&c[2]==='foreign'),false);
- }finally{f.close();}
+test('existing instructions and foreign configuration survive reruns', async () => {
+  const f = fixture();
+  try {
+    const config = '[mcp_servers.foreign]\nurl = "https://example.com"\n';
+    writeFileSync(join(f.home, 'config.toml'), config);
+    writeFileSync(join(f.home, 'AGENTS.md'), 'personal rules');
+    f.mcp(['foreign']);
+    await applyCodex(f.io);
+    await applyCodex(f.io);
+    assert.equal(readFileSync(join(f.home, 'config.toml'), 'utf8'), config);
+    assert.equal(readFileSync(join(f.home, 'AGENTS.md'), 'utf8'), 'personal rules');
+    assert.equal(
+      f.calls.some((c) => c[0] === 'mcp' && c[1] === 'remove' && c[2] === 'foreign'),
+      false,
+    );
+  } finally {
+    f.close();
+  }
 });

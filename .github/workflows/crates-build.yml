@@ -1,0 +1,94 @@
+name: Build crates
+
+# Build release archives and checksums for all binaries; cockpit includes its default extensions.
+# release.yml calls this with the release tag. PR and manual runs only build.
+on:
+  pull_request:
+    paths: ['.github/workflows/crates-build.yml', 'crates/**']
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      # The release tag to build: each binary reports its crate's version, which the installer checks against its own.
+      ref:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: [tui-review, web-mcp, ado-mcp, flow-cockpit]
+        platform:
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, archive: zip }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, archive: tar.gz }
+        exclude:
+          - crate: flow-cockpit
+            platform: { os: ubuntu-latest, target: x86_64-unknown-linux-musl, archive: tar.gz }
+    runs-on: ${{ matrix.platform.os }}
+    env:
+      CRATE: ${{ matrix.crate }}
+      TARGET: ${{ matrix.platform.target }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: crates/${{ matrix.crate }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Rust toolchain
+        run: rustup update stable && rustup default stable && rustup target add "$TARGET"
+
+      - name: musl C toolchain
+        if: contains(matrix.platform.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: crates/${{ matrix.crate }}
+          key: ${{ matrix.platform.target }}
+
+      - name: Build
+        run: cargo build --release --locked --target "$TARGET"
+
+      - name: Smoke test
+        run: '"target/$TARGET/release/$CRATE" --version'
+
+      - name: Package
+        if: matrix.crate != 'flow-cockpit'
+        run: |
+          name=$CRATE-$TARGET
+          mkdir -p "$RUNNER_TEMP/dist"
+          if [ "${{ matrix.platform.archive }}" = zip ]; then
+            7z a -tzip "$RUNNER_TEMP/dist/$name.zip" "./target/$TARGET/release/$CRATE.exe" > /dev/null
+          else
+            tar -czf "$RUNNER_TEMP/dist/$name.tar.gz" -C "target/$TARGET/release" "$CRATE"
+          fi
+          cd "$RUNNER_TEMP/dist"
+          for f in "$name".*; do sha256sum "$f" > "$f.sha256"; done
+
+      - name: Package cockpit
+        if: matrix.crate == 'flow-cockpit'
+        run: |
+          name=flow-cockpit-$TARGET
+          stage="$RUNNER_TEMP/stage"
+          mkdir -p "$stage/extensions" "$RUNNER_TEMP/dist"
+          cp "target/$TARGET/release/flow-cockpit.exe" "$stage/"
+          for dir in extensions/*/; do
+            ext=$(basename "$dir")
+            [ "$ext" = tests ] || cp -r "$dir" "$stage/extensions/$ext"
+          done
+          for ext in activity docs list run; do test -d "$stage/extensions/$ext"; done
+          (cd "$stage" && 7z a -tzip "$RUNNER_TEMP/dist/$name.zip" flow-cockpit.exe extensions > /dev/null)
+          cd "$RUNNER_TEMP/dist"
+          sha256sum "$name.zip" > "$name.zip.sha256"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.crate }}-${{ matrix.platform.target }}
+          path: ${{ runner.temp }}/dist/*

@@ -1,0 +1,199 @@
+name: crates
+
+# Selective Rust CI, including cockpit views/Nix and tui-review performance checks.
+# Manual runs test every crate.
+on:
+  pull_request:
+    paths:
+      - 'crates/tui-review/**'
+      - 'plugins/shared/tui-review/**'
+      - 'crates/web-mcp/**'
+      - 'plugins/shared/web-mcp/**'
+      - 'crates/ado-mcp/**'
+      - 'plugins/opt-in/mcp/mcp-azure/**'
+      - 'crates/flow-cockpit/**'
+      - 'plugins/opt-in/flow-cockpit/**'
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/crates.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      crates: ${{ steps.changes.outputs.crates }}
+      cockpit: ${{ steps.filter.outputs.cockpit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        id: filter
+        with:
+          filters: |
+            tui-review:
+              - 'crates/tui-review/**'
+              - 'plugins/shared/tui-review/**'
+              - '.github/workflows/crates.yml'
+            web-mcp:
+              - 'crates/web-mcp/**'
+              - 'plugins/shared/web-mcp/**'
+              - '.github/workflows/crates.yml'
+            ado-mcp:
+              - 'crates/ado-mcp/**'
+              - 'plugins/opt-in/mcp/mcp-azure/**'
+              - '.github/workflows/crates.yml'
+            cockpit:
+              - 'crates/flow-cockpit/**'
+              - 'plugins/opt-in/flow-cockpit/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/crates.yml'
+      - id: changes
+        env:
+          CHANGES: ${{ steps.filter.outputs.changes }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            echo 'crates=["tui-review","web-mcp","ado-mcp"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "crates=$(echo "$CHANGES" | jq -c 'map(select(. != "cockpit"))')" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: changes
+    if: needs.changes.outputs.crates != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: ${{ fromJSON(needs.changes.outputs.crates) }}
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: crates/${{ matrix.crate }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Rust toolchain
+        run: rustup update stable && rustup default stable && rustup component add clippy
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: crates/${{ matrix.crate }}
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test
+
+      - name: Speed and memory budgets
+        if: matrix.crate == 'tui-review'
+        run: cargo test --release --test perf -- --ignored --nocapture 2>&1 | tee "$RUNNER_TEMP/tui-review-budgets.txt"
+
+      - name: Benchmarks
+        if: matrix.crate == 'tui-review'
+        run: cargo bench --bench format --bench review -- --sample-count 50 | tee "$RUNNER_TEMP/tui-review-bench.txt"
+
+      - name: Mod fixture from tui-review gen
+        if: matrix.crate == 'tui-review'
+        run: |
+          cargo run --release -- gen --out "$RUNNER_TEMP/tui-review-fixture" > /dev/null
+          node ../../plugins/shared/tui-review/tests/make-fixture.mjs "$RUNNER_TEMP/tui-review-fixture"
+
+      - name: Mod tests and speed budgets
+        if: matrix.crate == 'tui-review'
+        working-directory: plugins/shared/tui-review
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude plugin validate .
+          claude plugin test .
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && matrix.crate == 'tui-review'
+        with:
+          name: tui-review-bench-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/tui-review-bench.txt
+            ${{ runner.temp }}/tui-review-budgets.txt
+
+  cockpit:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.cockpit == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+
+      - name: Rust toolchain
+        run: rustup update stable && rustup default stable && rustup component add clippy
+
+      # The app links the system's GTK and WebKit on Linux; this pulls GTK, libsoup and JavaScriptCore with it.
+      - name: WebKitGTK
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: crates/flow-cockpit
+
+      - name: Clippy
+        working-directory: crates/flow-cockpit
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # CI=true makes the relative-worktree test fail, not skip, when the runner's git is older than 2.48.
+      - name: Core tests
+        working-directory: crates/flow-cockpit
+        run: |
+          git --version
+          cargo test -p flow-cockpit-core
+
+      - name: App build
+        if: runner.os == 'Windows'
+        working-directory: crates/flow-cockpit
+        run: cargo build -p flow-cockpit
+
+      - name: Views tests and type checks
+        run: |
+          npm ci
+          node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/extensions/tests/*.test.ts'
+          npx tsc -p crates/flow-cockpit/app/shell
+          npx tsc -p crates/flow-cockpit/extensions
+
+  # The package Linux users run (nix run .#flow-cockpit); its build runs the app's tests and checks the default extensions
+  # it installs.
+  nix:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.cockpit == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+
+      - name: Nix package
+        run: |
+          nix build .#flow-cockpit -L
+          ./result/bin/flow-cockpit --version
+          ./result/bin/flow-cockpit --print-paths

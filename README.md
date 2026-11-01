@@ -45,7 +45,7 @@ codex mcp add dead-agent-skills-dead-skills --url https://mcp.context7.com/mcp
 
 web-mcp needs its release binary on PATH (or its absolute path in the native MCP command). Browser/search tools also
 need agent-browser. The setup skill and package README describe these prerequisites. GitHub uses
-`GITHUB_PERSONAL_ACCESS_TOKEN`; Azure uses `AZURE_DEVOPS_ORG_URL` and `AZURE_DEVOPS_PAT` with a documented environment
+`GITHUB_PERSONAL_ACCESS_TOKEN`; Azure uses the ado-mcp release binary with `ADO_ORG_URL` and `ADO_PAT` with a documented environment
 allowlist. Atlassian uses native Codex OAuth login. Credentials are not embedded in the marketplace.
 
 Shared startup rules and desktop notifications have packaged adapters for both harnesses. Night City supplies
@@ -59,31 +59,46 @@ comma. Codex installer state lives under `$CODEX_HOME/dead-agent-skills` (defaul
 The old executable name remains an alias.
 
 For Claude Code, the default bundle, **[dead-skills](plugins/default/README.md)**, pulls in claude-code-setup, claude-md-management, security-guidance and
-claude-security, and itself carries Context7, Night City (a
+claude-security and agent-review, and itself carries Context7, Night City (a
 toned-down synthwave theme that everything else here is painted in), desktop notifications when a turn ends or Claude
 waits for you, and my global rules. Everything else is opt-in: language
-servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
+servers, language and database skills (rust, csharp, postgres), integrations (GitHub, [Azure DevOps Server](plugins/opt-in/mcp/mcp-azure/README.md), Atlassian), skill packs
 like hallmark and graphify, and tools such as
 [tui-review](plugins/shared/tui-review/README.md), [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
-Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search read in its own browser, page fetching,
-passive lookups and a browser with an archive of everything it pulled.
+Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search read in one browser window of its own, page fetching,
+passive lookups and a browser with an archive of everything it pulled, and
+[headroom-trim](plugins/opt-in/headroom-trim/README.md), which shrinks every tool result with headroom's offline compression before Claude reads it.
+
+Also available: [flow-cockpit](plugins/opt-in/flow-cockpit/README.md), whose skill writes the views of the flow cockpit, a window
+over your flow runs, audits and Claude sessions (on Linux the app comes from the flake:
+`nix run github:deadmade/dead-claude-skills#flow-cockpit`; on Windows the installer downloads it to
+`%USERPROFILE%\.claude\bin\flow-cockpit\`). It also installs hooks that record questions, permission
+prompts and agent starts and stops per session into a local capture folder, which only the window reads.
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
-with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
-flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup
-and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
+with approval gates and a state file to resume from. They keep the number of agents small, ultracode included, and run
+each on a model suited to its job rather than the one you picked. Picking flows installs every plugin its conductors use.
+flows also sets the house standard for prose. A `writing` skill states Williams and Bizup's _Style_ in our own words.
+A code-only check on each Write or Edit of a Markdown file flags conversation shorthand such as `Q11` or `round 2`
+(`FLOWS_PROSE_CHECK=off` turns it off). Before a gate, an Opus editor copyedits the spec, plan or report by the skill;
+when code finds something lost, the gate shows the unedited document and what was lost.
+flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup,
+Cloudflare's security-audit and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
 their skills, hooks and ponytail's band stay out of your sessions outside the conductors, and the installer removes
 old installs of them.
 
     npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/latest/download/installer.tgz
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
-update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
-it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). Optional toggles add ccstatusline
+update, then applies only the changes. It points the marketplace at the `release` branch, which follows the newest
+release, so Claude Code updates the plugins on its own (rerun the installer for new tui-review and web-mcp binaries and the flow cockpit's Windows app), and
+it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). It
+lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
-Everything ships as one version, cut with `npm run release -- patch` and `git push --follow-tags origin main`; the
-tag builds the installer and the binaries and publishes the GitHub release they're downloaded from. From a checkout,
+Everything ships as one version. Every merge to main releases a patch; a bigger step is `npm run release -- minor`
+and `git push --follow-tags origin main`. The tag builds the installer and the binaries and publishes the GitHub
+release they're downloaded from. From a checkout,
 `npm ci` once, then `node installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.
 
 Author plugins in `catalog/plugins.json` and their source resources under `plugins/`. The catalog declares shared

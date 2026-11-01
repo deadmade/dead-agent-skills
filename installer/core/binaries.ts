@@ -1,10 +1,11 @@
-// The binaries the installer downloads or points plugins at: tui-review, web-mcp and agent-browser.
+// The binaries the installer downloads or points plugins at: tui-review, web-mcp, the flow cockpit and agent-browser.
 import { createHash } from 'node:crypto';
+import { posix, win32 } from 'node:path';
 import { BUNDLE } from './plugins.ts';
 import { RELEASES, newer, semver } from './release.ts';
 
-// installer/assets/agent-browser.json.
-export interface AgentBrowserPin {
+// installer/assets/agent-browser.json and uv.json.
+export interface UpstreamPin {
   upstream?: string;
   sha256?: Record<string, string>;
 }
@@ -37,11 +38,31 @@ export function missingBinaries(platform: string, wanted: string[], onPath: (bin
   });
 }
 
-// The binaries releases ship, built per platform by .github/workflows/build-{tui-review,web-mcp}.yml and attached to the
-// vX.Y.Z release by release.yml. plugin: which plugin needs it; key: its userConfig key for the binary's path.
-export const BIN_PLUGINS: Record<string, { name: string; key: string }> = {
+// The binaries releases ship, built per platform by .github/workflows/crates-build.yml (the flow cockpit by
+// build-flow-cockpit.yml) and attached to the vX.Y.Z release by release.yml. Keyed by plugin; name: the binary;
+// key: the plugin's userConfig key for its path. targets: the BIN_TARGETS keys it is built for, when not all.
+// linuxHint: Linux gets it elsewhere, and this says how. folder: the archive holds more than the binary (the flow
+// cockpit's default extensions), so it is unpacked whole into a folder of its own.
+export interface BinPlugin {
+  name: string;
+  key: string;
+  targets?: string[];
+  linuxHint?: (version: string) => string;
+  folder?: boolean;
+}
+export const BIN_PLUGINS: Record<string, BinPlugin> = {
   'tui-review': { name: 'tui-review', key: 'binPath' },
   'web-mcp': { name: 'web-mcp', key: 'binPath' },
+  'mcp-azure': { name: 'ado-mcp', key: 'binPath' },
+  // It links the system's GTK and WebKit on Linux, so Linux runs it from the flake, pinned to this release.
+  'flow-cockpit': {
+    name: 'flow-cockpit',
+    key: 'appPath',
+    targets: ['win32-x64'],
+    linuxHint: (version) =>
+      `run the app with \`nix run github:deadmade/dead-claude-skills/v${version}#flow-cockpit\`, or add the flake's flow-cockpit package to your system config`,
+    folder: true,
+  },
 };
 // Windows and Linux x64 only: no macOS or ARM builds.
 const BIN_TARGETS: Record<string, string> = {
@@ -49,13 +70,33 @@ const BIN_TARGETS: Record<string, string> = {
   'linux-x64': 'x86_64-unknown-linux-musl',
 };
 
-// The release archive of binary `name` ('tui-review' or 'web-mcp') at `version` for this machine, or undefined where none is built.
+// The release archive of binary `name` (a BIN_PLUGINS name) at `version` for this machine, or undefined where none is built.
 export function binAsset(name: string, platform: string, arch: string, version: string) {
-  const target = BIN_TARGETS[`${platform}-${arch}`];
-  if (!target) return undefined;
+  const key = `${platform}-${arch}`;
+  const target = BIN_TARGETS[key];
+  const plugin = Object.values(BIN_PLUGINS).find((p) => p.name === name);
+  if (!target || (plugin?.targets && !plugin.targets.includes(key))) return undefined;
   const file = `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
   const url = `${RELEASES}/v${version}/${file}`;
-  return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? `${name}.exe` : name };
+  const exe = platform === 'win32' ? `${name}.exe` : name;
+  return { file, url, sha256: `${url}.sha256`, exe, folder: plugin?.folder === true };
+}
+
+// Where the binary of `pluginName` goes in binDir on `platform`: a folder plugin's in a folder of its own.
+export function binPath(binDir: string, pluginName: string, platform: string) {
+  const { name, folder } = BIN_PLUGINS[pluginName];
+  const p = platform === 'win32' ? win32 : posix;
+  const exe = platform === 'win32' ? `${name}.exe` : name;
+  return folder ? p.join(binDir, name, exe) : p.join(binDir, exe);
+}
+
+// What to do when the binary of `pluginName` couldn't be installed. A folder plugin's failure is most likely its open
+// app holding the folder, and a hand-built one lacks what ships beside it, so it gets a rerun instead of a build.
+export function binAdvice(pluginName: string) {
+  const { name, folder } = BIN_PLUGINS[pluginName];
+  return folder
+    ? `close ${name} if it is open and run the installer again`
+    : `build it with \`cargo build --release\` in crates/${name} and set its path with /plugin configure ${pluginName}`;
 }
 
 // The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.
@@ -84,13 +125,14 @@ export function binAction({
   return supported ? 'download' : 'unsupported';
 }
 
-// installed: version from `agent-browser --version` or undefined; pinned: installer/assets/agent-browser.json. A newer one stays.
-export const agentBrowserAction = ({ installed, pinned }: { installed: string | undefined; pinned: string }) =>
+// installed: version from `<tool> --version` or undefined; pinned: the tool's installer/assets pin (agent-browser, uv).
+// A newer one stays.
+export const upstreamAction = ({ installed, pinned }: { installed: string | undefined; pinned: string }) =>
   !installed ? 'install' : installed === pinned || newer(installed, pinned) ? 'skip' : 'upgrade';
 
-// Which agent-browser web-mcp runs: a current one on PATH as is, else ours in ~/.claude/bin, downloaded when missing
-// or older than the pin.
-export const agentBrowserPlan = ({
+// Which copy of a pinned tool runs (agent-browser for web-mcp): a current one on PATH as is, else ours in ~/.claude/bin,
+// downloaded when missing or older than the pin.
+export const upstreamPlan = ({
   theirs,
   ours,
   pinned,
@@ -99,9 +141,23 @@ export const agentBrowserPlan = ({
   ours: string | undefined;
   pinned: string;
 }) =>
-  theirs && agentBrowserAction({ installed: theirs, pinned }) === 'skip'
+  theirs && upstreamAction({ installed: theirs, pinned }) === 'skip'
     ? { use: 'path' }
-    : { use: 'ours', download: agentBrowserAction({ installed: ours, pinned }) };
+    : { use: 'ours', download: upstreamAction({ installed: ours, pinned }) };
+
+// Why web-mcp's one browser window can't open on this machine, or undefined. search, browser and the fetch fallback all need it.
+export function windowProblem(o: {
+  browserRuns: boolean;
+  platform: NodeJS.Platform;
+  display: boolean;
+  xvfb: boolean;
+}): string | undefined {
+  if (!o.browserRuns)
+    return "web-mcp's browser window can't open: no browser it can use. search, browser and the fetch fallback won't work until you run agent-browser install, or install Helium or Chromium.";
+  if (o.platform === 'linux' && !o.display && !o.xvfb)
+    return "web-mcp's browser window can't open: this Linux has no display and no Xvfb. search, browser and the fetch fallback won't work until you install Xvfb or run Claude Code in a desktop session.";
+  return undefined;
+}
 
 // agent-browser's own release binaries (statically linked musl on Linux, so NixOS runs it), keyed like BIN_TARGETS.
 export const AGENT_BROWSER_FILES: Record<string, string> = {
@@ -111,7 +167,7 @@ export const AGENT_BROWSER_FILES: Record<string, string> = {
 
 // The upstream binary for pin (installer/assets/agent-browser.json) on this machine, checked against the pin's sha256, or
 // undefined where there is no build or no pinned hash.
-export function agentBrowserAsset(platform: string, arch: string, pin: AgentBrowserPin) {
+export function agentBrowserAsset(platform: string, arch: string, pin: UpstreamPin) {
   const key = `${platform}-${arch}`;
   const [file, digest] = [AGENT_BROWSER_FILES[key], pin.sha256?.[key]];
   if (!file || !semver(pin.upstream) || !/^[0-9a-f]{64}$/.test(digest ?? '')) return undefined;
@@ -119,8 +175,44 @@ export function agentBrowserAsset(platform: string, arch: string, pin: AgentBrow
   return { file, url, digest, raw: true, exe: platform === 'win32' ? 'agent-browser.exe' : 'agent-browser' };
 }
 
-// `agent-browser --version` may print a name prefix ("agent-browser 0.39.1"); undefined when no version is in it.
-export const agentBrowserVersion = (out: string | undefined) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
+// uv's own release archives (musl on Linux, so NixOS runs it), keyed like BIN_TARGETS. inner: the binary's path in the archive.
+export const UV_FILES: Record<string, { file: string; inner: string }> = {
+  'win32-x64': { file: 'uv-x86_64-pc-windows-msvc.zip', inner: 'uv.exe' },
+  'linux-x64': {
+    file: 'uv-x86_64-unknown-linux-musl.tar.gz',
+    inner: 'uv-x86_64-unknown-linux-musl/uv',
+  },
+};
+
+// The upstream archive for pin (installer/assets/uv.json) on this machine, checked against the pin's sha256, or
+// undefined where there is no build or no pinned hash. exe: the path inside the archive.
+export function uvAsset(platform: string, arch: string, pin: UpstreamPin) {
+  const key = `${platform}-${arch}`;
+  const [entry, digest] = [UV_FILES[key], pin.sha256?.[key]];
+  if (!entry || !semver(pin.upstream) || !/^[0-9a-f]{64}$/.test(digest ?? '')) return undefined;
+  const url = `https://github.com/astral-sh/uv/releases/download/${pin.upstream}/${entry.file}`;
+  return { file: entry.file, url, digest, exe: entry.inner };
+}
+
+// Which uv runs: ours in ~/.claude/bin whenever it exists (the plugin's launcher looks there first, so it must stay
+// current), else a PATH uv at or above the pin, else a download. ours: its version, undefined when it can't report one.
+export const uvPlan = ({
+  oursExists,
+  ours,
+  theirs,
+  pinned,
+}: {
+  oursExists: boolean;
+  ours: string | undefined;
+  theirs: string | undefined;
+  pinned: string;
+}) =>
+  oursExists
+    ? { use: 'ours', download: ours ? upstreamAction({ installed: ours, pinned }) : 'upgrade' }
+    : upstreamPlan({ theirs, ours: undefined, pinned });
+
+// `<tool> --version` may print a name prefix ("agent-browser 0.39.1", "uv 0.13.6 (…)"); undefined when no version is in it.
+export const versionIn = (out: string | undefined) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
 
 // The newest `chrome-<a>.<b>.<c>.<d>` among a browsers folder's entries, compared numerically (upstream sorts the names
 // as strings, where chrome-99 beats chrome-156).

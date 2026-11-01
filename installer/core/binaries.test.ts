@@ -4,15 +4,20 @@ import { readFileSync } from 'node:fs';
 import {
   missingBinaries,
   newestChromeForTesting,
-  agentBrowserAction,
+  upstreamAction,
   agentBrowserAsset,
-  agentBrowserPlan,
-  agentBrowserVersion,
+  upstreamPlan,
+  versionIn,
+  uvAsset,
+  uvPlan,
+  windowProblem,
   BIN_PLUGINS,
   binAsset,
   sha256Of,
   sha256Matches,
   binAction,
+  binAdvice,
+  binPath,
 } from './binaries.ts';
 import { unavailable } from './options.ts';
 
@@ -70,12 +75,71 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   const dirs: Record<string, string> = {
     'tui-review': 'plugins/shared/tui-review',
     'web-mcp': 'plugins/shared/web-mcp',
+    'mcp-azure': 'plugins/opt-in/mcp/mcp-azure',
+    'flow-cockpit': 'plugins/opt-in/flow-cockpit',
   };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
     assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
   assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0')!, /no web-mcp build for linux-ia32/);
   assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
   assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0')!, /no web-mcp build for darwin-arm64/);
+});
+
+test('binAsset gives the Windows zip for flow-cockpit', () => {
+  const win = binAsset('flow-cockpit', 'win32', 'x64', '1.2.3')!;
+  assert.equal(
+    win.url,
+    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/flow-cockpit-x86_64-pc-windows-msvc.zip',
+  );
+  assert.equal(win.sha256, `${win.url}.sha256`);
+  assert.equal(win.exe, 'flow-cockpit.exe');
+  // The zip holds the exe and its default extensions, so it goes into a folder of its own.
+  assert.equal(win.folder, true);
+  assert.equal(binAsset('tui-review', 'win32', 'x64', '1.2.3')!.folder, false);
+  assert.equal(BIN_PLUGINS['flow-cockpit'].key, 'appPath');
+});
+
+test('binAsset has no linux asset for flow-cockpit', () => {
+  assert.equal(binAsset('flow-cockpit', 'linux', 'x64', '1.2.3'), undefined);
+  assert.equal(binAsset('flow-cockpit', 'win32', 'arm64', '1.2.3'), undefined);
+  assert.equal(binAsset('flow-cockpit', 'darwin', 'arm64', '1.2.3'), undefined);
+});
+
+test('flow-cockpit has a pinned linux hint', () => {
+  const hint = BIN_PLUGINS['flow-cockpit'].linuxHint!('1.2.3');
+  assert.match(hint, /nix run github:deadmade\/dead-claude-skills\/v1\.2\.3#flow-cockpit/);
+  assert.equal(BIN_PLUGINS['tui-review'].linuxHint, undefined);
+});
+
+// The hint names the flake's package: the output the installer points Linux users at must exist.
+test('the flake has the flow-cockpit package the linux hint runs', () => {
+  const flake = readFileSync(new URL('../../flake.nix', import.meta.url), 'utf8');
+  assert.match(flake, /^\s+flow-cockpit = pkgs\.rustPlatform\.buildRustPackage/m);
+});
+
+// The installer downloads the name crates-build.yml uploads: the same target and the same file name.
+test('crates-build.yml packs the zip binAsset downloads', () => {
+  const yml = readFileSync(new URL('../../.github/workflows/crates-build.yml', import.meta.url), 'utf8');
+  assert.match(yml, /crate: \[.*flow-cockpit.*\]/);
+  assert.match(yml, /target: x86_64-pc-windows-msvc/);
+  assert.match(yml, /name=flow-cockpit-\$TARGET/);
+  assert.match(yml, /"\$RUNNER_TEMP\/dist\/\$name\.zip"/);
+  assert.equal('flow-cockpit-x86_64-pc-windows-msvc.zip', binAsset('flow-cockpit', 'win32', 'x64', '1.2.3')!.file);
+});
+
+test('binPath: the flow cockpit in a folder of its own, the others loose in bin', () => {
+  const win = 'C:\\Users\\u\\.claude\\bin';
+  assert.equal(binPath(win, 'flow-cockpit', 'win32'), 'C:\\Users\\u\\.claude\\bin\\flow-cockpit\\flow-cockpit.exe');
+  assert.equal(binPath(win, 'web-mcp', 'win32'), 'C:\\Users\\u\\.claude\\bin\\web-mcp.exe');
+  assert.equal(binPath('/h/.claude/bin', 'tui-review', 'linux'), '/h/.claude/bin/tui-review');
+});
+
+// A flow cockpit install that fails is most likely its open window holding the folder; building it by hand doesn't
+// bring the default extensions along.
+test('binAdvice: rerun for the flow cockpit, build for the others', () => {
+  assert.match(binAdvice('flow-cockpit'), /close flow-cockpit if it is open and run the installer again/);
+  assert.doesNotMatch(binAdvice('flow-cockpit'), /cargo/);
+  assert.match(binAdvice('web-mcp'), /cargo build --release` in crates\/web-mcp/);
 });
 
 test('tui-review versions match the release the installer fetches', () => {
@@ -105,12 +169,26 @@ test('tui-review checksum lines and what to do about tui-review', () => {
 
 test('agent-browser: install when missing, upgrade when older, keep when equal or newer', () => {
   const pinned = '0.39.1';
-  assert.equal(agentBrowserAction({ installed: undefined, pinned }), 'install');
-  assert.equal(agentBrowserAction({ installed: '0.38.0', pinned }), 'upgrade');
-  assert.equal(agentBrowserAction({ installed: '0.39.1', pinned }), 'skip');
-  assert.equal(agentBrowserAction({ installed: '0.40.0', pinned }), 'skip');
-  assert.equal(agentBrowserVersion('agent-browser 0.39.1\n'), '0.39.1');
-  assert.equal(agentBrowserVersion('nope'), undefined);
+  assert.equal(upstreamAction({ installed: undefined, pinned }), 'install');
+  assert.equal(upstreamAction({ installed: '0.38.0', pinned }), 'upgrade');
+  assert.equal(upstreamAction({ installed: '0.39.1', pinned }), 'skip');
+  assert.equal(upstreamAction({ installed: '0.40.0', pinned }), 'skip');
+  assert.equal(versionIn('agent-browser 0.39.1\n'), '0.39.1');
+  assert.equal(versionIn('uv 0.13.6 (abc 2026-01-01)'), '0.13.6');
+  assert.equal(versionIn('nope'), undefined);
+});
+
+test('uvPlan: ours wins whenever it exists, else a current PATH uv, else download', () => {
+  const pinned = '0.13.6';
+  const plan = (oursExists: boolean, ours?: string, theirs?: string) => uvPlan({ oursExists, ours, theirs, pinned });
+  assert.deepEqual(plan(true, '0.13.6', '0.14.0'), { use: 'ours', download: 'skip' });
+  assert.deepEqual(plan(true, '0.13.6'), { use: 'ours', download: 'skip' });
+  assert.deepEqual(plan(true, '0.12.0', '0.14.0'), { use: 'ours', download: 'upgrade' });
+  assert.deepEqual(plan(true, undefined, '0.14.0'), { use: 'ours', download: 'upgrade' }, 'ours is there but broken');
+  assert.deepEqual(plan(false, undefined, '0.13.6'), { use: 'path' });
+  assert.deepEqual(plan(false, undefined, '0.14.0'), { use: 'path' });
+  assert.deepEqual(plan(false, undefined, '0.12.0'), { use: 'ours', download: 'install' });
+  assert.deepEqual(plan(false), { use: 'ours', download: 'install' });
 });
 
 test('agent-browser: the pinned upstream binary, only with a pinned hash', () => {
@@ -128,16 +206,39 @@ test('agent-browser: the pinned upstream binary, only with a pinned hash', () =>
   assert.ok(!missingBinaries('linux', ['web-mcp'], () => false).some((r) => r.binary === 'agent-browser'));
 });
 
+test('uv: the pinned upstream archive, only with a valid pin', () => {
+  const pin = { upstream: '0.13.6', sha256: { 'win32-x64': 'a'.repeat(64), 'linux-x64': 'b'.repeat(64) } };
+  const base = 'https://github.com/astral-sh/uv/releases/download/0.13.6';
+  assert.deepEqual(uvAsset('win32', 'x64', pin), {
+    file: 'uv-x86_64-pc-windows-msvc.zip',
+    url: `${base}/uv-x86_64-pc-windows-msvc.zip`,
+    digest: 'a'.repeat(64),
+    exe: 'uv.exe',
+  });
+  assert.deepEqual(uvAsset('linux', 'x64', pin), {
+    file: 'uv-x86_64-unknown-linux-musl.tar.gz',
+    url: `${base}/uv-x86_64-unknown-linux-musl.tar.gz`,
+    digest: 'b'.repeat(64),
+    exe: 'uv-x86_64-unknown-linux-musl/uv',
+  });
+  assert.equal(uvAsset('darwin', 'arm64', pin), undefined);
+  assert.equal(uvAsset('linux', 'x64', { ...pin, upstream: '0.13; rm' }), undefined);
+  assert.equal(uvAsset('linux', 'x64', { ...pin, sha256: {} }), undefined);
+  assert.ok(!missingBinaries('linux', ['headroom-trim'], () => false).some((r) => r.binary === 'uv'));
+  const shipped = JSON.parse(readFileSync(new URL('../assets/uv.json', import.meta.url), 'utf8'));
+  assert.ok(uvAsset('win32', 'x64', shipped) && uvAsset('linux', 'x64', shipped));
+});
+
 test('agent-browser plan: a current PATH copy wins, else ours, downloaded only when missing or older', () => {
   const pinned = '0.39.1';
-  assert.deepEqual(agentBrowserPlan({ theirs: '0.39.1', ours: undefined, pinned }), { use: 'path' });
-  assert.deepEqual(agentBrowserPlan({ theirs: '0.40.0', ours: '0.38.0', pinned }), { use: 'path' });
-  assert.deepEqual(agentBrowserPlan({ theirs: '0.38.0', ours: '0.39.1', pinned }), { use: 'ours', download: 'skip' });
-  assert.deepEqual(agentBrowserPlan({ theirs: undefined, ours: undefined, pinned }), {
+  assert.deepEqual(upstreamPlan({ theirs: '0.39.1', ours: undefined, pinned }), { use: 'path' });
+  assert.deepEqual(upstreamPlan({ theirs: '0.40.0', ours: '0.38.0', pinned }), { use: 'path' });
+  assert.deepEqual(upstreamPlan({ theirs: '0.38.0', ours: '0.39.1', pinned }), { use: 'ours', download: 'skip' });
+  assert.deepEqual(upstreamPlan({ theirs: undefined, ours: undefined, pinned }), {
     use: 'ours',
     download: 'install',
   });
-  assert.deepEqual(agentBrowserPlan({ theirs: undefined, ours: '0.38.0', pinned }), {
+  assert.deepEqual(upstreamPlan({ theirs: undefined, ours: '0.38.0', pinned }), {
     use: 'ours',
     download: 'upgrade',
   });
@@ -150,4 +251,19 @@ test('newestChromeForTesting picks the newest version', () => {
   );
   assert.equal(newestChromeForTesting(['x', 'chrome-1.2.3']), undefined);
   assert.equal(newestChromeForTesting([]), undefined);
+});
+
+test('windowProblem: no browser, no display on Linux, and the cases that are fine', () => {
+  const ok = { browserRuns: true, platform: 'linux' as const, display: false, xvfb: false };
+  assert.equal(
+    windowProblem({ ...ok, browserRuns: false }),
+    "web-mcp's browser window can't open: no browser it can use. search, browser and the fetch fallback won't work until you run agent-browser install, or install Helium or Chromium.",
+  );
+  assert.equal(
+    windowProblem(ok),
+    "web-mcp's browser window can't open: this Linux has no display and no Xvfb. search, browser and the fetch fallback won't work until you install Xvfb or run Claude Code in a desktop session.",
+  );
+  assert.equal(windowProblem({ ...ok, display: true }), undefined);
+  assert.equal(windowProblem({ ...ok, xvfb: true }), undefined);
+  assert.equal(windowProblem({ ...ok, platform: 'win32' }), undefined);
 });

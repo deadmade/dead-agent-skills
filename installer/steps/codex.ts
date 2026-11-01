@@ -8,14 +8,7 @@ import { join, resolve } from 'node:path';
 import { CODEX_MARKETPLACE } from '../core/agents.ts';
 import { selectTarget } from '../core/catalog.ts';
 import { readCatalog } from '../system/catalog.ts';
-import {
-  type CodexState,
-  MCP_COMPONENTS,
-  codexPlan,
-  installedCodex,
-  mcpName,
-  mcpEnvironment,
-} from '../core/codex.ts';
+import { type CodexState, MCP_COMPONENTS, codexPlan, installedCodex, mcpName, mcpEnvironment } from '../core/codex.ts';
 import { binAsset } from '../core/binaries.ts';
 import { categorize } from '../core/options.ts';
 import { PKG, VERSION, ask, done, failures, tryJson } from '../context.ts';
@@ -77,7 +70,10 @@ export async function applyCodex(io: CodexIO = {}) {
   );
   const keys = Object.keys(current);
   const hidden = keys.filter(
-    (k) => k === 'web-mcp' && !binAsset('web-mcp', process.platform, process.arch, VERSION) && !find('web-mcp'),
+    (k) =>
+      ['web-mcp', 'mcp-azure'].includes(k) &&
+      !binAsset(k === 'mcp-azure' ? 'ado-mcp' : k, process.platform, process.arch, VERSION) &&
+      !find(k === 'mcp-azure' ? 'ado-mcp' : k),
   );
   const data: Data = {
     version: VERSION,
@@ -105,7 +101,7 @@ export async function applyCodex(io: CodexIO = {}) {
     core: 'Codex: shared rules + Context7, always installed; Claude UI features stay on Claude Code',
     hidden: hidden
       .filter((k) => !current[k])
-      .map((key) => ({ key, why: 'no release binary on this platform; flows also requires web-mcp' })),
+      .map((key) => ({ key, why: 'no release binary on this platform; flows requires web-mcp' })),
   };
   // A flow dependency must not silently bypass platform restrictions.
   if (hidden.includes('web-mcp') && !current.flows)
@@ -214,31 +210,32 @@ export async function applyCodex(io: CodexIO = {}) {
     note('Codex Atlassian authentication', [`Run codex mcp login ${mcpName('atlassian')} to sign in.`]);
   }
   if (plan.wanted.includes('mcp-azure')) {
-    const npx = find('npx');
-    if (!npx) throw new Error('Azure MCP needs npx on PATH');
-    const launcher = join(catalog, 'azure-mcp.mjs');
-    configure('mcp-azure', ['--', process.execPath, launcher, npx]);
+    let binary = find('ado-mcp');
+    if (!binary) {
+      const asset = binAsset('ado-mcp', process.platform, process.arch, VERSION);
+      if (!asset) throw new Error('No ado-mcp release for this platform');
+      binary = join(base, 'bin', VERSION, asset.exe);
+      if (!existsSync(binary)) await (io.download ?? downloadBin)('ado-mcp', asset, binary);
+    }
+    configure('mcp-azure', ['--', binary]);
     const config = join(home, 'config.toml');
     if (lstatSync(config).isSymbolicLink())
       throw new Error('Codex config.toml is a symlink; add Azure env_vars where it is managed');
     const raw = readFileSync(config, 'utf8');
-    const next = mcpEnvironment(raw, mcpName('mcp-azure'), [
-      'AZURE_DEVOPS_ORG_URL',
-      'AZURE_DEVOPS_PAT',
-      'AZURE_DEVOPS_DEFAULT_PROJECT',
-      'AZURE_DEVOPS_API_VERSION',
-    ]);
+    const next = mcpEnvironment(raw, mcpName('mcp-azure'), ['ADO_ORG_URL', 'ADO_PAT', 'ADO_PROJECT_DIR']);
     if (next !== raw) writeAtomic(config, next);
     note('Codex Azure authentication', [
-      'Set AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_PAT in the environment that starts Codex.',
-      'Optional: AZURE_DEVOPS_DEFAULT_PROJECT and AZURE_DEVOPS_API_VERSION (default 7.0).',
+      'Set ADO_ORG_URL (the collection URL) and ADO_PAT in the environment that starts Codex.',
+      'Optional: ADO_PROJECT_DIR overrides the repository used for project detection.',
     ]);
   }
   const packaged = join(catalog, 'plugins/dead-skills');
   const theme = installCodexTheme(home, join(packaged, 'themes/night-city.tmTheme'));
-  note('Codex Night City', [theme.conflict
-    ? 'Existing theme is managed elsewhere or differs; preserved. Use /setup-night-city to review it.'
-    : 'Run /theme and select Night City; the native picker saves your selection.']);
+  note('Codex Night City', [
+    theme.conflict
+      ? 'Existing theme is managed elsewhere or differs; preserved. Use /setup-night-city to review it.'
+      : 'Run /theme and select Night City; the native picker saves your selection.',
+  ]);
   note('Codex shared rules', [
     'Restart Codex and review/trust the dead-skills startup hooks in the native plugin UI.',
     'Verify shared rules in a new session before removing any legacy managed block.',
@@ -252,10 +249,15 @@ export async function applyCodex(io: CodexIO = {}) {
   });
   // Fail closed for symlinks, directories, or unreadable discovery, including a shadowing override.
   const instructions = () => {
-    for (const [source, name] of [['override', 'AGENTS.override.md'], ['agents', 'AGENTS.md']] as const) {
+    for (const [source, name] of [
+      ['override', 'AGENTS.override.md'],
+      ['agents', 'AGENTS.md'],
+    ] as const) {
       const file = join(home, name);
       let stat;
-      try { stat = lstatSync(file); } catch (error) {
+      try {
+        stat = lstatSync(file);
+      } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
         return undefined;
       }
@@ -268,18 +270,37 @@ export async function applyCodex(io: CodexIO = {}) {
   const before = instructions();
   const expected = fingerprint();
   const receipt = readRulesReceipt(home);
-  if (before && (receipt as { source?: unknown } | undefined)?.source === before.source &&
-      rulesMigration({ raw: before.raw, receipt, expected, userVerified: false }).action === 'offer-removal') {
+  if (
+    before &&
+    (receipt as { source?: unknown } | undefined)?.source === before.source &&
+    rulesMigration({ raw: before.raw, receipt, expected, userVerified: false }).action === 'offer-removal'
+  ) {
     const block = before.raw.match(/<!-- dead-agent-skills:start -->[\s\S]*?<!-- dead-agent-skills:end -->/)![0];
-    if (await question('Have you reviewed/trusted the startup hooks and explicitly verified shared rules in a new Codex session? Remove the legacy managed block?', false)) {
+    if (
+      await question(
+        'Have you reviewed/trusted the startup hooks and explicitly verified shared rules in a new Codex session? Remove the legacy managed block?',
+        false,
+      )
+    ) {
       const current = instructions();
       const fresh = fingerprint();
-      const freshReceipt = readRulesReceipt(home); 
-      if (current && (freshReceipt as { source?: unknown } | undefined)?.source === current.source && current.source === before.source && current.file === before.file &&
-          current.dev === before.dev && current.ino === before.ino &&
-          JSON.stringify(fresh) === JSON.stringify(expected)) {
-        const decision = rulesMigration({ raw: current.raw, receipt: freshReceipt, expected: fresh,
-          userVerified: true, confirmedBlockHash: hash(block) });
+      const freshReceipt = readRulesReceipt(home);
+      if (
+        current &&
+        (freshReceipt as { source?: unknown } | undefined)?.source === current.source &&
+        current.source === before.source &&
+        current.file === before.file &&
+        current.dev === before.dev &&
+        current.ino === before.ino &&
+        JSON.stringify(fresh) === JSON.stringify(expected)
+      ) {
+        const decision = rulesMigration({
+          raw: current.raw,
+          receipt: freshReceipt,
+          expected: fresh,
+          userVerified: true,
+          confirmedBlockHash: hash(block),
+        });
         if (decision.action === 'remove') writeAtomic(current.file, decision.next);
       }
     }

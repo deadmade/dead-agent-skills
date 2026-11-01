@@ -11,6 +11,7 @@
     "claude-code-setup@claude-plugins-official",
     "claude-md-management@claude-plugins-official",
     "security-guidance@claude-plugins-official",
-    "claude-security@claude-plugins-official"
+    "claude-security@claude-plugins-official",
+    "agent-review"
   ]
 }

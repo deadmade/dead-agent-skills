@@ -12,13 +12,7 @@ test('repository checks reject missing, stale and unexpected Codex distribution 
   const root = mkdtempSync(join(tmpdir(), 'marketplace-drift-'));
   const source = resolve(import.meta.dirname, '..');
   try {
-    for (const path of [
-      'package.json',
-      'installer/assets/azure-mcp.mjs',
-      'THIRD_PARTY.md',
-      'plugins/default/rules.md',
-      'catalog/plugins.json',
-    ]) {
+    for (const path of ['package.json', 'THIRD_PARTY.md', 'plugins/default/rules.md', 'catalog/plugins.json']) {
       const dest = join(root, path);
       mkdirSync(join(dest, '..'), { recursive: true });
       cpSync(join(source, path), dest);

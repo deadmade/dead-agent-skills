@@ -16,8 +16,8 @@
   }: let
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
-    # Upstream files copied by scripts/sync-*.mjs: fixing them here would churn every sync PR.
-    vendored = ["^portable/" "^plugins/default/themes/night-city\\.json$" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/self-review/(LICENSE|references/upstream/)"];
+    # Upstream files copied by tools/upstream-sync/src/adapters/*.ts: fixing them here would churn every sync PR.
+    vendored = ["^portable/" "^plugins/default/themes/night-city\\.json$" "^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/self-review/(LICENSE|references/upstream/)" "^crates/flow-cockpit/bindings/" "^crates/flow-cockpit/app/shell/vendor/" "^crates/flow-cockpit/core/tests/fixtures/"];
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let
@@ -44,7 +44,8 @@
         text = ''
           node --test --experimental-test-coverage --test-coverage-include='installer/**' \
             --test-coverage-exclude='installer/**/*.test.ts' --test-coverage-lines=79 'installer/**/*.test.ts'
-          exec node --test 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs'
+          node --test 'tools/upstream-sync/src/**/*.test.ts' 'tools/upstream-sync/src/**/*.test.mjs'
+          exec node --test 'scripts/*.test.mjs' 'plugins/flows/skills/writing/tests/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs' 'plugins/opt-in/headroom-trim/hooks/*.test.mjs' 'plugins/opt-in/flow-cockpit/hooks/*.test.mjs'
         '';
       };
     in
@@ -65,14 +66,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(catalog/|portable/|\\.agents/|\\.claude-plugin/|plugins/|crates/|scripts/check-repo\\.mjs$|package\\.json$)";
+            files = "^(\\.claude-plugin/|plugins/|crates/|scripts/check-repo\\.mjs$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|scripts/|crates/|catalog/|portable/|plugins/default/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(catalog/|portable/|installer/|tools/upstream-sync/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };
@@ -85,6 +86,9 @@
       pkgs = nixpkgs.legacyPackages.${system};
       manifest = (pkgs.lib.importTOML ./crates/tui-review/Cargo.toml).package;
       webMcp = (pkgs.lib.importTOML ./crates/web-mcp/Cargo.toml).package;
+      cockpit = (pkgs.lib.importTOML ./crates/flow-cockpit/Cargo.toml).workspace.package;
+      cockpitApp = (pkgs.lib.importTOML ./crates/flow-cockpit/app/Cargo.toml).package;
+      adoMcp = (pkgs.lib.importTOML ./crates/ado-mcp/Cargo.toml).package;
     in {
       tui-review = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
@@ -111,6 +115,72 @@
           mainProgram = "web-mcp";
         };
       };
+      # The flow cockpit window (Tauri, crates/flow-cockpit/app): `nix run .#flow-cockpit`, or the package in a system
+      # config. It links the system's GTK and WebKit, so Linux gets it from here, not as a release download.
+      flow-cockpit = pkgs.rustPlatform.buildRustPackage {
+        pname = cockpitApp.name;
+        inherit (cockpit) version;
+        src = ./crates/flow-cockpit;
+        cargoLock.lockFile = ./crates/flow-cockpit/Cargo.lock;
+        buildAndTestSubdir = "app";
+        nativeBuildInputs = with pkgs; [pkg-config wrapGAppsHook3];
+        buildInputs = with pkgs; [webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
+        # The hosted-session tests start a command in a session of its own with `setsid`, which the build's PATH lacks.
+        nativeCheckInputs = [pkgs.util-linux];
+        # These time the poll against file changes and the clock; they run in a local `cargo test`, not in the sandboxed
+        # build.
+        checkFlags = map (t: "--skip=${t}") ["poll_emits_once_per_change" "poll_sees_folders_created_later" "first_paint_before_link_scan"];
+        # The default extensions, which the app finds at <exe dir>/../share/flow-cockpit/extensions. `tests/` holds the
+        # views' tests and fixtures, not an extension; the tsconfig.json beside the folders isn't copied either.
+        postInstall = ''
+          dest=$out/share/flow-cockpit/extensions
+          mkdir -p "$dest"
+          for dir in extensions/*/; do
+            name=$(basename "$dir")
+            [ "$name" = tests ] || cp -r "$dir" "$dest/$name"
+          done
+        '';
+        # The installed tree holds the four defaults and no tests, fixtures or configs, and the app finds it. Copied
+        # out as a user would, the defaults type-check against `--print-types` as they are (the skill's tsc line).
+        doInstallCheck = true;
+        nativeInstallCheckInputs = [pkgs.typescript];
+        installCheckPhase = ''
+          runHook preInstallCheck
+          dest=$out/share/flow-cockpit/extensions
+          test "$(ls "$dest" | tr '\n' ' ')" = "activity docs list run "
+          test -z "$(find "$dest" -name '*.test.ts' -o -name fixtures -o -name '*.json')"
+          $out/bin/flow-cockpit --print-paths | grep -Fx "default extensions: $dest"
+          copy=$(mktemp -d)
+          cp -r "$dest"/. "$copy"
+          chmod -R u+w "$copy"
+          $out/bin/flow-cockpit --print-types > "$copy/flow-cockpit.d.ts"
+          (cd "$copy" && tsc --noEmit --strict --target es2023 --lib es2023,dom,dom.iterable --module esnext \
+            --moduleResolution bundler --verbatimModuleSyntax --erasableSyntaxOnly flow-cockpit.d.ts ./*/*.ts)
+          runHook postInstallCheck
+        '';
+        meta = {
+          inherit (cockpitApp) description;
+          mainProgram = "flow-cockpit";
+
+          platforms = ["x86_64-linux"];
+        };
+      };
+
+      # ado-mcp, the mcp-azure plugin's MCP server: `nix build .#ado-mcp`.
+      ado-mcp = pkgs.rustPlatform.buildRustPackage {
+        pname = adoMcp.name;
+        inherit (adoMcp) version;
+        src = ./crates/ado-mcp;
+        cargoLock.lockFile = ./crates/ado-mcp/Cargo.lock;
+        # The tests read git remotes and build reqwest clients, whose platform verifier needs CA certificates (cacert's
+        # setup hook sets SSL_CERT_FILE in the sandbox); debug checks keep the ADO_TIMEOUT_MS hook, debug builds only.
+        nativeCheckInputs = [pkgs.git pkgs.cacert];
+        checkType = "debug";
+        meta = {
+          inherit (adoMcp) description;
+          mainProgram = "ado-mcp";
+        };
+      };
     });
 
     devShells = forAllSystems (system: let
@@ -120,8 +190,9 @@
       default = pkgs.mkShell {
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
-        # What scripts/sync-*.mjs and the workflows use besides stdenv, and the Rust toolchain for tui-review's binary.
-        packages = with pkgs; [git gh nodejs_26 cargo rustc clippy rustfmt rust-analyzer];
+        # What tools/upstream-sync/src/adapters/*.ts and the workflows use besides stdenv, the Rust toolchain for the crates, and the
+        # libraries the flow cockpit window builds against.
+        packages = with pkgs; [git gh nodejs_26 uv cargo rustc clippy rustfmt rust-analyzer pkg-config webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };
     });

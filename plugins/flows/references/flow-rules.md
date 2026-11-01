@@ -29,12 +29,17 @@ Load [resource-index.md](resource-index.md) when resolving another package's ski
 upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it after every phase, with links to every
   artifact. It is how the next session resumes. feature-flow and research-flow have their own templates; the others
   use [build-template.md](build-template.md).
-- A flow.md started before the **Tasks** and **Rulings** sections or the **Run verdict** line existed gets them added
-  when it is resumed; none is required of it.
+- **`now:`** (frontmatter, one plain sentence) says where the run stands and what comes next. Rewrite it after every
+  phase and at every stop where you wait for the user; at such a stop it starts with `Waiting for you`, which is what
+  the flow cockpit reads as the run's status. A conductor called inline writes into its caller's `now:`.
+- A flow.md started before the **Tasks** and **Rulings** sections, the **Run verdict** line or `now:` existed gets
+  them added when it is resumed; none is required of it.
+- The user reads specs, plans and flow.md in the flow cockpit, which draws Mermaid: use a diagram where it explains
+  something better than prose; never required.
 - **Audits** (`/test-audit`, `/doc-audit`, `/harden`) write `docs/audits/<YYYY-MM-DD>-<flow>-<scope>.md`: the scope
   line, the findings table, the user's pick per finding, and what was fixed.
 - `/verify`, `/understand` and `/learn` keep no state file of their own; called from a build flow, they write their
-  result into its flow.md.
+  result into its flow.md. The copyedit keeps no state either; its diff is against the saved copy in its run folder.
 
 ## Running a flow
 
@@ -49,7 +54,14 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Use superpowers:finishing-a-development-branch." -->
   <!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Use superpowers:finishing-a-development-branch." -->
 - **Gates:** a gate passes only on the user's explicit approval of the artifact it names, recorded with the date in
-  the state file. "Sounds good" to an idea isn't approval of a document. Nothing past a gate starts before it passes.
+  the state file as a line `- Gate <n>, <what>: <date>[, <extra>]`, the date empty while the gate is open; a
+  reopening is appended as `Reopened <date>: <why>`. "Sounds good" to an idea isn't approval of a document. Nothing
+  past a gate starts before it passes.
+- **Copyedit pass:** before a gate shows the user a `spec.md`, a `plan.md` or an audit report, copyedit it
+  (read `<flow-root>/skills/writing/references/copyedit.md`), each time the document goes to a gate, and say in the gate message
+  that it was copyedited. When the copyedit refuses the edit (it lost something, or failed), the flow goes on: the gate
+  shows the unedited document and the lines `compare.mjs` printed, and says the copyedit was refused. flow.md is never
+  copyedited, and the prose check skips it: it changes after every phase.
 - The user may skip a phase by saying so ("skip grilling"); record it. Never skip one on your own, and never skip a
   gate.
 - Options always come with a recommendation and its reason.
@@ -59,11 +71,11 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   task's files aren't deviations. This holds in every build flow (`/feature-flow`, `/research-flow`, `/implement`,
   `/fix-flow`, `/upgrade`) and in `/harden`'s fixes.
   - **The fifth stop.** A deviation is never ruled on, by the coordinating session or by a subagent. The coordinating
-    session writes it under **Deviations** in flow.md (what, why the plan doesn't hold, options with a
-    recommendation) and asks the user with the host question tool; the build waits for the answer. A decision that changes
+    session writes it under **Deviations** in flow.md as `### <deviation>` with `Status: open` (then what, why the plan
+    doesn't hold, options with a recommendation), sets `now:` to `Waiting for you: …`, and asks the user with the host question tool; the build waits for the answer. A decision that changes
     the plan needs the user's approval of that change before work continues. Only the main session can ask: a
     subagent that meets a deviation stops and reports `NEEDS_CONTEXT` with the decision, the options and its
-    recommendation, and the coordinating session asks. This is a fifth stop next to the four that
+    recommendation, and the coordinating session asks. The answer is recorded as `Status: decided <date>: <what>`. This is a fifth stop next to the four that
     `subagent-driven-development` and `executing-plans` name. For deviations it overrides their continuous execution
     and their rulings, and a plan correction that is a deviation goes to the user too.
     <!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
@@ -73,6 +85,9 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Rulings, not stalls. Conflicts, ambiguities, plan defects — decide them." -->
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
+  - **Added tasks.** A task a decision adds during the build takes the number of the task it follows plus a letter
+    (`8b`, then `8c`). It goes into plan.md right after that task. Below its `**Depends on:**` line, which may name
+    lettered tasks, write `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
   - **Review findings and reports.** Where `subagent-driven-development` rules on what review or a subagent turns up,
     a deviation still goes to the user. In the fix loop (a plan-mandated finding), at the breaker and in the final
     review's fix wave, a finding whose fix is deviation-class goes to the user, not a ruling. A `NEEDS_CONTEXT` that
@@ -106,6 +121,14 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - At Finish, ask the user for the **Run verdict** and record it in flow.md: worked as a whole, yes or no; clean, yes
   or no.
 
+## Agents
+
+Don't start agents by the dozen, under ultracode or in a Workflow either. Decide how many a step really needs: combine
+related tasks, checks and verifications into one agent where that works, do small things inline, and ask before a run
+grows large. Give every agent a model that fits its job instead of the session's default: `haiku` for mechanical work,
+`sonnet` for searching and most review, `opus` or `fable` where the judgment is hard (a subtle review, the final
+review).
+
 ## Homes and commits
 
 - Specs and plans live only in `docs/features/<slug>/` (`spec.md`, `plan.md`), next to flow.md, not where
@@ -122,8 +145,9 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 
 - A conductor's `uses.json` lists the skills, agents and tools it runs (not other conductors). Change it with the
   SKILL.md, then run `node scripts/flows-uses.mjs`, which regenerates flows' dependencies and README tree.
-- **Packs** (superpowers, ponytail, mattpocock-picks, pstack-picks, tob-picks, paper-lookup) ship inside flows, in the
-  packs folder your SKILL.md names (below: `<packs>`). They aren't installed, so the Skill tool doesn't know them:
+- **Packs** (superpowers, ponytail, mattpocock-picks, pstack-picks, tob-picks, paper-lookup, security-audit) ship
+  inside flows, in the packs folder your SKILL.md names (below: `<packs>`). They aren't installed, so the Skill tool
+  doesn't know them:
   - A pack skill is read by path, `<packs>/<pack>/skills/<name>/SKILL.md`, and followed. Never through the Skill tool.
   - Inside a pack file, `<pack>:<name>` (`superpowers:writing-plans`) means `<packs>/<pack>/skills/<name>/SKILL.md`,
     and "invoke" or "use" it means read it there. `<skill-dir>` and relative paths (`./implementer-prompt.md`,
@@ -141,8 +165,12 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   Skills restricted to explicit invocation are read directly when a conductor calls them. Use the host adapter
   and resource index for cross-package lookup; never guess plugin-cache paths. Other conductors are at
   `<flow-root>/skills/<name>/SKILL.md`.
+
+Flows' `flows:writing` skill may be invoked by the host skill tool; it supplies the copyedit pass.
+
 - **Calling another conductor** (`/fix-flow` → `/verify`): read its SKILL.md and run it inline. Skip its start and
-  resume step (the caller hands it the input), keep its gates, then return to the caller's next phase.
+  resume step (the caller hands it the input), keep its gates, then return to the caller's next phase. Its `now:`
+  goes into the caller's flow.md.
 
 ## ponytail at chosen steps
 
@@ -167,6 +195,7 @@ verbatim at these steps, never the whole skill:
 
 In a build flow TDD wins over ponytail's no-test-for-trivial rule. Wherever **The smallest complete change** is pasted
 into a brief, this line goes with it: "TDD wins here: every change, trivial ones too, gets its failing test first."
+
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none." -->
 
 ## Stack packs
@@ -218,4 +247,5 @@ One ranked table, most severe first:
 
 Every finding has evidence produced in this run: a command and its output, a quote with its line, a failing test.
 Nothing from memory. Then the user picks by number (`1,3`, `all high`, `none`). Fix only those, then re-run the check
-that found each one and show it passes. Record picks and results in the report file.
+that found each one and show it passes. Record picks and results in the report file as `Picks: <finding numbers> |
+none`, then one line `Fixed <date>: <number>` per pick once its check passes.
