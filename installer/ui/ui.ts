@@ -143,7 +143,7 @@ export function line(message: string, { input, output } = STD) {
 // A typed answer that is never shown: the prompt is written here and everything line() draws (echo, redraws) is dropped.
 export async function secret(message: string, io = STD) {
   io.output.write(`${message} `);
-  const answer = await line('', { input: io.input, output: new Writable({ write: (_c, _e, cb) => cb() }) });
+  const answer = await line('', { input: io.input, output: Object.assign(new Writable({ write: (_c, _e, cb) => cb() }), { isTTY: true, columns: io.output.columns ?? 80 }) });
   io.output.write('\n');
   return answer;
 }
