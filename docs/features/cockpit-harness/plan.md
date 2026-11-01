@@ -424,6 +424,12 @@ runtime.js` (`data.previewCommand` — read-only, stays on the view-visible obje
   string. `startSession` must pass a `Channel` as `start_session`'s `on_output` argument (Task 3's signature requires
   one); the form creates one but attaches no handler to it — it never displays output itself. The terminal pane (Task
   6/7) gets its own, real listening channel later, via `shell.subscribeSession`, when it actually mounts.
+  **Superseded by the final whole-branch review** (flow.md Deviations, "The final whole-branch review found three
+  Important findings that are deviation-class", item #2): to answer a session's own startup terminal queries (DA1,
+  focus) before anything is listening, `boot.js`'s `launchInto` now mounts the pane and attaches its real,
+  already-live channel _before_ calling `start_session`/`resume_session`, passing that real channel as `on_output`
+  directly — there is no unread throwaway channel in the shipped code. `shell.subscribeSession` remains the mechanism
+  for reload-rehydration (an already-running session, found via `hosted_sessions()` at boot).
 - "Continue" on a listed flow run whose `phase` isn't `done` pre-fills the prompt as `/flows:<skill> <slug>`.
   `FlowRunSummary.conductor` is the flow's `flow:` value (for example `"feature"`), not the skill's name
   (`"feature-flow"`); the form maps it through one small table (`feature` → `feature-flow`, `research` →
@@ -552,6 +558,11 @@ exactly as flow-observability built it.
   there is no separate "fresh start" path that reuses `start_session`'s own channel; `subscribe_session`'s built-in
   replay-then-live makes the two cases (nothing buffered yet vs. a real backlog from before the reload) the same
   call.
+  **Superseded by the final whole-branch review** (same item as Task 5's note above): a _fresh_ start/resume now
+  mounts its pane and attaches its real channel _before_ the launch call (`boot.js`'s `launchInto`), to close a race
+  where a startup terminal query could go unanswered — so "mounting calls `subscribeSession`" above describes only
+  the _reload-rehydration_ path now; a fresh start's pane is live from byte 0 via its own `on_output` channel, never
+  calling `subscribe_session` at all.
 
 - [ ] **Step 1: Write the failing tests:** `hosted_session_shows_the_terminal_pane`, `outside_session_is_unchanged`
       (a fixture id not in `hostedSessions` renders byte-for-byte what today's build renders),

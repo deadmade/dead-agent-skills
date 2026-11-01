@@ -1,9 +1,8 @@
 ---
 flow: feature
 phase: execute
-now: Waiting for you: the final whole-branch review found 6 Important findings; 3 are deviation-class (a startup
-  terminal-query race, no in-window path forward for an ended session, Windows shipping this feature untested). See
-  Deviations.
+now: Slice 1 (Linux, Tasks 1-13) complete, final-reviewed, and fixed. Task 14 (Windows) deferred — no hardware
+  available. Finishing the branch next: Run verdict, then superpowers:finishing-a-development-branch.
 ---
 
 # Cockpit harness: flow
@@ -317,6 +316,33 @@ Task 14: not started — see Deviations ("Task 14 needs a real Windows machine, 
   concrete build-only gap found while actually running the build this task exists to ship. Test-only dependency
   (`nativeCheckInputs`, not a runtime dependency of the shipped app), additive, confined to the one file already
   conditionally in this task's list. Accepted.
+- 2026-10-31, Task 2 (ledgered at the time in the SDD workspace, copied here at Finish per flow-rules.md): plan.md's
+  Task 2 and Task 9 test commands said `cargo test -p flow-cockpit`, but the core crate's real package name is
+  `flow-cockpit-core` — those commands would have silently run the wrong crate and never touched the new tests. Fixed
+  both tasks' Step 2/4 commands in plan.md to `-p flow-cockpit-core`. Mechanical correction, no judgment call. Cost if
+  wrong: tests silently not run; cheap to notice (zero new tests reported) and fix.
+- 2026-10-31, Task 5 (copied here at Finish): `app/shell/tsconfig.json` touched (one line, adding `start-form.js` to
+  `include`) — required for `tsc` to actually check the new file; not in Task 5's Files list, but mechanical and
+  low-risk. Cost if wrong: a file silently excluded from typechecking; cheap to catch.
+- 2026-10-31, Task 7 (copied here at Finish), three items: `ShellApi`/`DataApi` extensions left as local typedefs in
+  `boot.js`/`runtime.js` rather than `api.d.ts` (not in the Files list) — same pattern as Tasks 5/6's small additions;
+  `boot.test.mjs` touched (one assertion, adding `'session-exited'` to boot's listened-event list) — a necessary,
+  direct consequence of the brief's own required `session-exited` listener; `createRuntime` gained two new options
+  (`hosted`, `mountPane`) — internal to `runtime.js` (already in Task 7's Files list), never reaches `ctx` or any
+  view, the natural private implementation of the brief's own already-specified routing/position-sync behavior. All
+  three: no judgment call beyond mechanical necessity, cost if wrong is cheap to catch/revert.
+- 2026-10-31, Task 12 (copied here at Finish): `boot.test.mjs`'s exact-events assertion updated to include
+  `'close-requested'` — same mechanical pattern as Tasks 4/7's analogous `boot.test.mjs` touches, a direct consequence
+  of `boot.js`'s own required new listener.
+- 2026-11-01, final-review fix wave: 5 Minor findings in the fix diff itself (none deviation-class), ruled on
+  directly rather than looping again (no second fix wave per process): a hidden pane/xterm instance from an abandoned
+  failed launch (user cancels instead of retrying) leaks for the window's life — accepted, no correctness effect;
+  `printed_lately`'s 2-minute window can make close-confirmation fire somewhat more often — accepted, can only make
+  the dialog stricter, matches the "fail closed" intent; `plain()`'s ANSI-stripping for background-output display
+  misses a few rare escape sequences — accepted, cosmetic only, underlying data untouched; opened tool-call results
+  kept per session for the window's life, unbounded — accepted for this slice; the fixed Start-session button's
+  placement wasn't checked visually in a real window (no GUI tooling here) — accepted, flagged for a human visual
+  check. Cost if any is wrong: all are cosmetic or bounded-memory concerns, cheap to revisit in a later pass.
 
 - 2026-10-31, pre-flight: `start_session`'s Tauri command gains `cols: u16, rows: u16` params (Task 3) — the registry
   method it calls required them and nothing else supplied them.
