@@ -117,14 +117,14 @@ test('the flake has the flow-cockpit package the linux hint runs', () => {
   assert.match(flake, /^\s+flow-cockpit = pkgs\.rustPlatform\.buildRustPackage/m);
 });
 
-// The installer downloads the name build-flow-cockpit.yml uploads: the same target and the same file name.
-test('build-flow-cockpit.yml packs the zip binAsset downloads', () => {
-  const yml = readFileSync(new URL('../../.github/workflows/build-flow-cockpit.yml', import.meta.url), 'utf8');
-  const target = /^\s+TARGET: (\S+)$/m.exec(yml)?.[1];
-  const name = /^\s+name=(\S+)$/m.exec(yml)?.[1];
-  assert.ok(target && name, 'the workflow sets TARGET and name');
+// The installer downloads the name crates-build.yml uploads: the same target and the same file name.
+test('crates-build.yml packs the zip binAsset downloads', () => {
+  const yml = readFileSync(new URL('../../.github/workflows/crates-build.yml', import.meta.url), 'utf8');
+  assert.match(yml, /crate: \[.*flow-cockpit.*\]/);
+  assert.match(yml, /target: x86_64-pc-windows-msvc/);
+  assert.match(yml, /name=flow-cockpit-\$TARGET/);
   assert.match(yml, /"\$RUNNER_TEMP\/dist\/\$name\.zip"/);
-  assert.equal(`${name!.replace('$TARGET', target!)}.zip`, binAsset('flow-cockpit', 'win32', 'x64', '1.2.3')!.file);
+  assert.equal('flow-cockpit-x86_64-pc-windows-msvc.zip', binAsset('flow-cockpit', 'win32', 'x64', '1.2.3')!.file);
 });
 
 test('binPath: the flow cockpit in a folder of its own, the others loose in bin', () => {

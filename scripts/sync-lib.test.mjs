@@ -66,14 +66,21 @@ test('stableTags is empty without a stable tag', () => {
 });
 
 test('sparseClone checks out a commit', () => {
+  // Pre-commit supplies Git variables for the real checkout; fixtures must own their index and hooks.
+  const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('GIT_')));
+  for (const key of Object.keys(gitEnv)) delete process.env[key];
   const dir = mkdtempSync(join(tmpdir(), 'sparse-clone-test-'));
   try {
     const repo = join(dir, 'repo');
     mkdirSync(repo);
     const git = (...args) =>
-      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-C', repo, ...args], {
-        encoding: 'utf8',
-      }).trim();
+      execFileSync(
+        'git',
+        ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=t', '-c', 'user.email=t@t', '-C', repo, ...args],
+        {
+          encoding: 'utf8',
+        },
+      ).trim();
     git('init', '--quiet');
     git('config', 'uploadpack.allowFilter', 'true');
     git('config', 'uploadpack.allowAnySHA1InWant', 'true');
@@ -100,6 +107,7 @@ test('sparseClone checks out a commit', () => {
     const head = sparseClone(url, ['sub']);
     assert.equal(read(join(head, 'sub', 'a.txt')), 'second\n');
   } finally {
+    Object.assign(process.env, gitEnv);
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -122,5 +130,8 @@ test('pinFrom throws on an unexpected tag or a missing digest', () => {
   const tagPattern = /^(\d+\.\d+\.\d+)$/;
   const assets = [{ name: 'x.zip' }];
   assert.throws(() => pinFrom({ tag_name: 'nightly', assets }, { win: 'x.zip' }, tagPattern), /unexpected tag nightly/);
-  assert.throws(() => pinFrom({ tag_name: '1.0.0', assets }, { win: 'x.zip' }, tagPattern), /no sha256 digest for x.zip/);
+  assert.throws(
+    () => pinFrom({ tag_name: '1.0.0', assets }, { win: 'x.zip' }, tagPattern),
+    /no sha256 digest for x.zip/,
+  );
 });

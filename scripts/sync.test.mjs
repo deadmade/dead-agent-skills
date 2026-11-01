@@ -32,7 +32,7 @@ test('every source passes its checks on the tree as committed', () => {
 
 test('uv is a source, titled by the pinned tag', () => {
   const uv = SOURCES.find((s) => s.name === 'uv');
-  assert.equal(uv.script, 'sync-uv.mjs');
+  assert.equal(uv.script, 'sync-pins.mjs');
   assert.match(uv.title(uv.check()), /^Pin uv to \d+\.\d+\.\d+$/);
 });
 

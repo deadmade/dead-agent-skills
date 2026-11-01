@@ -88,7 +88,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   x64 only, like tui-review's binary (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
-  release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `scripts/sync-agent-browser.mjs`, which imports
+  release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `scripts/sync-pins.mjs agent-browser`, which imports
   `AGENT_BROWSER_FILES` from `core/binaries.ts`). Unless a current one is on PATH, the installer keeps its own copy in
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
   pin); either way it sets `agentBrowserPath` to the one in use (`upstreamPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
@@ -119,7 +119,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   for one Azure DevOps Server collection and PAT: `pr_*`, `wi_*`, `pipeline_*`, `repo_list` and `project_list` (both
   in `pipeline.rs`; no default project: outside an Azure DevOps clone the model passes `project`, but `search`
   without one searches the whole collection), `search` (`search.rs`), `repo_file` (`file.rs`) and `wiki`
-  (`wiki.rs`), built for Windows and Linux x64 only (`build-ado-mcp.yml`). The installer asks for its settings itself
+  (`wiki.rs`), built for Windows and Linux x64 only (`crates-build.yml`). The installer asks for its settings itself
   (`SELF_CONFIGURED` in `core/config.ts`), downloads the binary and saves both, `binPath` included, in one
   `claude plugin configure --values-stdin` call.
   - Calls go through Microsoft's `azure_devops_rust_api` (`=0.39.1`, sending `api-version=7.1-preview`) on our own
@@ -163,7 +163,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   server of another identity unless that server's version is newer. A PostToolUse `http` hook posts to 127.0.0.1:47811;
   that port is written only in `hooks/hooks.json` and the installer reads it from there (`hookPort`), to stop the server
   before `uv sync` and before uninstalling the plugin. Every failure leaves Claude the original output.
-  The installer keeps the pinned uv (`installer/assets/uv.json`, bumped by `scripts/sync-uv.mjs`) in `~/.claude/bin`:
+  The installer keeps the pinned uv (`installer/assets/uv.json`, bumped by `scripts/sync-pins.mjs uv`) in `~/.claude/bin`:
   once ours exists it always wins and is upgraded when older than the pin, since the launcher looks there first; a
   current uv on PATH is used only while ours is absent (`uvPlan` in `core/binaries.ts`). It then runs `uv sync --locked`
   and fetches tiktoken's vocabulary (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0008-python-through-installer-uv.md`. Dependabot's `uv`
@@ -174,7 +174,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   writes extensions into the user's extensions folder, running the app from its `appPath` userConfig) and the capture
   hooks. The installer offers it on Linux x64 and Windows x64 (`BIN_PLUGINS` in `core/binaries.ts`): on Linux it only
   prints the flake's `nix run` command pinned to its release (`linuxHint`); on Windows it downloads
-  `build-flow-cockpit.yml`'s zip (`flow-cockpit.exe` plus the default extensions) whole into
+  `crates-build.yml`'s zip (`flow-cockpit.exe` plus the default extensions) whole into
   `~/.claude/bin/flow-cockpit/`, replacing an older folder whole, and sets `appPath`. The workspace: `core/` parses flow.md, plan.md, audit
   reports, build logs and transcripts into a typed model and indexes projects, runs and sessions; `app/` is the window
   (read-only commands for the views; the session-control commands in `app/src/pty.rs`, which spawn each hosted
@@ -287,7 +287,7 @@ plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches
 flow cockpit's crate, plugin, the flake or the npm manifests (core tests and clippy on Linux and Windows, the app's Windows build, the
 views tests and both `tsc -p` checks; on Linux `nix build .#flow-cockpit`; with `CI=true` the core's relative-worktree
 test fails instead of skipping on a git older than 2.48); `crates-build.yml` (both binaries) and
-`build-flow-cockpit.yml` (the Windows app's release build and zip, also on PRs touching its crate) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
+`crates-build.yml` (the Windows app's release build and zip, also on PRs touching its crate) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
 skills, and a "Sync <name> failing" issue it closes on the next green run), and as a dry run (no PR, no issues) on PRs
 touching the sync code.
 

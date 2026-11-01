@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextVersion } from './next-version.mjs';
+import { nextVersion } from './release.mjs';
 
 test('bumps package.json when no tag is ahead of it', () => {
   assert.equal(nextVersion('0.6.0', ['v0.5.0', 'v0.6.0'], 'patch'), '0.6.1');

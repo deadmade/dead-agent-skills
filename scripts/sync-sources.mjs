@@ -61,7 +61,8 @@ const RELEASE = (name) => ({
 export const SOURCES = [
   {
     name: 'agent-browser',
-    script: 'sync-agent-browser.mjs',
+    script: 'sync-pins.mjs',
+    args: ['agent-browser'],
     paths: ['installer/assets/agent-browser.json'],
     scan: false,
     check: () => {
@@ -76,7 +77,8 @@ export const SOURCES = [
   },
   {
     name: 'uv',
-    script: 'sync-uv.mjs',
+    script: 'sync-pins.mjs',
+    args: ['uv'],
     paths: ['installer/assets/uv.json'],
     scan: false,
     check: () => {
@@ -181,7 +183,8 @@ export const SOURCES = [
   },
   {
     name: 'postgres',
-    script: 'sync-postgres.mjs',
+    script: 'sync-simple.mjs',
+    args: ['postgres'],
     paths: ['plugins/opt-in/implementation/postgres'],
     check: () => {
       const d = 'plugins/opt-in/implementation/postgres';
@@ -233,7 +236,8 @@ export const SOURCES = [
   RELEASE('superpowers'),
   {
     name: 'rust-skills',
-    script: 'sync-rust.mjs',
+    script: 'sync-simple.mjs',
+    args: ['rust'],
     paths: ['plugins/opt-in/implementation/rust-skills'],
     check: () => {
       const d = 'plugins/opt-in/implementation/rust-skills';
@@ -248,7 +252,8 @@ export const SOURCES = [
   },
   {
     name: 'security-audit',
-    script: 'sync-security-audit.mjs',
+    script: 'sync-simple.mjs',
+    args: ['security-audit'],
     paths: ['plugins/flows/packs/security-audit'],
     check: () => {
       const d = 'plugins/flows/packs/security-audit';

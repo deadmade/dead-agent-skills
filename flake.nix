@@ -44,7 +44,7 @@
         text = ''
           node --test --experimental-test-coverage --test-coverage-include='installer/**' \
             --test-coverage-exclude='installer/**/*.test.ts' --test-coverage-lines=79 'installer/**/*.test.ts'
-          exec node --test 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs' 'plugins/opt-in/headroom-trim/hooks/*.test.mjs' 'plugins/opt-in/flow-cockpit/hooks/*.test.mjs'
+          exec node --test 'scripts/*.test.mjs' 'plugins/flows/skills/writing/tests/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs' 'plugins/opt-in/headroom-trim/hooks/*.test.mjs' 'plugins/opt-in/flow-cockpit/hooks/*.test.mjs'
         '';
       };
     in

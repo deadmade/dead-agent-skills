@@ -86,22 +86,8 @@ jobs:
     with:
       ref: ${{ needs.version.outputs.tag }}
 
-  flow-cockpit:
-    needs: version
-    if: needs.version.outputs.tag
-    uses: ./.github/workflows/build-flow-cockpit.yml
-    with:
-      ref: ${{ needs.version.outputs.tag }}
-
-  ado-mcp:
-    needs: version
-    if: needs.version.outputs.tag
-    uses: ./.github/workflows/build-ado-mcp.yml
-    with:
-      ref: ${{ needs.version.outputs.tag }}
-
   publish:
-    needs: [version, check, binaries, flow-cockpit, ado-mcp]
+    needs: [version, check, binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: write

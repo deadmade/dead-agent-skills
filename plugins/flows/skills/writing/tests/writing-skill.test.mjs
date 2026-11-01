@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkUses, readUses } from './flows-uses.mjs';
+import { checkUses, readUses } from '../../../../../scripts/flows-uses.mjs';
 
-const ROOT = join(import.meta.dirname, '..');
+const ROOT = join(import.meta.dirname, '../../../../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 const RULE = "_write for a smart reader who wasn't there, and omit needless words._";
 
