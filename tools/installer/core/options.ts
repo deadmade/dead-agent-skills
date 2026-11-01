@@ -14,7 +14,7 @@ export interface Page {
 
 const DCG = 'https://raw.githubusercontent.com/Dicklesworthstone/destructive_command_guard/main';
 
-// dcg's own installer/uninstaller: they install the binary and write or remove its Claude Code hook.
+// dcg's own tools/installer/uninstaller: they install the binary and write or remove its Claude Code hook.
 export function dcgCommand(platform: string, action: 'install' | 'uninstall'): [string, string[]] {
   if (platform === 'win32') {
     const script = action === 'install' ? 'install.ps1' : 'uninstall.ps1';

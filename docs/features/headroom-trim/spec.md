@@ -68,22 +68,22 @@ Decided with the user on 2026-10-30. The rejected options are in flow.md under *
 
 A new opt-in plugin, `headroom-trim`, in `plugins/opt-in/headroom-trim/`:
 
-| Part                                | What it does                                                                                                                                                               |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/` (`pyproject.toml`, `uv.lock`, `server.py`) | uv project: the network guard, headroom's offline switches, the HTTP server, the response walk, the idle exit, the log.                                                 |
-| `hooks/hooks.json`                  | SessionStart: `node launch.mjs`. PostToolUse, matcher `*`: `type: "http"` to `http://127.0.0.1:<port>/hook`, short timeout.                                                |
-| `hooks/launch.mjs` + tested module  | Checks `/health`; replaces a server whose lockfile hash differs; finds uv (`~/.claude/bin`, then absolute PATH entries) and starts `uv run --locked` detached and hidden. Returns at once. |
-| `README.md`, marketplace entry      | What it does, what it needs, how to turn it off, what the local port means. The description ends "Opt-in."                                                                                             |
+| Part                                                 | What it does                                                                                                                                                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `server/` (`pyproject.toml`, `uv.lock`, `server.py`) | uv project: the network guard, headroom's offline switches, the HTTP server, the response walk, the idle exit, the log.                                                                    |
+| `hooks/hooks.json`                                   | SessionStart: `node launch.mjs`. PostToolUse, matcher `*`: `type: "http"` to `http://127.0.0.1:<port>/hook`, short timeout.                                                                |
+| `hooks/launch.mjs` + tested module                   | Checks `/health`; replaces a server whose lockfile hash differs; finds uv (`~/.claude/bin`, then absolute PATH entries) and starts `uv run --locked` detached and hidden. Returns at once. |
+| `README.md`, marketplace entry                       | What it does, what it needs, how to turn it off, what the local port means. The description ends "Opt-in."                                                                                 |
 
 Installer:
 
-| Part                                         | What it does                                                                                                                                         |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `installer/assets/uv.json`                   | The uv pin: version and sha256 per platform (`x86_64-pc-windows-msvc.zip`, `x86_64-unknown-linux-musl.tar.gz`).                                      |
-| `core/` plan + `steps/uv.ts`                 | With headroom-trim selected: once `~/.claude/bin/uv[.exe]` exists it wins and is upgraded when older than the pin (download, check, unpack, replace); a uv on PATH at or above the pin is used only while ours is absent. |
-| the same step                                | Run `uv sync` in `<plugin>/server` so Python and the wheels are fetched at install time, then fetch tiktoken's vocabulary into plugin data. |
-| `scripts/sync-uv.mjs` + a `SOURCES` entry    | Bumps the uv pin weekly, as `sync-agent-browser.mjs` does for agent-browser.                                                                         |
-| `.github/dependabot.yml`                     | A `uv` entry for `plugins/opt-in/headroom-trim/server`, weekly, grouped. If Dependabot can't read it, a `sync.yml` job does the bump instead.        |
+| Part                                      | What it does                                                                                                                                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tools/installer/assets/uv.json`          | The uv pin: version and sha256 per platform (`x86_64-pc-windows-msvc.zip`, `x86_64-unknown-linux-musl.tar.gz`).                                                                                                           |
+| `core/` plan + `steps/uv.ts`              | With headroom-trim selected: once `~/.claude/bin/uv[.exe]` exists it wins and is upgraded when older than the pin (download, check, unpack, replace); a uv on PATH at or above the pin is used only while ours is absent. |
+| the same step                             | Run `uv sync` in `<plugin>/server` so Python and the wheels are fetched at install time, then fetch tiktoken's vocabulary into plugin data.                                                                               |
+| `scripts/sync-uv.mjs` + a `SOURCES` entry | Bumps the uv pin weekly, as `sync-agent-browser.mjs` does for agent-browser.                                                                                                                                              |
+| `.github/dependabot.yml`                  | A `uv` entry for `plugins/opt-in/headroom-trim/server`, weekly, grouped. If Dependabot can't read it, a `sync.yml` job does the bump instead.                                                                             |
 
 ### A tool call
 
@@ -93,7 +93,7 @@ Installer:
    this: one result per `compress()` call, `protect_recent=0`. headroom's router decides whether and how to trim it.
 3. If any string came back different, the server answers 200 with
    `{"hookSpecificOutput": {"hookEventName": "PostToolUse", "updatedToolOutput": <the same structure, strings
-   replaced>}}`. Otherwise it answers 200 with an empty body, and Claude Code keeps the original.
+replaced>}}`. Otherwise it answers 200 with an empty body, and Claude Code keeps the original.
 4. Any exception inside the server answers 200 with an empty body. The hook never blocks.
 
 ### Start, stop, update

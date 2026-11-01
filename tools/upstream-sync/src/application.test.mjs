@@ -159,7 +159,7 @@ test('Rust adapter copies and rewrites from a local upstream and is idempotent',
 
 test('pin adapter returns structured results and missing digests fail', (t) => {
   const f = fixture(t);
-  f.write('installer/assets/uv.json', '{}');
+  f.write('tools/installer/assets/uv.json', '{}');
   f.commit();
   const runner = (program) => {
     assert.equal(program, 'gh');
@@ -239,9 +239,9 @@ test('GitHub issue operations deduplicate and successful reports close failures'
   assert.equal(calls.at(-1)[1], 'close');
   // A failed apply must invalidate earlier results before the destination check.
   const f = fixture(t);
-  f.write('installer/assets/uv.json', '{}');
+  f.write('tools/installer/assets/uv.json', '{}');
   f.commit();
-  f.write('installer/assets/uv.json', 'dirty');
+  f.write('tools/installer/assets/uv.json', 'dirty');
   const uvdir = artifactDirectory('uv');
   mkdirSync(uvdir, { recursive: true });
   writeFileSync(join(uvdir, 'result.json'), '{}');

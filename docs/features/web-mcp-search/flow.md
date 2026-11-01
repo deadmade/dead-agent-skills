@@ -42,12 +42,12 @@ Workspace: worktree `.claude/worktrees/web-search`, branch `worktree-web-search`
   (`config.rs:82-84`, `plugins/shared/web-mcp/.mcp.json`). Unreachable → the whole call fails with
   `SearchError::Unreachable` (`search.rs:46-49`). Checked live 2026-10-22: both test searches on this machine
   failed that way, with no fallback.
-- **SearXNG engines are effectively one index.** `installer/assets/searxng.yml`: Bing and Yahoo on, DuckDuckGo,
+- **SearXNG engines are effectively one index.** `tools/installer/assets/searxng.yml`: Bing and Yahoo on, DuckDuckGo,
   Brave and Google CSE off (they CAPTCHA or rate-limit a scraper). The earlier flow already noted "H3 rests on bing
   and yahoo, which serve one index" (`../web-mcp/flow.md:377`).
-- **The installer ties things to SearXNG:** `installer/steps/searxng.ts` runs it in Docker (`searxngRun`,
-  `installer/core/options.ts:32`), and the built-in WebSearch/WebFetch are denied only once SearXNG answers JSON
-  (`webBuiltinsDecision`, `installer/core/settings.ts:101-111`).
+- **The installer ties things to SearXNG:** `tools/installer/steps/searxng.ts` runs it in Docker (`searxngRun`,
+  `tools/installer/core/options.ts:32`), and the built-in WebSearch/WebFetch are denied only once SearXNG answers JSON
+  (`webBuiltinsDecision`, `tools/installer/core/settings.ts:101-111`).
 - **How results are built** (`search::web`, `search.rs:405-504`): backend results → archive the listing → fetch
   the top `TOP = 5` (`PAGE_WAIT` 3 s each, `browser_fallback: false`) → BM25 over passages
   (`rank.rs:143-197`). Without a filter, BM25 runs over the **whole archive**, so old pages from earlier
@@ -169,8 +169,8 @@ extensions? yes".
 
 - Reviewers: correctness, fit and simpler, in parallel; 42 findings merged into about 20, none dropped.
 - I checked two claims myself:
-  - `installer/core/binaries.ts:31` lists docker for web-mcp;
-  - `resetSettings` rebuilds from `{}` (`installer/core/settings.ts:192`).
+  - `tools/installer/core/binaries.ts:31` lists docker for web-mcp;
+  - `resetSettings` rebuilds from `{}` (`tools/installer/core/settings.ts:192`).
 - Decisions:
   - **D1, profile shape:**
     - A: one profile per engine, kept warm with an idle timeout, offered against B: one profile with a tab per

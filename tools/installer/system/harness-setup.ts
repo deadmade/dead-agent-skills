@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 function stat(path: string) {
-  try { return lstatSync(path); } catch (error) {
+  try {
+    return lstatSync(path);
+  } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw error;
   }
@@ -14,7 +16,9 @@ export function readRulesReceipt(home: string): unknown {
     const file = join(directory, 'rules-hook.json');
     if (!stat(directory)?.isDirectory() || !stat(file)?.isFile()) return undefined;
     return JSON.parse(readFileSync(file, 'utf8'));
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 export function installCodexTheme(home: string, source: string): { installed: boolean; conflict: boolean } {
   const directory = join(home, 'themes');
@@ -36,6 +40,8 @@ export function installCodexTheme(home: string, source: string): { installed: bo
       const concurrent = stat(file);
       return { installed: false, conflict: !concurrent?.isFile() || !readFileSync(file).equals(text) };
     }
-  } finally { rmSync(temporary, { force: true }); }
+  } finally {
+    rmSync(temporary, { force: true });
+  }
   return { installed: true, conflict: false };
 }

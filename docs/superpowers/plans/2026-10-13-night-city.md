@@ -8,7 +8,7 @@ flavor text, and installer support for a Night City ccstatusline config.
 
 **Architecture:** One plugin folder `plugins/night-city/` holding `themes/night-city.json` and a TypeScript mod
 (`hooks/`). The scene generator and word list are pure files with tests; `register.tsx` wires them to engine events.
-Installer changes are small pure functions in `installer/core.mjs` with tests, called from `install.mjs`.
+Installer changes are small pure functions in `tools/installer/core.mjs` with tests, called from `install.mjs`.
 
 **Tech Stack:** Claude Code mod API 2.1.296 (`claude-code` types, `claude-code/testing`), Node stdlib (installer),
 ccstatusline 2.2.32 config format.
@@ -53,10 +53,10 @@ API facts below cite `claude-code.d.ts` = `/tmp/claude-1000/bundled-skills/2.1.2
 - Create: `plugins/night-city/.claude-plugin/plugin.json` (fields as `plugins/cswap/.claude-plugin/plugin.json`
   minus `userConfig`), `plugins/night-city/themes/night-city.json`, `plugins/night-city/README.md`
 - Modify: `.claude-plugin/marketplace.json` (entry like `nix-lsp`'s at lines 43-46; its `description` is the
-  installer's label), `installer/core.mjs` (add `'night-city'` to the System page `keys`, line 355, and update that
+  installer's label), `tools/installer/core.mjs` (add `'night-city'` to the System page `keys`, line 355, and update that
   page's blurb at line 354 to mention the theme), `README.md:6-11` (opt-in list), `THIRD_PARTY.md` (new section:
   palette derived from github.com/livlign/ccthemes `plugins/theme-gallery/themes/cyberpunk.json`, MIT)
-- Test: `npm test` (check-repo + `installer/core.test.mjs:372-379` "every opt-in on exactly one page")
+- Test: `npm test` (check-repo + `tools/installer/core.test.mjs:372-379` "every opt-in on exactly one page")
 
 - [ ] **Step 1:** Add the marketplace entry only; run `npm test`. Expected: FAIL (no plugin.json / not on a page).
 - [ ] **Step 2:** Create `plugin.json`, the README, the `CATEGORIES` entry and blurb, README and THIRD_PARTY lines.
@@ -176,12 +176,12 @@ the intro isn't playing. The art is original, not copied.
 
 **Files:**
 
-- Create: `installer/ccstatusline-night-city.json` (same `lines` as `installer/ccstatusline.json`, every widget
+- Create: `tools/installer/ccstatusline-night-city.json` (same `lines` as `tools/installer/ccstatusline.json`, every widget
   kept, truecolor `colorLevel` and hex colors / gradient / powerline per ccstatusline's README:
   `$(dirname $(readlink -f $(command -v ccstatusline)))/../README.md`)
-- Modify: `installer/core.mjs` (`mergeSettings` :98), `installer/install.mjs` (`applyCcstatusline` :173-188,
+- Modify: `tools/installer/core.mjs` (`mergeSettings` :98), `tools/installer/install.mjs` (`applyCcstatusline` :173-188,
   toggles :579)
-- Test: `installer/core.test.mjs`
+- Test: `tools/installer/core.test.mjs`
 
 **Interfaces:**
 
@@ -198,7 +198,7 @@ the intro isn't playing. The art is original, not copied.
   - `mergeSettings` with `nightCity: false` removes the Night City theme, keeps any other theme; with `nightCity:
 true` or omitted keeps it.
   - Night City config has the same widget `type`s, in the same order, as the stock one.
-- [ ] **Step 2:** `node --test installer/core.test.mjs` → FAIL.
+- [ ] **Step 2:** `node --test tools/installer/core.test.mjs` → FAIL.
 - [ ] **Step 3:** Implement. `applyCcstatusline` keeps its structure and its newer-version warning: the target file
       is `ccstatusline-night-city.json` when night-city is selected; a current file that `isShipped` (but isn't the
       target) is replaced without asking. Pass `nightCity: <night-city selected>` in the toggles at :579.

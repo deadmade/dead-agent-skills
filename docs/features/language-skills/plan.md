@@ -25,7 +25,7 @@ are there. Also read `docs/adr/0001-vendor-language-skills.md` and `GLOSSARY.md`
 ## Global Constraints
 
 - Node standard library only, no npm dependencies. New shared logic gets a test in `scripts/*.test.mjs` or
-  `installer/*.test.mjs`.
+  `tools/installer/*.test.mjs`.
 - Plugin names: `csharp-skills` and `rust-skills`. Folders: `plugins/languages/csharp-skills` and
   `plugins/languages/rust-skills`. `plugins/languages/` has no `plugin.json`.
 - Every new `plugin.json` has `"version"` equal to `package.json`'s. Never bump it by hand.
@@ -114,10 +114,10 @@ Nothing from this task is committed except a note in flow.md.
 - Modify:
   - `scripts/check-repo.mjs:12-14`: `pluginDirs()`.
   - `scripts/release.mjs:41`: `pluginDirs()`.
-  - `installer/core.mjs`: add `manifestPath`.
-  - `installer/install.mjs`: the token-plugin lookup at `:417-419` and the `shippedVersions` lookup, which builds
+  - `tools/installer/core.mjs`: add `manifestPath`.
+  - `tools/installer/install.mjs`: the token-plugin lookup at `:417-419` and the `shippedVersions` lookup, which builds
     `join(PKG, src, '.claude-plugin/plugin.json')`. Both use `manifestPath`.
-  - `installer/core.test.mjs`.
+  - `tools/installer/core.test.mjs`.
   - `package.json` `files`: add `"plugins/languages/*/.claude-plugin/plugin.json"`.
 
 **Interfaces:**
@@ -128,7 +128,7 @@ Nothing from this task is committed except a note in flow.md.
     - Returns `/`-joined repo-relative paths such as `plugins/cswap` and `plugins/languages/rust-skills`, sorted.
     - A `GROUPS` folder is replaced by its subfolders.
     - Every other folder counts as a plugin, even without a manifest, so check-repo still flags it.
-  - In `installer/core.mjs`, `export function manifestPath(manifest, id): string | null`:
+  - In `tools/installer/core.mjs`, `export function manifestPath(manifest, id): string | null`:
     - Finds the marketplace entry named `nameOf(id)` and returns its string `source`, without the leading `./`,
       plus `/.claude-plugin/plugin.json`.
     - Returns `null` for url sources and unknown names.
@@ -144,7 +144,7 @@ Nothing from this task is committed except a note in flow.md.
 
   Against the real repo: `pluginDirs(ROOT)` contains `plugins/cswap` and not `plugins/languages`.
 
-  `installer/core.test.mjs`:
+  `tools/installer/core.test.mjs`:
 
   ```js
   const m = {
@@ -164,7 +164,7 @@ Nothing from this task is committed except a note in flow.md.
 - [ ] **Step 2: Run, expect FAIL.**
 
   ```bash
-  node --test scripts/plugin-dirs.test.mjs installer/core.test.mjs
+  node --test scripts/plugin-dirs.test.mjs tools/installer/core.test.mjs
   ```
 
 - [ ] **Step 3: Implement.**
@@ -238,12 +238,12 @@ Nothing from this task is committed except a note in flow.md.
 
 ### Task 4: Installer "Languages" page
 
-This lands before the plugins, because `installer/core.test.mjs` requires every real opt-in to sit on a page:
+This lands before the plugins, because `tools/installer/core.test.mjs` requires every real opt-in to sit on a page:
 `assert.ok(!pages.some((p) => p.id === 'other'))`. `categorize` ignores keys that don't exist yet.
 
 **Files:**
 
-- Modify: `installer/core.mjs` (the `lsp` entry of `CATEGORIES`) and `installer/core.test.mjs`.
+- Modify: `tools/installer/core.mjs` (the `lsp` entry of `CATEGORIES`) and `tools/installer/core.test.mjs`.
 
 - [ ] **Step 1: Failing test.**
 
@@ -280,7 +280,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   - `.claude-plugin/marketplace.json`: an entry directly after `tob-picks`.
     - `"name": "rust-skills"`, `"source": "./plugins/languages/rust-skills"`, `"category": "development"`.
     - Description: "Rust best practices from Apollo GraphQL's handbook (rust-best-practices): ownership, errors, clippy, testing, dispatch. Vendored, synced weekly. Opt-in."
-  - `installer/core.test.mjs` opt-ins list: add `rust-skills`.
+  - `tools/installer/core.test.mjs` opt-ins list: add `rust-skills`.
 
 **Interfaces:**
 
@@ -345,7 +345,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   - `.claude-plugin/marketplace.json`: an entry directly after `rust-skills`.
     - `"name": "csharp-skills"`, `"source": "./plugins/languages/csharp-skills"`, `"category": "development"`.
     - Description: "Microsoft's .NET skills (dotnet/skills): C#, testing, MSBuild/NuGet, ASP.NET Core, Blazor, EF Core, MAUI, WinForms, behind six C#-only router skills. Vendored, synced weekly. Opt-in."
-  - `installer/core.test.mjs` opt-ins list: add `csharp-skills`.
+  - `tools/installer/core.test.mjs` opt-ins list: add `csharp-skills`.
 
 **Interfaces:**
 

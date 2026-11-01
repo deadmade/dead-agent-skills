@@ -90,6 +90,7 @@ Checks for every task, from `crates/ado-mcp`: `cargo test` and `cargo clippy --a
 ### Task 1: `search` for work items, with the search plumbing
 
 **Files:**
+
 - Modify: `crates/ado-mcp/Cargo.toml` (feature `search`), `crates/ado-mcp/Cargo.lock`
 - Modify: `crates/ado-mcp/src/api.rs` (`Api.search` field, `area!(search)`; `scope()`: `"search"` →
   `"Code, Work Items or Wiki (Read), for what you searched"`)
@@ -99,12 +100,13 @@ Checks for every task, from `crates/ado-mcp`: `cargo test` and `cargo clippy --a
 - Modify: `crates/ado-mcp/tests/fixtures.rs`, `crates/ado-mcp/tests/mcp.rs`, `crates/ado-mcp/tests/api.rs`
 
 **Interfaces:**
+
 - Produces: `pub(crate) enum Kind { Code, Wi, Wiki }` (serde `rename_all = "lowercase"`, JsonSchema);
   `pub(crate) struct SearchArgs { kind: Kind, text: String, project: Option<String>, repo: Option<String>,
-  limit: Option<u16> }`; `pub(crate) async fn search(ctx: &Ctx, a: &SearchArgs) -> Result<String, ApiError>`;
+limit: Option<u16> }`; `pub(crate) async fn search(ctx: &Ctx, a: &SearchArgs) -> Result<String, ApiError>`;
   pure `fn plain(highlight: &str) -> String` (strips `<highlighthit>`/`</highlighthit>`, decodes entities via
   `out::html_to_text`); pure `fn info(code: i32) -> Option<&'static str>`; pure `fn more_call(a: &SearchArgs,
-  limit: usize) -> String`.
+limit: usize) -> String`.
 - Task 2 adds the `Code` and `Wiki` arms; in this task they return `ApiError::local("…")` placeholders that Task 2
   replaces (not shipped: Task 2 follows directly).
 
@@ -116,6 +118,7 @@ indented snippet line (`plain`, one line, ≤ 200 chars). The result's `fields` 
 strings (`"system.id": "2"`, `system.workitemtype`, `system.state`, `system.title`; Server 7.1 Work Item Search
 sample): look them up by those lower-case names. The snippet is the first hit whose `fieldReferenceName` isn't
 `system.title`, else the first hit. `infoCode` ≠ 0 and known → its line first:
+
 - `1`, `6`, `7`, `9`: "the search index is being rebuilt; results may be incomplete"
 - `2`: "search indexing hasn't started on this collection"
 - `11`: "work items aren't searchable for this PAT"
@@ -129,7 +132,7 @@ A 404 on the search route with no `project` → `"Search isn't installed or is t
 `project`, the generic not-found relabelled `with_what("project <name>")` (a stale cached id is the likelier cause).
 
 - [ ] **Step 1: Write the failing tests** in `tests/search.rs` (helpers copied from `tests/wi.rs`: `env`, `ok`,
-  `bodies`):
+      `bodies`):
   - `wi_hits_one_line_each`: route the collection-wide path to `search-wi.json`, shaped from the Server 7.1 sample
     (lower-case string `fields`; 3 results, `count: 3`; one result whose hits are a `system.title` highlight and a
     `system.description` highlight `fix <highlighthit>login</highlighthit> &lt;T&gt;`); assert the reply has
@@ -149,19 +152,20 @@ A 404 on the search route with no `project` → `"Search isn't installed or is t
   - In `tests/api.rs`, a 403 on `_apis/search/…` names `Code, Work Items or Wiki (Read)`.
 - [ ] **Step 2:** `cargo test --test search --test api` → FAIL (no tool `search`).
 - [ ] **Step 3:** Add `search` to the crate features, `Api.search`, the `scope()` arm; write `search.rs` per the
-  Interfaces and Behaviour above; register `#[tool(description = "Search the collection's work items, code or wiki
-  with the server's own search (ranked). kind and text are required; project (and repo, for code) narrow it.",
-  annotations(read_only_hint = true))]`; add one `INSTRUCTIONS` line: "- search finds work items, wiki pages and
-  code in repos that aren't cloned; for the clone itself, search locally."
+      Interfaces and Behaviour above; register `#[tool(description = "Search the collection's work items, code or wiki
+with the server's own search (ranked). kind and text are required; project (and repo, for code) narrow it.",
+annotations(read_only_hint = true))]`; add one `INSTRUCTIONS` line: "- search finds work items, wiki pages and
+      code in repos that aren't cloned; for the clone itself, search locally."
 - [ ] **Step 4:** Add `search` to `READS` (12) and the 401 sweep with `{"kind": "wi", "text": "x"}` (Task 2 moves
-  it to `kind: code`); map
-  `search-wi.json` → `search::models::WorkItemSearchResponse` in `TABLE`.
+      it to `kind: code`); map
+      `search-wi.json` → `search::models::WorkItemSearchResponse` in `TABLE`.
 - [ ] **Step 5:** `cargo test` and clippy → PASS. The `INSTRUCTIONS` length test still passes.
 - [ ] **Step 6:** Commit: "Add the search tool for work items over the server's Search."
 
 ### Task 2: `search` for code and wiki
 
 **Files:**
+
 - Modify: `crates/ado-mcp/src/search.rs`, `crates/ado-mcp/tests/search.rs`, `crates/ado-mcp/tests/fixtures.rs`,
   `crates/ado-mcp/tests/mcp.rs` (the sweep's `search` call becomes `{"kind": "code", "text": "x"}`: the sweep merges
   `repo: R` into every call, `repo` with another kind is refused before any request, and code search's first request,
@@ -170,6 +174,7 @@ A 404 on the search route with no `project` → `"Search isn't installed or is t
   `crates/ado-mcp/tests/fixtures/search-repo-status.json`
 
 **Interfaces:**
+
 - Consumes: Task 1's `SearchArgs`, `plain`, `info`, `more_call`.
 - Produces: pure `fn matches(m: Option<&serde_json::Value>) -> usize` (length of `matches.content`).
 
@@ -184,12 +189,12 @@ case); any other failure of the status call adds nothing. Wiki → `fetch_wiki_s
 else the first hit; `project` → filter `{"Project": [name]}`.
 
 - [ ] **Step 1: Write the failing tests:** `code_hits` (fixture with 2 results, 3 and 1 offsets →
-  `Shop/Orders:/src/OrderParser.cs  (3 matches)` and `… (1 match)`; no `contentId`/`changeId` value in the reply);
-  `code_repo_filter` (body filters `Project` and `Repository`); `code_repo_not_indexed` (zero hits + a status
-  fixture with no indexed branches → the not-indexed line; the status fixture goes in `TABLE` as the crate's
-  repository status model); `code_repo_status_404` (zero hits + status 404 → the same line); `repo_needs_code` (kind wi + repo → error);
-  `wiki_hits` (`Shop/Shop.wiki:/Runbooks/Deploy` and the `content` hit's snippet without markup, not the
-  `fileNames` hit).
+      `Shop/Orders:/src/OrderParser.cs  (3 matches)` and `… (1 match)`; no `contentId`/`changeId` value in the reply);
+      `code_repo_filter` (body filters `Project` and `Repository`); `code_repo_not_indexed` (zero hits + a status
+      fixture with no indexed branches → the not-indexed line; the status fixture goes in `TABLE` as the crate's
+      repository status model); `code_repo_status_404` (zero hits + status 404 → the same line); `repo_needs_code` (kind wi + repo → error);
+      `wiki_hits` (`Shop/Shop.wiki:/Runbooks/Deploy` and the `content` hit's snippet without markup, not the
+      `fileNames` hit).
 - [ ] **Step 2:** `cargo test --test search` → FAIL.
 - [ ] **Step 3:** Implement the two arms.
 - [ ] **Step 4:** Map `search-code.json` → `CodeSearchResponse`, `search-wiki.json` → `WikiSearchResponse`.
@@ -199,16 +204,18 @@ else the first hit; `project` → filter `{"Project": [name]}`.
 ### Task 3: `repo_file`
 
 **Files:**
+
 - Create: `crates/ado-mcp/src/file.rs`, `crates/ado-mcp/tests/file.rs`, `crates/ado-mcp/tests/fixtures/item.json`,
   `crates/ado-mcp/tests/fixtures/item-folder.json`
 - Modify: `crates/ado-mcp/src/main.rs`, `crates/ado-mcp/src/tools.rs`, `crates/ado-mcp/tests/fixtures.rs`,
   `crates/ado-mcp/tests/mcp.rs`
 
 **Interfaces:**
+
 - Produces: `pub(crate) struct RepoFileArgs { project: Option<String>, repo: Option<String>, path: String,
-  branch: Option<String>, start: Option<u32> }`; `pub(crate) async fn repo_file(ctx: &Ctx, a: &RepoFileArgs) ->
-  Result<String, ApiError>`; pure `fn numbered(content: &str, start: usize, max_lines: usize, max_chars: usize) ->
-  (String, Option<usize>)` returning the lines `{n:>5}  {line}` and the next start line if cut.
+branch: Option<String>, start: Option<u32> }`; `pub(crate) async fn repo_file(ctx: &Ctx, a: &RepoFileArgs) ->
+Result<String, ApiError>`; pure `fn numbered(content: &str, start: usize, max_lines: usize, max_chars: usize) ->
+(String, Option<usize>)` returning the lines `{n:>5}  {line}` and the next start line if cut.
 
 Behaviour: scope `ctx.scope(project, repo, None)` (the clone's repo by default; `branch` is not taken from the
 clone: no `branch` → no version, so the server reads the default branch). No `repo_id` in the scope (a `project`
@@ -226,22 +233,23 @@ line; if more remains, the last line is `… more: repo_file path=<p> start=<nex
 `branch` (via `out::args`, only those the call gave: the scope holds no repo name).
 
 - [ ] **Step 1: Write the failing tests:** `numbered` unit tests in `file.rs` (start 1 of 3 lines → no next; 250
-  lines → 200 shown, next 201; one 50,000-char line → cut, next 2); stdio tests `reads_lines` (`My Proj`, numbered
-  `    1  using System;`, the query has exactly one `path`, `includeContent=true` and `$format=json`, and no
-  `versionDescriptor` without `branch`), `branch_passed`, `odd_path` (Review Focus 6: path `/src/C#/a+b&c.cs` arrives
-  decoded as exactly that one `path` value), `folder`, `binary`, `missing` (no GUID in the reply), `needs_repo`
-  (`project` without `repo` → the pass-repo line, no request), and `long_line_more` (Review Focus 5).
+      lines → 200 shown, next 201; one 50,000-char line → cut, next 2); stdio tests `reads_lines` (`My Proj`, numbered
+      `    1  using System;`, the query has exactly one `path`, `includeContent=true` and `$format=json`, and no
+      `versionDescriptor` without `branch`), `branch_passed`, `odd_path` (Review Focus 6: path `/src/C#/a+b&c.cs` arrives
+      decoded as exactly that one `path` value), `folder`, `binary`, `missing` (no GUID in the reply), `needs_repo`
+      (`project` without `repo` → the pass-repo line, no request), and `long_line_more` (Review Focus 5).
 - [ ] **Step 2:** `cargo test --test file` → FAIL.
 - [ ] **Step 3:** Implement and register as a read tool: description "Read a file from any repo on the server (default
-  branch unless branch), 200 numbered lines per call from start. For search hits in repos that aren't cloned."
+      branch unless branch), 200 numbered lines per call from start. For search hits in repos that aren't cloned."
 - [ ] **Step 4:** `READS` (13), the 401 sweep (`{"path": "/a"}`, which carries the sweep's `repo: R`), and both
-  fixtures in `HAND_WRITTEN` (our own struct reads them).
+      fixtures in `HAND_WRITTEN` (our own struct reads them).
 - [ ] **Step 5:** `cargo test` and clippy → PASS.
 - [ ] **Step 6:** Commit: "Add repo_file to read a file from any repo on the server."
 
 ### Task 4: `wiki`
 
 **Files:**
+
 - Modify: `crates/ado-mcp/Cargo.toml` (feature `wiki`), `crates/ado-mcp/Cargo.lock`, `crates/ado-mcp/src/api.rs`
   (`Api.wiki`; `scope()`: `"wiki"` → `"Wiki (Read)"`), `crates/ado-mcp/src/main.rs`, `crates/ado-mcp/src/tools.rs`
 - Create: `crates/ado-mcp/src/wiki.rs`, `crates/ado-mcp/tests/wiki.rs`, fixtures `wikis.json`, `wikis-one.json`,
@@ -249,9 +257,10 @@ line; if more remains, the last line is `… more: repo_file path=<p> start=<nex
 - Modify: `crates/ado-mcp/tests/fixtures.rs`, `crates/ado-mcp/tests/mcp.rs`, `crates/ado-mcp/tests/api.rs`
 
 **Interfaces:**
+
 - Produces: `pub(crate) struct WikiArgs { project: Option<String>, wiki: Option<String>, path: Option<String>,
-  full: Option<bool>, limit: Option<u16> }`; `pub(crate) async fn wiki(ctx: &Ctx, a: &WikiArgs) -> Result<String,
-  ApiError>`; pure `fn tree(page: &WikiPage, depth: usize, out: &mut Vec<String>)` (two spaces per level).
+full: Option<bool>, limit: Option<u16> }`; `pub(crate) async fn wiki(ctx: &Ctx, a: &WikiArgs) -> Result<String,
+ApiError>`; pure `fn tree(page: &WikiPage, depth: usize, out: &mut Vec<String>)` (two spaces per level).
 
 Behaviour: scope `ctx.scope(project, None, None)`. No `wiki` → list the project's wikis; one → use it; several →
 `"several wikis: <a>, <b>; pass wiki="`; none → `"<project> has no wiki"`. The page calls take the picked wiki's `id` from the list as `wikiIdentifier` (the crate
@@ -262,23 +271,24 @@ puts it into the URL raw; an id holds no `/` or space), and for a code wiki (`ve
 cut at `limit` (default 100) with the more line.
 
 - [ ] **Step 1: Write the failing tests:** `page_text` (content shown, `My Proj`, no URL), `page_clipped` (5000
-  chars → cut line naming `full=true`), `tree_default` (indentation, 100 cap with `limit=200` more line on a
-  120-page fixture built in the test), `several_wikis`, `no_wiki`, `missing_page` (`not found: page /Nope`, no
-  GUID), `code_wiki_version` (a code wiki's query carries `versionDescriptor.version=main`), and the 403 →
-  `Wiki (Read)` line in
-  `tests/api.rs`.
+      chars → cut line naming `full=true`), `tree_default` (indentation, 100 cap with `limit=200` more line on a
+      120-page fixture built in the test), `several_wikis`, `no_wiki`, `missing_page` (`not found: page /Nope`, no
+      GUID), `code_wiki_version` (a code wiki's query carries `versionDescriptor.version=main`), and the 403 →
+      `Wiki (Read)` line in
+      `tests/api.rs`.
 - [ ] **Step 2:** `cargo test --test wiki --test api` → FAIL.
 - [ ] **Step 3:** Implement and register: "Read a wiki page (path) as markdown, or list the wiki's pages without
-  path. One wiki per project is picked automatically." Add `INSTRUCTIONS` line: "- wiki reads the project's wiki
-  pages; repo_file reads files of repos that aren't cloned."
+      path. One wiki per project is picked automatically." Add `INSTRUCTIONS` line: "- wiki reads the project's wiki
+      pages; repo_file reads files of repos that aren't cloned."
 - [ ] **Step 4:** `READS` (14), the 401 sweep (`{}`), `TABLE` (`wiki::models::WikiV2List`,
-  `wiki::models::WikiPage`); a model that doesn't fit → D1 fallback.
+      `wiki::models::WikiPage`); a model that doesn't fit → D1 fallback.
 - [ ] **Step 5:** `cargo test` and clippy → PASS.
 - [ ] **Step 6:** Commit: "Add the wiki tool for reading wiki pages."
 
 ### Task 5: test results in `pipeline_view`
 
 **Files:**
+
 - Modify: `crates/ado-mcp/Cargo.toml` (feature `test`), `crates/ado-mcp/Cargo.lock`, `crates/ado-mcp/src/api.rs`
   (`Api.test`; `scope()`: `"test"` → `"Test Management (Read)"`), `crates/ado-mcp/src/pipeline.rs`,
   `crates/ado-mcp/src/tools.rs` (description)
@@ -288,6 +298,7 @@ cut at `limit` (default 100) with the more line.
   `crates/ado-mcp/tests/api.rs`
 
 **Interfaces:**
+
 - Produces (private to `pipeline.rs`): pure `fn newest_per_name(runs: Vec<TestRun>) -> Vec<TestRun>` (highest id
   per `name`); pure `fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: &str) -> Vec<String>`.
 
@@ -305,11 +316,11 @@ Then for each kept run with failures, `results_client().list(org, project, run_i
 `tests: couldn't be read (<error>)`; the stages and issues still print.
 
 - [ ] **Step 1: Write the failing tests:** unit tests for `newest_per_name` (two runs named `Unit`, ids 5 and 9 → 9
-  kept) and `test_lines` (summary wording, 5 stack lines max, 20 cap); stdio tests `tests_summary_and_failures`,
-  `no_test_runs_adds_nothing`, `test_area_404_adds_nothing`, `retried_run_counts_newest`, `runs_query`
-  (`buildUri` and `includeRunDetails=true`; the failed-results query has `outcomes=Failed` and `$top`),
-  `test_403_keeps_stages` (Review Focus 4: stages and issues present, plus `tests: couldn't be read` naming
-  `Test Management (Read)`). `test-runs.json` is shaped from the Runs-List `includeRunDetails=true` sample.
+      kept) and `test_lines` (summary wording, 5 stack lines max, 20 cap); stdio tests `tests_summary_and_failures`,
+      `no_test_runs_adds_nothing`, `test_area_404_adds_nothing`, `retried_run_counts_newest`, `runs_query`
+      (`buildUri` and `includeRunDetails=true`; the failed-results query has `outcomes=Failed` and `$top`),
+      `test_403_keeps_stages` (Review Focus 4: stages and issues present, plus `tests: couldn't be read` naming
+      `Test Management (Read)`). `test-runs.json` is shaped from the Runs-List `includeRunDetails=true` sample.
 - [ ] **Step 2:** `cargo test --test pipeline` → FAIL.
 - [ ] **Step 3:** Implement; description gains "and its test results".
 - [ ] **Step 4:** `TABLE`: `test::models::TestRunList`, `test::models::TestCaseResultList`.
@@ -319,10 +330,12 @@ Then for each kept run with failures, `results_client().list(org, project, run_i
 ### Task 6: `pr_files since` and the latest iteration in `pr_view`
 
 **Files:**
+
 - Modify: `crates/ado-mcp/src/pr.rs` (`PrFilesArgs.since: Option<u32>`, `pr_files`, `pr_view`),
   `crates/ado-mcp/src/tools.rs` (descriptions), `crates/ado-mcp/tests/pr.rs`
 
 **Interfaces:**
+
 - Consumes: the iterations list `pr_files` already sends (`pr.rs:648-660`).
 
 Behaviour: `since` → the iteration-changes call gets `.compare_to(since)`; `since == latest` → `"no changes since
@@ -335,8 +348,8 @@ other calls and adds `iteration: <latest>` to its status line; if that call fail
 view. `view_routes` (`tests/pr.rs:32-41`) gains the iterations route.
 
 - [ ] **Step 1: Write the failing tests:** `files_since` (query has `$compareTo=2`), `files_since_latest`,
-  `files_since_beyond`, `files_since_zero`, `files_since_diff_line` (the two commits from `iterations.json`),
-  `view_shows_iteration` (`iteration: 2`: `iterations.json` holds ids 1 and 2), `view_iteration_unavailable`.
+      `files_since_beyond`, `files_since_zero`, `files_since_diff_line` (the two commits from `iterations.json`),
+      `view_shows_iteration` (`iteration: 2`: `iterations.json` holds ids 1 and 2), `view_iteration_unavailable`.
 - [ ] **Step 2:** `cargo test --test pr` → FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** `cargo test` and clippy → PASS.
@@ -345,10 +358,12 @@ view. `view_routes` (`tests/pr.rs:32-41`) gains the iterations route.
 ### Task 7: every link in `wi_view`
 
 **Files:**
+
 - Modify: `crates/ado-mcp/src/wi.rs`, `crates/ado-mcp/tests/wi.rs`, `crates/ado-mcp/tests/fixtures/wi.json` (more
   relations)
 
 **Interfaces:**
+
 - Produces (private): pure `fn other_links(w: &WorkItem) -> Vec<String>`.
 
 Behaviour: after parent/children/PRs, the remaining relations: work item links (every relation whose `rel` isn't
@@ -361,10 +376,10 @@ out; `Hyperlink` and `AttachedFile` →
 `links: N` and `attachments: N` counts. No URL reaches the reply.
 
 - [ ] **Step 1: Write the failing tests:** `other_links` unit test (Related ×2, Duplicate Of, a
-  `Microsoft.VSTS.Common.TestedBy-Forward` link, a commit, a branch `feature/x`, a malformed commit link, 2
-  attachments, 1 hyperlink → six lines in that order, no `vstfs`/`http`); stdio `view_all_links`. In the existing
-  `view_lines` (`tests/wi.rs:111`), drop `#99` and `2d9e7b10` from the leak list (`wi.json` links #99 as Related and
-  commit `2d9e7b10…`), assert `Related: #99` and `commits: 2d9e7b10` instead, keep `http` and `vstfs`.
+      `Microsoft.VSTS.Common.TestedBy-Forward` link, a commit, a branch `feature/x`, a malformed commit link, 2
+      attachments, 1 hyperlink → six lines in that order, no `vstfs`/`http`); stdio `view_all_links`. In the existing
+      `view_lines` (`tests/wi.rs:111`), drop `#99` and `2d9e7b10` from the leak list (`wi.json` links #99 as Related and
+      commit `2d9e7b10…`), assert `Related: #99` and `commits: 2d9e7b10` instead, keep `http` and `vstfs`.
 - [ ] **Step 2:** `cargo test --test wi` → FAIL.
 - [ ] **Step 3:** Implement. `wi.json` still fits `WorkItem` (`cargo test --test fixtures`).
 - [ ] **Step 4:** `cargo test` and clippy → PASS.
@@ -373,9 +388,10 @@ out; `Hyperlink` and `AttachedFile` →
 ### Task 8: docs, scopes and the smoke checklist
 
 **Files:**
+
 - Modify: `plugins/opt-in/mcp/mcp-azure/README.md` (tool list, PAT scopes + Wiki (Read), Test Management (Read),
   the Limits line that says no wikis or test plans),
-  `installer/install.mjs:473-474` (the `HANDOFF` text's PAT scopes),
+  `tools/installer/install.mjs:473-474` (the `HANDOFF` text's PAT scopes),
   `.claude-plugin/marketplace.json:56` and `crates/ado-mcp/Cargo.toml` `description` (now also search, wiki and
   files),
   `plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json` (description, and the PAT description's scopes),
@@ -384,7 +400,7 @@ out; `Hyperlink` and `AttachedFile` →
   and `search`, `repo_file`, `wiki`; add `repo_file`'s items GET to the "sent or read by hand" list)
 
 - [ ] **Step 1:** Make the edits. The smoke section also checks that the server accepts `7.1-preview` for search,
-  wiki and test (spec Constraints).
+      wiki and test (spec Constraints).
 - [ ] **Step 2:** `npm test` from the repo root (installer tests included) → PASS (check-repo, prettier-clean JSON/MD via `nix fmt` if
-  available).
+      available).
 - [ ] **Step 3:** Commit: "Document search, repo_file, wiki and the new PAT scopes for mcp-azure."

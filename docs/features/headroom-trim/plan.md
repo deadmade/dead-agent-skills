@@ -31,7 +31,7 @@ stdlib `.mjs` hooks (`node --test`); the TypeScript installer (Node stdlib, eras
 - Port 47811, written only in `plugins/opt-in/headroom-trim/hooks/hooks.json`.
 - Hook timeout 5 s; idle exit after 30 min; the launcher returns within about 300 ms.
 - `requires-python = "==3.13.*"`; `headroom-ai==0.42.0`, no extras; `CompressConfig(protect_recent=0,
-  kompress_model="disabled")`.
+kompress_model="disabled")`.
 - `UV_PROJECT_ENVIRONMENT=<plugin data>/venv`. Plugin data is `CLAUDE_PLUGIN_DATA` in the hook, and
   `<CONFIG>/plugins/data/headroom-trim-dead-claude-skills/` for the installer (the id with `@` replaced by `-`, as in
   `web-mcp-dead-claude-skills`).
@@ -79,28 +79,31 @@ Bash, PowerShell, Grep, Glob, Read and one MCP tool, and capture real `tool_resp
 dispatched, or the replacement is ignored for Bash, PowerShell or Grep, stop and report: the user decides.**
 
 **Files:**
+
 - Create: `plugins/opt-in/headroom-trim/server/tests/fixtures/<tool>.json` (one per tool above: the full PostToolUse
   JSON Claude Code posted, plus one MCP result that carries an image block if any MCP tool here returns one)
 - Modify: `docs/features/headroom-trim/flow.md` (a **Probe** note under **Grounding**: version, per tool honoured or not)
 - Throwaway (scratchpad, not committed): a probe plugin with an http hook and a small Node capture server
 
 - [ ] **Step 1:** Write a probe plugin in the scratchpad: `hooks/hooks.json` with a PostToolUse `*` http hook to
-  `http://127.0.0.1:47899/hook`; a Node server that saves each body to `<tool_name>.json` and answers
-  `updatedToolOutput` equal to `tool_response` with every string of 20+ characters replaced by `PROBE-REPLACED`.
+      `http://127.0.0.1:47899/hook`; a Node server that saves each body to `<tool_name>.json` and answers
+      `updatedToolOutput` equal to `tool_response` with every string of 20+ characters replaced by `PROBE-REPLACED`.
 - [ ] **Step 2:** Run `claude -p --plugin-dir <probe> "<prompt that runs each tool once>"`, asking Claude to quote the
-  first line of each result. Expected: the captured JSON files exist, and Claude quotes `PROBE-REPLACED` for each
-  honoured tool.
+      first line of each result. Expected: the captured JSON files exist, and Claude quotes `PROBE-REPLACED` for each
+      honoured tool.
 - [ ] **Step 3:** Copy the captured files into `server/tests/fixtures/`, personal paths replaced by `C:/x` or `/x`.
-  Write the per-tool result into flow.md.
+      Write the per-tool result into flow.md.
 - [ ] **Step 4:** Commit the fixtures and flow.md: "Capture Claude Code PostToolUse fixtures for headroom-trim."
 
 ### Task 2: The uv project and the response walk
 
 **Files:**
+
 - Create: `plugins/opt-in/headroom-trim/server/pyproject.toml`, `server/uv.lock`, `server/trim.py`,
   `server/tests/__init__.py`, `server/tests/test_trim.py`
 
 **Interfaces:**
+
 - Consumes: Task 1's fixtures.
 - Produces: `trim.walk(tool: str, response: object, trim_text: Callable[[str, str], str]) -> object | None`: the same
   structure with each string replaced by `trim_text(tool, s)`, or `None` when no string changed.
@@ -110,21 +113,21 @@ dispatched, or the replacement is ignored for Bash, PowerShell or Grep, stop and
   alone (headroom's token counter applied to each string).
 
 - [ ] **Step 1:** `pyproject.toml`: `[project] name = "headroom-trim-server"`, `version = "0.0.0"`, `requires-python =
-  "==3.13.*"`, `dependencies = ["headroom-ai==0.42.0"]`; `[tool.uv] package = false`. Run `uv lock` in `server/`.
-  Expected: `uv.lock` written.
+"==3.13.*"`, `dependencies = ["headroom-ai==0.42.0"]`; `[tool.uv] package = false`. Run `uv lock` in `server/`.
+      Expected: `uv.lock` written.
 - [ ] **Step 2: Failing tests** in `test_trim.py` (`unittest`):
   - `test_walk_returns_none_when_nothing_changes`: `walk("Bash", fixture, lambda t, s: s) is None`.
   - `test_walk_keeps_structure`: with `lambda t, s: s.upper()`, every key, list length, bool and number of the Bash
     fixture is unchanged and every string is upper-cased.
   - `test_walk_passes_tool_name`: the callback receives `"Grep"` for the Grep fixture.
   - `test_mcp_image_left_alone`: a response with `{"type": "image", "source": {"type": "base64", "data": <10 KB
-    base64>}}` through `walk("mcp__x__y", ..., lambda t, s: headroom_text(t, s)[0])` returns `None` or keeps `data`
+base64>}}` through `walk("mcp__x__y", ..., lambda t, s: headroom_text(t, s)[0])` returns `None` or keeps `data`
     byte-identical. If headroom changes it, the walk skips `{"type": "image"}` blocks (shape handling, not a trim rule).
   - `test_headroom_trims_a_long_log`: `headroom_text("Bash", <600 log lines with timestamps>)[0]` is shorter, and the
     returned `before` is greater than `after`.
   - `test_headroom_keeps_read`: `headroom_text("Read", <the same text>)[0]` equals the input.
 - [ ] **Step 3:** Run `uv run --locked python -m unittest discover -s tests` in `server/` with `UV_PROJECT_ENVIRONMENT`
-  pointed at a scratch folder. Expected: FAIL (no `trim` module).
+      pointed at a scratch folder. Expected: FAIL (no `trim` module).
 - [ ] **Step 4:** Implement `walk` and `headroom_text` in `server/trim.py`.
 - [ ] **Step 5:** Run the tests. Expected: PASS.
 - [ ] **Step 6:** Commit: "Add headroom-trim's uv project and response walk."
@@ -132,14 +135,16 @@ dispatched, or the replacement is ignored for Bash, PowerShell or Grep, stop and
 ### Task 3: The trim server process
 
 **Files:**
+
 - Create: `plugins/opt-in/headroom-trim/server/guard.py`, `server/server.py`, `server/tests/test_guard.py`,
   `server/tests/test_server.py`
 
 **Interfaces:**
+
 - Consumes: `trim.walk`, `trim.headroom_text`.
 - Produces: `python <abs>/server.py --port <int> --data <dir> --lock-hash <hex> [--idle <seconds>]`. Exit code 75 when
   the port can't be bound. Routes: `POST /hook` (PostToolUse JSON in; 200 with `{"hookSpecificOutput":
-  {"hookEventName": "PostToolUse", "updatedToolOutput": ...}}` or an empty body); `GET /health` →
+{"hookEventName": "PostToolUse", "updatedToolOutput": ...}}` or an empty body); `GET /health` →
   `{"ok": true, "lock": "<hex>"}`; `POST /shutdown` (from 127.0.0.1 only) → 200, then the server stops.
   `guard.install() -> None`.
 
@@ -163,27 +168,29 @@ dispatched, or the replacement is ignored for Bash, PowerShell or Grep, stop and
     under it.
 - [ ] **Step 2:** Run the tests. Expected: FAIL.
 - [ ] **Step 3:** Implement `guard.py` (a PEP 578 hook that raises on non-loopback `socket.connect`, `socket.sendto`
-  and `socket.getaddrinfo`, shaped like the scratchpad `netguard.py`) and `server.py`: the guard and env first, then
-  the telemetry no-ops, then headroom; `ThreadingHTTPServer` with `daemon_threads = True` and
-  `allow_reuse_address = sys.platform != "win32"`; a lock around `compress()`; the idle timer reset on each request;
-  `/shutdown` and the idle timer call `server.shutdown()` from another thread, and the main thread takes the compress
-  lock once after `serve_forever()` returns, so an in-flight trim finishes before exit.
+      and `socket.getaddrinfo`, shaped like the scratchpad `netguard.py`) and `server.py`: the guard and env first, then
+      the telemetry no-ops, then headroom; `ThreadingHTTPServer` with `daemon_threads = True` and
+      `allow_reuse_address = sys.platform != "win32"`; a lock around `compress()`; the idle timer reset on each request;
+      `/shutdown` and the idle timer call `server.shutdown()` from another thread, and the main thread takes the compress
+      lock once after `serve_forever()` returns, so an in-flight trim finishes before exit.
 - [ ] **Step 4:** Run the tests. Expected: PASS.
 - [ ] **Step 5:** Commit: "Add headroom-trim's trim server with the network guard."
 
 ### Task 4: The plugin, the launcher and the hooks
 
 **Files:**
+
 - Create: `plugins/opt-in/headroom-trim/.claude-plugin/plugin.json`, `hooks/hooks.json`, `hooks/launch.mjs`,
   `hooks/launcher.mjs`, `hooks/launcher.test.mjs`, `hooks/hooks.test.mjs`, `README.md`
 - Modify: `.claude-plugin/marketplace.json`, `package.json` (the test glob), `flake.nix` (the run-tests glob and the
   pre-commit `files` regex), `README.md` (the opt-in paragraph)
 
 **Interfaces:**
+
 - Consumes: Task 3's command line, exit code and routes.
 - Produces in `launcher.mjs`: `decide({ env, health, lockHash }) -> 'off' | 'running' | 'replace' | 'start'` (pure);
   `lockHashOf(text: string) -> string` (sha256 hex); `findUv({ config, path, platform, isFile }) -> string |
-  undefined` (the Global Constraints' lookup); `startArgs({ uv, serverDir, port, data, lock }) -> { cmd, args, env }`;
+undefined` (the Global Constraints' lookup); `startArgs({ uv, serverDir, port, data, lock }) -> { cmd, args, env }`;
   `main({ argv, env, fetch, spawn, readFile, isFile }) -> Promise<void>`, never throwing.
 
 - [ ] **Step 1: Failing tests** in `launcher.test.mjs`:
@@ -192,7 +199,7 @@ dispatched, or the replacement is ignored for Bash, PowerShell or Grep, stop and
   - `findUv`: `<config>/bin/uv.exe` on win32 when it exists; else the first absolute PATH entry holding `uv.exe`;
     a relative PATH entry (`.`) is skipped; `undefined` when none.
   - `startArgs`: `cmd` is the uv path; `args` are `['run', '--locked', '--project', <serverDir>, 'python',
-    <serverDir>/server.py, '--port', '47811', '--data', <data>, '--lock-hash', <hash>]` (absolute script path);
+<serverDir>/server.py, '--port', '47811', '--data', <data>, '--lock-hash', <hash>]` (absolute script path);
     `env.UV_PROJECT_ENVIRONMENT` is `<data>/venv`.
   - `main` with no uv found resolves and writes one line to `<data>/launcher.log`, creating `<data>` first.
   - `main` with a `fetch` that never answers resolves within 400 ms (health check aborted at 250 ms).
@@ -200,31 +207,33 @@ dispatched, or the replacement is ignored for Bash, PowerShell or Grep, stop and
     1.4 s, and it still spawns if the old server never goes away (the new one then exits 75 on its own).
   - `main` spawns with `{ detached: true, windowsHide: true, stdio: 'ignore' }` and calls `unref()`.
 - [ ] **Step 2:** `hooks.test.mjs`, like `plugins/flows/hooks/hooks.test.mjs`: SessionStart is one exec-form command
-  hook `node` with `args` `["${CLAUDE_PLUGIN_ROOT}/hooks/launch.mjs", "47811"]`; PostToolUse matcher `*` is one
-  `type: "http"` hook with `url` `http://127.0.0.1:47811/hook` and `timeout` 5; the port is the same in both; every
-  `${CLAUDE_PLUGIN_ROOT}` path exists.
+      hook `node` with `args` `["${CLAUDE_PLUGIN_ROOT}/hooks/launch.mjs", "47811"]`; PostToolUse matcher `*` is one
+      `type: "http"` hook with `url` `http://127.0.0.1:47811/hook` and `timeout` 5; the port is the same in both; every
+      `${CLAUDE_PLUGIN_ROOT}` path exists.
 - [ ] **Step 3:** Run `node --test plugins/opt-in/headroom-trim/hooks/*.test.mjs`. Expected: FAIL.
 - [ ] **Step 4:** Implement `launcher.mjs`, the four-line `launch.mjs` (reads argv and env, `await main(...)`), and
-  `hooks.json`. The launcher reads `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA` and `CLAUDE_CONFIG_DIR` (default
-  `~/.claude`) from its environment.
+      `hooks.json`. The launcher reads `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA` and `CLAUDE_CONFIG_DIR` (default
+      `~/.claude`) from its environment.
 - [ ] **Step 5:** `plugin.json` at `package.json`'s version, no `userConfig`; the marketplace entry (category
-  `productivity`, description ending "Needs uv, which the installer downloads. Opt-in."); the plugin README: what it
-  does, the 7.0% measurement, no network, `HEADROOM_TRIM=off` (stops this session's launcher; disable the plugin to
-  stop all trimming), "whatever listens on 127.0.0.1:47811 reads every tool result and can rewrite it", and that an
-  `allowedHttpHookUrls` setting without `http://127.0.0.1:47811/hook` silently turns the hook off; the root README's
-  opt-in paragraph; the test globs in `package.json` and `flake.nix`.
+      `productivity`, description ending "Needs uv, which the installer downloads. Opt-in."); the plugin README: what it
+      does, the 7.0% measurement, no network, `HEADROOM_TRIM=off` (stops this session's launcher; disable the plugin to
+      stop all trimming), "whatever listens on 127.0.0.1:47811 reads every tool result and can rewrite it", and that an
+      `allowedHttpHookUrls` setting without `http://127.0.0.1:47811/hook` silently turns the hook off; the root README's
+      opt-in paragraph; the test globs in `package.json` and `flake.nix`.
 - [ ] **Step 6:** Run `npm test` and `claude plugin validate plugins/opt-in/headroom-trim`. Expected: PASS.
 - [ ] **Step 7:** Commit: "Add the headroom-trim plugin with its launcher and hooks."
 
 ### Task 5: The installer's uv step
 
 **Files:**
-- Create: `installer/assets/uv.json`, `installer/steps/uv.ts`, `installer/core/fixtures/installed_plugins.json`
+
+- Create: `tools/installer/assets/uv.json`, `tools/installer/steps/uv.ts`, `tools/installer/core/fixtures/installed_plugins.json`
   (captured from this machine, personal paths replaced)
-- Modify: `installer/core/binaries.ts` (+ `binaries.test.ts`), `installer/core/plugins.ts` (+ `plugins.test.ts`),
-  `installer/core/options.ts` (+ `options.test.ts`), `installer/steps/agent-browser.ts`, `installer/install.ts`
+- Modify: `tools/installer/core/binaries.ts` (+ `binaries.test.ts`), `tools/installer/core/plugins.ts` (+ `plugins.test.ts`),
+  `tools/installer/core/options.ts` (+ `options.test.ts`), `tools/installer/steps/agent-browser.ts`, `tools/installer/install.ts`
 
 **Interfaces:**
+
 - Produces in `core/binaries.ts`, generalised from the agent-browser code so both tools share one path:
   - `interface UpstreamPin { upstream?: string; sha256?: Record<string, string> }` (replaces `AgentBrowserPin`).
   - `upstreamAction({ installed, pinned })` and `upstreamPlan({ theirs, ours, pinned })` (renamed from
@@ -243,51 +252,52 @@ dispatched, or the replacement is ignored for Bash, PowerShell or Grep, stop and
     `darwin-arm64`, a bad version or a missing hash; the agent-browser tests pass unchanged against the renamed
     functions; `missingBinaries` does not report uv for `headroom-trim`.
   - `plugins.test.ts`: `pluginInstallPath` against the captured fixture; `pluginDataDir(config,
-    'headroom-trim@dead-claude-skills')` is `<config>/plugins/data/headroom-trim-dead-claude-skills`.
+'headroom-trim@dead-claude-skills')` is `<config>/plugins/data/headroom-trim-dead-claude-skills`.
   - `options.test.ts`: `unavailable('headroom-trim', 'darwin', 'arm64', v)` returns a reason; on `win32-x64` and
     `linux-x64` it returns nothing.
 - [ ] **Step 2:** Run `npm test`. Expected: FAIL.
 - [ ] **Step 3:** Implement them; write `uv.json` from the Global Constraints; add `'headroom-trim'` to the Tools keys;
-  switch `steps/agent-browser.ts` to the renamed functions.
+      switch `steps/agent-browser.ts` to the renamed functions.
 - [ ] **Step 4:** `steps/uv.ts`: like `installAgentBrowser`, ask before downloading (default yes), install to
-  `<CONFIG>/bin/uv[.exe]` (not `asset.exe`), every failure one `failures` line ("uv: …; headroom-trim stays off until
-  uv is installed"). `prepareTrimServer`: `POST /shutdown` to `127.0.0.1:47811` and wait up to 2 s for the port, then
-  `uv sync --locked --project <installPath>/server` with `UV_PROJECT_ENVIRONMENT=<pluginDataDir>/venv`; a failed sync
-  is a `failures` line saying the first session will retry it. After a good sync, fetch tiktoken's vocabulary:
-  `uv run --locked --project <installPath>/server python -c "import tiktoken; tiktoken.get_encoding('o200k_base')"`
-  with the same `UV_PROJECT_ENVIRONMENT` and `TIKTOKEN_CACHE_DIR=<pluginDataDir>/tiktoken` (no headroom import, so
-  no telemetry); a failure is a `failures` line ("headroom-trim: token counts are estimated until the installer
-  fetches tiktoken's vocabulary"). Wire it in `install.ts` after the agent-browser step:
-  `if (selected.includes(HEADROOM_TRIM)) { const uv = await installUv(); if (uv) await prepareTrimServer(uv); }`.
+      `<CONFIG>/bin/uv[.exe]` (not `asset.exe`), every failure one `failures` line ("uv: …; headroom-trim stays off until
+      uv is installed"). `prepareTrimServer`: `POST /shutdown` to `127.0.0.1:47811` and wait up to 2 s for the port, then
+      `uv sync --locked --project <installPath>/server` with `UV_PROJECT_ENVIRONMENT=<pluginDataDir>/venv`; a failed sync
+      is a `failures` line saying the first session will retry it. After a good sync, fetch tiktoken's vocabulary:
+      `uv run --locked --project <installPath>/server python -c "import tiktoken; tiktoken.get_encoding('o200k_base')"`
+      with the same `UV_PROJECT_ENVIRONMENT` and `TIKTOKEN_CACHE_DIR=<pluginDataDir>/tiktoken` (no headroom import, so
+      no telemetry); a failure is a `failures` line ("headroom-trim: token counts are estimated until the installer
+      fetches tiktoken's vocabulary"). Wire it in `install.ts` after the agent-browser step:
+      `if (selected.includes(HEADROOM_TRIM)) { const uv = await installUv(); if (uv) await prepareTrimServer(uv); }`.
 - [ ] **Step 5:** Run `npm test` and `npm run typecheck`. Expected: PASS, line coverage still at or above 79.
 - [ ] **Step 6:** Commit: "Install a pinned uv and the trim server's environment for headroom-trim."
 
 ### Task 6: Updates, CI and docs
 
 **Files:**
+
 - Create: `scripts/sync-uv.mjs`
 - Modify: `scripts/sync-agent-browser.mjs` (shared with `sync-uv.mjs` through one helper in `scripts/sync-lib.mjs`),
   `scripts/sync-sources.mjs`, `.github/dependabot.yml`, `.github/workflows/test.yml`, `flake.nix` (devShell `uv`),
   `THIRD_PARTY.md`, `CLAUDE.md`
 
 - [ ] **Step 1:** Move the "latest release → tag and per-file sha256 digests → write the pin" logic of
-  `sync-agent-browser.mjs` into a `syncPin({ repo, files, out, tagPattern })` helper in `sync-lib.mjs`; both scripts
-  call it. uv's tags have no `v`.
-- [ ] **Step 2:** The `uv` `SOURCES` entry: `paths: ['installer/assets/uv.json']`, `scan: false`, a `check` asserting
-  a semver `upstream` and a 64-hex sha256 for both keys, title "Pin uv to <tag>", and a `body` naming the release URL
-  and that the installer downloads this uv for headroom-trim.
+      `sync-agent-browser.mjs` into a `syncPin({ repo, files, out, tagPattern })` helper in `sync-lib.mjs`; both scripts
+      call it. uv's tags have no `v`.
+- [ ] **Step 2:** The `uv` `SOURCES` entry: `paths: ['tools/installer/assets/uv.json']`, `scan: false`, a `check` asserting
+      a semver `upstream` and a 64-hex sha256 for both keys, title "Pin uv to <tag>", and a `body` naming the release URL
+      and that the installer downloads this uv for headroom-trim.
 - [ ] **Step 3:** Run `node scripts/sync-agent-browser.mjs`, `node scripts/sync-uv.mjs` and `npm test` (which runs
-  `sync.test.mjs`). Expected: both pins written with both hashes; tests PASS.
+      `sync.test.mjs`). Expected: both pins written with both hashes; tests PASS.
 - [ ] **Step 4:** Dependabot: a `uv` entry, `directory: /plugins/opt-in/headroom-trim/server`, weekly on Monday,
-  grouped `uv: ['*']`. Check GitHub's Dependabot docs (supported ecosystems) that `uv` reads a project `uv.lock`; if
-  not, stop and report: the fallback (a sync job with uv on its runner) is a deviation.
+      grouped `uv: ['*']`. Check GitHub's Dependabot docs (supported ecosystems) that `uv` reads a project `uv.lock`; if
+      not, stop and report: the fallback (a sync job with uv on its runner) is a deviation.
 - [ ] **Step 5:** `test.yml`: after Node setup, `astral-sh/setup-uv` pinned by commit sha with its version comment and
-  `enable-cache: true`; a step "headroom-trim server tests" running `uv run --locked python -m unittest discover -s
-  tests` in `plugins/opt-in/headroom-trim/server` with `UV_PROJECT_ENVIRONMENT=${{ runner.temp }}/trim-venv`; the
-  "Installer package" step's asset grep also checks `assets/uv.json`. `flake.nix`: `uv` in the devShell packages.
+      `enable-cache: true`; a step "headroom-trim server tests" running `uv run --locked python -m unittest discover -s
+tests` in `plugins/opt-in/headroom-trim/server` with `UV_PROJECT_ENVIRONMENT=${{ runner.temp }}/trim-venv`; the
+      "Installer package" step's asset grep also checks `assets/uv.json`. `flake.nix`: `uv` in the devShell packages.
 - [ ] **Step 6:** THIRD_PARTY.md: headroom-ai (Apache-2.0) and uv, fetched at runtime at pinned versions, not
-  vendored. CLAUDE.md: a Layout bullet for `plugins/opt-in/headroom-trim/` (server, launcher, port 47811, ADR 0008) and
-  the server tests under Checks.
+      vendored. CLAUDE.md: a Layout bullet for `plugins/opt-in/headroom-trim/` (server, launcher, port 47811, ADR 0008) and
+      the server tests under Checks.
 - [ ] **Step 7:** Run `npm test`. Expected: PASS.
 - [ ] **Step 8:** Commit: "Keep uv and headroom current and test the trim server in CI."
 
@@ -299,13 +309,13 @@ The installer adds the marketplace from the `release` branch, so this runs once 
 **Files:** none beyond fixes the check turns up, each a new change.
 
 - [ ] **Step 1:** Run the released installer with headroom-trim selected. Expected: uv placed or found, `uv sync`
-  done, no failures.
+      done, no failures.
 - [ ] **Step 2:** Start a new Claude Code session, run a long `git log` through Bash. Expected: `trim.log` gains a
-  line, `/health` answers, no console window appeared, and the server is still running after the session exits.
+      line, `/health` answers, no console window appeared, and the server is still running after the session exits.
 - [ ] **Step 3:** Run `claude -p "run git log -n 200 with Bash"` with no server running. Expected: the server is up
-  afterwards.
+      afterwards.
 - [ ] **Step 4:** With `HEADROOM_TRIM=off` and no server running, a new session starts none.
 - [ ] **Step 4b (final review):** an update that changes only server code replaces the running server; a `/compact`
-  in a session from before an update leaves the newer server alone; a first start offline leaves the reason in
-  `server.log`; while the server is down or starting, note whether Claude Code shows a hook error on each tool call.
+      in a session from before an update leaves the newer server alone; a first start offline leaves the reason in
+      `server.log`; while the server is down or starting, note whether Claude Code shows a hook error on each tool call.
 - [ ] **Step 5:** Record the results in flow.md's **Walkthrough**.

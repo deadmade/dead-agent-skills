@@ -3,10 +3,10 @@ import { test } from 'node:test';
 import { cpSync, mkdirSync, readdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { selectTarget } from '../installer/core/catalog.ts';
-import { readCatalog } from '../installer/system/catalog.ts';
+import { selectTarget } from '../tools/installer/core/catalog.ts';
+import { readCatalog } from '../tools/installer/system/catalog.ts';
 import { checkCodex } from './check-codex.mjs';
-import { buildPackages, nativeMarketplace } from '../installer/system/packages.ts';
+import { buildPackages, nativeMarketplace } from '../tools/installer/system/packages.ts';
 
 test('repository checks reject missing, stale and unexpected Codex distribution files', () => {
   const root = mkdtempSync(join(tmpdir(), 'marketplace-drift-'));

@@ -4,10 +4,10 @@ import { test } from 'node:test';
 import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { selectTarget } from '../installer/core/catalog.ts';
-import { readCatalog } from '../installer/system/catalog.ts';
+import { selectTarget } from '../tools/installer/core/catalog.ts';
+import { readCatalog } from '../tools/installer/system/catalog.ts';
 const definitions = selectTarget(readCatalog(resolve(import.meta.dirname, '..')), 'codex').plugins;
-import { which, startSync } from '../installer/system/proc.ts';
+import { which, startSync } from '../tools/installer/system/proc.ts';
 
 const codex = which('codex');
 test('repository catalog installs directly with no installer or build', { skip: !codex }, () => {

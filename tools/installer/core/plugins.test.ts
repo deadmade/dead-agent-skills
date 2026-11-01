@@ -207,7 +207,7 @@ test('manifestPath finds a local plugin manifest, null for url sources and unkno
 });
 
 test('pluginInstallPath reads Claude Code installed_plugins.json', () => {
-  const installed = json('installer/core/fixtures/installed_plugins.json');
+  const installed = json('tools/installer/core/fixtures/installed_plugins.json');
   assert.equal(
     pluginInstallPath(installed, 'flows@dead-claude-skills'),
     'C:\\Users\\someone\\.claude\\plugins\\cache\\dead-claude-skills\\flows\\0.6.0',

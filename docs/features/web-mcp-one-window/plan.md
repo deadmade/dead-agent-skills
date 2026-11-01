@@ -58,6 +58,7 @@ until it exits, and runs every search engine, `browser` session and fetch fallba
 
   `n` starts at 1. `Browser` maps the caller's name to the current generation's at call time. `check_session` also
   reserves the name `window`.
+
 - **Config files:**
   - The owner's is `profiles/<n>/agent-browser.json`, holding:
     - `profile`: `<slot>/profile`;
@@ -69,6 +70,7 @@ until it exits, and runs every search engine, `browser` session and fetch fallba
       newline-separated.
 
     It has no `idleTimeout`.
+
   - Attached calls use `<search dir>/attach.json`, holding `{"idleTimeout": "3600s"}`.
   - Paths must be UTF-8, else the config fails.
 - **Chrome dies with web-mcp:**
@@ -121,6 +123,7 @@ until it exits, and runs every search engine, `browser` session and fetch fallba
    - closing a gone tab opens none (`closing_a_gone_tab_opens_none`).
 
    All pinned in Task 5.
+
 5. **The first search on a fresh machine:** starting the window takes 8 s, and every engine still answers. Pinned in
    Task 5 (`window_start_is_outside_the_engine_deadline`).
 
@@ -143,7 +146,7 @@ in the session scratchpad.
   - the error a call gets after its Chrome died, saved as a fixture text in findings.md.
 
 - [ ] **Step 1:** Get agent-browser 0.39.1 for win32-x64 from its release, check it against
-      `installer/assets/agent-browser.json`'s sha256, and run `agent-browser install`.
+      `tools/installer/assets/agent-browser.json`'s sha256, and run `agent-browser install`.
 - [ ] **Step 2:** Download
       `https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies/releases/download/v1.1.9/ISDCAC-chrome-source.zip`.
       Record its sha256, its layout (manifest at the root, or under one top folder), and that the unpacked folder
@@ -248,7 +251,7 @@ in the session scratchpad.
 
 - Create: `crates/web-mcp/src/window.rs`
 - Modify: `crates/web-mcp/src/browser.rs`: add `pub(crate) async fn run_owner(&self, session: &str, config: &Path,
-  args: &[String]) -> Result<Value, BrowserError>`. It is `run_with` without `--cdp`, with every `AGENT_BROWSER_*`
+args: &[String]) -> Result<Value, BrowserError>`. It is `run_with` without `--cdp`, with every `AGENT_BROWSER_*`
   removed, no default timeout, and the search dir as cwd. `run_with` gains the cwd as a parameter instead of taking
   it from the config's folder.
 - Modify: `crates/web-mcp/src/main.rs`: `mod window;` and `window::tie_to_process()` first in `main`.
@@ -394,14 +397,14 @@ in the session scratchpad.
 
 **Files:**
 
-- Modify: `installer/core/binaries.ts`: `windowProblem`.
-- Test: `installer/core/binaries.test.ts`.
-- Modify: `installer/steps/agent-browser.ts`: `useAgentBrowser`, and the early returns of `installAgentBrowser`.
+- Modify: `tools/installer/core/binaries.ts`: `windowProblem`.
+- Test: `tools/installer/core/binaries.test.ts`.
+- Modify: `tools/installer/steps/agent-browser.ts`: `useAgentBrowser`, and the early returns of `installAgentBrowser`.
 
 **Interfaces:**
 
 - Produces: `export function windowProblem(o: { browserRuns: boolean; platform: NodeJS.Platform; display: boolean;
-  xvfb: boolean }): string | undefined`.
+xvfb: boolean }): string | undefined`.
   - `display` is `!!(env.DISPLAY || env.WAYLAND_DISPLAY)`. `xvfb` is `!!which('Xvfb')`.
 
 - [ ] **Step 1: Failing tests in `binaries.test.ts`.** Each one's text matches exactly.
@@ -453,13 +456,13 @@ in the session scratchpad.
 Found in Task 7's live check. On Windows `chrome.exe --version` opens a browser window instead of printing a version,
 so `pick` (`crates/web-mcp/src/profile.rs`) never accepts Chrome for Testing there unless `WEB_MCP_CHROME` is set,
 and every `--version` attempt flashes a Chrome window. The installer's `searchBrowserWorks`
-(`installer/system/browser.ts`) does the same check.
+(`tools/installer/system/browser.ts`) does the same check.
 
 **Files:**
 
 - Modify: `crates/web-mcp/src/profile.rs`: `pick` and `version`, plus their tests.
-- Modify: `installer/system/browser.ts`.
-- Modify: `installer/system/browser.test.ts`.
+- Modify: `tools/installer/system/browser.ts`.
+- Modify: `tools/installer/system/browser.test.ts`.
 
 **Interfaces:** unchanged. `pick` keeps its signature, and so does `searchBrowserWorks`.
 
@@ -481,6 +484,6 @@ downloads it but can't run it.
   - `browser.test.ts`: on win32, a found Chrome for Testing binary counts as working without being started.
 - [ ] **Step 2:** They fail.
 - [ ] **Step 3:** Implement, with `cfg!(windows)` in Rust and `platform === 'win32'` in TypeScript.
-- [ ] **Step 4:** `cargo test` and clippy in `crates/web-mcp`, then `node --test installer/system/browser.test.ts` and
+- [ ] **Step 4:** `cargo test` and clippy in `crates/web-mcp`, then `node --test tools/installer/system/browser.test.ts` and
       `npm run typecheck`.
 - [ ] **Step 5:** Commit the named files: "Find Chrome for Testing on Windows without starting it."

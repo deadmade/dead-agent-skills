@@ -41,7 +41,7 @@ same day). Grill answers Q1–Q12, review decisions D1–D10 and grounding in [f
 - Config through env, set in `.mcp.json`: `CLAUDE_PROJECT_DIR` (fallback: the process cwd), `WEB_MCP_SEARXNG_URL`
   (default `http://127.0.0.1:8888`), `WEB_MCP_AGENT_BROWSER` (default `agent-browser`, resolved through `PATHEXT` on
   Windows), `WEB_MCP_MODEL_DIR` (Task 12 only).
-- Platforms: brv's five targets (`installer/core.mjs:306-312`).
+- Platforms: brv's five targets (`tools/installer/core.mjs:306-312`).
 - One version for everything (`check-repo.mjs` enforces it); never bump by hand. Installer code: Node stdlib only, new
   logic in `core.mjs`/`files.mjs` with a test.
 - Commits: one sentence, no `Co-Authored-By` line (user hook).
@@ -137,7 +137,7 @@ same day). Grill answers Q1–Q12, review decisions D1–D10 and grounding in [f
 - Create: `.github/workflows/web-mcp.yml` (tui-review.yml's clippy and test jobs on `ubuntu-latest` and
   `windows-latest`, paths `plugins/web-mcp/**`)
 - Modify: `.claude-plugin/marketplace.json`, `scripts/check-repo.mjs:60-65`, `scripts/release.mjs:39-45`,
-  `flake.nix:79-93` (a `web-mcp` package beside `brv`), `installer/core.mjs` CATEGORIES "tools" keys (:385)
+  `flake.nix:79-93` (a `web-mcp` package beside `brv`), `tools/installer/core.mjs` CATEGORIES "tools" keys (:385)
 
 **Interfaces:**
 
@@ -478,7 +478,7 @@ same day). Grill answers Q1–Q12, review decisions D1–D10 and grounding in [f
 
 **Files:** Modify `src/rank.rs`, `Cargo.toml` (feature `embed`, default on), `plugins/web-mcp/.claude-plugin/plugin.json`
 (`userConfig.modelDir`, default `""`), `plugins/web-mcp/.mcp.json` (`WEB_MCP_MODEL_DIR: "${user_config.modelDir}"`),
-`installer/core.mjs`, `installer/install.mjs`.
+`tools/installer/core.mjs`, `tools/installer/install.mjs`.
 
 **Interfaces:**
 
@@ -491,8 +491,8 @@ same day). Grill answers Q1–Q12, review decisions D1–D10 and grounding in [f
 
 **Files:** Create `.github/workflows/build-web-mcp.yml` (build-brv.yml with `working-directory: plugins/web-mcp/server`
 and `web-mcp-${target}` names). Modify `.github/workflows/release.yml:71-98` (a `web-mcp` job in `needs`, and the
-release notes name `web-mcp-*` next to `brv-*`), `installer/core.mjs:304-336`, `installer/install.mjs:270-340,581`,
-`installer/core.test.mjs`.
+release notes name `web-mcp-*` next to `brv-*`), `tools/installer/core.mjs:304-336`, `tools/installer/install.mjs:270-340,581`,
+`tools/installer/core.test.mjs`.
 
 **Interfaces:**
 
@@ -507,15 +507,15 @@ release notes name `web-mcp-*` next to `brv-*`), `installer/core.mjs:304-336`, `
   - the existing brv cases under the new name;
   - a test pinning tui-review's configure key `brvPath` and web-mcp's `binPath`;
   - `unavailable('web-mcp', 'linux', 'ia32')`.
-- [ ] **Steps 2–4:** `node --test installer/core.test.mjs` FAIL, implement, `npm test` PASS. Dispatch
+- [ ] **Steps 2–4:** `node --test tools/installer/core.test.mjs` FAIL, implement, `npm test` PASS. Dispatch
       `build-web-mcp.yml` on the branch (`gh workflow run`) and check five artifacts.
 - [ ] **Step 5: Commit** "Build web-mcp per platform in releases and let the installer download and configure it."
 
 ### Task 14: Installer: SearXNG and the built-in web tools toggle
 
-**Files:** Create `installer/searxng.yml` (`use_default_settings: true`, `search.formats: [html, json]`,
-`server.limiter: false`, `server.secret_key` replaced at install). Modify `installer/core.mjs`, `installer/install.mjs`,
-`installer/files.mjs`, `installer/core.test.mjs`.
+**Files:** Create `tools/installer/searxng.yml` (`use_default_settings: true`, `search.formats: [html, json]`,
+`server.limiter: false`, `server.secret_key` replaced at install). Modify `tools/installer/core.mjs`, `tools/installer/install.mjs`,
+`tools/installer/files.mjs`, `tools/installer/core.test.mjs`.
 
 **Interfaces:**
 
@@ -554,9 +554,9 @@ release notes name `web-mcp-*` next to `brv-*`), `installer/core.mjs:304-336`, `
 
 ### Task 15: Installer: agent-browser pin, install and sync
 
-**Files:** Create `installer/agent-browser.json` (`{"upstream": "0.39.1"}`), `.github/workflows/sync-agent-browser.yml`
-(sync-cswap.yml's shape, reading `npm view agent-browser version`). Modify `installer/core.mjs`,
-`installer/install.mjs`, `installer/core.test.mjs`.
+**Files:** Create `tools/installer/agent-browser.json` (`{"upstream": "0.39.1"}`), `.github/workflows/sync-agent-browser.yml`
+(sync-cswap.yml's shape, reading `npm view agent-browser version`). Modify `tools/installer/core.mjs`,
+`tools/installer/install.mjs`, `tools/installer/core.test.mjs`.
 
 **Interfaces:**
 

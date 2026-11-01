@@ -44,8 +44,8 @@ test('packed compiled installer loads catalog and selects without authored plugi
     cpSync(join(root, 'catalog'), join(temp, 'catalog'), { recursive: true });
     writeFileSync(join(temp, 'package.json'), JSON.stringify({ type: 'module' }));
     assert.equal(existsSync(join(temp, 'plugins')), false);
-    const load = pathToFileURL(join(temp, 'installer/system/catalog.js')).href;
-    const select = pathToFileURL(join(temp, 'installer/core/catalog.js')).href;
+    const load = pathToFileURL(join(temp, 'tools/installer/system/catalog.js')).href;
+    const select = pathToFileURL(join(temp, 'tools/installer/core/catalog.js')).href;
     const run = startSync(process.execPath, [
       '--input-type=module',
       '-e',

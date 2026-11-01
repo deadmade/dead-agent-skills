@@ -37,12 +37,13 @@ whose `url: String` is required (`wit/models.rs:3550`). Our fixture `wi-comments
 
 **Cause (evidence):** the server sends each comment's `mentions` entries without a `url`; serde fails the whole list.
 A probe (temporary test, deleted) decoding bodies into `CommentList`:
+
 - a mention `{"artifactId":"<guid>","artifactType":"Person","commentId":1234,"targetId":"<guid>"}` without `url`
   as a comment's first field → `missing field url at line 1 column 195` (194 with a 3-digit `commentId`: the live error);
 - a comment without `url` → fails at the comment's end (column 87 for a bare one), which can't be column 194 for a
   real comment carrying a `createdBy` identity; the list without `url` → fails at the body's end.
-Two different items failing at the same column 194 fits the fixed-length GUID mention. Item 72's 10920 fits a long
-first comment followed by one with a mention.
+  Two different items failing at the same column 194 fits the fixed-length GUID mention. Item 72's 10920 fits a long
+  first comment followed by one with a mention.
 
 **Blast radius:** `wi_view` (comments only; the item is a separate call and degrades as designed). `wi_comment`
 decodes the crate's `Comment` from `add_comment`'s answer: a comment that mentions someone would be posted and then
@@ -77,7 +78,7 @@ One `/verify` over both ado-mcp fix flows (`ado-mcp-default-project-400`, `ado-m
 from feature-flow `ado-mcp-next` before its build, 2026-10-28; base e8542cb, uncommitted tree.
 
 - **Checks** (latest run, e8542cb + tree): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` clean;
-  `cargo test` 177 passed; check-repo passed; `npm test` 141 passed, 1 failed (`installer/files.test.mjs` clean slate:
+  `cargo test` 177 passed; check-repo passed; `npm test` 141 passed, 1 failed (`tools/installer/files.test.mjs` clean slate:
   Windows `EPERM` creating a symlink, untouched code).
 - **Review** (`/self-review`, 9 passes): security and the bug pass found nothing. 14 findings plus noted items, all
   fixed on the user's "fix all pls":
@@ -97,9 +98,10 @@ from feature-flow `ado-mcp-next` before its build, 2026-10-28; base e8542cb, unc
 ## Learned
 
 2026-10-28, picked "1-4":
+
 - `docs/solutions/ado-mcp-missing-field-url.md`: the missing-`url` root cause and how to spot it.
 - CLAUDE.md, Checks: concurrency tests bound the slow call against a fast first call; the Windows `EPERM` symlink
-  failure in `installer/files.test.mjs` is the machine.
+  failure in `tools/installer/files.test.mjs` is the machine.
 - Memory: the user's collection has Search with Code, Work items and Wiki.
 
 ## Run verdict

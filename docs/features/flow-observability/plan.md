@@ -777,8 +777,8 @@ and CI checks it.
   `plugins/opt-in/flow-cockpit/ skills/views/SKILL.md` (`name`, `description`), `plugins/opt-in/flow-cockpit/README.md`,
   `.github/workflows/flow-cockpit.yml`
 - Modify: `.claude-plugin/marketplace.json` (entry after md-pane, `"category": "development"`),
-  `installer/core/plugins.test.ts:30-52`, `installer/core/options.ts` (`tools` page keys; `unavailable` hides
-  `flow-cockpit` on win32 until Task 13), `installer/core/options.test.ts`, `flake.nix` (package `flow-cockpit`:
+  `tools/installer/core/plugins.test.ts:30-52`, `tools/installer/core/options.ts` (`tools` page keys; `unavailable` hides
+  `flow-cockpit` on win32 until Task 13), `tools/installer/core/options.test.ts`, `flake.nix` (package `flow-cockpit`:
   `buildRustPackage`, `src = ./crates/flow-cockpit`, `buildAndTestSubdir = "app"`, version from
   `(importTOML …).workspace.package.version`, `nativeBuildInputs = [pkg-config wrapGAppsHook3]`,
   `buildInputs = [webkitgtk_4_1 gtk3 libsoup_3 librsvg]`, `checkFlags` skipping `poll_emits_once_per_change`, `poll_sees_folders_created_later` and
@@ -897,15 +897,15 @@ turns ending) into a per-session capture file.
 
 - Create: `.github/workflows/build-flow-cockpit.yml` (Windows only, `x86_64-pc-windows-msvc`, zip + `.sha256`,
   `--version` smoke test through a pipe)
-- Modify: `.github/workflows/release.yml` (job, `needs`, notes line), `installer/core/binaries.ts` (`BIN_PLUGINS`
+- Modify: `.github/workflows/release.yml` (job, `needs`, notes line), `tools/installer/core/binaries.ts` (`BIN_PLUGINS`
   entries gain optional `targets: string[]` and `linuxHint: (version: string) => string`; `flow-cockpit` with
   `key: 'appPath'`, `targets: ['win32-x64']`, `linuxHint` giving
   `nix run github:deadmade/dead-claude-skills/v${version}#flow-cockpit`; `binAsset` returns `undefined` outside `targets`),
-  `installer/steps/binaries.ts` (`applyBin`: with a `linuxHint` on Linux, push the hint to `done`; the `build` hint
-  names the plugin's own crate), `installer/install.ts:254-255` (call `applyBin` for flow-cockpit),
-  `installer/core/options.ts` (`unavailable` treats a platform with a `linuxHint` as offered; the win32 hiding from
-  Task 9 goes), `installer/core/binaries.test.ts` (`dirs` gains `plugins/opt-in/flow-cockpit`),
-  `installer/core/options.test.ts`, `plugins/opt-in/flow-cockpit/.claude-plugin/plugin.json` (`userConfig.appPath`),
+  `tools/installer/steps/binaries.ts` (`applyBin`: with a `linuxHint` on Linux, push the hint to `done`; the `build` hint
+  names the plugin's own crate), `tools/installer/install.ts:254-255` (call `applyBin` for flow-cockpit),
+  `tools/installer/core/options.ts` (`unavailable` treats a platform with a `linuxHint` as offered; the win32 hiding from
+  Task 9 goes), `tools/installer/core/binaries.test.ts` (`dirs` gains `plugins/opt-in/flow-cockpit`),
+  `tools/installer/core/options.test.ts`, `plugins/opt-in/flow-cockpit/.claude-plugin/plugin.json` (`userConfig.appPath`),
   `plugins/opt-in/flow-cockpit/skills/views/SKILL.md` (Windows path), `README.md`, `CLAUDE.md`
 
 - [ ] **Step 1: Write the failing tests:** `binAsset gives the Windows zip for flow-cockpit`;

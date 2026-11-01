@@ -37,14 +37,14 @@ ponytail is on 5.3.2 while cswap is on 0.27.2. But new versions only come when I
   change detection, no test file. Crate list hardcoded here and again in `check-repo.mjs` (`CRATES`).
 - `scripts/check-repo.mjs:63-82`: every version must equal package.json's.
 - `release.yml` on `v*`: tag must equal package.json; rebuilds tui-review and web-mcp every time; cswap.exe is reused
-  when `installer/cswap.json` didn't change since the previous release (`git diff $prev HEAD`) — the only existing
+  when `tools/installer/cswap.json` didn't change since the previous release (`git diff $prev HEAD`) — the only existing
   "changed since last release" logic.
 - Installer couples binaries to `VERSION`: `binAsset` URL `releases/download/v${VERSION}/…` (`core.mjs:353-358`),
   `binAction` compares `<bin> --version` (crate version) to `VERSION`, `cswapDownload` same scheme. `pinMarketplace`
   pins the marketplace to `ref: v${VERSION}`. `shippedVersions`/`outdated` (`core.mjs:511-530`) already compare per
   plugin.
 - `sync-ponytail.mjs:140-141` stamps ponytail's `plugin.json` with package.json's version (upstream is 5.3.2; only its
-  sha is kept in `UPSTREAM`). cswap's upstream pin is `installer/cswap.json` (tag `cswap-v0.26.0`).
+  sha is kept in `UPSTREAM`). cswap's upstream pin is `tools/installer/cswap.json` (tag `cswap-v0.26.0`).
 - `binAction` needs `<bin> --version` === `VERSION` exactly (`core.test.mjs:406-409` ties tui-review's Cargo version to
   package.json); independent crate versions would re-download forever unless the expected version comes from the
   crate's `Cargo.toml` in the checkout. cswap.exe already checks currency against its upstream pin, and agent-browser
@@ -105,7 +105,7 @@ User took every recommendation:
 - Dependabot cargo `versioning-strategy: lockfile-only` (cargo support checked in GitHub's options reference).
 - Fixed in the plan: `/` paths everywhere and a backslash test; `setVersion` null fails the sync; throwaway-repo test
   for the git readers; pure `syncBump`; smoke test with a throwaway tag; release dry-run via `release.mjs patch`; one
-  repo-wide `git diff`; `LAST_SHARED`/`newer`/`BIN_PLUGINS` imported from `installer/core.mjs`; `manifestPath` in the
+  repo-wide `git diff`; `LAST_SHARED`/`newer`/`BIN_PLUGINS` imported from `tools/installer/core.mjs`; `manifestPath` in the
   crate test; CLAUDE.md vendored list notes "their `plugin.json` is ours"; flake hook regex; default README reword;
   sync-ponytail fails when upstream's tag and plugin.json disagree; `cargo metadata --locked`.
 - Known risks added to the spec: moved plugin folder, installer run from a `main` checkout.

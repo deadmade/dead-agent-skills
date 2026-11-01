@@ -18,7 +18,7 @@ if ! searxng; then
   conf=$HOME/.claude/searxng
   mkdir -p "$conf"
   [ -f "$conf/settings.yml" ] ||
-    sed "s/^\(\s*secret_key:\).*/\1 \"$(openssl rand -hex 32)\"/" installer/searxng.yml >"$conf/settings.yml"
+    sed "s/^\(\s*secret_key:\).*/\1 \"$(openssl rand -hex 32)\"/" tools/installer/searxng.yml >"$conf/settings.yml"
   docker start searxng 2>/dev/null || docker run -d --name searxng --restart unless-stopped \
     -p 127.0.0.1:8888:8080 -v "$conf:/etc/searxng/" docker.io/searxng/searxng:latest
   for _ in $(seq 30); do searxng && break; sleep 1; done

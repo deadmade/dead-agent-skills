@@ -41,7 +41,7 @@ Repo plumbing (explorer 1):
 - Tests: `claude plugin test .`, `claude-code/testing`; pane tests mount `pane()` from `plugins/tui-review/tests/harness.ts:130`;
   night-city tests transcript components via `$.ui.render({ component, props })`.
 - Shipping: marketplace entry (check-repo fails without it), installer `CATEGORIES` `tools` page
-  (`installer/core.mjs` ~355) + the hardcoded opt-in list in `installer/core.test.mjs:51-77`, README.md plugin prose
+  (`tools/installer/core.mjs` ~355) + the hardcoded opt-in list in `tools/installer/core.test.mjs:51-77`, README.md plugin prose
   (l.9-13), own plugin README, CI step in `.github/workflows/test.yml` like cswap/night-city. Not in the dead-skills bundle.
 
 Mod API, build 2.1.302 (explorer 2; line numbers in the bundled plugin-authoring `types/claude-code.d.ts`):
@@ -153,4 +153,4 @@ the final message of the run; the plan's paths predate the move to `plugins/mods
 | 8 missing / too large / long documents                                                | T3        | `plugins/mods/md-pane/hooks/register.tsx:83`, `:92`                                                                     | `register.test.ts:238`, `:248`, `:256`, `:378`                           |
 | Fullscreen terminal only; summaries and over-long replies untouched                   | T2        | `plugins/mods/md-pane/hooks/register.tsx:157-163`                                                                       | `register.test.ts:107`, `:149`                                           |
 | Streaming: one stat per existing path, misses kept 2 s                                | T2        | `plugins/mods/md-pane/hooks/register.tsx` `isFile`                                                                      | `register.test.ts:117`, `:124`, `:133`                                   |
-| Shipped: marketplace, installer Tools page, CI, docs                                  | T1, T5    | `.claude-plugin/marketplace.json`, `installer/core.mjs`, `.github/workflows/test.yml`, `plugins/mods/md-pane/README.md` | `npm test` (check-repo, `core.test.mjs`)                                 |
+| Shipped: marketplace, installer Tools page, CI, docs                                  | T1, T5    | `.claude-plugin/marketplace.json`, `tools/installer/core.mjs`, `.github/workflows/test.yml`, `plugins/mods/md-pane/README.md` | `npm test` (check-repo, `core.test.mjs`)                                 |

@@ -49,13 +49,13 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 
 ### Shipping a third binary (Explore agent, 2026-10-27)
 
-- **Installer.** `BIN_PLUGINS` (`installer/core/binaries.ts:42-45`) maps a plugin to its `userConfig` key; `BIN_TARGETS`
-  (`:47-50`) is Windows and Linux x64 only; `binAsset` (`:53-59`) is generic. `applyBin` (`installer/steps/binaries.ts:24-53`)
+- **Installer.** `BIN_PLUGINS` (`tools/installer/core/binaries.ts:42-45`) maps a plugin to its `userConfig` key; `BIN_TARGETS`
+  (`:47-50`) is Windows and Linux x64 only; `binAsset` (`:53-59`) is generic. `applyBin` (`tools/installer/steps/binaries.ts:24-53`)
   is generic too, but `binVersionAt` (`:18-22`) needs `prose --version` to print `prose <version>`, and the fallback
   hint at `:35` hardcodes "web-mcp else tui-review". `install.ts:254-255` calls `applyBin` once per binary plugin. The
   key is written through `claude plugin configure --values-stdin` (`binaries.ts:47`), not settings.json. A binary on
   PATH means no `binPath` is written (`binaries.ts:71-85`).
-- **Tests that list binaries:** `installer/core/binaries.test.ts:54-84`, `plugins.test.ts:28-48` (the opt-in list),
+- **Tests that list binaries:** `tools/installer/core/binaries.test.ts:54-84`, `plugins.test.ts:28-48` (the opt-in list),
   `options.test.ts:64-72`. The "tools" category is `options.ts:70`.
 - **Hardcoded crate lists:** `scripts/check-repo.mjs:94-97`, `scripts/release.mjs:48-54`, `.github/dependabot.yml:12`,
   `flake.nix:84-114`, `release.yml` (`needs` at `:36`, notes at `:69-70`). `build-<x>.yml` and `<x>.yml` are copies
@@ -340,7 +340,7 @@ order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I 
 Three reviewers: Correctness (Fable), Fit (Opus, with pstack `blast-radius`), Simpler (Sonnet, with ponytail
 `ponytail-review`). 40 findings; duplicates merged, none dropped. Every `file:line` the plan cited matched the tree.
 
-- **Blocking:** the environment won't run on NixOS, the installer's Linux (`installer/core/binaries.ts:12,36,106`):
+- **Blocking:** the environment won't run on NixOS, the installer's Linux (`tools/installer/core/binaries.ts:12,36,106`):
   uv's Python and PyTorch's manylinux wheels need the usual system library layout. nixpkgs packages spaCy and
   `en_core_web_trf` 3.8.0 (`pkgs/development/python-modules/spacy/models.json`, `models.nix`, fetched). Decided: (a), a
   `flake.nix` package `flows-prose` on NixOS; uv everywhere else.
@@ -474,7 +474,7 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   fixed script path, the document on stdin) and is suppressed for that one file. If wrong, the first two would show
   as a stack trace instead of a skip line.
 
-- 2026-10-28, preflight: `measure.mjs`'s `findPython` repeats `installer/core/prose.ts`'s two-line `prosePython` path
+- 2026-10-28, preflight: `measure.mjs`'s `findPython` repeats `tools/installer/core/prose.ts`'s two-line `prosePython` path
   rule, because the plugin ships without the installer's TypeScript; the plan mandates both. If wrong, a change to the
   environment's layout must touch both files.
 - 2026-10-28, Phase 7: the subagent method's final whole-branch review is served by `/verify`'s `/self-review` over
@@ -533,7 +533,7 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
     test, the order of discovery turned into the reader's order, the relevance test, topic strings, faked connectives,
     the five shapes of hidden actions, where hidden characters sit, the three questions for a passive, noun strings,
     the four fixes for sprawl, metadiscourse's two cuttable kinds, intensifiers, and "concise, not terse".
-  - **Cut:** the installer's prose step and toggle, `installer/assets/prose/`, ADR 0005, `measure.mjs`,
+  - **Cut:** the installer's prose step and toggle, `tools/installer/assets/prose/`, ADR 0005, `measure.mjs`,
     `measure.py`, `phrases.mjs` and `phrases.tsv`, the editing guide `references/edit.md`, the abbreviation rule and
     `common-terms.txt`, and `editor-test/` (74 files, 837 KB; the spec's Evidence section keeps the results).
   - **Kept and fixed:** the shorthand check, which now reports only the lines a rewrite added; `/copyedit` with
@@ -572,10 +572,10 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
 
 ## Walkthrough
 
-| spec goal                    | file:line                                                                                                                                                          | test                                                                                       |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| 1 One writing skill          | `plugins/flows/skills/writing/SKILL.md:21,55,85,145,178,185`; `scripts/flows-uses.mjs:16`; `doc-audit/uses.json:5`, `integrate/uses.json:3`; `scripts/sync-pstack.mjs:29-32,75-77` | `scripts/writing-skill.test.mjs:14`; `scripts/flows-uses.test.mjs:81,93`; the book check above |
-| 2 A shorthand check on every write | `plugins/flows/hooks/hooks.json:10,16`; `plugins/flows/hooks/prose.mjs:52,78,117`                                                                                 | `plugins/flows/hooks/prose.test.mjs:14,19,31` and "a rewrite checks only the lines the old file lacked" |
-| 3 A copyedit before each gate | `plugins/flows/skills/writing/references/copyedit.md`; `plugins/flows/skills/writing/scripts/compare.mjs`; `plugins/flows/references/flow-rules.md:38`                                              | `scripts/copyedit.test.mjs:50,314`; `scripts/writing-skill.test.mjs` (flow-rules runs it) |
+| spec goal                          | file:line                                                                                                                                                                          | test                                                                                                    |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 1 One writing skill                | `plugins/flows/skills/writing/SKILL.md:21,55,85,145,178,185`; `scripts/flows-uses.mjs:16`; `doc-audit/uses.json:5`, `integrate/uses.json:3`; `scripts/sync-pstack.mjs:29-32,75-77` | `scripts/writing-skill.test.mjs:14`; `scripts/flows-uses.test.mjs:81,93`; the book check above          |
+| 2 A shorthand check on every write | `plugins/flows/hooks/hooks.json:10,16`; `plugins/flows/hooks/prose.mjs:52,78,117`                                                                                                  | `plugins/flows/hooks/prose.test.mjs:14,19,31` and "a rewrite checks only the lines the old file lacked" |
+| 3 A copyedit before each gate      | `plugins/flows/skills/writing/references/copyedit.md`; `plugins/flows/skills/writing/scripts/compare.mjs`; `plugins/flows/references/flow-rules.md:38`                             | `scripts/copyedit.test.mjs:50,314`; `scripts/writing-skill.test.mjs` (flow-rules runs it)               |
 
 ## Run verdict

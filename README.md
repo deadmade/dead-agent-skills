@@ -99,7 +99,7 @@ and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a
 Everything ships as one version. Every merge to main releases a patch; a bigger step is `npm run release -- minor`
 and `git push --follow-tags origin main`. The tag builds the installer and the binaries and publishes the GitHub
 release they're downloaded from. From a checkout,
-`npm ci` once, then `node installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.
+`npm ci` once, then `node tools/installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.
 
 Author plugins in `catalog/plugins.json` and their source resources under `plugins/`. The catalog declares shared
 resources, dependencies, targets and native overlays; default shared events live in `plugins/default/hooks/shared.json`.

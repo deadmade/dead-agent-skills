@@ -125,9 +125,9 @@ PR per plugin when upstream tags a newer release. Patch feature-flow for v7 brai
       - "Ships with the next release. To decline, leave this PR open."
       - `cc @deadmade`
 - [ ] **Step 7: Run the new test automatically.**
-  - In `package.json`, set `test` to `node scripts/check-repo.mjs && node --test "installer/*.test.mjs" "scripts/*.test.mjs"`.
-  - In `flake.nix`, change the `installer-test` script to `exec node --test 'installer/*.test.mjs' 'scripts/*.test.mjs'`.
-  - Widen its `files` to `^(installer/|scripts/|\.claude-plugin/marketplace\.json$|package\.json$)`.
+  - In `package.json`, set `test` to `node scripts/check-repo.mjs && node --test "tools/installer/*.test.mjs" "scripts/*.test.mjs"`.
+  - In `flake.nix`, change the `installer-test` script to `exec node --test 'tools/installer/*.test.mjs' 'scripts/*.test.mjs'`.
+  - Widen its `files` to `^(tools/installer/|scripts/|\.claude-plugin/marketplace\.json$|package\.json$)`.
 - [ ] **Step 8: Docs.**
   - In `README.md:87`, replace "Superpowers, ponytail and atlassian come from their own repos and keep their own
     versions." with: superpowers and ponytail are pinned to a release tag and commit in `marketplace.json`; the weekly
@@ -142,8 +142,8 @@ PR per plugin when upstream tags a newer release. Patch feature-flow for v7 brai
 
 **Files:**
 
-- Modify: `installer/core.mjs` (next to `outdated`, around `:320`), `installer/install.mjs:366-368`
-- Test: `installer/core.test.mjs`
+- Modify: `tools/installer/core.mjs` (next to `outdated`, around `:320`), `tools/installer/install.mjs:366-368`
+- Test: `tools/installer/core.test.mjs`
 
 **Interfaces:**
 
@@ -166,9 +166,9 @@ PR per plugin when upstream tags a newer release. Patch feature-flow for v7 brai
   - Expected: `{ 'feature-flow': '0.1.1', superpowers: '7.0.0' }`.
   - Also: ``outdated([{ id: `superpowers@${M}`, version: '6.4.2' }], that)`` deep-equals
     ``[{ id: `superpowers@${M}`, from: '6.4.2', to: '7.0.0' }]``.
-- [ ] **Step 2: Run** `node --test installer/`. Expected: FAIL, because `shippedVersions` isn't exported.
+- [ ] **Step 2: Run** `node --test tools/installer/`. Expected: FAIL, because `shippedVersions` isn't exported.
 - [ ] **Step 3: Implement** `shippedVersions` and use it in `install.mjs`.
-- [ ] **Step 4: Run** `node --test installer/`. Expected: PASS, including the existing `outdated` test.
+- [ ] **Step 4: Run** `node --test tools/installer/`. Expected: PASS, including the existing `outdated` test.
 - [ ] **Step 5: Commit.**
       `git commit -m "Let the installer update superpowers and ponytail when their pinned release changes."`
 

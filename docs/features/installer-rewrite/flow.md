@@ -27,7 +27,7 @@ flow that is actually usable. At the moment I cant even know what I have install
 
 ## Grounding
 
-- `installer/core.mjs` pure, no deps; `install.mjs` uses clack for intro/outro, spinners, notes, log, confirm,
+- `tools/installer/core.mjs` pure, no deps; `install.mjs` uses clack for intro/outro, spinners, notes, log, confirm,
   select, text; chooser loop `install.mjs:419-447`; `tabs.mjs` is the clack chooser.
 - `claude plugin list --json` has `version`; our plugins ship `plugin.json` versions (0.1.1); the user's machine has
   0.1.0 and git-sha versions. `claude plugin update <plugin>` exists.
@@ -86,16 +86,16 @@ None that change an interface or add a library. Rulings (ledger, `.superpowers/s
 
 ## Walkthrough
 
-| spec goal                                                   | plan task | file:line                                                        | test                                                                                                            |
-| ----------------------------------------------------------- | --------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| No npm dependency (clack, shrinkwrap gone)                  | 5, 6      | `package.json`, `installer/ui.mjs:2-5`, `installer/view.mjs:2-3` | repo checks; `git grep clack` empty                                                                             |
-| Framed start screen, category values, Core line, Apply/Quit | 2, 3      | `installer/view.mjs:137-205`                                     | start shows kept, pending + and −, toggles and the Apply count; empty categories read none                      |
-| Keys ↑/↓ enter esc only; esc asks with pending changes      | 2, 5      | `installer/view.mjs:101-127`, `installer/install.mjs:407-421`    | down/up wrap…; esc on start: quit when idle, ask-quit…; pty run                                                 |
-| Category screen: states as words, disabled, description     | 3         | `installer/view.mjs:155-169, 207-236`                            | category states are words; category shows the focused item description                                          |
-| Updates screen, skip, outdated rule (no downgrade)          | 1, 2, 3   | `installer/core.mjs:298`, `installer/view.mjs:50-54`             | outdated compares our shipped versions…; updates rows toggle skip…; updates screen shows from → to and skip     |
-| Review lists only changes (incl. strip/clean removals)      | 3 + fix   | `installer/view.mjs:238-267`, `installer/install.mjs:401-405`    | review lists only non-empty groups…; review lists what strip-defaults sweeps away                               |
-| `claude plugin update` step                                 | 5         | `installer/install.mjs:471-473`                                  | pty Apply run (log shows `plugin update … --json`)                                                              |
-| One line per step; framed notes that wrap; summary ✓/✗      | 4, 5      | `installer/ui.mjs:117-139`                                       | progress turns a throw into failed; frame cuts…, wrap never cuts                                                |
-| Raw mode/cursor restored on every exit; no type-ahead       | 4 + fix   | `installer/ui.mjs:12-82`                                         | screen resolves on enter and restores…; ctrl-c…; throwing move…; keys typed before a prompt…; pty ctrl-c checks |
-| Fits narrow and short terminals                             | 3 + fix   | `installer/view.mjs:171-180, 269-275`                            | every line fits narrow terminals; every screen fits short, narrow terminals                                     |
-| README describes the new flow                               | 6         | `README.md:31-38`                                                | —                                                                                                               |
+| spec goal                                                   | plan task | file:line                                                                    | test                                                                                                            |
+| ----------------------------------------------------------- | --------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| No npm dependency (clack, shrinkwrap gone)                  | 5, 6      | `package.json`, `tools/installer/ui.mjs:2-5`, `tools/installer/view.mjs:2-3` | repo checks; `git grep clack` empty                                                                             |
+| Framed start screen, category values, Core line, Apply/Quit | 2, 3      | `tools/installer/view.mjs:137-205`                                           | start shows kept, pending + and −, toggles and the Apply count; empty categories read none                      |
+| Keys ↑/↓ enter esc only; esc asks with pending changes      | 2, 5      | `tools/installer/view.mjs:101-127`, `tools/installer/install.mjs:407-421`    | down/up wrap…; esc on start: quit when idle, ask-quit…; pty run                                                 |
+| Category screen: states as words, disabled, description     | 3         | `tools/installer/view.mjs:155-169, 207-236`                                  | category states are words; category shows the focused item description                                          |
+| Updates screen, skip, outdated rule (no downgrade)          | 1, 2, 3   | `tools/installer/core.mjs:298`, `tools/installer/view.mjs:50-54`             | outdated compares our shipped versions…; updates rows toggle skip…; updates screen shows from → to and skip     |
+| Review lists only changes (incl. strip/clean removals)      | 3 + fix   | `tools/installer/view.mjs:238-267`, `tools/installer/install.mjs:401-405`    | review lists only non-empty groups…; review lists what strip-defaults sweeps away                               |
+| `claude plugin update` step                                 | 5         | `tools/installer/install.mjs:471-473`                                        | pty Apply run (log shows `plugin update … --json`)                                                              |
+| One line per step; framed notes that wrap; summary ✓/✗      | 4, 5      | `tools/installer/ui.mjs:117-139`                                             | progress turns a throw into failed; frame cuts…, wrap never cuts                                                |
+| Raw mode/cursor restored on every exit; no type-ahead       | 4 + fix   | `tools/installer/ui.mjs:12-82`                                               | screen resolves on enter and restores…; ctrl-c…; throwing move…; keys typed before a prompt…; pty ctrl-c checks |
+| Fits narrow and short terminals                             | 3 + fix   | `tools/installer/view.mjs:171-180, 269-275`                                  | every line fits narrow terminals; every screen fits short, narrow terminals                                     |
+| README describes the new flow                               | 6         | `README.md:31-38`                                                            | —                                                                                                               |

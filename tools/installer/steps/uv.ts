@@ -1,5 +1,5 @@
 // headroom-trim's trim server is a uv project. Our copy in ~/.claude/bin (where the plugin's launcher looks first) is kept
-// at the version pinned in installer/assets/uv.json; with none there, a PATH uv at or above the pin is used. Then the
+// at the version pinned in tools/installer/assets/uv.json; with none there, a PATH uv at or above the pin is used. Then the
 // server's environment and tiktoken's vocabulary are built into the plugin's data folder, so the first session starts
 // at once. Asks before a download; every failure is a summary line.
 import { existsSync } from 'node:fs';
@@ -29,7 +29,7 @@ export async function installUv(): Promise<string | undefined> {
   const key = `${process.platform}-${process.arch}`;
   const asset = uvAsset(process.platform, process.arch, pin);
   if (!asset) {
-    failures.push(`uv: no pinned build for ${key} in installer/assets/uv.json; ${OFF}`);
+    failures.push(`uv: no pinned build for ${key} in tools/installer/assets/uv.json; ${OFF}`);
     return undefined;
   }
   const bin = join(BIN_DIR, WIN ? 'uv.exe' : 'uv');

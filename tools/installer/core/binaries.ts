@@ -4,7 +4,7 @@ import { posix, win32 } from 'node:path';
 import { BUNDLE } from './plugins.ts';
 import { RELEASES, newer, semver } from './release.ts';
 
-// installer/assets/agent-browser.json and uv.json.
+// tools/installer/assets/agent-browser.json and uv.json.
 export interface UpstreamPin {
   upstream?: string;
   sha256?: Record<string, string>;
@@ -125,7 +125,7 @@ export function binAction({
   return supported ? 'download' : 'unsupported';
 }
 
-// installed: version from `<tool> --version` or undefined; pinned: the tool's installer/assets pin (agent-browser, uv).
+// installed: version from `<tool> --version` or undefined; pinned: the tool's tools/installer/assets pin (agent-browser, uv).
 // A newer one stays.
 export const upstreamAction = ({ installed, pinned }: { installed: string | undefined; pinned: string }) =>
   !installed ? 'install' : installed === pinned || newer(installed, pinned) ? 'skip' : 'upgrade';
@@ -165,7 +165,7 @@ export const AGENT_BROWSER_FILES: Record<string, string> = {
   'linux-x64': 'agent-browser-linux-musl-x64',
 };
 
-// The upstream binary for pin (installer/assets/agent-browser.json) on this machine, checked against the pin's sha256, or
+// The upstream binary for pin (tools/installer/assets/agent-browser.json) on this machine, checked against the pin's sha256, or
 // undefined where there is no build or no pinned hash.
 export function agentBrowserAsset(platform: string, arch: string, pin: UpstreamPin) {
   const key = `${platform}-${arch}`;
@@ -184,7 +184,7 @@ export const UV_FILES: Record<string, { file: string; inner: string }> = {
   },
 };
 
-// The upstream archive for pin (installer/assets/uv.json) on this machine, checked against the pin's sha256, or
+// The upstream archive for pin (tools/installer/assets/uv.json) on this machine, checked against the pin's sha256, or
 // undefined where there is no build or no pinned hash. exe: the path inside the archive.
 export function uvAsset(platform: string, arch: string, pin: UpstreamPin) {
   const key = `${platform}-${arch}`;

@@ -67,8 +67,8 @@ dependencies. Types: `/tmp/claude-0/bundled-skills/2.1.302/0b885b2b5aea887736e0d
 - Create: `plugins/md-pane/.claude-plugin/plugin.json`, `plugins/md-pane/hooks/hooks.json`,
   `plugins/md-pane/tsconfig.json`, `plugins/md-pane/types/index.d.ts`, `plugins/md-pane/hooks/register.tsx` (an
   empty `register` for now), `plugins/md-pane/hooks/paths.ts`
-- Modify: `.claude-plugin/marketplace.json` (append after `tui-review`), `installer/core.mjs:385`,
-  `installer/core.test.mjs:51-77`
+- Modify: `.claude-plugin/marketplace.json` (append after `tui-review`), `tools/installer/core.mjs:385`,
+  `tools/installer/core.test.mjs:51-77`
 - Test: `plugins/md-pane/hooks/paths.test.ts`
 
 **Interfaces:**

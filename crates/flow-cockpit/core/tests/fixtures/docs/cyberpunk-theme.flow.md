@@ -32,8 +32,8 @@ could we design our own theme? Would be awesome to have like a cyberpunk style t
   `plugin.json` + `themes/<slug>.json`.
 - `scripts/check-repo.mjs`: every plugin dir listed in the marketplace (l.46-48), version = package.json (l.55-59),
   `claude plugin validate` per plugin (l.17-24, the only check that sees theme JSON).
-- Installer: non-bundle plugins are opt-ins (`installer/core.mjs:70-73`); a new opt-in must join a `CATEGORIES`
-  `keys` list (`core.mjs:302-365`) or `installer/core.test.mjs:372-379` fails. Nothing in installer/scripts touches
+- Installer: non-bundle plugins are opt-ins (`tools/installer/core.mjs:70-73`); a new opt-in must join a `CATEGORIES`
+  `keys` list (`core.mjs:302-365`) or `tools/installer/core.test.mjs:372-379` fails. Nothing in tools/installer/scripts touches
   `~/.claude/themes` or the `theme` setting.
 - Existing palette: `plugins/tui-review/hooks/theme.ts` (One Dark-ish, diff pane only); no Claude Code theme exists.
 - Docs to touch: README opt-in list (`README.md:6-11`); THIRD_PARTY.md only if the palette is derived from others.

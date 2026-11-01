@@ -3,9 +3,9 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { buildPackages, nativeMarketplace } from '../installer/system/packages.ts';
+import { buildPackages, nativeMarketplace } from '../tools/installer/system/packages.ts';
 
-import { renderClaudeTheme } from '../installer/core/themes.ts';
+import { renderClaudeTheme } from '../tools/installer/core/themes.ts';
 
 export function checkHarnesses(root) {
   const temp = mkdtempSync(join(tmpdir(), 'harness-marketplace-check-'));

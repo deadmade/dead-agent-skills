@@ -172,6 +172,7 @@ merged (repo_file Accept/format, the 401 sweep).
    - Smaller: repo_file needs a repo, `repo=` only when given, wiki 404 `with_what`, wiki id as identifier, code wiki
      version, `large_futures` boxing, first-slice note.
    - Simpler 1 (repo status call): kept, the spec lists the case.
+
 - Shape unchanged (no new task order, module or library), so no second round; edits checked by me.
 
 ## Tasks
@@ -213,7 +214,7 @@ Copied from the SDD ledger, in the order made; each with what it costs if wrong.
 - Ruling: tests/api.rs gets no maps_403_test_scope — a test-area 403 never fails the tool, test_403_keeps_stages checks the whole reply with Test Management (Read), and api.rs's unit test maps both paths — cost if wrong: none.
 - Ruling: the INSTRUCTIONS line naming 20 failed tests stays (beyond the brief) — the server's list exceptions must stay true, as Task 4's tree 100 — cost if wrong: one clause.
 - Ruling: the test-runs call stays outside retry_stale, with a comment — timeline() has its own retry; joining both under one would need a non-retrying timeline variant for a case that heals on the next call — cost if wrong: one reply without test lines after a project is recreated.
-- Ruling: a failed results call keeps the summary and the failures read so far, then "  failed tests couldn't be read (<error>)" — the controller's fix asked for the summary to still print; one line beats losing the counts — cost if wrong: wording.
+- Ruling: a failed results call keeps the summary and the failures read so far, then " failed tests couldn't be read (<error>)" — the controller's fix asked for the summary to still print; one line beats losing the counts — cost if wrong: wording.
 - Ruling: pr_view's other degraded lines (checks, work items, latest run) get with_what labels in this task — pre-existing GUID leak in the same file, reached by the same view — cost if wrong: none.
 - Ruling: `since` not in the iteration list → local "not found: iteration <n> on !<id>" before any request — the changes call's 404 can't say which iteration was missing — cost if wrong: none.
 - Ruling: links and attachments share one line `links: N  attachments: N` — the plan's "six lines" — cost if wrong: layout.
@@ -231,16 +232,16 @@ Copied from the SDD ledger, in the order made; each with what it costs if wrong.
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
-| 1 `search` (wi, code, wiki; scope, infoCode, 404s, more line) | T1, T2 (+ T4 fix: mappedPath) | `crates/ado-mcp/src/search.rs:253` | `tests/search.rs` (wi_hits_one_line_each … repo_arg_is_a_name) |
-| 1a `repo_file` | T3 | `crates/ado-mcp/src/file.rs:79` | `tests/file.rs` (reads_lines … start_past_the_end) |
-| 2 `wiki` | T4 | `crates/ado-mcp/src/wiki.rs:74` | `tests/wiki.rs` (page_text, tree_default, …) |
-| 3 test results in `pipeline_view` | T5 (+ final fix: latest attempt per job) | `crates/ado-mcp/src/pipeline.rs:470`, `:404` | `tests/pipeline.rs:179-367` (tests_summary_and_failures … test_403_keeps_stages) |
-| 4 `pr_files since`, `pr_view` iteration | T6 | `crates/ado-mcp/src/pr.rs:684`, `:656` | `tests/pr.rs:930-1151` (files_since … view_sections_404) |
-| 5 `wi_view` every link | T7 | `crates/ado-mcp/src/wi.rs:146` | `src/wi.rs:737` (other_links_*), `tests/wi.rs:125` (view_all_links) |
-| 6 plugin, docs, permissions | T8 | mcp-azure `README.md`, `installer/install.mjs` HANDOFF, `crates/ado-mcp/src/api.rs` `scope()`, `src/tools.rs` INSTRUCTIONS | `tests/mcp.rs:78` (READS 14, 401 sweep, INSTRUCTIONS), `tests/api.rs` (maps_403_*), `npm test` |
-| 7 tests | T1-T8 | `crates/ado-mcp/tests/` | `cargo test` (272), clippy, fmt |
+| spec goal                                                     | plan task                                | file:line                                                                                                                        | test                                                                                           |
+| ------------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1 `search` (wi, code, wiki; scope, infoCode, 404s, more line) | T1, T2 (+ T4 fix: mappedPath)            | `crates/ado-mcp/src/search.rs:253`                                                                                               | `tests/search.rs` (wi_hits_one_line_each … repo_arg_is_a_name)                                 |
+| 1a `repo_file`                                                | T3                                       | `crates/ado-mcp/src/file.rs:79`                                                                                                  | `tests/file.rs` (reads_lines … start_past_the_end)                                             |
+| 2 `wiki`                                                      | T4                                       | `crates/ado-mcp/src/wiki.rs:74`                                                                                                  | `tests/wiki.rs` (page_text, tree_default, …)                                                   |
+| 3 test results in `pipeline_view`                             | T5 (+ final fix: latest attempt per job) | `crates/ado-mcp/src/pipeline.rs:470`, `:404`                                                                                     | `tests/pipeline.rs:179-367` (tests_summary_and_failures … test_403_keeps_stages)               |
+| 4 `pr_files since`, `pr_view` iteration                       | T6                                       | `crates/ado-mcp/src/pr.rs:684`, `:656`                                                                                           | `tests/pr.rs:930-1151` (files_since … view_sections_404)                                       |
+| 5 `wi_view` every link                                        | T7                                       | `crates/ado-mcp/src/wi.rs:146`                                                                                                   | `src/wi.rs:737` (other_links_*), `tests/wi.rs:125` (view_all_links)                            |
+| 6 plugin, docs, permissions                                   | T8                                       | mcp-azure `README.md`, `tools/installer/install.mjs` HANDOFF, `crates/ado-mcp/src/api.rs` `scope()`, `src/tools.rs` INSTRUCTIONS | `tests/mcp.rs:78` (READS 14, 401 sweep, INSTRUCTIONS), `tests/api.rs` (maps_403_*), `npm test` |
+| 7 tests                                                       | T1-T8                                    | `crates/ado-mcp/tests/`                                                                                                          | `cargo test` (272), clippy, fmt                                                                |
 
 No goal without code, no code without a goal. Left to the live smoke checklist (`docs/features/ado-mcp/smoke.md`):
 the crate's closed enums (D8), mappedPath on a code wiki, `7.1-preview` on search, wiki and test, a run's
@@ -250,13 +251,13 @@ the crate's closed enums (D8), mappedPath on a code wiki, `7.1-preview` on searc
 
 /verify, 2026-10-29, on `claude/loving-goodall-syqcul ← f30a1b4`: **ready**.
 
-| Part   | State |
-| ------ | ----- |
-| Checks | green: ado-mcp `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (282/282); `npm test` 141 pass, 1 skipped, 1 fail (the known Windows symlink `EPERM` in `installer/files.test.mjs`) |
+| Part   | State                                                                                                                                                                                                                                          |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checks | green: ado-mcp `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (282/282); `npm test` 141 pass, 1 skipped, 1 fail (the known Windows symlink `EPERM` in `tools/installer/files.test.mjs`)                        |
 | Review | `/self-review`: 8 passes; the user picked 1-7 and 12-15, all fixed (6985a5e..cca5db6); left 8 (failed count by outcome), 9 (the more-failed-tests pointer), 10 (a real `pipelineReference` fixture, after the smoke run), 11 (missing content) |
-| Docs   | `/doc-audit branch`: 9 findings, all fixed (e3291bc, GLOSSARY.md); [report](../../audits/2026-10-29-doc-audit-branch.md) |
-| Tests  | skipped by the user: the test analyzer's gaps were filled |
-| Read   | skipped by the user |
+| Docs   | `/doc-audit branch`: 9 findings, all fixed (e3291bc, GLOSSARY.md); [report](../../audits/2026-10-29-doc-audit-branch.md)                                                                                                                       |
+| Tests  | skipped by the user: the test analyzer's gaps were filled                                                                                                                                                                                      |
+| Read   | skipped by the user                                                                                                                                                                                                                            |
 
 Before a release: the live smoke checklist (`docs/features/ado-mcp/smoke.md`) at work.
 

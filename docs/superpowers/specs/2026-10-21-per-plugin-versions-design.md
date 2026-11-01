@@ -171,4 +171,4 @@ These must describe the new scheme:
 - **Running the installer from a `main` checkout** instead of a release tag downloads the binaries again on every run,
   because `main`'s plugin numbers can be ahead of the release's binaries.
 - **Content outside a plugin's paths that changes its behaviour** gets no bump. One example is
-  `installer/assets/ccstatusline-night-city.json`. The safety net only watches the plugin's folder (plus the crate).
+  `tools/installer/assets/ccstatusline-night-city.json`. The safety net only watches the plugin's folder (plus the crate).

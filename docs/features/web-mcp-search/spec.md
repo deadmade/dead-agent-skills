@@ -210,7 +210,7 @@ doesn't depend on the machine's locale or IP region. A query written in German s
 
 ## Constraints
 
-- Rust crate `crates/web-mcp`; agent-browser pinned at 0.39.1 (`installer/assets/agent-browser.json`), driven as a
+- Rust crate `crates/web-mcp`; agent-browser pinned at 0.39.1 (`tools/installer/assets/agent-browser.json`), driven as a
   child process (`browser.rs`, one `--json` call or batch per action); Windows and Linux x64.
 - The engine parsers are parsers of what other tools write. They test against **captured result pages** in fixtures
   (CLAUDE.md's rule), not assumed shapes.

@@ -80,17 +80,17 @@ segment forms in scripts.
 
 **Files:**
 
-- Modify: `installer/install.mjs:316` (delete `BIN_VERSION`), `:363,560,565` (use `VERSION`), `:519` (`bundle`)
-- Modify: `installer/core.test.mjs:57` (`bundle` fixture), `:400-403` (brv version test)
-- Test: `installer/core.test.mjs`
+- Modify: `tools/installer/install.mjs:316` (delete `BIN_VERSION`), `:363,560,565` (use `VERSION`), `:519` (`bundle`)
+- Modify: `tools/installer/core.test.mjs:57` (`bundle` fixture), `:400-403` (brv version test)
+- Test: `tools/installer/core.test.mjs`
 
 **Interfaces:**
 
-- Consumes: `manifestPath(manifest, id)` from `installer/core.mjs:43` (returns `<source>/.claude-plugin/plugin.json`
+- Consumes: `manifestPath(manifest, id)` from `tools/installer/core.mjs:43` (returns `<source>/.claude-plugin/plugin.json`
   or null), `BUNDLE` (`'dead-skills'`, exported by core.mjs), `VERSION` (`install.mjs:92`, package.json's version).
 - Produces: nothing new; later tasks rely on the installer having no `'plugins'` path literal.
 
-- [ ] **Step 1: Write the failing test** in `installer/core.test.mjs`
+- [ ] **Step 1: Write the failing test** in `tools/installer/core.test.mjs`
 
 ```js
 test('install.mjs finds plugin folders through the marketplace, never by a literal plugins/ path', () => {
@@ -99,7 +99,7 @@ test('install.mjs finds plugin folders through the marketplace, never by a liter
 });
 ```
 
-- [ ] **Step 2: Run** `node --test installer/core.test.mjs` — expected: this test FAILS.
+- [ ] **Step 2: Run** `node --test tools/installer/core.test.mjs` — expected: this test FAILS.
 
 - [ ] **Step 3: Implement**
   - Delete `BIN_VERSION` (`:316`) and its comment; use `VERSION` at its three uses. check-repo forces every
@@ -113,7 +113,7 @@ test('install.mjs finds plugin folders through the marketplace, never by a liter
 - [ ] **Step 4: Run** `npm test` — expected: PASS, ending `✓ repo checks passed`, all suites ok.
       (No smoke run of install.mjs: without a TTY it exits at line 96, before the reads this task changes.)
 
-- [ ] **Step 5: Commit:** `git add installer/install.mjs installer/core.test.mjs && git commit -m "Make the installer find the bundle through the marketplace and take the binary version from package.json."`
+- [ ] **Step 5: Commit:** `git add tools/installer/install.mjs tools/installer/core.test.mjs && git commit -m "Make the installer find the bundle through the marketplace and take the binary version from package.json."`
 
 ### Task 2: Move the Rust crates to `crates/`
 
@@ -124,8 +124,8 @@ test('install.mjs finds plugin folders through the marketplace, never by a liter
   - `scripts/check-repo.mjs:74-75` (`CRATES`), `scripts/release.mjs:44-45`
   - `flake.nix:82-83,88-89,101-102` (crate paths); `:64` and `:71` hook `files`: add `crates/` to both alternations
   - `.gitignore:8-9` → one line `target/`
-  - `installer/core.test.mjs:401` (Cargo.toml path)
-  - `installer/install.mjs:372` build hint →
+  - `tools/installer/core.test.mjs:401` (Cargo.toml path)
+  - `tools/installer/install.mjs:372` build hint →
     ``build it with `cargo build --release` in crates/${pluginName === 'web-mcp' ? 'web-mcp' : 'brv'} and set its path with /plugin configure ${pluginName}``
   - `.github/workflows/tui-review.yml`: `paths` `['crates/brv/**', 'plugins/mods/tui-review/**']`,
     `working-directory`/`workspaces` `crates/brv`, line 49 `node ../../plugins/mods/tui-review/tests/make-fixture.mjs`
@@ -164,7 +164,7 @@ test('install.mjs finds plugin folders through the marketplace, never by a liter
   - `scripts/sync-*.mjs` destinations: csharp:1,157, graphify:1,20, hallmark:14, mattpocock:1,42, paper-lookup:12,
     postgres:12, pstack:1,166, rust:10, self-review:1,22, tob:1,75 (only the `ROOT`-based ones; upstream
     `plugins/...` paths inside clones stay)
-  - `installer/core.test.mjs:99-101,392,402` (`:519-543` fixture strings stay: they test functions, not the tree)
+  - `tools/installer/core.test.mjs:99-101,392,402` (`:519-543` fixture strings stay: they test functions, not the tree)
   - `package.json:9` test glob → `plugins/opt-in/notify/hooks/*.test.mjs`; `files` globs unchanged
     (`plugins/*/` covers flows, `plugins/*/*/` the layers)
   - `.gitignore`: `plugins/shared/tui-review/tests/fixture.gen.ts`; types → `plugins/**/.claude-plugin/types/`
@@ -209,7 +209,7 @@ test('install.mjs finds plugin folders through the marketplace, never by a liter
   `docs/adr/0001-vendor-language-skills.md:4`
 - Modify: `plugins/flows/references/flow-rules.md:44-45` — checkout hint becomes "in a checkout of this marketplace:
   the folder its marketplace `source` names, then `skills/<name>/SKILL.md`"
-- Modify: comments in `installer/view.mjs:7`, `plugins/shared/tui-review/hooks/theme.ts:1,24`, `chunks.ts:1`
+- Modify: comments in `tools/installer/view.mjs:7`, `plugins/shared/tui-review/hooks/theme.ts:1,24`, `chunks.ts:1`
   (`crates/brv/src/...`), `plugins/shared/tui-review/README.md:81-99`
 - GLOSSARY.md is committed in Task 0.
 

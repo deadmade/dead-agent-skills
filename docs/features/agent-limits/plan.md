@@ -27,8 +27,8 @@ When a flow runs, especially `/research-flow` under ultracode, it should not gro
 **No limits anywhere.**
 
 - Nothing in `plugins/flows/skills`, `references` or `agents` mentions a budget, concurrency or `effort`.
-- `installer/core/settings.ts:117` writes exactly one env var, `CLAUDE_CODE_TMUX_TRUECOLOR`.
-- `installer/core/settings.test.ts:185-187` asserts the env with `deepEqual`, so any new env key breaks that test.
+- `tools/installer/core/settings.ts:117` writes exactly one env var, `CLAUDE_CODE_TMUX_TRUECOLOR`.
+- `tools/installer/core/settings.test.ts:185-187` asserts the env with `deepEqual`, so any new env key breaks that test.
 
 **One shared home for flow rules.**
 
@@ -189,8 +189,8 @@ Ladder: haiku < sonnet < opus < fable. "Session" means the user's `/model`. The 
    - The three flow.md templates (`feature-flow/references/flow-template.md`, `research-flow/references/research-template.md`, `references/build-template.md`): `agents:` frontmatter, plus "Agents" and "Deferred" headings.
    - **Test:** `npm test`, with `uses.json` unchanged so the generated parts stay fresh. Grep flows' own text for any per-item spawn that isn't batched.
 
-5. **Installer default** in `installer/core/settings.ts`. Add a named constant with a comment explaining that it needs v2.1.269+, older versions ignore it, and a hand-set value wins. Write it as `out.env = { CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: WORKFLOW_CONCURRENCY, ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' }`. `resetSettings` already rebuilds from `mergeSettings({})`, so a clean slate gets it too. If the user wants it switchable, add an `agentLimits` toggle (the enforced draft's pattern): off deletes only a value still equal to ours, as `isOurStatusLine` does. That touches `core/options.ts`, `steps/settings.ts`, `ui/`, `context.ts` and `install.ts`, with their tests.
-   - **Test:** in `installer/core/settings.test.ts`:
+5. **Installer default** in `tools/installer/core/settings.ts`. Add a named constant with a comment explaining that it needs v2.1.269+, older versions ignore it, and a hand-set value wins. Write it as `out.env = { CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: WORKFLOW_CONCURRENCY, ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' }`. `resetSettings` already rebuilds from `mergeSettings({})`, so a clean slate gets it too. If the user wants it switchable, add an `agentLimits` toggle (the enforced draft's pattern): off deletes only a value still equal to ours, as `isOurStatusLine` does. That touches `core/options.ts`, `steps/settings.ts`, `ui/`, `context.ts` and `install.ts`, with their tests.
+   - **Test:** in `tools/installer/core/settings.test.ts`:
      - extend the `deepEqual` at :185-187 with the new key;
      - a user value of `'3'` survives;
      - no `CLAUDE_CODE_SUBAGENT_MODEL*` key is ever written;

@@ -115,7 +115,7 @@ jobs:
         with:
           node-version: 26
 
-      # The installer as npx runs it: prepack compiles installer/**/*.ts to JS, package.json's files picks what ships.
+      # The installer as npx runs it: prepack compiles tools/installer/**/*.ts to JS, package.json's files picks what ships.
       - name: Pack the installer
         run: |
           npm ci
@@ -136,7 +136,7 @@ jobs:
           ado-mcp-*: the mcp-azure server for Windows and Linux x64; the installer downloads it.
           flow-cockpit-*: the flow cockpit window for Windows x64, with its default extensions; the installer downloads it. Linux runs it from the flake: \`nix run github:deadmade/dead-claude-skills/$TAG#flow-cockpit\`."
 
-  # The branch the installer points the marketplace at (RELEASE_BRANCH in installer/core/release.ts): Claude Code's
+  # The branch the installer points the marketplace at (RELEASE_BRANCH in tools/installer/core/release.ts): Claude Code's
   # marketplace auto-update follows it, so plugins update without rerunning the installer. Moved once the release exists,
   # and never back to an older one (a re-run of an old merge's run). A job of its own, so its write token never shares a
   # runner with publish's npm ci.

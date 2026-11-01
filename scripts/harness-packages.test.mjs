@@ -33,7 +33,7 @@ test('source-only CRLF checkout builds identical isolated targets and resolves e
   const { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync, existsSync } = await import('node:fs');
   const { join } = await import('node:path');
   const { tmpdir } = await import('node:os');
-  const { buildPackages, nativeMarketplace } = await import('../installer/system/packages.ts');
+  const { buildPackages, nativeMarketplace } = await import('../tools/installer/system/packages.ts');
   const temp = mkdtempSync(join(tmpdir(), 'harness-source-'));
   const put = (path, value) => {
     mkdirSync(join(temp, path, '..'), { recursive: true });
@@ -102,9 +102,9 @@ test('npm tarball ships neutral catalog and loads selection without authored res
   const { mkdtempSync, rmSync, existsSync } = await import('node:fs');
   const { join, resolve } = await import('node:path');
   const { tmpdir } = await import('node:os');
-  const { which, startSync } = await import('../installer/system/proc.ts');
-  const { readCatalog } = await import('../installer/system/catalog.ts');
-  const { selectTarget } = await import('../installer/core/catalog.ts');
+  const { which, startSync } = await import('../tools/installer/system/proc.ts');
+  const { readCatalog } = await import('../tools/installer/system/catalog.ts');
+  const { selectTarget } = await import('../tools/installer/core/catalog.ts');
   const temp = mkdtempSync(join(tmpdir(), 'harness-tarball-'));
   try {
     const result = startSync(which('npm'), ['pack', '--ignore-scripts', '--json', '--pack-destination', temp], {
@@ -156,8 +156,8 @@ test('build CLI reports optional omissions with target, plugin and event before 
     put(
       'scripts/build-harnesses.mjs',
       source('scripts/build-harnesses.mjs').replaceAll(
-        "'../installer/",
-        "'" + new URL('../installer/', import.meta.url).href,
+        "'../tools/installer/",
+        "'" + new URL('../tools/installer/', import.meta.url).href,
       ),
     );
     put('package.json', '{"version":"1.0.0"}');

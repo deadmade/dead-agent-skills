@@ -53,7 +53,7 @@ us.
    plugin. Today three places assume `plugins/<name>/`:
    - `scripts/check-repo.mjs` (unlisted plugin dirs, version check)
    - `scripts/release.mjs:41` (version bump)
-   - `installer/install.mjs:418` (manifest lookup), with the matching `files` glob in `package.json`
+   - `tools/installer/install.mjs:418` (manifest lookup), with the matching `files` glob in `package.json`
 8. README, THIRD_PARTY.md, CLAUDE.md (layout and vendored list), GLOSSARY.md and the installer cover the two new
    plugins, per the checklist in `docs/features/language-skills/flow.md` → Grounding.
 
@@ -95,7 +95,7 @@ us.
   - Vendored output, routers included, is never edited by hand.
 - Both upstreams are MIT.
 - One version for everything: each new `plugin.json` carries the repo version. `check-repo.mjs` enforces this.
-- Installer logic goes in `installer/core.mjs` with tests. No npm dependencies.
+- Installer logic goes in `tools/installer/core.mjs` with tests. No npm dependencies.
 - The work goes on its own branch off `main`. The current checkout is `feat/tob-picks` with unrelated staged changes.
 
 ## Decided with the user (2026-10-13)

@@ -42,8 +42,8 @@
         name = "installer-test";
         runtimeInputs = [pkgs.nodejs];
         text = ''
-          node --test --experimental-test-coverage --test-coverage-include='installer/**' \
-            --test-coverage-exclude='installer/**/*.test.ts' --test-coverage-lines=79 'installer/**/*.test.ts'
+          node --test --experimental-test-coverage --test-coverage-include='tools/installer/**' \
+            --test-coverage-exclude='tools/installer/**/*.test.ts' --test-coverage-lines=79 'tools/installer/**/*.test.ts'
           node --test 'tools/upstream-sync/src/**/*.test.ts' 'tools/upstream-sync/src/**/*.test.mjs'
           exec node --test 'scripts/*.test.mjs' 'plugins/flows/skills/writing/tests/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs' 'plugins/opt-in/headroom-trim/hooks/*.test.mjs' 'plugins/opt-in/flow-cockpit/hooks/*.test.mjs'
         '';
@@ -73,7 +73,7 @@
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(catalog/|portable/|installer/|tools/upstream-sync/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(catalog/|portable/|tools/installer/|tools/upstream-sync/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };

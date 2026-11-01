@@ -126,7 +126,7 @@ Not product code. It settles the facts later tasks pin. An answer that contradic
   `<engine>-none.html` (its own no-results page) and `<engine>-captcha.html` / `<engine>-consent.html`
 
 - [ ] **Step 1:** Install agent-browser 0.39.1 (upstream linux-x64 binary, sha256 from
-      `installer/assets/agent-browser.json`) and run `agent-browser install`, both into the scratchpad. Record whether
+      `tools/installer/assets/agent-browser.json`) and run `agent-browser install`, both into the scratchpad. Record whether
       `install` still downloads Chrome for Testing when a branded Chrome is installed.
 - [ ] **Step 2:** Record:
   - where Chrome for Testing lands and the rule to find the newest one: a folder layout both Rust and TS can read
@@ -553,26 +553,26 @@ crates/web-mcp/tests plugins/shared/web-mcp/.mcp.json` finds nothing.
 **Files:**
 
 - Delete:
-  - `installer/steps/searxng.ts`, `installer/assets/searxng.yml`;
+  - `tools/installer/steps/searxng.ts`, `tools/installer/assets/searxng.yml`;
   - `searxngRun`/`searxngSettings` (`core/options.ts:30-47`) and their test (`core/options.test.ts:77-…`);
   - `writeSearxng` (`system/files.ts:90-97`) and its test (`system/files.test.ts:61-…`);
   - the docker row (`core/binaries.ts:31`) and its assertion (`core/settings.test.ts:223`).
 - Create:
-  - `newestChromeForTesting(entries: string[]): string | undefined` in `installer/core/binaries.ts` (pure: picks
+  - `newestChromeForTesting(entries: string[]): string | undefined` in `tools/installer/core/binaries.ts` (pure: picks
     the newest version folder by the findings.md rule), with a test;
-  - `findChromeForTesting(home: string, platform: NodeJS.Platform): string | undefined` in `installer/system/`
+  - `findChromeForTesting(home: string, platform: NodeJS.Platform): string | undefined` in `tools/installer/system/`
     (reads the folder, then calls the core function).
 - Modify:
-  - `installer/steps/agent-browser.ts`: split it in two.
+  - `tools/installer/steps/agent-browser.ts`: split it in two.
     - `installAgentBrowser(): Promise<{ path?: string; works: boolean }>`: the download and `agent-browser install`;
       `works` = install exited 0 and `findChromeForTesting(...)` found one.
     - All three early returns give `{ works: false }`: the bad pin or missing build, the declined download
       (`:47`) and the failed download. The `plan.use === 'path'` branch (`:35`) returns the install result.
     - `configureAgentBrowser(path: string)`: the `claude plugin configure … agentBrowserPath` call.
-  - `installer/install.ts:153,261-279`: run `installAgentBrowser` before `webBuiltinsDecision`, with
+  - `tools/installer/install.ts:153,261-279`: run `installAgentBrowser` before `webBuiltinsDecision`, with
     `healthy: works`; run `configureAgentBrowser` after `applySettings`. Update the comments that say "SearXNG
     answers".
-  - `installer/core/settings.ts:98-111,128`: the comments say "web-mcp's browser works". No logic change.
+  - `tools/installer/core/settings.ts:98-111,128`: the comments say "web-mcp's browser works". No logic change.
 - [ ] **Step 1: Write the failing test** `newestChromeForTesting picks the newest version` (`core/binaries.test.ts`).
 - [ ] **Step 2: Run `npm test`.** Expect: FAIL on it only.
 - [ ] **Step 3: Implement** the deletions, the split and the reorder. `grep -ri 'searxng\|docker' installer` finds

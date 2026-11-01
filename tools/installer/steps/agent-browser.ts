@@ -1,5 +1,5 @@
 // web-mcp's `browser` tool drives agent-browser. A current one on PATH is used as is; otherwise upstream's release
-// binary for the version pinned in installer/assets/agent-browser.json goes to ~/.claude/bin. Either way its browser is
+// binary for the version pinned in tools/installer/assets/agent-browser.json goes to ~/.claude/bin. Either way its browser is
 // installed; installAgentBrowser says whether web-mcp's browser window can open, configureAgentBrowser points
 // web-mcp's agentBrowserPath at the copy in use. Asks before a download; every failure is a summary line.
 import { homedir } from 'node:os';
@@ -35,7 +35,7 @@ export async function installAgentBrowser(binDir = BIN_DIR): Promise<{ path?: st
   if (!asset) {
     failures.push(
       AGENT_BROWSER_FILES[key]
-        ? `agent-browser: bad pin in installer/assets/agent-browser.json (${JSON.stringify(pin)})`
+        ? `agent-browser: bad pin in tools/installer/assets/agent-browser.json (${JSON.stringify(pin)})`
         : `agent-browser: no upstream build for ${key}`,
     );
     windowWorks();

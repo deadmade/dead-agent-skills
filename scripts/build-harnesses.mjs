@@ -1,8 +1,8 @@
 // Build and validate first; replace only the owned generated trees and catalogs.
 import { mkdirSync, mkdtempSync, renameSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { buildPackages, nativeMarketplace } from '../installer/system/packages.ts';
-import { renderClaudeTheme } from '../installer/core/themes.ts';
+import { buildPackages, nativeMarketplace } from '../tools/installer/system/packages.ts';
+import { renderClaudeTheme } from '../tools/installer/core/themes.ts';
 const root = join(import.meta.dirname, '..');
 const staging = mkdtempSync(join(root, '.native-build-'));
 try {

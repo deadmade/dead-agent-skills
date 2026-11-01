@@ -5,7 +5,7 @@ Rust or Node equivalent that keeps headroom's protections. The user wants it on 
 including machines without Python or uv, and wants headroom updated like any other dependency.
 
 Python code ships as a uv project (`pyproject.toml` + `uv.lock`) inside its plugin. The installer keeps a pinned uv the
-way it keeps agent-browser: the version and each platform archive's sha256 sit in `installer/assets/uv.json`. Once its
+way it keeps agent-browser: the version and each platform archive's sha256 sit in `tools/installer/assets/uv.json`. Once its
 own copy in `~/.claude/bin` exists, that copy wins and is upgraded when older than the pin; a uv on PATH at or above
 the pin is used only while it is absent, so the installer and the plugin run the same uv. It then runs `uv sync`, so
 Python and the wheels are fetched at install time. The plugin finds that uv itself (`~/.claude/bin` first, then

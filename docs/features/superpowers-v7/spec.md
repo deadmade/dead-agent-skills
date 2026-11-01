@@ -109,7 +109,7 @@ Builder's call: no version bump here. `scripts/release.mjs` bumps every local pl
 
 ### Installer: url-sourced plugins count as shipped
 
-`installer/install.mjs:475-480` builds `shipped` from local plugins only, so `outdated()` never offers a superpowers or
+`tools/installer/install.mjs:475-480` builds `shipped` from local plugins only, so `outdated()` never offers a superpowers or
 ponytail update. Pinned url entries get added with version `ref` minus its leading `v`. Upstream `plugin.json`
 versions match their tags: 7.0.0 and 5.1.0. Re-running the installer then updates them like the local plugins.
 
@@ -122,7 +122,7 @@ versions match their tags: 7.0.0 and 5.1.0. Re-running the installer then update
 
 ## Testing
 
-- `node scripts/check-repo.mjs` and `node --test installer/ scripts/` pass. `nix fmt` leaves no diff.
+- `node scripts/check-repo.mjs` and `node --test tools/installer/ scripts/` pass. `nix fmt` leaves no diff.
 - `claude plugin validate .` passes locally with the new source fields.
 - `node scripts/sync-plugins.mjs ponytail DietrichGebert/ponytail` against a file whose ponytail pin is set back to
   `v5.0.0`: `git diff` shows only ponytail's `ref` and `sha` lines changing, to v5.1.0 and `9cc65d0…`. Run against

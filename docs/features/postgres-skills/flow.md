@@ -32,8 +32,8 @@ Supabase's `postgres-best-practices`, for best practices and concurrency advice)
 - **Every plugin skill is listed in every project.** `paths:` doesn't gate plugin skills (ADR 0001, checked on
   2.1.272 and 2.1.296). An opt-in Postgres plugin costs one description per turn for whoever installs it.
 - **What a new vendored plugin touches** (from the language-skills flow): the `marketplace.json` entry; `plugin.json`
-  (same version as package.json); an `installer/core.mjs` `CATEGORIES` key (`:303-345`; `lsp` "Languages" or
-  `workflow` are candidates, otherwise it lands in "Other"); the opt-ins list in `installer/core.test.mjs`; the
+  (same version as package.json); an `tools/installer/core.mjs` `CATEGORIES` key (`:303-345`; `lsp` "Languages" or
+  `workflow` are candidates, otherwise it lands in "Other"); the opt-ins list in `tools/installer/core.test.mjs`; the
   README opt-in list; `scripts/sync-<x>.mjs` plus `sync-<x>.yml`; UPSTREAM/LICENSE; THIRD_PARTY.md; the CLAUDE.md
   vendored list; the `flake.nix`/`treefmt.toml` excludes. `check-repo.mjs` needs no change.
 - **Defaults** are the `dead-skills` dependencies. Everything else, including the language plugins, is opt-in.
@@ -168,6 +168,6 @@ dropped. The user accepted all recommendations ("yes, accept all, go native"). C
 | Opt-in plugin `postgres` with Neon + Timescale skills, unchanged | 2         | `plugins/database/postgres/`, `.claude-plugin/marketplace.json`                   | `check-repo.mjs` (marketplace ↔ dirs, version); `core.test.mjs` opt-ins list                                    |
 | Weekly sync, fail on missing/partial upstream                    | 2         | `scripts/sync-postgres.mjs:29-43`, `.github/workflows/sync-postgres.yml`          | manual: two runs (changed, then unchanged), `find -type l` empty; reviewer re-ran in a clean clone              |
 | LICENSE + NOTICE shipped                                         | 2         | `sync-postgres.mjs:38-41`                                                         | manual: `ls skills/*/`                                                                                          |
-| Installer "Databases" page after "Languages"                     | 2         | `installer/core.mjs:333-338`                                                      | `core.test.mjs:397`                                                                                             |
+| Installer "Databases" page after "Languages"                     | 2         | `tools/installer/core.mjs:333-338`                                                | `core.test.mjs:397`                                                                                             |
 | THIRD_PARTY, CLAUDE.md, README, GLOSSARY true to the code        | 2         | `THIRD_PARTY.md`, `CLAUDE.md`, `README.md`, `GLOSSARY.md`                         | reviewer read                                                                                                   |
 | `paths:` frontmatter on both skills (reopened, user picked A)    | 3         | `scripts/sync-lib.mjs` `addPaths`, `scripts/sync-postgres.mjs:10,43-45`           | `sync-lib.test.mjs` "addPaths"; manual: sync changed → commit → unchanged                                       |

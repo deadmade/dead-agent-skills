@@ -8,6 +8,7 @@ phase: done
 ## Request
 
 "Currently two issus arrived with the mcp server. Two possible improvements came out of this:
+
 1. A project_list tool. It would have answered your question, and it's useful for any clone that isn't on Azure DevOps.
 2. A clearer 400. A bad default project should say which project was rejected, for example "default project X was refused"."
 
@@ -23,7 +24,7 @@ phase: done
 
 **Task 1 Files:** `crates/ado-mcp/src/{config,ctx,api,pipeline,tools}.rs`, `crates/ado-mcp/tests/{common/mod,ctx,mcp,api,fixtures}.rs`,
 `crates/ado-mcp/tests/fixtures/projects.json`, `plugins/opt-in/mcp/mcp-azure/{.mcp.json,.claude-plugin/plugin.json,README.md}`,
-`installer/{install.mjs,core.test.mjs}`, `docs/features/ado-mcp/spec.md`, `CLAUDE.md`.
+`tools/installer/{install.mjs,core.test.mjs}`, `docs/features/ado-mcp/spec.md`, `CLAUDE.md`.
 
 ## Skipped
 
@@ -90,7 +91,7 @@ One `/verify` over both ado-mcp fix flows (`ado-mcp-default-project-400`, `ado-m
 from feature-flow `ado-mcp-next` before its build, 2026-10-28; base e8542cb, uncommitted tree.
 
 - **Checks** (latest run, e8542cb + tree): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` clean;
-  `cargo test` 177 passed; check-repo passed; `npm test` 141 passed, 1 failed (`installer/files.test.mjs` clean slate:
+  `cargo test` 177 passed; check-repo passed; `npm test` 141 passed, 1 failed (`tools/installer/files.test.mjs` clean slate:
   Windows `EPERM` creating a symlink, untouched code).
 - **Review** (`/self-review`, 9 passes): security and the bug pass found nothing. 14 findings plus noted items, all
   fixed on the user's "fix all pls":
@@ -110,9 +111,10 @@ from feature-flow `ado-mcp-next` before its build, 2026-10-28; base e8542cb, unc
 ## Learned
 
 2026-10-28, picked "1-4":
+
 - `docs/solutions/ado-mcp-missing-field-url.md`: the missing-`url` root cause and how to spot it.
 - CLAUDE.md, Checks: concurrency tests bound the slow call against a fast first call; the Windows `EPERM` symlink
-  failure in `installer/files.test.mjs` is the machine.
+  failure in `tools/installer/files.test.mjs` is the machine.
 - Memory: the user's collection has Search with Code, Work items and Wiki.
 
 ## Run verdict

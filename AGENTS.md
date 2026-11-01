@@ -2,14 +2,14 @@
 
 Personal skills, flows and MCP integrations for Claude Code and Codex. The native marketplaces
 (`.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`) load checked-in packages from `portable/`;
-authored plugins live under `plugins/`, grouped by install layer. The optional npx installer in `installer/` sets up a machine from them. README.md is the user-facing description;
+authored plugins live under `plugins/`, grouped by install layer. The optional npx installer in `tools/installer/` sets up a machine from them. README.md is the user-facing description;
 keep it, plugin READMEs and plugin/marketplace `description`s true to what the code does.
 
 The default branch is `main`. Feature branches and PRs target `main`; releases are cut from `main`.
 
 ## Layout
 
-- `installer/`: TypeScript, by layer. `install.ts` is the entry point and only runs the flow (read state, screens, steps,
+- `tools/installer/`: TypeScript, by layer. `install.ts` is the entry point and only runs the flow (read state, screens, steps,
   summary); `context.ts` holds the shared paths, version and summary lines; `core/` the pure decisions by topic
   (`settings`, `plugins`, `binaries`, `options`, `release`); `system/` everything that touches the OS (file writes and
   clean-slate backup/delete, processes, downloads); `steps/` one file per thing the installer
@@ -20,7 +20,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   shim needs cmd.exe. Node runs the `.ts` files as they are
   (type stripping; Node 26+, `engines`), so only erasable syntax: no `enum`, `namespace` or parameter properties
   (`erasableSyntaxOnly`), and imports name the `.ts` file. Node won't strip types under `node_modules`, so npx can't run them: `release.yml` packs the installer
-  (`npm pack`, whose `prepack` checks native distribution freshness and runs `tsc` and writes `installer/**/*.js`, gitignored) as `installer.tgz` on the release, and
+  (`npm pack`, whose `prepack` checks native distribution freshness and runs `tsc` and writes `tools/installer/**/*.js`, gitignored) as `installer.tgz` on the release, and
   users run `npx --allow-remote=root <release>/latest/download/installer.tgz` (npm 12 refuses tarball URLs without the
   flag). npx caches by URL and keeps running the first installer it fetched (`--prefer-online` too), so each run reads
   the tag `latest/` redirects to and, when it is newer, hands over to that release's versioned URL (`newerInstaller`).
@@ -52,7 +52,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   stock fallback. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
   highlighting off. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
   Code otherwise draws in 256 colours and the theme's indigos turn grey.
-  The ccstatusline toggle writes `installer/assets/ccstatusline-night-city.json` (`ccstatusline.json`, the old stock config, is
+  The ccstatusline toggle writes `tools/installer/assets/ccstatusline-night-city.json` (`ccstatusline.json`, the old stock config, is
   kept only so the installer recognises and replaces it):
   Powerline (needs a Nerd Font), and since Powerline mode draws a gradient in its first colour only, the ナイトシティ
   sign is one widget per glyph. Nothing draws above the prompt now: ponytail's band is vendored but never loads, and the flows band and
@@ -89,7 +89,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   x64 only, like tui-review's binary (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
-  release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `npm run sync -- apply agent-browser`, which imports
+  release binaries' sha256 in `tools/installer/assets/agent-browser.json` (bumped by `npm run sync -- apply agent-browser`, which imports
   `AGENT_BROWSER_FILES` from `core/binaries.ts`). Unless a current one is on PATH, the installer keeps its own copy in
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
   pin); either way it sets `agentBrowserPath` to the one in use (`upstreamPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
@@ -164,7 +164,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   server of another identity unless that server's version is newer. A PostToolUse `http` hook posts to 127.0.0.1:47811;
   that port is written only in `hooks/hooks.json` and the installer reads it from there (`hookPort`), to stop the server
   before `uv sync` and before uninstalling the plugin. Every failure leaves Claude the original output.
-  The installer keeps the pinned uv (`installer/assets/uv.json`, bumped by `npm run sync -- apply uv`) in `~/.claude/bin`:
+  The installer keeps the pinned uv (`tools/installer/assets/uv.json`, bumped by `npm run sync -- apply uv`) in `~/.claude/bin`:
   once ours exists it always wins and is upgraded when older than the pin, since the launcher looks there first; a
   current uv on PATH is used only while ours is absent (`uvPlan` in `core/binaries.ts`). It then runs `uv sync --locked`
   and fetches tiktoken's vocabulary (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0008-python-through-installer-uv.md`. Dependabot's `uv`
@@ -247,12 +247,12 @@ plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus the upstream-sync workspace tests and all `installer/**/*.test.ts`, `scripts/*.test.mjs`, `plugins/default/hooks/*.test.mjs`, `plugins/flows/hooks/*.test.mjs` and `plugins/opt-in/headroom-trim/hooks/*.test.mjs`
+- `npm test`: repo checks plus the upstream-sync workspace tests and all `tools/installer/**/*.test.ts`, `scripts/*.test.mjs`, `plugins/default/hooks/*.test.mjs`, `plugins/flows/hooks/*.test.mjs` and `plugins/opt-in/headroom-trim/hooks/*.test.mjs`
   (`claude plugin validate` is skipped when `claude` isn't on PATH). The installer tests run with a line-coverage floor
-  (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `installer/modules.test.ts`
+  (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `tools/installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
-- `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `installer/` (sources and tests, strict).
+- `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `tools/installer/` (sources and tests, strict).
 - tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
 - web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
@@ -308,14 +308,14 @@ required checks with the admin bypass.
 
 ## Multiple agents
 
-`catalog/plugins.json` is the authored neutral catalog, loaded by `installer/system/catalog.ts`;
-`installer/core/agents.ts` declares host capabilities. `installer/system/packages.ts` generates both native distributions
+`catalog/plugins.json` is the authored neutral catalog, loaded by `tools/installer/system/catalog.ts`;
+`tools/installer/core/agents.ts` declares host capabilities. `tools/installer/system/packages.ts` generates both native distributions
 without changing vendored sources. Author → `npm run build:harnesses` → review generated changes → commit source and
 outputs together. `npm run check:harnesses` and prepack compare all owned outputs without rewriting them.
 `build:codex`/`check:codex` remain compatibility aliases. Native source manifests are development overlays, not the
 marketplace distribution. Add future targets through catalog capability, package, runtime and theme adapters; shared
 handlers must not learn native event or manifest shapes.
-`installer/steps/codex.ts` uses Codex's native plugin and MCP commands, respecting CODEX_HOME.
+`tools/installer/steps/codex.ts` uses Codex's native plugin and MCP commands, respecting CODEX_HOME.
 Keep Claude marketplace IDs and the legacy executable alias stable. The GitHub repository still has its old name.
 Flow behavior is shared; host-specific mappings live under `plugins/flows/references/hosts/`.
 Unavailable subagents mean skipped steps, never sequential replacements or successful check claims.
