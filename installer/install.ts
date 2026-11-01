@@ -263,7 +263,8 @@ await applyPlugins({
 });
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
-if (selected.includes(MCP_AZURE)) await applyBin('mcp-azure', MCP_AZURE, process.platform, process.arch, selfValues[MCP_AZURE]);
+if (selected.includes(MCP_AZURE))
+  await applyBin('mcp-azure', MCP_AZURE, process.platform, process.arch, selfValues[MCP_AZURE]);
 if (selected.includes(FLOW_COCKPIT)) await applyBin('flow-cockpit', FLOW_COCKPIT);
 
 // The built-in web tools are denied only once web-mcp's browser window can open.

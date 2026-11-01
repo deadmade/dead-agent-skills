@@ -1,6 +1,11 @@
 // Plugin settings collected by the installer, with secrets passed only on stdin.
 import { newer } from './release.ts';
-export interface ConfigField { title: string; description: string; sensitive?: boolean; required?: boolean }
+export interface ConfigField {
+  title: string;
+  description: string;
+  sensitive?: boolean;
+  required?: boolean;
+}
 export const SELF_CONFIGURED = ['mcp-azure'];
 
 // What to ask for a self-configured plugin, in manifest order; binKey is set by applyBin, not asked.
@@ -31,14 +36,34 @@ export function configValues(prompts: ReturnType<typeof configPrompts>, answers:
 
 // supported: configureSupported(). Without `configure`, a new plugin gets the handoff note and an installed one is left
 // as it is.
-export function selfConfigure({ installed, configuredKeys, requiredKeys, supported = true }: { installed: boolean; configuredKeys: string[]; requiredKeys: string[]; supported?: boolean }) {
+export function selfConfigure({
+  installed,
+  configuredKeys,
+  requiredKeys,
+  supported = true,
+}: {
+  installed: boolean;
+  configuredKeys: string[];
+  requiredKeys: string[];
+  supported?: boolean;
+}) {
   if (!supported) return installed ? 'skip' : 'handoff';
   return installed && requiredKeys.every((k) => configuredKeys.includes(k)) ? 'skip' : 'prompt';
 }
 
 // After the prompts: a new plugin still without a required value is handed off (nothing installed); an installed one
 // keeps what was given, and the summary names its unset keys, never values.
-export function afterPrompts({ name, id, installed, missing }: { name: string; id: string; installed: boolean; missing: string[] }) {
+export function afterPrompts({
+  name,
+  id,
+  installed,
+  missing,
+}: {
+  name: string;
+  id: string;
+  installed: boolean;
+  missing: string[];
+}) {
   if (!missing.length) return {};
   if (!installed) return { handoff: true };
   return { unset: `${name}: ${missing.join(', ')} not set; run /plugin configure ${id} in Claude Code` };

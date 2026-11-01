@@ -231,7 +231,7 @@ not json at all, "timestamp"
                 (20, None)
             ]
         );
-        assert!(parse(log, ts("2026-10-20T00:00:00Z")).is_empty());
+        assert_eq!(parse(log, ts("2026-10-20T00:00:00Z")), []);
     }
 
     #[test]

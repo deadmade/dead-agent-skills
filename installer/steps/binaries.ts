@@ -25,7 +25,13 @@ function binVersionAt(name: string, path: string) {
 }
 
 // platform, arch: this machine's, passed in by tests.
-export async function applyBin(pluginName: string, plugin: string, platform = process.platform, arch = process.arch, extra: Record<string, string> = {}) {
+export async function applyBin(
+  pluginName: string,
+  plugin: string,
+  platform = process.platform,
+  arch = process.arch,
+  extra: Record<string, string> = {},
+) {
   const { name, key, linuxHint, folder } = BIN_PLUGINS[pluginName];
   const version = VERSION;
   if (platform === 'linux' && linuxHint) return done.push(`${name}: ${linuxHint(version)}`);
@@ -40,9 +46,7 @@ export async function applyBin(pluginName: string, plugin: string, platform = pr
   if (action === 'skip') done.push(`${name}: using the one on PATH`);
   let ours = action === 'configure';
   if (action === 'unsupported')
-    failures.push(
-      `${name}: no release build for ${platform}-${arch}${folder ? '' : `; ${binAdvice(pluginName)}`}`,
-    );
+    failures.push(`${name}: no release build for ${platform}-${arch}${folder ? '' : `; ${binAdvice(pluginName)}`}`);
   if (action === 'download') {
     const r = await progress(`Downloading ${name} ${version}`, async () => {
       await downloadBin(name, asset!, bin);
@@ -58,7 +62,8 @@ export async function applyBin(pluginName: string, plugin: string, platform = pr
   if (r.ok) {
     if (values[key]) done.push(`${pluginName}: ${key} is ${bin}`);
     if (Object.keys(extra).length) done.push(`${pluginName}: saved ${Object.keys(extra).join(', ')}`);
-  } else if (Object.keys(extra).length) failures.push(`${pluginName}: could not save its settings; run /plugin configure ${plugin} in Claude Code`);
+  } else if (Object.keys(extra).length)
+    failures.push(`${pluginName}: could not save its settings; run /plugin configure ${plugin} in Claude Code`);
   else
     failures.push(
       `${pluginName}: could not set ${key} (${r.err}); set it to ${bin} with /plugin configure ${pluginName}`,

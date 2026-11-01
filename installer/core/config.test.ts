@@ -2,7 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { SELF_CONFIGURED, configPrompts, configValues, selfConfigure, configureArgs, configureSupported, afterPrompts } from './config.ts';
+import {
+  SELF_CONFIGURED,
+  configPrompts,
+  configValues,
+  selfConfigure,
+  configureArgs,
+  configureSupported,
+  afterPrompts,
+} from './config.ts';
 const M = 'dead-claude-skills';
 const json = (path: string) => JSON.parse(readFileSync(resolve(import.meta.dirname, '../..', path), 'utf8'));
 test('mcp-azure asks for its settings itself, in manifest order, without its binary path', () => {
@@ -83,4 +91,3 @@ test('configureArgs reads the values from stdin, never from its arguments', () =
   for (const v of ['test-pat', 'https://tfs.example/tfs/Coll'])
     assert.ok(!args.some((a) => a.includes(v)), `${v} is not an argument`);
 });
-

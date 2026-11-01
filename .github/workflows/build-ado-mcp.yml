@@ -47,7 +47,7 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --locked --bins --target ${{ matrix.target }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Smoke test
         run: target/${{ matrix.target }}/release/ado-mcp --version
@@ -57,9 +57,9 @@ jobs:
           name=ado-mcp-${{ matrix.target }}
           mkdir -p "$RUNNER_TEMP/dist"
           if [ "${{ matrix.archive }}" = zip ]; then
-            7z a -tzip "$RUNNER_TEMP/dist/$name.zip" "./target/${{ matrix.target }}/release/ado-mcp.exe" "./target/${{ matrix.target }}/release/timetrack.exe" > /dev/null
+            7z a -tzip "$RUNNER_TEMP/dist/$name.zip" "./target/${{ matrix.target }}/release/ado-mcp.exe" > /dev/null
           else
-            tar -czf "$RUNNER_TEMP/dist/$name.tar.gz" -C "target/${{ matrix.target }}/release" ado-mcp timetrack
+            tar -czf "$RUNNER_TEMP/dist/$name.tar.gz" -C "target/${{ matrix.target }}/release" ado-mcp
           fi
           cd "$RUNNER_TEMP/dist"
           for f in "$name".*; do

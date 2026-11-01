@@ -268,7 +268,10 @@ test('trimServerPort: the hook port of the installed copy, undefined when not in
   const read = (p: string) => (p === join('/ht', 'hooks', 'hooks.json') ? hooks : undefined);
   assert.equal(trimServerPort(installed, 'headroom-trim@m', read), 47811);
   assert.equal(trimServerPort(installed, 'other@m', read), undefined);
-  assert.equal(trimServerPort(installed, 'headroom-trim@m', () => undefined), undefined);
+  assert.equal(
+    trimServerPort(installed, 'headroom-trim@m', () => undefined),
+    undefined,
+  );
 });
 
 test('pluginDataDir replaces @ with - in the id', () => {

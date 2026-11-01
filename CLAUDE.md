@@ -30,7 +30,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; tui-review and web-mcp
   are also offered on their own but live in `shared/`. Moving a folder doesn't touch installs (they key on the
   plugin `name`); renaming a plugin does.
-- `crates/`: the four Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`), `web-mcp` (web-mcp's server) `ado-mcp` (mcp-azure’s server), and
+- `crates/`: the four Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`), `web-mcp` (web-mcp's server), `ado-mcp` (mcp-azure’s server), and
   `flow-cockpit` (the flow cockpit window, a workspace of `core` and `app`). Each keeps its own
   `Cargo.lock`; nothing in the plugins reaches into them at runtime.
 - `crates/ado-mcp/`: the mcp-azure server. Its library (`lib.rs`) also backs `timetrack` (`src/bin/timetrack/`), a
