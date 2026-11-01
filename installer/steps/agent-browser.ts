@@ -48,7 +48,9 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
   let deps = false;
   if (plan.download !== 'skip') {
     const what = plan.download === 'install' ? 'Download' : `Upgrade ${ours} to`;
-    if (!(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))) {
+    if (
+      !(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))
+    ) {
       done.push('agent-browser: install skipped by you');
       return { works: false };
     }

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-doc"
+description = "Enables the doc command without any pre-configured scope."
+commands.allow = ["doc"]
+
+[[permission]]
+identifier = "deny-doc"
+description = "Denies the doc command without any pre-configured scope."
+commands.deny = ["doc"]

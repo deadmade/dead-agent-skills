@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hosted-sessions"
+description = "Enables the hosted_sessions command without any pre-configured scope."
+commands.allow = ["hosted_sessions"]
+
+[[permission]]
+identifier = "deny-hosted-sessions"
+description = "Denies the hosted_sessions command without any pre-configured scope."
+commands.deny = ["hosted_sessions"]
