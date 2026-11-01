@@ -66,8 +66,8 @@ export const CATEGORIES: Page[] = [
   {
     id: 'tools',
     title: 'Tools',
-    blurb: 'Plugins that bring their own binary or pane.',
-    keys: ['graphify', 'tui-review', 'web-mcp', 'headroom-trim', 'web-builtins-off', 'md-pane'],
+    blurb: 'Plugins that bring their own binary, pane or window.',
+    keys: ['graphify', 'tui-review', 'web-mcp', 'headroom-trim', 'web-builtins-off', 'md-pane', 'flow-cockpit'],
   },
   {
     id: 'system',
@@ -116,6 +116,9 @@ export function unavailable(key: string, platform: string, arch: string, version
   if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version);
   if (name === 'headroom-trim' && !UV_FILES[`${platform}-${arch}`]) return `no uv build for ${platform}-${arch}`;
   const bin = BIN_PLUGINS[name];
-  if (bin && !binAsset(bin.name, platform, arch, version)) return `no ${bin.name} build for ${platform}-${arch}`;
+  // A linuxHint points at the flake, which builds for x86_64-linux only.
+  const hinted = bin?.linuxHint && platform === 'linux' && arch === 'x64';
+  if (bin && !hinted && !binAsset(bin.name, platform, arch, version))
+    return `no ${bin.name} build for ${platform}-${arch}`;
   return undefined;
 }

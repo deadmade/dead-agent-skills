@@ -51,7 +51,7 @@ import {
 } from './context.ts';
 import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
 import { HEADROOM_TRIM, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
-import { TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
+import { FLOW_COCKPIT, TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
 import { applyDcg } from './steps/dcg.ts';
@@ -257,6 +257,7 @@ await applyPlugins({
 });
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
+if (selected.includes(FLOW_COCKPIT)) await applyBin('flow-cockpit', FLOW_COCKPIT);
 
 // The built-in web tools are denied only once web-mcp's browser window can open.
 const browser = selected.includes(WEB_MCP) ? await installAgentBrowser() : { works: false };

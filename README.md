@@ -16,6 +16,12 @@ Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.
 passive lookups and a browser with an archive of everything it pulled, and
 [headroom-trim](plugins/opt-in/headroom-trim/README.md), which shrinks every tool result with headroom's offline compression before Claude reads it.
 
+Also available: [flow-cockpit](plugins/opt-in/flow-cockpit/README.md), whose skill writes the views of the flow cockpit, a window
+over your flow runs, audits and Claude sessions (on Linux the app comes from the flake:
+`nix run github:deadmade/dead-claude-skills#flow-cockpit`; on Windows the installer downloads it to
+`%USERPROFILE%\.claude\bin\flow-cockpit\`). It also installs hooks that record questions, permission
+prompts and agent starts and stops per session into a local capture folder, which only the window reads.
+
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
 with approval gates and a state file to resume from. They keep the number of agents small, ultracode included, and run
@@ -33,7 +39,7 @@ old installs of them.
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It points the marketplace at the `release` branch, which follows the newest
-release, so Claude Code updates the plugins on its own (rerun the installer for new tui-review and web-mcp binaries), and
+release, so Claude Code updates the plugins on its own (rerun the installer for new tui-review and web-mcp binaries and the flow cockpit's Windows app), and
 it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). It
 lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).

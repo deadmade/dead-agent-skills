@@ -1,0 +1,1180 @@
+// The view runtime. It loads every view the app lists as code (`view_source` → a `text/javascript` Blob → `import()`,
+// the Blob URL revoked right after), adds each loaded extension's `style.css` as one `<style>`, draws the views of the
+// current route, each in its own section, and loads them again on `views-changed`. The views are those of the route's
+// project: a repository the user trusts adds its own on its project's pages only, so moving to another project loads
+// that project's set (a view from the same place as before is kept, with its module state). A repository view's module
+// can't be unloaded, so when one that was imported stops being allowed (trust taken away, its folder gone, switched
+// off) or its id comes with other code (another trusted checkout's, an edit), the window reloads; the address keeps the
+// page. A view that fails to load
+// or to draw shows its error card in its own section, with the default of that id drawn below it when another
+// extension replaced it; the other views never see it.
+import { card } from './blocks/card.js';
+import { diff } from './blocks/diff.js';
+import { markdown, mermaidSources } from './blocks/markdown.js';
+import { ahead, mermaid, taskGraph, taskGraphSource } from './blocks/mermaid.js';
+import { stepper } from './blocks/stepper.js';
+import { findLinkedRun, renderRunBar, taskNumbers } from './run-bar.js';
+import { MAIN, buildChips, filterActivity, followLatest, taskOf } from './session-chips.js';
+
+/**
+ * @typedef {import('./api').View} View
+ * @typedef {import('./api').Route} Route
+ * @typedef {import('./api').DataApi} DataApi
+ * @typedef {import('./api').ViewContext} ViewContext
+ * @typedef {import('../../bindings/ViewInfo').ViewInfo} ViewInfo
+ * @typedef {import('../../bindings/Extensions').Extensions} Extensions
+ * @typedef {import('../../bindings/DocName').DocName} DocName
+ * @typedef {(cmd: string, args?: Record<string, unknown>) => Promise<any>} Invoke
+ * @typedef {(event: string, handler: (event: { payload: any }) => void) => Promise<unknown>} Listen
+ * @typedef {{ view: View | null, error: unknown }} Loaded
+ * @typedef {Loaded & { info: ViewInfo, fallback: Loaded | null }} Entry
+ */
+
+const SLOTS = ['list', 'run', 'run-tab', 'doc', 'session'];
+const blocks = Object.freeze({ markdown, mermaid, diff, stepper, card, taskGraph });
+/** @type {DocName[]} */
+const DOCS = ['Spec', 'Plan', 'Flow'];
+
+/** @param {unknown} err */
+const reason = (err) => (err instanceof Error ? err.message : String(err));
+
+/**
+ * A command's output as a `<pre>` shows it: without the terminal's escape sequences (colors, cursor moves, titles),
+ * which would show as stray characters. Only the display: what was read is kept as it came.
+ * @param {string} text
+ */
+const plain = (text) => text.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, '');
+
+/**
+ * An element's place in its view's section, which a redraw builds anew: from the nearest `id` or `data-keep` (the
+ * section's own descendants only), else child indexes from the section.
+ * @typedef {{ view: string, path: string[] }} Place
+ * @param {Element} el @returns {Place | null}
+ */
+function placeOf(el) {
+  const home = el.closest('section.view');
+  if (!(home instanceof window.HTMLElement) || !home.dataset.view) return null;
+  /** @type {string[]} */
+  const path = [];
+  for (let node = el; node !== home && node.parentElement; node = node.parentElement) {
+    const name = node.id || node.getAttribute('data-keep');
+    if (name) {
+      path.unshift(`#${name}`);
+      break;
+    }
+    path.unshift(String(Array.prototype.indexOf.call(node.parentElement.children, node)));
+  }
+  return { view: home.dataset.view, path };
+}
+
+/**
+ * Each view's first section, with the first element of each `id` and `data-keep` name in it (nested sections'
+ * included), so a redraw finds every kept place without searching the section again: a long session has thousands.
+ * @typedef {Map<string, { section: Element, names: Map<string, Element> }>} Places
+ * @param {HTMLElement} root @returns {Places}
+ */
+function places(root) {
+  /** @type {Places} */
+  const views = new Map();
+  for (const section of root.querySelectorAll('section.view')) {
+    const view = section instanceof window.HTMLElement ? section.dataset.view : undefined;
+    if (!view || views.has(view)) continue;
+    /** @type {Map<string, Element>} */
+    const names = new Map();
+    for (const el of section.querySelectorAll('[id], [data-keep]')) {
+      for (const name of [el.id, el.getAttribute('data-keep')]) if (name && !names.has(name)) names.set(name, el);
+    }
+    views.set(view, { section, names });
+  }
+  return views;
+}
+
+/** A place's element: a name is always the path's first step (see `placeOf`). @param {Places} index @param {Place} place */
+function find(index, place) {
+  const at = index.get(place.view);
+  /** @type {Element | null | undefined} */
+  let node = at?.section;
+  for (const step of place.path) {
+    if (!node || !at) return null;
+    node = step.startsWith('#') ? at.names.get(step.slice(1)) : node.children[Number(step)];
+  }
+  return node ?? null;
+}
+
+/**
+ * What the user did to the drawn views: scrolled panes, open folds, expanded disclosures, and the focused field with
+ * its text and selection.
+ * @typedef {{ place: Place, top: number, left: number }} Scrolled
+ * @typedef {{ place: Place, value: string | null, start: number | null, end: number | null, direction: string | null }} Focused
+ * @typedef {{ scrolled: Scrolled[], folds: { place: Place, open: boolean }[], expanded: { place: Place, value: string }[], focused: Focused | null }} Kept
+ * `moved` holds the elements that have scrolled (from `scroll` events): only those are measured, since reading the
+ * scroll position of every element of a long session takes seconds. The ones no longer drawn are dropped from it.
+ * @param {HTMLElement} root @param {Set<Element>} moved @returns {Kept}
+ */
+function snapshot(root, moved) {
+  /** @type {Kept} */
+  const kept = { scrolled: [], folds: [], expanded: [], focused: null };
+  for (const el of moved) {
+    if (!root.contains(el)) {
+      moved.delete(el);
+      continue;
+    }
+    const at = el.scrollTop || el.scrollLeft ? placeOf(el) : null;
+    if (at) kept.scrolled.push({ place: at, top: el.scrollTop, left: el.scrollLeft });
+  }
+  for (const el of root.querySelectorAll('details')) {
+    const at = placeOf(el);
+    if (at) kept.folds.push({ place: at, open: el.open });
+  }
+  for (const el of root.querySelectorAll('[aria-expanded]')) {
+    const at = placeOf(el);
+    if (at) kept.expanded.push({ place: at, value: el.getAttribute('aria-expanded') ?? '' });
+  }
+  const active = document.activeElement;
+  const at = active && root.contains(active) ? placeOf(active) : null;
+  if (active && at) {
+    const field = active instanceof window.HTMLInputElement || active instanceof window.HTMLTextAreaElement;
+    /** @param {() => number | string | null} read */
+    const safe = (read) => {
+      try {
+        return read();
+      } catch {
+        return null; // An input type without a text selection.
+      }
+    };
+    kept.focused = {
+      place: at,
+      value: field ? active.value : null,
+      start: field ? /** @type {number | null} */ (safe(() => active.selectionStart)) : null,
+      end: field ? /** @type {number | null} */ (safe(() => active.selectionEnd)) : null,
+      direction: field ? /** @type {string | null} */ (safe(() => active.selectionDirection)) : null,
+    };
+  }
+  return kept;
+}
+
+/**
+ * Puts back what `snapshot` saw, on the elements in the same places; the panes it scrolls join `moved`.
+ * @param {HTMLElement} root @param {Kept} kept @param {Set<Element>} moved
+ */
+function restore(root, kept, moved) {
+  /** @type {Places | null} */
+  let index = null;
+  /** @param {Place} place */
+  const lookup = (place) => find((index ??= places(root)), place);
+  for (const { place, open } of kept.folds) {
+    const el = lookup(place);
+    if (el instanceof window.HTMLDetailsElement) el.open = open;
+  }
+  // A disclosure opens and closes through its own handler: the view's state follows the click. The handler may
+  // draw part of the view again, so the places are looked up afresh after it.
+  for (const { place, value } of kept.expanded) {
+    const el = lookup(place);
+    if (el instanceof window.HTMLElement && el.getAttribute('aria-expanded') !== value) {
+      el.click();
+      index = null;
+    }
+  }
+  const focus = kept.focused;
+  const el = focus && lookup(focus.place);
+  if (focus && el instanceof window.HTMLElement) {
+    el.focus({ preventScroll: true });
+    if ((el instanceof window.HTMLInputElement || el instanceof window.HTMLTextAreaElement) && focus.value !== null) {
+      if (el.value !== focus.value) {
+        el.value = focus.value;
+        // The view filters on what was typed, as if it were typed again.
+        el.dispatchEvent(new window.Event('input', { bubbles: true }));
+      }
+      if (focus.start !== null && focus.end !== null) {
+        try {
+          el.setSelectionRange(focus.start, focus.end, /** @type {any} */ (focus.direction ?? undefined));
+        } catch {
+          // An input type without a text selection.
+        }
+      }
+    }
+    // The restored text reaches the view as typed (`input`), which may draw part of it again.
+    index = null;
+  }
+  for (const { place, top, left } of kept.scrolled) {
+    const el = lookup(place);
+    if (el) {
+      el.scrollTop = top;
+      el.scrollLeft = left;
+      moved.add(el);
+    }
+  }
+}
+
+/**
+ * The route's place in the window's address, so back, forward and a reload find it: `#/<kind>/<part>/…`, each part
+ * URI-encoded (`#/run/<project>/<slug>/<tab>`, `#/session/<project>/<id>`).
+ * @param {Route} at
+ */
+function hashOf(at) {
+  const parts =
+    at.to === 'list'
+      ? [at.project]
+      : at.to === 'run'
+        ? [at.project, at.slug, at.tab]
+        : at.to === 'doc'
+          ? [at.project, at.slug, at.name]
+          : [at.project, at.id];
+  return `#/${[at.to, ...parts.filter((p) => p !== undefined)].map(encodeURIComponent).join('/')}`;
+}
+
+/** The route an address names; null when it names none. @param {string} hash @returns {Route | null} */
+function routeOf(hash) {
+  if (!hash.startsWith('#/')) return null;
+  /** @type {string[]} */
+  let parts;
+  try {
+    parts = hash.slice(2).split('/').map(decodeURIComponent);
+  } catch {
+    return null; // A broken escape.
+  }
+  if (parts.some((p) => !p)) return null;
+  const [to, project, a, b] = parts;
+  const n = parts.length;
+  if (to === 'list') return n === 1 ? { to } : n === 2 ? { to, project } : null;
+  if (to === 'run') return n === 3 ? { to, project, slug: a } : n === 4 ? { to, project, slug: a, tab: b } : null;
+  if (to === 'session') return n === 3 ? { to, project, id: a } : null;
+  const name = DOCS.find((d) => d === b);
+  return to === 'doc' && n === 4 && name ? { to, project, slug: a, name } : null;
+}
+
+/** The run route names a tab no loaded view draws. @param {string} id */
+function missingTab(id) {
+  const line = document.createElement('p');
+  line.className = 'quiet';
+  line.textContent = `The ${id} tab isn't loaded.`;
+  return line;
+}
+
+/**
+ * @param {{ root: HTMLElement, invoke: Invoke, listen: Listen, importModule?: (url: string) => Promise<any>, renderTimeout?: number, hosted?: ReadonlySet<string>, mountPane?: (id: string) => HTMLElement, resume?: (id: string) => Promise<void> }} app
+ *   `renderTimeout`: how long a view's render may take, in ms, before it shows as broken.
+ *   `hosted`: the ids of the sessions this app runs, which the shell keeps current (a set the runtime only reads);
+ *   `mountPane`: makes the terminal of one of them, an element in `#terminals`. The runtime calls it once per id, the first
+ *   time that session's tab is drawn, and from then on only places and hides what it returned. Both are the shell's: a
+ *   view's `ctx` has neither, nor anything that reaches the session.
+ *   `resume`: runs the session again (the shell's `resumeSession`, which also adds it to `hosted`). With it, the screen of
+ *   a session not in `hosted` has a Resume button; without it there is none. Like `mountPane` it is the shell's, so it
+ *   is on no view's `ctx`.
+ */
+export function createRuntime({
+  root,
+  invoke,
+  listen,
+  importModule = (url) => import(url),
+  renderTimeout = 5000,
+  hosted = new Set(),
+  mountPane,
+  resume,
+}) {
+  /** The projects as of the current draw: one `projects` call per draw, for the runtime and the views alike. */
+  /** @type {Promise<import('../../bindings/Project').Project[]> | null} */
+  let projectsNow = null;
+  /** @type {DataApi} */
+  const data = Object.freeze({
+    projects: () => (projectsNow ??= invoke('projects')),
+    entries: (/** @type {string} */ project) => invoke('entries', { project }),
+    flowRun: (/** @type {string} */ project, /** @type {string} */ slug) => invoke('flow_run', { project, slug }),
+    doc: (/** @type {string} */ project, /** @type {string} */ slug, /** @type {DocName} */ name) =>
+      invoke('doc', { project, slug, name }),
+    session: (/** @type {string} */ id, /** @type {import('./api').SessionPage} */ page = {}) =>
+      invoke('session', { id, before: page.before ?? null, limit: page.limit ?? null }),
+    toolInput: (/** @type {string} */ session, /** @type {string} */ tool) => invoke('tool_input', { session, tool }),
+    toolResult: (/** @type {string} */ session, /** @type {string} */ tool) => invoke('tool_result', { session, tool }),
+    backgroundTasks: (/** @type {string} */ session) => invoke('background_tasks', { session }),
+    backgroundOutput: (/** @type {string} */ session, /** @type {string} */ task) =>
+      invoke('background_output', { session, taskId: task }),
+    views: () => invoke('views'),
+    viewSource: (/** @type {string} */ id) => invoke('view_source', { id }),
+    previewCommand: (/** @type {import('../../bindings/LaunchSpecInput').LaunchSpecInput} */ input) =>
+      invoke('preview_command', { input }),
+  });
+
+  /** @type {Route} */
+  let route = { to: 'list' };
+  /** @type {Entry[]} */
+  let entries = [];
+  /** @type {unknown} */
+  let listError = null;
+  /** @type {Extensions} */
+  let extensions = { styles: [], disabled: [], looked: [] };
+  /** The route last drawn, as JSON. */
+  let drawnAt = '';
+  /** The route came from moving through history (back, forward), not from `navigate`. */
+  let traversing = false;
+  /** What the user did to the pages they left, by route JSON, for back and forward to put back; the newest 50. */
+  /** @type {Map<string, Kept>} */
+  const left = new Map();
+  /** @type {Promise<void>} */
+  let last = Promise.resolve();
+  /** The drawn elements that have scrolled, for `snapshot`. `scroll` doesn't bubble, so it is caught on its way down. */
+  /** @type {Set<Element>} */
+  const moved = new Set();
+  root.addEventListener(
+    'scroll',
+    (event) => {
+      if (event.target instanceof window.Element) moved.add(event.target);
+    },
+    true,
+  );
+
+  /** The project whose views are loaded (`''` for none); null before the first load and after `views-changed`. */
+  /** @type {string | null} */
+  let loadedFor = null;
+  /** A `views-changed` reload is under way: what was imported is checked against what is still allowed. */
+  let reloading = false;
+  /**
+   * Per project, the repository views imported for its pages, by id, with the code each was imported from. A module
+   * can't be unloaded, so its timers and listeners outlive its page: once one isn't allowed any more, or its id is
+   * served with other code (another trusted checkout's, or an edit), the window reloads.
+   * @type {Map<string, Map<string, string>>}
+   */
+  const imported = new Map();
+
+  /** The commands' `project` argument: none for no project. @param {string} project */
+  const scope = (project) => (project ? { project } : {});
+
+  /**
+   * The project a route's page belongs to: the one it names, else (the list) the first project, which the list then
+   * shows; `''` for none.
+   * @param {Route} at @returns {Promise<string>}
+   */
+  async function projectOf(at) {
+    if ('project' in at && at.project) return at.project;
+    try {
+      /** @type {import('../../bindings/Project').Project[] | null} */
+      const projects = await data.projects();
+      return projects?.[0]?.id ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * `project` only for a view listed as a repository's: any other is read without it, so a repository view that turns
+   * up between the listing and this read can't come back under another view's label.
+   * @param {string} id @param {boolean} builtin @param {string} project @returns {Promise<View>}
+   */
+  async function load(id, builtin, project) {
+    /** @type {string} */
+    const source = await invoke('view_source', { id, ...(builtin ? { builtin: true } : {}), ...scope(project) });
+    if (project) {
+      if (!imported.has(project)) imported.set(project, new Map());
+      imported.get(project)?.set(id, source);
+    }
+    const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+    let module;
+    try {
+      module = await importModule(url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    const view = module?.default;
+    if (!view || typeof view.render !== 'function') throw new Error('it has no default export with a render function');
+    /** @type {unknown[]} */
+    const slots = Array.isArray(view.slot) ? view.slot : [view.slot];
+    if (!slots.length) throw new Error('its slot list is empty');
+    const odd = slots.findIndex((s) => typeof s !== 'string' || !SLOTS.includes(s));
+    if (odd >= 0) throw new Error(`its slot "${slots[odd]}" isn't one of ${SLOTS.join(', ')}`);
+    return view;
+  }
+
+  /** @param {string} id @param {boolean} builtin @param {string} project @returns {Promise<Loaded>} */
+  const loaded = (id, builtin, project) =>
+    load(id, builtin, project).then(
+      (view) => ({ view, error: null }),
+      (error) => ({ view: null, error }),
+    );
+
+  /** Each extension's `style.css` as one `<style>`; the ones from the last load go. */
+  function applyStyles() {
+    for (const old of document.head.querySelectorAll('style[data-extension]')) old.remove();
+    for (const { extension, css } of extensions.styles) {
+      const style = document.createElement('style');
+      style.dataset.extension = extension;
+      style.textContent = css;
+      document.head.append(style);
+    }
+  }
+
+  /**
+   * Loads the views of `project`'s pages. With `keep`, a view the last load got from the same place is kept as it is,
+   * module state and all; a repository's view never is, since another project's repository may have one of that id.
+   * @param {string} project @param {boolean} keep @returns {Promise<ViewInfo[] | null>} the listing; null on an error
+   */
+  async function loadAll(project, keep) {
+    loadedFor = project;
+    try {
+      /** @type {[ViewInfo[], Extensions | null]} */
+      const [infos, ext] = await Promise.all([invoke('views', scope(project)), invoke('extensions', scope(project))]);
+      extensions = ext ?? { styles: [], disabled: [], looked: [] };
+      applyStyles();
+      const before = keep ? entries : [];
+      entries = await Promise.all(
+        infos.map(async (info) => {
+          const same = before.find(
+            (e) =>
+              info.source !== 'Repo' &&
+              e.info.id === info.id &&
+              e.info.source === info.source &&
+              e.info.replaced === info.replaced,
+          );
+          if (same) return same;
+          const own = await loaded(info.id, false, info.source === 'Repo' ? project : '');
+          // A broken replacement's slot comes from the built-in behind it.
+          const fallback = own.view || !info.replaced ? null : await loaded(info.id, true, '');
+          return { info, ...own, fallback };
+        }),
+      );
+      listError = null;
+      return infos;
+    } catch (err) {
+      entries = [];
+      listError = err;
+      return null;
+    }
+  }
+
+  /** `imported` as it is now, to compare a reload's against. */
+  const importedNow = () => new Map([...imported].map(([p, ids]) => [p, new Map(ids)]));
+
+  /**
+   * Whether every repository view imported before this reload (`was`) is still allowed on its project's pages
+   * (trusted, its folder there, not switched off) and still served with the code it was imported from. `infos` is the
+   * listing just read for `project`, whose repository views the reload has just imported again.
+   * @param {Map<string, Map<string, string>>} was @param {string} project @param {ViewInfo[]} infos
+   */
+  async function stillAllowed(was, project, infos) {
+    for (const [p, ids] of was) {
+      /** @type {ViewInfo[] | null} */
+      const listed = p === project ? infos : await invoke('views', scope(p)).catch(() => null);
+      if (!listed) continue;
+      const repo = new Set(listed.filter((i) => i.source === 'Repo').map((i) => i.id));
+      for (const [id, source] of ids) {
+        if (!repo.has(id)) return false;
+        const now =
+          p === project ? imported.get(p)?.get(id) : await invoke('view_source', { id, project: p }).catch(() => null);
+        if (now !== source) return false;
+      }
+    }
+    return true;
+  }
+
+  /** The slots a view serves; empty while it never loaded. @param {Entry} entry @returns {readonly string[]} */
+  const slotsOf = (entry) => {
+    const slot = entry.view?.slot ?? entry.fallback?.view?.slot;
+    return slot === undefined ? [] : typeof slot === 'string' ? [slot] : slot;
+  };
+
+  /** @param {string} id @param {unknown} err @param {boolean} replaced */
+  const errorCard = (id, err, replaced) =>
+    card({
+      title: `The ${id} view couldn't be drawn.`,
+      meta: replaced ? 'Your copy failed, so the default one is drawn below.' : undefined,
+      body: reason(err),
+      error: true,
+    });
+
+  /** A render that never settles becomes an error, so one view can't stall the window. */
+  /** @param {View} view @param {ViewContext} ctx @returns {Promise<Node>} */
+  async function render(view, ctx) {
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let timer;
+    const late = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`its render didn't finish within ${renderTimeout / 1000} s`)),
+        renderTimeout,
+      );
+    });
+    try {
+      const node = await Promise.race([Promise.resolve().then(() => view.render(ctx)), late]);
+      if (!(node instanceof window.Node)) throw new Error('its render returned no DOM node');
+      return node;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** One view in its own section; a failure stays inside it. @param {Entry} entry @param {ViewContext} ctx */
+  async function section(entry, ctx) {
+    const box = document.createElement('section');
+    box.className = 'view';
+    box.dataset.view = entry.info.id;
+    let error = entry.error;
+    if (entry.view) {
+      try {
+        box.append(await render(entry.view, ctx));
+        return box;
+      } catch (err) {
+        error = err;
+      }
+    }
+    box.append(errorCard(entry.info.id, error, entry.info.replaced));
+    if (!entry.info.replaced) return box;
+    entry.fallback ??= await loaded(entry.info.id, true, '');
+    const builtin = entry.fallback.view;
+    try {
+      if (!builtin) throw entry.fallback.error;
+      box.append(await render(builtin, ctx));
+    } catch (err) {
+      box.append(
+        card({ title: `The default ${entry.info.id} view couldn't be drawn either.`, body: reason(err), error: true }),
+      );
+    }
+    return box;
+  }
+
+  /**
+   * The placeholders `terminalSlot` made. A view can draw an element with the same attribute, even for a hosted
+   * session's id and ahead of the real one: only these get a pane laid over them.
+   * @type {WeakSet<Element>}
+   */
+  const ownSlots = new WeakSet();
+
+  /**
+   * A hosted session's terminal is never drawn in `#app`, which a redraw replaces: this empty element marks where it
+   * goes, and `placePanes` lays the real pane (in `#terminals`) over it.
+   * @param {string} id
+   */
+  function terminalSlot(id) {
+    const slot = document.createElement('div');
+    slot.className = 'terminal-slot';
+    slot.dataset.terminalSlot = id;
+    slot.style.minHeight = '24rem';
+    ownSlots.add(slot);
+    return slot;
+  }
+
+  /**
+   * The Resume button of a session this app doesn't run, drawn beside its Activity view. A resume that works is drawn
+   * again, now as a hosted session; one that fails says why and can be tried again.
+   * @param {string} id @param {(id: string) => Promise<void>} run
+   */
+  function resumeBar(id, run) {
+    const bar = document.createElement('div');
+    bar.className = 'resume-bar';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.resume = '';
+    button.textContent = 'Resume';
+    const problem = document.createElement('p');
+    problem.className = 'error';
+    problem.setAttribute('role', 'alert');
+    problem.hidden = true;
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      problem.hidden = true;
+      try {
+        await run(id);
+      } catch (err) {
+        problem.textContent = `The session didn't resume: ${reason(err)}`;
+        problem.hidden = false;
+        button.disabled = false;
+        return;
+      }
+      requestDraw();
+    });
+    bar.append(button, problem);
+    return bar;
+  }
+
+  /** A hosted session's chip choice, by session id, kept while the window is open: a chip's id, or `FOLLOW`. */
+  /** @type {Map<string, string>} */
+  const picks = new Map();
+  const FOLLOW = 'follow';
+  /** What a session with nothing read yet looks like. @type {import('../../bindings/Activity').Activity} */
+  const NOTHING = {
+    turns: [],
+    start: 0,
+    total: 0,
+    agents: [],
+    live: { waiting: null, since: null, left_open: false },
+  };
+
+  /**
+   * What the user did in a session's output panel, kept across the redraws a live session gets every few seconds: the
+   * calls left open, the results and the background output read (so a redraw shows them at once, not "Loading…"), and
+   * how far each was scrolled. Keys are `call:<id>` and `output:<task>`.
+   * @typedef {{ open: Set<string>, read: Map<string, string>, top: Map<string, number> }} PanelKept
+   * @type {Map<string, PanelKept>}
+   */
+  const panelKept = new Map();
+
+  /** @param {string} session @returns {PanelKept} */
+  function keptFor(session) {
+    let kept = panelKept.get(session);
+    if (!kept) panelKept.set(session, (kept = { open: new Set(), read: new Map(), top: new Map() }));
+    return kept;
+  }
+
+  /**
+   * A `<pre>` of `text` that keeps how far it was scrolled under `key`, and gets it back once it is in the page.
+   * @param {PanelKept} kept @param {string} key @param {string} text
+   */
+  function keptPre(kept, key, text) {
+    const pre = document.createElement('pre');
+    pre.textContent = text;
+    pre.addEventListener('scroll', () => kept.top.set(key, pre.scrollTop));
+    const top = kept.top.get(key);
+    // The draw puts the panel in the page before its next await, so before this runs.
+    if (top) queueMicrotask(() => (pre.scrollTop = top));
+    return pre;
+  }
+
+  /**
+   * One tool call in the output panel; its result is read when it opens.
+   * @param {string} session @param {import('../../bindings/ToolCall').ToolCall} call
+   */
+  function panelCall(session, call) {
+    const kept = keptFor(session);
+    const key = `call:${call.id}`;
+    const out = document.createElement('div');
+    const fold = document.createElement('details');
+    fold.className = call.failed ? 'unfold tool-call failed' : 'unfold tool-call';
+    const head = document.createElement('summary');
+    head.textContent = `${call.tool} ${call.summary}${call.failed ? ' (failed)' : ''}`;
+    fold.append(head, out);
+    fold.addEventListener('toggle', () => {
+      if (!fold.open) {
+        kept.open.delete(call.id);
+        return;
+      }
+      kept.open.add(call.id);
+      if (out.childNodes.length) return;
+      const known = kept.read.get(key);
+      if (known !== undefined) {
+        out.replaceChildren(keptPre(kept, key, known));
+        return;
+      }
+      const note = document.createElement('p');
+      note.className = 'quiet';
+      note.textContent = 'Loading…';
+      out.append(note);
+      data.toolResult(session, call.id).then(
+        (text) => {
+          if (text === null) {
+            note.textContent = 'No result yet, or the transcript no longer holds it.';
+            return;
+          }
+          kept.read.set(key, text);
+          out.replaceChildren(keptPre(kept, key, text));
+        },
+        (err) => {
+          note.textContent = `This call's result couldn't be read: ${reason(err)}`;
+        },
+      );
+    });
+    // Open before this redraw: open again, with the result already read, if it was.
+    if (kept.open.has(call.id)) {
+      const known = kept.read.get(key);
+      if (known !== undefined) out.append(keptPre(kept, key, known));
+      fold.open = true;
+    }
+    return fold;
+  }
+
+  /**
+   * The panel for a chip that isn't the main one: an agent's replies and calls in time order, its report last, or a
+   * background command's output, read now.
+   * @param {string} session @param {import('../../bindings/Activity').Activity} activity
+   * @param {import('./session-chips.js').Chip} chip
+   */
+  function outputPanel(session, activity, chip) {
+    const panel = document.createElement('div');
+    panel.className = 'session-panel';
+    const title = document.createElement('h2');
+    title.textContent = chip.label;
+    panel.append(title);
+    if (chip.kind === 'background') {
+      // What was read for this command last time shows at once, and the fresh read replaces it.
+      const kept = keptFor(session);
+      const task = taskOf(chip);
+      const key = `output:${task}`;
+      const known = kept.read.get(key);
+      const note = document.createElement('p');
+      note.className = 'quiet';
+      note.textContent = 'Loading…';
+      /** @type {HTMLElement} */
+      let shown = known === undefined ? note : keptPre(kept, key, plain(known));
+      panel.append(shown);
+      /** @param {string} message */
+      const fail = (message) => {
+        kept.read.delete(key);
+        note.textContent = message;
+        if (shown !== note) shown.replaceWith(note);
+        shown = note;
+      };
+      data.backgroundOutput(session, task).then(
+        (text) => {
+          if (text === null) return fail("This command's output can't be read.");
+          // Only the newest command's output is kept: a command's can run to a megabyte.
+          for (const k of kept.read.keys()) if (k.startsWith('output:') && k !== key) kept.read.delete(k);
+          kept.read.set(key, text);
+          if (shown !== note) {
+            if (shown.textContent !== plain(text)) shown.textContent = plain(text);
+            return;
+          }
+          shown = keptPre(kept, key, plain(text));
+          note.replaceWith(shown);
+        },
+        (err) => fail(`This command's output couldn't be read: ${reason(err)}`),
+      );
+      return panel;
+    }
+    const { text, tools } = filterActivity(activity, chip);
+    const when = (/** @type {{ at: string }} */ item) => Date.parse(item.at) || 0;
+    const items = [
+      ...text.map((t) => ({ at: t.at, node: () => blocks.markdown(t.text) })),
+      ...tools.map((c) => ({ at: c.at, node: () => panelCall(session, c) })),
+    ].sort((a, b) => when(a) - when(b));
+    if (!items.length) {
+      const note = document.createElement('p');
+      note.className = 'quiet';
+      note.textContent = `Nothing from ${chip.label} yet.`;
+      panel.append(note);
+    }
+    for (const item of items) panel.append(item.node());
+    return panel;
+  }
+
+  /**
+   * A hosted session's output pane: the chips, and under them the Activity view (`sections`, drawn once by this draw)
+   * for the main chip or this panel for any other. Choosing a chip swaps what is under the chips from what this draw
+   * already read (`activity`, `tasks`): the view's elements are kept, so the main chip brings back the same ones.
+   * @param {string} session @param {Node[]} sections
+   * @param {import('../../bindings/Activity').Activity} activity
+   * @param {import('../../bindings/BackgroundTask').BackgroundTask[]} tasks
+   * @param {import('../../bindings/FlowRun').FlowRun | null} run the flow run the session is linked to, if any
+   */
+  function sessionOutput(session, sections, activity, tasks, run) {
+    const chips = buildChips(activity, tasks);
+    const numbers = run ? taskNumbers(run, activity.agents) : new Map();
+    const bar = document.createElement('div');
+    bar.className = 'chips';
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', 'Output');
+    bar.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem';
+    const body = document.createElement('div');
+    body.className = 'session-output-body';
+
+    const shown = () => {
+      const pick = picks.get(session) ?? MAIN;
+      const id = pick === FOLLOW ? followLatest(chips) : pick;
+      return chips.find((c) => c.id === id) ?? chips[0];
+    };
+
+    const button = (/** @type {string} */ label) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = label;
+      return b;
+    };
+    const follow = button('Follow latest');
+    follow.dataset.follow = '';
+    follow.addEventListener('click', () => {
+      picks.set(session, picks.get(session) === FOLLOW ? shown().id : FOLLOW);
+      show();
+    });
+    bar.append(
+      ...chips.map((chip) => {
+        const b = button(numbers.has(chip.id) ? `${chip.label} · task ${numbers.get(chip.id)}` : chip.label);
+        b.dataset.chip = chip.id;
+        b.addEventListener('click', () => {
+          picks.set(session, chip.id);
+          show();
+        });
+        return b;
+      }),
+      follow,
+    );
+
+    function show() {
+      const chip = shown();
+      for (const b of bar.querySelectorAll('[data-chip]')) {
+        b.setAttribute('aria-pressed', String(b instanceof window.HTMLElement && b.dataset.chip === chip.id));
+      }
+      follow.setAttribute('aria-pressed', String(picks.get(session) === FOLLOW));
+      body.replaceChildren(...(chip.kind === 'main' ? sections : [outputPanel(session, activity, chip)]));
+    }
+    show();
+    const box = document.createElement('div');
+    box.className = 'session-output';
+    if (run) box.append(renderRunBar(run));
+    box.append(bar, body);
+    return box;
+  }
+
+  /** The panes `mountPane` made, by session id: each is made once for the window's life, then shown and hidden. */
+  /** @type {Map<string, HTMLElement>} */
+  const panes = new Map();
+  /** The placeholder the shown pane follows. @type {HTMLElement | null} */
+  let slotNow = null;
+  /** @type {ResizeObserver | null} */
+  let slotWatch = null;
+
+  /** Moves the shown pane over its placeholder's screen rect. */
+  function placeShown() {
+    const id = slotNow?.dataset.terminalSlot;
+    const pane = id === undefined ? undefined : panes.get(id);
+    if (!slotNow || !pane) return;
+    const { left, top, width, height } = slotNow.getBoundingClientRect();
+    pane.style.display = '';
+    Object.assign(pane.style, {
+      position: 'fixed',
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${width}px`,
+      height: `${height}px`,
+    });
+  }
+
+  /**
+   * After every draw: the pane for the placeholder this draw left (mounted the first time) goes over it, and every
+   * other pane is hidden, not removed: the sessions run on, and their terminals keep what they drew.
+   */
+  function placePanes() {
+    slotWatch?.disconnect();
+    // Only the runtime's own placeholder of a hosted session counts: nothing a view draws can get a pane laid over it.
+    const found = [...root.querySelectorAll('[data-terminal-slot]')].find(
+      (el) => ownSlots.has(el) && el instanceof window.HTMLElement && hosted.has(el.dataset.terminalSlot ?? ''),
+    );
+    slotNow = found instanceof window.HTMLElement ? found : null;
+    const id = slotNow?.dataset.terminalSlot;
+    if (slotNow && id !== undefined && mountPane && !panes.has(id)) {
+      try {
+        panes.set(id, mountPane(id));
+      } catch (err) {
+        console.error('flow-cockpit: the terminal:', err);
+        slotNow.textContent = `The terminal couldn't be shown: ${reason(err)}`;
+        slotNow = null;
+      }
+    }
+    for (const [other, pane] of panes) if (other !== id || !slotNow) pane.style.display = 'none';
+    if (!slotNow) return;
+    placeShown();
+    if (typeof window.ResizeObserver === 'function') {
+      slotWatch ??= new window.ResizeObserver(placeShown);
+      slotWatch.observe(slotNow);
+    }
+  }
+
+  async function draw() {
+    try {
+      await paint();
+    } finally {
+      placePanes();
+    }
+  }
+
+  async function paint() {
+    const at = Object.freeze({ ...route });
+    const traversed = traversing;
+    traversing = false;
+    projectsNow = null; // Each draw reads the projects afresh, once.
+    const project = await projectOf(at);
+    if (project !== loadedFor) {
+      const was = reloading ? importedNow() : null;
+      reloading = false;
+      // What this load imports for the project is recorded afresh, so a view that no longer loads counts as changed.
+      if (was) imported.delete(project);
+      const infos = await loadAll(project, loadedFor !== null);
+      if (was && !infos) imported.set(project, was.get(project) ?? new Map());
+      // The address keeps the page across the reload.
+      if (was && infos && !(await stillAllowed(was, project, infos))) return window.location.reload();
+    }
+    const tabs = Object.freeze(
+      entries
+        .filter((e) => slotsOf(e).includes('run-tab'))
+        .map((e) => {
+          const view = /** @type {View} */ (e.view ?? e.fallback?.view);
+          return Object.freeze({ id: e.info.id, title: view.title || e.info.id });
+        }),
+    );
+    /** @type {ViewContext} */
+    const ctx = Object.freeze({ data, blocks, navigate, route: at, tabs });
+    // A view that never loaded has no known slot: its error shows on every route.
+    const shown = entries.filter((e) => slotsOf(e).includes(at.to) || !slotsOf(e).length);
+    const wanted = at.to === 'run' ? at.tab : undefined;
+    const tab = wanted ? entries.find((e) => e.info.id === wanted && slotsOf(e).includes('run-tab')) : undefined;
+    // A hosted session's chips are built from one read of its turns and background commands per draw, and its run bar
+    // from the flow run that lists it.
+    const hostedHere = at.to === 'session' && mountPane !== undefined && hosted.has(at.id);
+    const [sections, tabSection, output] = await Promise.all([
+      Promise.all(shown.map((e) => section(e, ctx))),
+      tab ? section(tab, ctx) : wanted ? missingTab(wanted) : null,
+      hostedHere
+        ? Promise.all([
+            data.session(at.id).catch(() => null),
+            data.backgroundTasks(at.id).catch(() => null),
+            findLinkedRun(data, at.project, at.id).catch(() => null),
+          ])
+        : null,
+    ]);
+    if (listError !== null) {
+      root.replaceChildren(card({ title: "The views couldn't be listed.", body: reason(listError), error: true }));
+      return;
+    }
+    if (!sections.length) {
+      // `list` and `run` are both a slot and the default extension that fills it.
+      const lines = extensions.disabled.includes(at.to)
+        ? [`The ${at.to} extension is switched off in config.toml.`]
+        : ['No view draws this screen.', `Add an extension with a view for the "${at.to}" slot.`];
+      if (extensions.looked.length)
+        lines.push(`The default extensions weren't found. Looked in ${extensions.looked.join(', ')}.`);
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.append(
+        ...lines.map((text) => {
+          const line = document.createElement('p');
+          line.textContent = text;
+          return line;
+        }),
+      );
+      root.replaceChildren(empty);
+      return;
+    }
+    // The same route drawn again (fresh data, a reloaded view) keeps what the user did to it. A new route starts
+    // fresh, unless back or forward returns to a page left earlier: that gets back what the user had done to it.
+    // A control with a name of its own (an `id` or `data-keep`), such as a tab, keeps the focus on the next page when
+    // that page has it too.
+    const where = JSON.stringify(at);
+    const opened = where !== drawnAt;
+    const kept = opened ? null : snapshot(root, moved);
+    const leaving = opened && drawnAt ? snapshot(root, moved) : null;
+    /** @type {Route | null} */
+    const was = leaving ? JSON.parse(drawnAt) : null;
+    if (leaving) {
+      left.delete(drawnAt);
+      left.set(drawnAt, leaving);
+      if (left.size > 50) left.delete(/** @type {string} */ (left.keys().next().value));
+    }
+    // A hosted session's tab: its terminal's place beside the view, which is drawn as it is for any other session.
+    // The chips sit over the view, and a chip other than the main one swaps it for the output panel.
+    if (at.to === 'session' && output) {
+      const beside = document.createElement('div');
+      beside.className = 'hosted-session';
+      beside.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem';
+      const [activity, tasks, run] = output;
+      beside.append(sessionOutput(at.id, sections, activity ?? NOTHING, tasks ?? [], run), terminalSlot(at.id));
+      root.replaceChildren(beside);
+    } else if (at.to === 'session' && resume && !hosted.has(at.id))
+      root.replaceChildren(resumeBar(at.id, resume), ...sections);
+    else root.replaceChildren(...sections);
+    const host = sections.map((s) => s.querySelector('[data-slot="run-tab"]')).find(Boolean);
+    // A tab no run-tab view draws says so in the slot; a run view that leaves no slot draws that tab itself.
+    if (tab) (host ?? root).append(/** @type {Node} */ (tabSection));
+    else if (tabSection && host) host.append(tabSection);
+    drawnAt = where;
+    const name = leaving?.focused?.place.path;
+    const named = name?.length === 1 && name[0].startsWith('#') ? leaving?.focused : null;
+    const back =
+      kept ??
+      (traversed
+        ? left.get(where)
+        : named
+          ? { scrolled: [], folds: [], expanded: [], focused: { ...named, value: null } }
+          : undefined);
+    if (back) restore(root, back, moved);
+    // Another tab of the same run, or back and forth between its tabs, isn't a run opening: nothing is read ahead.
+    const sameRun = was?.to === 'run' && at.to === 'run' && was.project === at.project && was.slug === at.slug;
+    drawAhead(at, opened && !sameRun);
+  }
+
+  // Drawing ahead: the diagrams the next pages show, queued to draw in idle time (blocks/mermaid.js). After the list,
+  // the task graph and document diagrams of the shown project's unfinished runs; when a run opens, the rest of that
+  // run's, first in line. One pass at a time; a route drawn meanwhile is taken up after it.
+  /** @type {Route | null} */
+  let aheadNext = null;
+  let aheadBusy = false;
+  // What each run (`project/slug`) was last read for, from its list entry: a redraw reads a run's documents again only
+  // when what flow.md and plan.md carry changed (phase, status, `now:`, gates, open deviations, progress), and its task
+  // graph only when its progress or `now:` line did. Not on last activity alone, which moves with every transcript
+  // write of a live session; a spec edited mid-run shows when the run opens.
+  /** @type {Map<string, { docs: string, graph: string }>} */
+  const looked = new Map();
+
+  /** @param {Route} at @param {boolean} opened a new route, not a redraw of the one shown */
+  async function drawAhead(at, opened) {
+    // On a run, the view draws the live graph itself: only opening it draws ahead.
+    if (at.to !== 'list' && !(at.to === 'run' && opened)) return;
+    aheadNext = at;
+    if (aheadBusy) return;
+    aheadBusy = true;
+    for (let next = /** @type {Route | null} */ (at); next; next = aheadNext) {
+      aheadNext = null;
+      try {
+        await aheadFor(next);
+      } catch (err) {
+        console.warn('flow-cockpit: drawing ahead:', err);
+      }
+    }
+    aheadBusy = false;
+  }
+
+  /** @param {Route} at */
+  async function aheadFor(at) {
+    if (at.to === 'run') return aheadRun(at.project, at.slug, true, true, true);
+    if (at.to !== 'list') return;
+    /** @type {import('../../bindings/Project').Project[]} */
+    const projects = (await data.projects()) ?? [];
+    // The project the list shows.
+    const project = projects.find((p) => p.id === at.project) ?? projects[0];
+    if (!project) return;
+    /** @type {import('../../bindings/Entry').Entry[]} */
+    const listed = (await data.entries(project.id)) ?? [];
+    for (const e of listed) {
+      if (e.kind !== 'FlowRun' || e.status === 'Done') continue;
+      const key = `${project.id}/${e.slug}`;
+      const was = looked.get(key);
+      const now = {
+        docs: JSON.stringify([e.phase, e.status, e.now, e.gates, e.open_deviations, e.progress]),
+        graph: JSON.stringify([e.progress, e.now]),
+      };
+      if (was?.docs === now.docs && was.graph === now.graph) continue;
+      await aheadRun(project.id, e.slug, false, !was || was.graph !== now.graph, !was || was.docs !== now.docs);
+      looked.set(key, now);
+    }
+  }
+
+  /**
+   * Queues a run's task graph (`graph`) and its documents' diagrams (`docs`).
+   * @param {string} project @param {string} slug @param {boolean} first @param {boolean} graph @param {boolean} docs
+   */
+  async function aheadRun(project, slug, first, graph, docs) {
+    const [run, ...texts] = await Promise.all([
+      graph ? data.flowRun(project, slug) : null,
+      ...(docs ? DOCS.map((name) => data.doc(project, slug, name)) : []),
+    ]);
+    const source = run ? taskGraphSource(run) : null;
+    ahead([...(source === null ? [] : [source]), ...texts.flatMap((t) => (t ? mermaidSources(t) : []))], first);
+  }
+
+  /** @param {() => Promise<void>} step */
+  function queue(step) {
+    last = last.then(step).catch((err) => {
+      console.error('flow-cockpit:', err);
+      root.replaceChildren(card({ title: "The window couldn't be drawn.", body: reason(err), error: true }));
+      placePanes();
+    });
+    return last;
+  }
+
+  // At most one draw and one reload wait in the queue: a burst of `changed` events draws once.
+  let drawWaiting = false;
+  let reloadWaiting = false;
+  function requestDraw() {
+    if (drawWaiting) return last;
+    drawWaiting = true;
+    return queue(() => {
+      drawWaiting = false;
+      return draw();
+    });
+  }
+  function requestReload() {
+    if (reloadWaiting) return last;
+    reloadWaiting = true;
+    return queue(() => {
+      reloadWaiting = false;
+      loadedFor = null; // The files changed: every view loads afresh.
+      reloading = true;
+      return draw();
+    });
+  }
+
+  // The route lives in the window's address too (`hashOf`): each new route is one history entry, so the mouse's back
+  // and forward buttons move between pages and a reload opens the page it was on. Nothing is written to disk.
+  /** @param {Route} to */
+  function navigate(to) {
+    // The route as the address reads it back, so a click, back and a reload draw the same; one the address can't hold
+    // opens the list, as its reload would.
+    const at = routeOf(hashOf(to)) ?? { to: 'list' };
+    const hash = hashOf(at);
+    if (hash !== window.location.hash) window.history.pushState(null, '', hash);
+    route = at;
+    traversing = false; // A click after back or forward, before that draw, opens its page fresh.
+    requestDraw();
+  }
+
+  /** The route the address names; one that names none becomes the list, in place. @returns {Route} */
+  function fromAddress() {
+    const at = routeOf(window.location.hash) ?? { to: 'list' };
+    const hash = hashOf(at);
+    if (hash !== window.location.hash) window.history.replaceState(null, '', hash);
+    return at;
+  }
+
+  /** Back or forward moved the address: draw its route, the same way `navigate` does. */
+  function follow() {
+    const at = fromAddress();
+    if (hashOf(at) === hashOf(route)) return; // `hashchange` after `popstate`, for the same move.
+    route = at;
+    traversing = true;
+    requestDraw();
+  }
+
+  /**
+   * F5 and Ctrl+R (with Shift too) reload the window, from anywhere in it; the address keeps the page. The key is kept
+   * from the engine, so one that binds it too (WebView2) doesn't reload a second time.
+   * @param {KeyboardEvent} event
+   */
+  function reloadKey(event) {
+    // `code` too: on a layout whose R key types another letter, Ctrl+R still means reload.
+    const r = event.key?.toLowerCase() === 'r' || event.code === 'KeyR';
+    const ctrlR = (event.ctrlKey || event.metaKey) && !event.altKey && r;
+    const f5 = event.key === 'F5' && !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (!ctrlR && !f5) return;
+    // In a hosted session's terminal the key is Claude Code's (Ctrl+R searches its history): it isn't ours to take.
+    if (document.activeElement?.closest('#terminals')) return;
+    event.preventDefault();
+    if (!event.repeat) window.location.reload();
+  }
+
+  /** The mouse's side buttons: 3 is back, 4 forward. @param {MouseEvent} event */
+  function sideButton(event) {
+    if (event.button !== 3 && event.button !== 4) return;
+    event.preventDefault();
+    if (event.button === 3) window.history.back();
+    else window.history.forward();
+  }
+
+  return {
+    /**
+     * Loads the views, draws `start` (else the route the window's address names, else the list) and follows the
+     * app's events and the window's history.
+     * @param {Route} [start]
+     */
+    async start(start) {
+      if (start) window.history.replaceState(null, '', hashOf(start));
+      route = start ?? fromAddress();
+      window.addEventListener('popstate', follow);
+      window.addEventListener('hashchange', follow);
+      window.addEventListener('mouseup', sideButton);
+      window.addEventListener('keydown', reloadKey);
+      if (mountPane) {
+        // The shown pane follows its placeholder as the page scrolls and the window resizes, not only as it is drawn.
+        window.addEventListener('scroll', placeShown, true);
+        window.addEventListener('resize', placeShown);
+      }
+      await listen('views-changed', () => requestReload());
+      await listen('changed', (event) => {
+        const project = event.payload?.project ?? null;
+        const mine = 'project' in route ? route.project : undefined;
+        if (project === null || mine === undefined || project === mine) requestDraw();
+      });
+      return requestReload();
+    },
+    navigate,
+    /** What the views read, for the shell's own chrome (the start form) to read through too. Nothing here starts a session. */
+    data,
+    /** The route as it is now. @returns {Route} */
+    route: () => ({ ...route }),
+    /** Resolves once every draw asked for so far is done. */
+    idle: () => last,
+  };
+}

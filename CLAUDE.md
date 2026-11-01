@@ -30,7 +30,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; tui-review and web-mcp
   are also offered on their own but live in `shared/`. Moving a folder doesn't touch installs (they key on the
   plugin `name`); renaming a plugin does.
-- `crates/`: the two Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`) and `web-mcp` (web-mcp's server). Each keeps its own
+- `crates/`: the three Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`), `web-mcp` (web-mcp's server) and
+  `flow-cockpit` (the flow cockpit window, a workspace of `core` and `app`). Each keeps its own
   `Cargo.lock`; nothing in the plugins reaches into them at runtime.
 - `plugins/default/`: the dead-skills bundle. Its `dependencies` are the core plugins; itself it carries the global rules
   (`rules.md`, a SessionStart hook), Context7 (`.mcp.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
@@ -124,6 +125,32 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   current uv on PATH is used only while ours is absent (`uvPlan` in `core/binaries.ts`). It then runs `uv sync --locked`
   and fetches tiktoken's vocabulary (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0008-python-through-installer-uv.md`. Dependabot's `uv`
   entry keeps `uv.lock` current.
+- The flow cockpit (`docs/features/flow-observability/`): a Tauri window over flow runs, audits and Claude sessions, in
+  `crates/flow-cockpit/`, that can also start, resume and host real `claude` sessions in terminals of its own
+  (`docs/features/cockpit-harness/`; Linux only so far, the Windows build offers neither Start nor Resume), plus the `plugins/opt-in/flow-cockpit/` plugin, which carries only the `views` skill (Claude
+  writes extensions into the user's extensions folder, running the app from its `appPath` userConfig) and the capture
+  hooks. The installer offers it on Linux x64 and Windows x64 (`BIN_PLUGINS` in `core/binaries.ts`): on Linux it only
+  prints the flake's `nix run` command pinned to its release (`linuxHint`); on Windows it downloads
+  `build-flow-cockpit.yml`'s zip (`flow-cockpit.exe` plus the default extensions) whole into
+  `~/.claude/bin/flow-cockpit/`, replacing an older folder whole, and sets `appPath`. The workspace: `core/` parses flow.md, plan.md, audit
+  reports, build logs and transcripts into a typed model and indexes projects, runs and sessions; `app/` is the window
+  (read-only commands for the views; the session-control commands in `app/src/pty.rs`, which spawn each hosted
+  `claude` in its own PTY, stream its bytes untouched and stop it with SIGHUP before any SIGKILL, for the shell's own
+  chrome only; a 2 s poll that also rereads `config.toml`, extension loading, `--print-types`,
+  `--print-paths`). `app/shell/` holds the view runtime, the building blocks, `tokens.css` and the shell's own chrome (start form,
+  terminal panes, chips, run bar, close confirmation), which alone gets the `shell` object of session controls that no
+  view's `ctx` has (JavaScript with JSDoc,
+  checked by `tsc --checkJs` against `api.d.ts`, which views import as the bare module `flow-cockpit`);
+  `extensions/<name>/` the four default extensions (a folder of view `.ts` files and an optional `style.css`, loaded
+  from disk, not compiled in), with their jsdom tests and fixtures in `extensions/tests/` and their `tsconfig.json`
+  beside them; `bindings/` the generated `.d.ts` of every type the views see (one `#[ignore]`d `export_bindings` test
+  per crate writes them; `bindings_are_current` fails when they are stale). Linux gets the app from the flake's
+  `flow-cockpit` package, since it links the system's GTK and WebKit; it installs every `extensions/` folder but
+  `tests/` at `share/flow-cockpit/extensions/` and checks that tree, and that copies of the defaults type-check against
+  `--print-types`. The app finds the defaults at `$FLOW_COCKPIT_EXTENSIONS` (a dev override: point it at `crates/flow-cockpit/extensions` to see edits live), else
+  `<exe dir>/../share/flow-cockpit/extensions`, else `<exe dir>/extensions`. Our code writes nothing (the webview
+  engine keeps its own small folder, `~/.local/share/dev.deadmade.flow-cockpit/`, `%LOCALAPPDATA%` on Windows), and it
+  reads the user's extensions and `config.toml` (`disabled`, `hidden`, `trusted`) from `~/.config/flow-cockpit/` (`%APPDATA%\flow-cockpit\` on Windows).
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
   on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
   talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
@@ -148,12 +175,14 @@ These are copied from upstream by `scripts/sync-*.mjs` (the weekly `sync.yml` op
 sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0; pstack-picks' `.claude-plugin/plugin.json` is hand-written), `plugins/flows/agents/`,
 `plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
 `plugins/flows/skills/self-review/references/upstream/` with its `LICENSE` and `LICENSE-MIT`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
+`crates/flow-cockpit/app/shell/vendor/` (marked, DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync script: it is copied unchanged from
+the npm tarballs THIRD_PARTY.md names, so a new version replaces the files rather than editing them.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Versions and releases
 
 Everything ships as one version: `package.json` and `package-lock.json`, the marketplace's `metadata.version`, every
-plugin's `.claude-plugin/plugin.json`, both crates' `Cargo.toml`/`Cargo.lock` and the installer URL in README.md.
+plugin's `.claude-plugin/plugin.json`, every crate's `Cargo.toml`/`Cargo.lock` and the installer URL in README.md.
 `check-repo.mjs` fails on drift. Never bump by hand. Every merge to `main` that touches more than `docs/` or the root
 `*.md` files releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
 bump off `main` and tags it, so `main`'s `package.json` lags behind the tags and the next version counts from the
@@ -162,7 +191,7 @@ highest `vX.Y.Z` tag (`scripts/next-version.mjs`; fetch tags before a local rele
     npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-Either way the merge's run packs the installer (`installer.tgz`), builds tui-review and web-mcp from the tag and
+Either way the merge's run packs the installer (`installer.tgz`), builds tui-review, web-mcp and the flow cockpit's Windows app from the tag and
 publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back).
 The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so Claude Code's
 marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
@@ -180,6 +209,12 @@ plugins of ours that the manifest no longer lists.
 - web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
   linking fails.
+- flow-cockpit: `cargo test` and `cargo clippy --workspace --all-targets -- -D warnings` in `crates/flow-cockpit` (the
+  app needs the dev shell's GTK and WebKit); `nix build .#flow-cockpit` builds the package and runs the app's tests
+  except the three timing ones its `checkFlags` skip. The views tests (jsdom, after `npm ci`):
+  `node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/extensions/tests/*.test.ts'`, then
+  `npx tsc -p crates/flow-cockpit/app/shell` and `npx tsc -p crates/flow-cockpit/extensions`. They run only there and in
+  `flow-cockpit.yml`, never in `npm test` or the pre-commit hook.
 - tui-review mod tests need a generated fixture first, from `crates/tui-review`:
   `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/shared/tui-review`.
@@ -200,9 +235,12 @@ plugins of ours that the manifest no longer lists.
   it fails on a high or critical finding. A finding judged benign gets a scoped suppression with its reason in
   `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.
 
-CI: `test.yml` (npm test, the installer typecheck, the dead-skills and md-pane mod tests and the headroom-trim server tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `crates.yml` (clippy and tests,
-plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches; `crates-build.yml` (both binaries) on PRs
-touching it and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
+CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests and the headroom-trim server tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `crates.yml` (clippy and tests,
+plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches; `flow-cockpit.yml` on PRs touching the
+flow cockpit's crate, plugin, the flake or the npm manifests (core tests and clippy on Linux and Windows, the app's Windows build, the
+views tests and both `tsc -p` checks; on Linux `nix build .#flow-cockpit`; with `CI=true` the core's relative-worktree
+test fails instead of skipping on a git older than 2.48); `crates-build.yml` (both binaries) and
+`build-flow-cockpit.yml` (the Windows app's release build and zip, also on PRs touching its crate) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
 skills, and a "Sync <name> failing" issue it closes on the next green run), and as a dry run (no PR, no issues) on PRs
 touching the sync code.
 
