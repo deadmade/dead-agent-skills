@@ -37,7 +37,7 @@ jobs:
       - name: Repo checks and installer tests
         run: npm test
 
-      - name: Installer typecheck
+      - name: Installer and upstream-sync typecheck
         run: |
           npm ci
           npm run typecheck

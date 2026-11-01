@@ -5,8 +5,8 @@
 // Idempotent: re-running against the same upstream commit produces no diff.
 import { cpSync, existsSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { ROOT, fail, finish, git, sparseClone } from './sync-lib.mjs';
+import { fail } from '../text.ts';
+import type { SyncContext, AdapterResult } from '../types.ts';
 
 const UPSTREAM_URL = 'https://github.com/nutlope/hallmark.git';
 // Prefixed to the description to keep the skill out of non-web work. Must not contain double quotes
@@ -14,8 +14,6 @@ const UPSTREAM_URL = 'https://github.com/nutlope/hallmark.git';
 // Claude Code ignores it for plugin skills (verified on 2.1.272; it only works for project skills).
 const SCOPE =
   'WEB FRONTEND ONLY: use solely for browser UI work (HTML/CSS, React/Vue/Svelte/Astro pages and components); never for CLIs, backends, libraries, or non-web apps (e.g. Rust, Python, Go), even when asked for a new app.';
-
-const DEST = join(ROOT, 'plugins', 'opt-in', 'hallmark', 'skills', 'hallmark');
 
 export const DROPPED = [
   'agents',
@@ -31,7 +29,7 @@ export const DROPPED = [
 
 // Per file, the text that points at a dropped part. A pattern that stops matching upstream leaves a mention that
 // LEFTOVER catches, so the sync fails instead of shipping a dangling instruction.
-const EDITS = {
+const EDITS: Record<string, [RegExp, string][]> = {
   'SKILL.md': [
     [/^\*\*Powered by Together AI\.\*\*\n\n/m, ''],
     [/; `TOGETHER_API_KEY` set \([^)]*\)/, ''],
@@ -57,7 +55,7 @@ const LEFTOVER =
 
 // In the first frontmatter block (which must name the skill `hallmark`): prefix the description with SCOPE.
 // Returns null when the frontmatter isn't shaped as expected.
-function scopeDescription(text) {
+function scopeDescription(text: string) {
   const lines = text.split('\n');
   if (lines[0] !== '---') return null;
   let named = false;
@@ -80,18 +78,21 @@ function scopeDescription(text) {
 }
 
 // Applies EDITS to one file's text; returns it with the line numbers of any mention of a dropped part still left.
-export function trim(file, text) {
+export function trim(file: string, text: string) {
   const out = (EDITS[file] ?? []).reduce((t, [re, to]) => t.replace(re, to), text);
   const left = out.split('\n').flatMap((l, i) => (LEFTOVER.test(l) ? [i + 1] : []));
   return { out, left };
 }
 
-function main() {
+export function run(ctx: SyncContext): AdapterResult {
+  const { ROOT, finish, git, sparseClone } = ctx;
+  const DEST = join(ROOT, 'plugins', 'opt-in', 'hallmark', 'skills', 'hallmark');
+
   const up = sparseClone(UPSTREAM_URL, ['skills/hallmark']);
   const SRC = join(up, 'skills', 'hallmark');
   if (!existsSync(join(SRC, 'SKILL.md'))) fail('upstream skills/hallmark/SKILL.md not found');
   // A copied symlink would point outside the plugin once installed.
-  for (const f of readdirSync(SRC, { recursive: true })) {
+  for (const f of readdirSync(SRC, { recursive: true, encoding: 'utf8' })) {
     if (lstatSync(join(SRC, f)).isSymbolicLink()) fail(`upstream skills/hallmark/${f} is a symlink`);
   }
 
@@ -103,14 +104,16 @@ function main() {
   // Every Markdown file the skill reads (themes/README.md only documents how upstream builds the themes).
   const docs = [
     'SKILL.md',
-    ...readdirSync(join(DEST, 'references'), { recursive: true })
+    ...readdirSync(join(DEST, 'references'), { recursive: true, encoding: 'utf8' })
       .filter((f) => f.endsWith('.md') && f !== join('themes', 'README.md'))
       .map((f) => join('references', f).replaceAll('\\', '/')),
   ];
   for (const f of docs) {
     const { out, left } = trim(f, readFileSync(join(DEST, f), 'utf8'));
     if (left.length)
-      fail(`${f} still mentions a dropped part on line ${left.join(', ')}; update EDITS in sync-hallmark.mjs`);
+      fail(
+        `${f} still mentions a dropped part on line ${left.join(', ')}; update EDITS in tools/upstream-sync/src/adapters/hallmark.ts`,
+      );
     writeFileSync(join(DEST, f), out);
   }
 
@@ -119,6 +122,5 @@ function main() {
   writeFileSync(join(DEST, 'SKILL.md'), scoped);
 
   finish('hallmark', git('-C', up, 'rev-parse', 'HEAD'), join(DEST, 'UPSTREAM'), DEST);
+  return ctx.result;
 }
-
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();

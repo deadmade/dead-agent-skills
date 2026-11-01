@@ -4,7 +4,7 @@
 
 `plugins/opt-in/hallmark/skills/hallmark/` is vendored from [nutlope/hallmark](https://github.com/nutlope/hallmark)
 (MIT License, Copyright (c) 2026 Hallmark contributors; full text in `skills/hallmark/LICENSE`).
-It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions), which prefixes the frontmatter `description`
+It is synced by `tools/upstream-sync/src/adapters/hallmark.ts` (weekly via GitHub Actions), which prefixes the frontmatter `description`
 with "WEB FRONTEND ONLY" and ships only the skill: upstream's installers, its settings.json lint hook, Together AI image
 generation (`comp.md`, `imagegen.mjs`), the theme-picture renderer, its dev checks and fixtures and the Codex adapter are
 deleted, along with the sentences that point at them. The synced upstream commit is in `skills/hallmark/UPSTREAM`.
@@ -15,7 +15,7 @@ licence); none are vendored, and the skill credits each one a page uses.
 
 `plugins/flows/packs/paper-lookup/skills/paper-lookup/` is vendored from the paper-lookup skill of
 [K-Dense-AI/scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) (MIT License, Copyright (c)
-2025 K-Dense Inc.; full text in `skills/paper-lookup/LICENSE.md`). It is synced by `scripts/sync-paper-lookup.mjs`
+2025 K-Dense Inc.; full text in `skills/paper-lookup/LICENSE.md`). It is synced by `tools/upstream-sync/src/adapters/paper-lookup.ts`
 (weekly via GitHub Actions), which trims it for computer science: the reference files for PubMed, PMC, Europe PMC,
 bioRxiv, medRxiv, PubTator3, BioStudies, ROR and Figshare are deleted along with SKILL.md table rows naming them, a
 note under the title covers leftover mentions, the frontmatter `description` is replaced, and the "Citing Scientific
@@ -27,7 +27,7 @@ The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
 `plugins/flows/packs/security-audit/skills/security-audit/` is vendored unchanged from
 [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT License, Copyright (c)
 2025-2026 Cloudflare, Inc.; full text in `plugins/flows/packs/security-audit/LICENSE`) by
-`scripts/sync-security-audit.mjs` (weekly via GitHub Actions). `/harden` reads its domain files and candidate-verifier
+`tools/upstream-sync/src/adapters/simple.ts` (weekly via GitHub Actions). `/harden` reads its domain files and candidate-verifier
 prompt by path. The synced upstream commit is in `plugins/flows/packs/security-audit/UPSTREAM`.
 
 ## MCP servers (dead-skills, mcp-github)
@@ -39,7 +39,7 @@ prompt by path. The synced upstream commit is in `plugins/flows/packs/security-a
 
 `plugins/flows/packs/mattpocock-picks/skills/` vendors a picked set of skills from [mattpocock/skills](https://github.com/mattpocock/skills)
 (MIT License, Copyright (c) 2026 Matt Pocock; full text in `plugins/flows/packs/mattpocock-picks/LICENSE`), unmodified
-apart from flattening `engineering/` and `productivity/` into one folder. Synced by `scripts/sync-mattpocock.mjs`
+apart from flattening `engineering/` and `productivity/` into one folder. Synced by `tools/upstream-sync/src/adapters/mattpocock.ts`
 (weekly via GitHub Actions); the synced upstream commit is in `plugins/flows/packs/mattpocock-picks/UPSTREAM`.
 
 ## pstack-picks
@@ -47,7 +47,7 @@ apart from flattening `engineering/` and `productivity/` into one folder. Synced
 `plugins/flows/packs/pstack-picks/` vendors a picked set of skills and the `comment-sicko` agent from
 [pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT License, Copyright (c) 2026 Lauren Tan;
 full text in `plugins/flows/packs/pstack-picks/LICENSE`). Modified mechanically for Claude Code by
-`scripts/sync-pstack.mjs` (tool names, subagent types, model names, paths, and an added port note
+`tools/upstream-sync/src/adapters/pstack.ts` (tool names, subagent types, model names, paths, and an added port note
 under each file's frontmatter). Not vendored: pstack's `unslop` and `technical-writing`, which flows' own `writing` skill
 replaces; the sync rewrites the references to them to point at it. The synced upstream commit is in
 `plugins/flows/packs/pstack-picks/UPSTREAM`.
@@ -58,7 +58,7 @@ replaces; the sync rewrites the references to them to point at it. The synced up
 mutation-testing), the `spec-compliance-checker` and `sharp-edges-analyzer` agents and the `spec-compliance` workflow
 from [trailofbits/skills](https://github.com/trailofbits/skills) (Creative Commons Attribution-ShareAlike 4.0,
 Copyright Trail of Bits; full text in `plugins/flows/packs/tob-picks/LICENSE`). The vendored files stay under CC BY-SA 4.0.
-Modified by `scripts/sync-tob.mjs`: each upstream plugin's skill, agents and workflow are merged into one plugin,
+Modified by `tools/upstream-sync/src/adapters/tob.ts`: each upstream plugin's skill, agents and workflow are merged into one plugin,
 the Codex-only `agents/openai.yaml` and its icon are dropped, the `spec-to-code-compliance:` namespace is renamed to
 `tob-picks:`, the workflow's typed dispatch is pointed at `flows:spec-compliance-checker`, and `FsCheck|CsCheck` is
 added to property-based-testing's library detection command. The `spec-compliance-checker` agent is also copied to
@@ -69,7 +69,7 @@ GitHub Actions; the synced upstream commit is in `plugins/flows/packs/tob-picks/
 
 `plugins/opt-in/implementation/rust-skills/` vendors the rust-best-practices skill from
 [apollographql/skills](https://github.com/apollographql/skills) (MIT License; `plugins/opt-in/implementation/rust-skills/LICENSE`).
-Modified by `scripts/sync-rust.mjs`: a `paths:` block (`**/*.rs`, `**/Cargo.toml`, `**/Cargo.lock`) is added to
+Modified by `tools/upstream-sync/src/adapters/simple.ts`: a `paths:` block (`**/*.rs`, `**/Cargo.toml`, `**/Cargo.lock`) is added to
 SKILL.md's frontmatter. Synced weekly via GitHub Actions (`sync.yml`); the synced upstream commit is in
 `plugins/opt-in/implementation/rust-skills/UPSTREAM`.
 
@@ -77,7 +77,7 @@ SKILL.md's frontmatter. Synced weekly via GitHub Actions (`sync.yml`); the synce
 
 `plugins/opt-in/implementation/csharp-skills/` vendors the skills of [dotnet/skills](https://github.com/dotnet/skills) (MIT License,
 Copyright (c) .NET Foundation and Contributors; `plugins/opt-in/implementation/csharp-skills/LICENSE`). Modified by
-`scripts/sync-csharp.mjs`: upstream's skills are copied to `library/`, and six generated router skills in `skills/` (core,
+`tools/upstream-sync/src/adapters/csharp.ts`: upstream's skills are copied to `library/`, and six generated router skills in `skills/` (core,
 testing, build, web, data, desktop) index them; the four skills upstream marks `disable-model-invocation: true` are
 left out of the indexes. csharp-expert gets a note that its specialists are already installed in csharp-skills, its
 install, restart and update blocks are rewritten, and it gets a fixed index summary. Upstream's agents, binlog MCP
@@ -96,7 +96,7 @@ file with the synced commit:
 - `postgres-database-migration/` from [timescale/pg-aiguide](https://github.com/timescale/pg-aiguide) (Apache License
   2.0; `LICENSE` and `NOTICE` in the folder).
 
-Modified by `scripts/sync-postgres.mjs`: a `paths:` block (`**/*.sql`, `**/migrations/**`, `**/migrate/**`,
+Modified by `tools/upstream-sync/src/adapters/simple.ts`: a `paths:` block (`**/*.sql`, `**/migrations/**`, `**/migrate/**`,
 `**/*.prisma`, `**/alembic/**`) is added to each SKILL.md's frontmatter. Synced weekly via GitHub Actions
 (`sync.yml`).
 
@@ -106,13 +106,13 @@ Modified by `scripts/sync-postgres.mjs`: a `paths:` block (`**/*.sql`, `**/migra
 from [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify) (Apache License 2.0, Copyright 2026
 Safi Shamsi and the Graphify contributors; `LICENSE`, `LICENSE-MIT` and `NOTICE` in `plugins/shared/graphify/`),
 unmodified. `plugins/shared/graphify/hooks/hooks.json` reproduces the hooks upstream's installer writes and calls the
-separately installed `graphifyy` CLI. Synced by `scripts/sync-graphify.mjs` (weekly via GitHub Actions); the
+separately installed `graphifyy` CLI. Synced by `tools/upstream-sync/src/adapters/graphify.ts` (weekly via GitHub Actions); the
 synced upstream commit is in `plugins/shared/graphify/UPSTREAM`.
 
 ## self-review
 
 flows' `/self-review` (`plugins/flows/skills/self-review/`) vendors review passes from two upstreams, synced by
-`scripts/sync-self-review.mjs` (weekly via GitHub Actions; the synced commits are in
+`tools/upstream-sync/src/adapters/self-review.ts` (weekly via GitHub Actions; the synced commits are in
 `plugins/flows/skills/self-review/UPSTREAM`, the license files and `NOTICE` sit next to it):
 [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)'s code-review command
 (`references/upstream/code-review.md`) and five pr-review-toolkit agents (`plugins/flows/agents/`: silent-failure-hunter,
@@ -136,7 +136,7 @@ what remains is terms of art and fixed lists (coordinating conjunctions, "the fi
 `plugins/flows/packs/ponytail/` is vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT
 License, Copyright (c) 2026 DietrichGebert; full text in `LICENSE`): the Claude Code plugin's `.claude-plugin/plugin.json`,
 `hooks/` (without the other hosts' hook configs) and `skills/`, at upstream's newest stable release. It is synced by
-`scripts/sync-release.mjs` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The synced
+`tools/upstream-sync/src/adapters/release.ts` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The synced
 upstream commit is in `UPSTREAM`.
 
 ## superpowers
@@ -144,7 +144,7 @@ upstream commit is in `UPSTREAM`.
 `plugins/flows/packs/superpowers/` is vendored from [obra/superpowers](https://github.com/obra/superpowers) (MIT License,
 Copyright (c) 2025 Jesse Vincent; full text in `LICENSE`): the Claude Code plugin's `.claude-plugin/plugin.json`,
 `hooks/` (without Cursor's hook config) and `skills/`, at upstream's newest stable release. It is synced by
-`scripts/sync-release.mjs` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The
+`tools/upstream-sync/src/adapters/release.ts` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The
 synced upstream commit is in `UPSTREAM`.
 
 ## web-mcp
@@ -203,7 +203,7 @@ License, Copyright its authors), with changed and added colors. Nothing is vendo
 
 `plugins/shared/agent-review/skills/agent-review/` is vendored from [captivus/agent-review](https://github.com/captivus/agent-review)
 (MIT License, Copyright (c) 2026 Corey Gallon; full text in `plugins/shared/agent-review/LICENSE`). It is synced by
-`scripts/sync-agent-review.mjs` (weekly via GitHub Actions; the synced commit is in `plugins/shared/agent-review/UPSTREAM`).
+`tools/upstream-sync/src/adapters/agent-review.ts` (weekly via GitHub Actions; the synced commit is in `plugins/shared/agent-review/UPSTREAM`).
 The only local changes are in `SKILL.md`'s frontmatter (`disable-model-invocation: true` added, `effort` removed), one
 sentence pointing at the dead-skills `rules.md` instead of the upstream README, `references/tool-notes.md` without its
 install section (it describes the unmodified skill) and `SKILL.md`'s link to it no longer naming install options, and a

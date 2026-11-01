@@ -1,6 +1,6 @@
 name: Sync
 
-# Every vendored upstream, one job each (scripts/sync-sources.mjs lists them, scripts/sync.mjs runs one): sync, check,
+# Every vendored upstream, one job each (tools/upstream-sync/src/sources.ts lists them, tools/upstream-sync/src/cli.ts runs one): sync, check,
 # open or update its sync/<name> PR, open an issue per new upstream skill, and keep a "Sync <name> failing" issue open
 # while it fails. Runs only on schedule or manual dispatch.
 on:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       source:
-        description: 'One source to sync (a name from scripts/sync-sources.mjs); empty for all'
+        description: 'One source to sync (a name from tools/upstream-sync/src/sources.ts); empty for all'
         type: string
         default: ''
 
@@ -26,11 +26,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+
       - name: Sources
         id: list
         env:
           SOURCE: ${{ inputs.source }}
-        run: echo "sources=$(node scripts/sync.mjs --list "$SOURCE")" >> "$GITHUB_OUTPUT"
+        run: echo "sources=$(node tools/upstream-sync/src/cli.ts list --json ${SOURCE:+"$SOURCE"})" >> "$GITHUB_OUTPUT"
 
   sync:
     needs: list
@@ -45,18 +49,18 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # sync-agent-browser.mjs imports installer/core/binaries.ts, so it needs a Node that strips types.
+      # The sync CLI runs TypeScript directly on Node.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
 
       - name: Sync
         id: run
-        run: node scripts/sync.mjs run ${{ matrix.source }}
+        run: node tools/upstream-sync/src/cli.ts apply --github-output ${{ matrix.source }}
 
       - name: Issues for new upstream skills
-        if: ${{ !cancelled() }}
-        run: node scripts/sync.mjs issues ${{ matrix.source }}
+        if: steps.run.outcome == 'success'
+        run: node tools/upstream-sync/src/cli.ts issues ${{ matrix.source }}
 
       # A PR opened with the workflow's token starts no other workflow, so test.yml never sees it: check here.
       - name: Claude Code, for plugin validate
@@ -81,8 +85,8 @@ jobs:
 
       - name: Report the failure
         if: failure()
-        run: node scripts/sync.mjs failed ${{ matrix.source }} "$RUN_URL"
+        run: node tools/upstream-sync/src/cli.ts failed ${{ matrix.source }} "$RUN_URL"
 
       - name: Close a failure report
         if: success()
-        run: node scripts/sync.mjs passed ${{ matrix.source }} "$RUN_URL"
+        run: node tools/upstream-sync/src/cli.ts passed ${{ matrix.source }} "$RUN_URL"

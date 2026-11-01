@@ -1,15 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import {
-  README_POINTER,
-  RULES_POINTER,
-  TOOL_NOTES_LINK,
-  localize,
-  stamp,
-  trimToolNotes,
-} from './sync-agent-review.mjs';
-import { ROOT } from './sync-lib.mjs';
+import { README_POINTER, RULES_POINTER, TOOL_NOTES_LINK, localize, stamp, trimToolNotes } from './agent-review.ts';
+import { fileURLToPath } from 'node:url';
+const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const upstream = [
   '---',

@@ -6,13 +6,11 @@
 // Idempotent: re-running against the same upstream commit produces no diff.
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { ROOT, fail, finish, git, sparseClone } from './sync-lib.mjs';
+import { fail } from '../text.ts';
+import type { SyncContext, AdapterResult } from '../types.ts';
 
 const UPSTREAM_URL = 'https://github.com/captivus/agent-review.git';
 const UPSTREAM_WEB = 'https://github.com/captivus/agent-review/blob/main';
-const PLUGIN = join(ROOT, 'plugins', 'shared', 'agent-review');
-const DEST = join(PLUGIN, 'skills', 'agent-review');
 
 export const README_POINTER = 'the `README.md` has a snippet for your instructions file';
 export const RULES_POINTER =
@@ -22,7 +20,7 @@ export const TOOL_NOTES_LINK = 'install options and setting up independent revie
 // SKILL.md with the local changes above. Returns null when upstream changed shape (no frontmatter, no `name:
 // agent-review`, or the README pointer or tool-notes link text is gone), so the sync fails instead of shipping a
 // half-localized skill.
-export function localize(text) {
+export function localize(text: string) {
   const lines = text.split('\n');
   if (lines[0] !== '---') return null;
   const end = lines.indexOf('---', 1);
@@ -39,14 +37,14 @@ export function localize(text) {
 
 // tool-notes.md without its install section. Returns null unless that is the first section and "Independent
 // reviewers" directly follows it, so a section upstream adds in between fails the sync instead of being dropped.
-export function trimToolNotes(text) {
+export function trimToolNotes(text: string) {
   const heads = [...text.matchAll(/^## .*$/gm)];
   if (heads[0]?.[0] !== '## Install options' || heads[1]?.[0] !== '## Independent reviewers') return null;
   return text.slice(0, heads[0].index) + text.slice(heads[1].index);
 }
 
 // Source note right after the frontmatter (which must stay first), or at the top of a file without one.
-export function stamp(text, url) {
+export function stamp(text: string, url: string) {
   const note = `<!-- Vendored from ${url} by scripts/sync-agent-review.mjs. Don't edit: the weekly sync overwrites it. -->`;
   const end = text.startsWith('---\n') ? text.indexOf('\n---\n', 4) : -1;
   if (end < 0) return `${note}\n\n${text}`;
@@ -54,15 +52,21 @@ export function stamp(text, url) {
   return `${text.slice(0, cut)}\n${note}\n${text.slice(cut)}`;
 }
 
-function main() {
+export function run(ctx: SyncContext): AdapterResult {
+  const { ROOT, finish, git, sparseClone } = ctx;
+  const PLUGIN = join(ROOT, 'plugins', 'shared', 'agent-review');
+  const DEST = join(PLUGIN, 'skills', 'agent-review');
+
   const up = sparseClone(UPSTREAM_URL, ['/SKILL.md', '/LICENSE', '/references/'], { noCone: true });
   for (const p of ['SKILL.md', 'LICENSE', 'references']) {
     if (!existsSync(join(up, p))) fail(`upstream ${p} not found (renamed or removed?)`);
   }
   const skill = localize(readFileSync(join(up, 'SKILL.md'), 'utf8'));
-  if (!skill) fail('upstream SKILL.md changed shape: check localize() in scripts/sync-agent-review.mjs');
+  if (!skill)
+    fail('upstream SKILL.md changed shape: check localize() in tools/upstream-sync/src/adapters/agent-review.ts');
   const refs = readdirSync(join(up, 'references')).map((f) => {
-    if (!f.endsWith('.md')) fail(`upstream references/${f} isn't Markdown: vendor it in scripts/sync-agent-review.mjs`);
+    if (!f.endsWith('.md'))
+      fail(`upstream references/${f} isn't Markdown: vendor it in tools/upstream-sync/src/adapters/agent-review.ts`);
     const text = readFileSync(join(up, 'references', f), 'utf8');
     if (f !== 'tool-notes.md') return [f, text];
     return [f, trimToolNotes(text) ?? fail('upstream tool-notes.md changed shape: check trimToolNotes()')];
@@ -76,6 +80,5 @@ function main() {
   }
   cpSync(join(up, 'LICENSE'), join(PLUGIN, 'LICENSE'));
   finish('agent-review', git('-C', up, 'rev-parse', 'HEAD'), join(PLUGIN, 'UPSTREAM'), PLUGIN);
+  return ctx.result;
 }
-
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();

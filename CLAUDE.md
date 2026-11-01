@@ -88,20 +88,20 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   x64 only, like tui-review's binary (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
-  release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `scripts/sync-pins.mjs agent-browser`, which imports
+  release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `npm run sync -- apply agent-browser`, which imports
   `AGENT_BROWSER_FILES` from `core/binaries.ts`). Unless a current one is on PATH, the installer keeps its own copy in
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
   pin); either way it sets `agentBrowserPath` to the one in use (`upstreamPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
   `search` reads Google, Bing, DuckDuckGo and Brave (papers: Google Scholar and Semantic Scholar too) as tabs of one browser window per server (ADR 0007, `window.rs`): an owner session `web-mcp-<pid>-window` launches it on the first call that needs a browser and keeps it until exit; every engine, `browser` session and fetch fallback attaches as a tab (`--cdp <owner's cdp url> --pin-tab`, `attach.json`, idle 3600 s). Attached session names carry a generation `g<n>`, bumped when the owner reports a new cdp url (it relaunches a dead Chrome itself); a window closed by hand comes back through `tab_gone` → `tab new`. Browser first found of `WEB_MCP_CHROME`, Chrome for Testing from `agent-browser install`, `helium`, `chromium`; never branded Chrome. Under `WEB_MCP_SEARCH_DIR` (default the data dir, no temp fallback) each server holds the first free profile slot `profiles/<n>/` (its consent marks too); rests stay machine-wide. agent-browser's attach behaviour (`tab_gone`, `close` without a daemon, a dead Chrome's error) is recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in `docs/features/web-mcp-search/findings.md`; tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`, so `cargo build --bins` before the unit tests), which changes with any agent-browser answer web-mcp reads. I still don't care about cookies (downloaded on first use, not vendored; THIRD_PARTY.md) loads for every engine, Bing included. On Windows web-mcp puts itself in a kill-on-close job, so Chrome dies with it. `browser` and the fetch fallback need what search needs; the installer warns when the window can't open (no usable browser, or Linux without a display and Xvfb) and then counts web-mcp unhealthy. A blocked engine rests 30 min. No passage index: ranking is BM25 over each search's own pages. Engine parsers test against captured result pages in `crates/web-mcp/tests/fixtures/engines/`; Google's and Semantic Scholar's aren't captured yet, so their tests are `#[ignore]`d until they are.
 - `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
-  `scripts/sync-*.mjs`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
+  `tools/upstream-sync/src/adapters/*.ts`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
   plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
   (`${CLAUDE_PLUGIN_ROOT}/packs`), and the installer retires old installs of them and checks none remains
   (`stillInstalled`). The folder list is the source of truth, not this file. pstack-picks leaves out pstack's
   `technical-writing` and `unslop` (flows' `writing` replaces them, and the sync rewrites the lines that named them);
-  `sync-pstack.mjs --ref <hash>` syncs one commit, given as a full 40-character hash, instead of upstream's default
-  branch; its entry in `scripts/sync-sources.mjs` checks the number of vendored skills (16), so change that count
+  `npm run sync -- apply pstack-picks --ref <hash>` syncs one commit, given as a full 40-character hash, instead of upstream's default
+  branch; its entry in `tools/upstream-sync/src/sources.ts` checks the number of vendored skills (16), so change that count
   whenever you change `SKILLS`. pstack-picks' `UPSTREAM`
   stays at `519d36a` on purpose: upstream's newer commits fail the sync's `GUARD`, so its weekly `sync.yml` job
   (no `--ref`) fails until a PR adapts the rewrites; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
@@ -110,7 +110,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   marker in flows' own `.md` files; `checkOverrides` (`scripts/flows-uses.mjs`, run by check-repo and by every pack
   sync before its PR) fails when the quoted sentence is gone. `docs/vendor-a-pack.md` is the checklist for a new pack.
 - `plugins/flows/packs/ponytail/`, `plugins/flows/packs/superpowers/`: vendored unchanged from upstream's newest stable release
-  (`scripts/sync-release.mjs <name>`, ADR 0002): ponytail's skills and its
+  (`npm run sync -- apply <name>`, ADR 0002): ponytail's skills and its
   SessionStart/SubagentStart/UserPromptSubmit hooks and band mod (the hooks and band don't load); superpowers' skills and SessionStart hook (its
   `run-hook.cmd` and `session-start` stay LF via `.gitattributes`). Other hosts' adapters are left out. The sync PR
   carries upstream's release notes, and the sync fails on a `plugin.json` component or default folder it doesn't know.
@@ -163,7 +163,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   server of another identity unless that server's version is newer. A PostToolUse `http` hook posts to 127.0.0.1:47811;
   that port is written only in `hooks/hooks.json` and the installer reads it from there (`hookPort`), to stop the server
   before `uv sync` and before uninstalling the plugin. Every failure leaves Claude the original output.
-  The installer keeps the pinned uv (`installer/assets/uv.json`, bumped by `scripts/sync-pins.mjs uv`) in `~/.claude/bin`:
+  The installer keeps the pinned uv (`installer/assets/uv.json`, bumped by `npm run sync -- apply uv`) in `~/.claude/bin`:
   once ours exists it always wins and is upgraded when older than the pin, since the launcher looks there first; a
   current uv on PATH is used only while ours is absent (`uvPlan` in `core/binaries.ts`). It then runs `uv sync --locked`
   and fetches tiktoken's vocabulary (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0008-python-through-installer-uv.md`. Dependabot's `uv`
@@ -198,23 +198,27 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
   talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
   sets `preferredNotifChannel: "notifications_disabled"`.
-- `plugins/opt-in/implementation/rust-skills/`, `plugins/opt-in/implementation/csharp-skills/`: vendored (`sync-rust.mjs`, `sync-csharp.mjs`). `paths:` frontmatter doesn't
+- `plugins/opt-in/implementation/rust-skills/`, `plugins/opt-in/implementation/csharp-skills/`: vendored (`tools/upstream-sync/src/adapters/simple.ts`, `tools/upstream-sync/src/adapters/csharp.ts`). `paths:` frontmatter doesn't
   gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an
   unscanned `library/`, with upstream's binlog MCP workflows cut (the server isn't vendored); the router reads library files via the installer's `Read(~/.claude/plugins/**)` rule (without
   the installer users get a permission prompt).
 - `plugins/opt-in/implementation/postgres/`: a database plugin. It vendors
-  Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its
+  Neon's and Timescale's Postgres skills from two upstreams (`tools/upstream-sync/src/adapters/simple.ts`), so each skill folder carries its
   own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
-- `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring; every one is
-  a `SOURCES` entry in `sync-sources.mjs`, with its PR paths, checks and PR/issue text, run by `sync.mjs`),
-  `sync-release.mjs` (vendors ponytail and superpowers releases, writes the PR's release notes), `draw-mascot.mjs` (Onibi, Night City's pixel-art mascot, also notify's `icon.png`).
-
-Atlassian is the only url-sourced marketplace entry, deliberately unpinned. The installer would read a pinned url
-entry's version from its `ref` (`shippedVersions`).
+- `tools/upstream-sync/`: private TypeScript workspace for upstream vendoring, run directly on Node 26.
+  `npm run sync -- list` lists sources; `preview <source>` shows changes from committed HEAD in an isolated
+  worktree; `apply <source>` updates a clean destination and writes a structured result under the runner temp directory.
+  The registry owns source checks and PR metadata; adapters export `run(context)` and have no import-time effects.
+  Context supplies the checkout, Git/GitHub access, temporary directories and result collection. Tests use local
+  upstreams and fake GitHub responses. Historical generated-file ownership stamps retain their original script names.
+- `scripts/`: repository validation, releases, flow dependency generation and mascot artwork; upstream syncing lives
+  in `tools/upstream-sync/`.
+  Atlassian is the only url-sourced marketplace entry, deliberately unpinned. The installer would read a pinned url
+  entry's version from its `ref` (`shippedVersions`).
 
 ## Vendored content: don't edit
 
-These are copied from upstream by `scripts/sync-*.mjs` (the weekly `sync.yml` opens the PRs) and overwritten on every
+These are copied from upstream by `tools/upstream-sync/src/adapters/*.ts` (the weekly `sync.yml` opens the PRs) and overwritten on every
 sync: `plugins/shared/agent-review/skills/`, `plugins/shared/agent-review/LICENSE` and `UPSTREAM`, `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0; pstack-picks' `.claude-plugin/plugin.json` is hand-written), `plugins/flows/agents/`,
 `plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
 `plugins/flows/skills/self-review/references/upstream/` with its `LICENSE` and `LICENSE-MIT`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
@@ -242,7 +246,7 @@ plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs`, `plugins/default/hooks/*.test.mjs`, `plugins/flows/hooks/*.test.mjs` and `plugins/opt-in/headroom-trim/hooks/*.test.mjs`
+- `npm test`: repo checks plus the upstream-sync workspace tests and all `installer/**/*.test.ts`, `scripts/*.test.mjs`, `plugins/default/hooks/*.test.mjs`, `plugins/flows/hooks/*.test.mjs` and `plugins/opt-in/headroom-trim/hooks/*.test.mjs`
   (`claude plugin validate` is skipped when `claude` isn't on PATH). The installer tests run with a line-coverage floor
   (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
@@ -287,7 +291,7 @@ plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches
 flow cockpit's crate, plugin, the flake or the npm manifests (core tests and clippy on Linux and Windows, the app's Windows build, the
 views tests and both `tsc -p` checks; on Linux `nix build .#flow-cockpit`; with `CI=true` the core's relative-worktree
 test fails instead of skipping on a git older than 2.48); `crates-build.yml` (both binaries) and
-`crates-build.yml` (the Windows app's release build and zip, also on PRs touching its crate) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
+`crates-build.yml` (the Windows app's release build and zip, also on PRs touching its crate) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per source registry entry (new upstream
 skills, and a "Sync <name> failing" issue it closes on the next green run), and as a dry run (no PR, no issues) on PRs
 touching the sync code.
 

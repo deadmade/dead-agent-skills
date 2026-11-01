@@ -16,7 +16,7 @@
   }: let
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
-    # Upstream files copied by scripts/sync-*.mjs: fixing them here would churn every sync PR.
+    # Upstream files copied by tools/upstream-sync/src/adapters/*.ts: fixing them here would churn every sync PR.
     vendored = ["^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/self-review/(LICENSE|references/upstream/)" "^crates/flow-cockpit/bindings/" "^crates/flow-cockpit/app/shell/vendor/" "^crates/flow-cockpit/core/tests/fixtures/"];
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
@@ -44,6 +44,7 @@
         text = ''
           node --test --experimental-test-coverage --test-coverage-include='installer/**' \
             --test-coverage-exclude='installer/**/*.test.ts' --test-coverage-lines=79 'installer/**/*.test.ts'
+          node --test 'tools/upstream-sync/src/**/*.test.ts' 'tools/upstream-sync/src/**/*.test.mjs'
           exec node --test 'scripts/*.test.mjs' 'plugins/flows/skills/writing/tests/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs' 'plugins/opt-in/headroom-trim/hooks/*.test.mjs' 'plugins/opt-in/flow-cockpit/hooks/*.test.mjs'
         '';
       };
@@ -72,7 +73,7 @@
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(installer/|tools/upstream-sync/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };
@@ -189,7 +190,7 @@
       default = pkgs.mkShell {
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
-        # What scripts/sync-*.mjs and the workflows use besides stdenv, the Rust toolchain for the crates, and the
+        # What tools/upstream-sync/src/adapters/*.ts and the workflows use besides stdenv, the Rust toolchain for the crates, and the
         # libraries the flow cockpit window builds against.
         packages = with pkgs; [git gh nodejs_26 uv cargo rustc clippy rustfmt rust-analyzer pkg-config webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";

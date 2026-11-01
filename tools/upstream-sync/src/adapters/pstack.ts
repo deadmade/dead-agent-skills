@@ -3,7 +3,8 @@
 // to publish if any Cursor-ism survives. Idempotent: same upstream commit, same output.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, description, fail, finish, git, reportNew, sparseClone, tempDir } from './sync-lib.mjs';
+import { description, fail } from '../text.ts';
+import type { SyncContext, AdapterResult } from '../types.ts';
 
 const UPSTREAM_URL = 'https://github.com/cursor/plugins.git';
 const SKILLS = [
@@ -81,8 +82,8 @@ const GUARD =
 const CLAUDE_MODELS = '`fable`, `opus`, `sonnet`, `haiku`';
 const CURSOR_PANEL = String.raw`\`claude-fable-5-1-thinking-max\`, \`gpt-5\.6-sol-max\`, \`grok-4\.6-fast-xhigh\`, \`claude-opus-5-thinking-xhigh\``;
 const WRITING = "flows' **writing** skill (`flows:writing`, loaded through the Skill tool)";
-const re = (src, flags = 'g') => new RegExp(src, flags);
-const REWRITES = [
+const re = (src: string, flags = 'g') => new RegExp(src, flags);
+const REWRITES: [RegExp, string][] = [
   // --- subagent config (how, why, interrogate) ---
   // read-only subagents -> Explore (Claude Code's read-only agent type), with the role-line models and fallbacks
   [
@@ -171,7 +172,7 @@ const SKILL_NOTE = `\n> **Claude Code port:** skills this file names (for exampl
 const AGENT_NOTE =
   "\n> **Claude Code port:** to run the **how** or **why** skill, read its `SKILL.md` from the pstack-picks plugin (glob `~/.claude/plugins/**/pstack-picks/**/skills/<name>/SKILL.md`) and follow it. They are user-invoked, so the Skill tool can't load them.\n";
 
-function rewrite(file, text) {
+function rewrite(file: string, text: string) {
   for (const [pattern, replacement] of REWRITES) text = text.replace(pattern, replacement);
   const note = /\/skills\/[^/]+\/SKILL\.md$/.test(file)
     ? SKILL_NOTE
@@ -183,66 +184,70 @@ function rewrite(file, text) {
   return text;
 }
 
-const files = (dir) =>
-  readdirSync(dir, { recursive: true })
+const files = (dir: string) =>
+  readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .map((f) => join(dir, f).replaceAll('\\', '/'))
     .filter((f) => statSync(f).isFile());
 
-const PLUGIN = join(ROOT, 'plugins', 'flows', 'packs', 'pstack-picks');
+export function run(ctx: SyncContext): AdapterResult {
+  const { ROOT, finish, git, reportNew, sparseClone, tempDir } = ctx;
+  const PLUGIN = join(ROOT, 'plugins', 'flows', 'packs', 'pstack-picks');
 
-// `--ref <commit|tag|branch>` syncs that revision instead of upstream's default branch (the weekly workflow passes none).
-const refAt = process.argv.indexOf('--ref');
-const ref = refAt < 0 ? undefined : process.argv[refAt + 1];
-if (refAt >= 0 && !ref) fail('--ref needs a commit, tag or branch');
+  // `--ref <commit|tag|branch>` syncs that revision instead of upstream's default branch (the weekly workflow passes none).
+  const ref = ctx.ref;
 
-const up = sparseClone(
-  UPSTREAM_URL,
-  ['/pstack/LICENSE', ...SKILLS.map((s) => `/pstack/skills/${s}/`), ...AGENTS.map((a) => `/pstack/agents/${a}.md`)],
-  { noCone: true, ref },
-);
-const UP = join(up, 'pstack');
-
-for (const s of SKILLS) {
-  if (!existsSync(join(UP, 'skills', s, 'SKILL.md')))
-    fail(`upstream pstack/skills/${s}/SKILL.md not found (renamed or removed?)`);
-}
-for (const a of AGENTS) {
-  if (!existsSync(join(UP, 'agents', `${a}.md`))) fail(`upstream pstack/agents/${a}.md not found`);
-}
-
-// New upstream skills: every directory under pstack/skills that is neither vendored nor skipped.
-const known = new Set([...SKILLS, ...SKIPPED]);
-const NEW = git('-C', up, 'ls-tree', '-d', '--name-only', 'HEAD', 'pstack/skills/')
-  .split('\n')
-  .filter(Boolean)
-  .map((d) => d.split('/').pop())
-  .filter((s) => !known.has(s));
-if (NEW.length) {
-  for (const s of NEW) git('-C', up, 'sparse-checkout', 'add', `/pstack/skills/${s}/`);
-  reportNew(NEW.map((s) => [s, description(join(UP, 'skills', s, 'SKILL.md'))]));
-}
-
-// Build into a staging dir, rewrite, guard, then swap in.
-const STAGE = join(tempDir(), 'stage');
-mkdirSync(join(STAGE, 'agents'), { recursive: true });
-for (const s of SKILLS) cpSync(join(UP, 'skills', s), join(STAGE, 'skills', s), { recursive: true });
-for (const a of AGENTS) cpSync(join(UP, 'agents', `${a}.md`), join(STAGE, 'agents', `${a}.md`));
-cpSync(join(UP, 'LICENSE'), join(STAGE, 'LICENSE'));
-
-const staged = [...files(join(STAGE, 'skills')), ...files(join(STAGE, 'agents'))];
-for (const f of staged.filter((f) => f.endsWith('.md'))) writeFileSync(f, rewrite(f, readFileSync(f, 'utf8')));
-
-const leftovers = staged.flatMap((f) =>
-  readFileSync(f, 'utf8')
-    .split('\n')
-    .flatMap((line, i) => (GUARD.test(line) ? [`${f.slice(STAGE.length + 1)}:${i + 1}:${line}`] : [])),
-);
-if (leftovers.length)
-  fail(
-    `Cursor-specific text survived the rewrite; add a rule to REWRITES in scripts/sync-pstack.mjs:\n${leftovers.join('\n')}`,
+  const up = sparseClone(
+    UPSTREAM_URL,
+    ['/pstack/LICENSE', ...SKILLS.map((s) => `/pstack/skills/${s}/`), ...AGENTS.map((a) => `/pstack/agents/${a}.md`)],
+    { noCone: true, ref },
   );
+  const UP = join(up, 'pstack');
 
-for (const p of ['skills', 'agents', 'LICENSE', 'UPSTREAM']) rmSync(join(PLUGIN, p), { recursive: true, force: true });
-for (const p of ['skills', 'agents', 'LICENSE']) cpSync(join(STAGE, p), join(PLUGIN, p), { recursive: true });
+  for (const s of SKILLS) {
+    if (!existsSync(join(UP, 'skills', s, 'SKILL.md')))
+      fail(`upstream pstack/skills/${s}/SKILL.md not found (renamed or removed?)`);
+  }
+  for (const a of AGENTS) {
+    if (!existsSync(join(UP, 'agents', `${a}.md`))) fail(`upstream pstack/agents/${a}.md not found`);
+  }
 
-finish('pstack-picks', git('-C', up, 'rev-parse', 'HEAD'), join(PLUGIN, 'UPSTREAM'), PLUGIN);
+  // New upstream skills: every directory under pstack/skills that is neither vendored nor skipped.
+  const known = new Set([...SKILLS, ...SKIPPED]);
+  const NEW = git('-C', up, 'ls-tree', '-d', '--name-only', 'HEAD', 'pstack/skills/')
+    .split('\n')
+    .filter(Boolean)
+    .map((d) => d.split('/').pop()!)
+    .filter((s) => !known.has(s));
+  if (NEW.length) {
+    for (const s of NEW) git('-C', up, 'sparse-checkout', 'add', `/pstack/skills/${s}/`);
+    reportNew(NEW.map((s) => [s, description(join(UP, 'skills', s, 'SKILL.md'))]));
+  }
+
+  // Build into a staging dir, rewrite, guard, then swap in.
+  const STAGE = join(tempDir(), 'stage');
+  mkdirSync(join(STAGE, 'agents'), { recursive: true });
+  for (const s of SKILLS) cpSync(join(UP, 'skills', s), join(STAGE, 'skills', s), { recursive: true });
+  for (const a of AGENTS) cpSync(join(UP, 'agents', `${a}.md`), join(STAGE, 'agents', `${a}.md`));
+  cpSync(join(UP, 'LICENSE'), join(STAGE, 'LICENSE'));
+
+  const staged = [...files(join(STAGE, 'skills')), ...files(join(STAGE, 'agents'))];
+  for (const f of staged.filter((f) => f.endsWith('.md'))) writeFileSync(f, rewrite(f, readFileSync(f, 'utf8')));
+
+  const leftovers = staged.flatMap((f) =>
+    readFileSync(f, 'utf8')
+      .split('\n')
+      .flatMap((line, i) => (GUARD.test(line) ? [`${f.slice(STAGE.length + 1)}:${i + 1}:${line}`] : [])),
+  );
+  if (leftovers.length)
+    fail(
+      `Cursor-specific text survived the rewrite; add a rule to REWRITES in tools/upstream-sync/src/adapters/pstack.ts:\n${leftovers.join('\n')}`,
+    );
+
+  for (const p of ['skills', 'agents', 'LICENSE', 'UPSTREAM'])
+    rmSync(join(PLUGIN, p), { recursive: true, force: true });
+  for (const p of ['skills', 'agents', 'LICENSE']) cpSync(join(STAGE, p), join(PLUGIN, p), { recursive: true });
+
+  finish('pstack-picks', git('-C', up, 'rev-parse', 'HEAD'), join(PLUGIN, 'UPSTREAM'), PLUGIN);
+
+  return ctx.result;
+}

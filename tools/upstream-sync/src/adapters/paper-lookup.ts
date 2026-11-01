@@ -5,11 +5,10 @@
 // Idempotent: re-running against the same upstream commit produces no diff.
 import { cpSync, existsSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { ROOT, fail, finish, git, sparseClone } from './sync-lib.mjs';
+import { fail } from '../text.ts';
+import type { SyncContext, AdapterResult } from '../types.ts';
 
 const UPSTREAM_URL = 'https://github.com/K-Dense-AI/scientific-agent-skills.git';
-const DEST = join(ROOT, 'plugins', 'flows', 'packs', 'paper-lookup', 'skills', 'paper-lookup');
 
 // references/<file>.md → the name upstream's tables use for it.
 export const DROPPED = {
@@ -33,14 +32,14 @@ const NOTE = `> **Trimmed for computer science.** This copy has no reference fil
 
 // A table row goes when its first or second cell names a dropped source (a use case's primary database, an identifier
 // or a database's own row). Mentions in later cells ("also consider") stay; the note covers them.
-const dropsRow = (line) =>
+const dropsRow = (line: string) =>
   line
     .split('|')
     .slice(1, 3)
     .some((c) => NAMES.some((n) => c.trim().startsWith(n)));
 
 // Returns the trimmed SKILL.md, or null when its frontmatter description or title isn't where we expect it.
-export function trimSkill(text) {
+export function trimSkill(text: string) {
   if (!/^description: .*$/m.test(text) || !/^# .*$/m.test(text)) return null;
   const out = text
     .replace(/^description: .*$/m, () => `description: ${DESCRIPTION}`)
@@ -52,12 +51,15 @@ export function trimSkill(text) {
   return out.trimEnd() + '\n';
 }
 
-function main() {
+export function run(ctx: SyncContext): AdapterResult {
+  const { ROOT, finish, git, sparseClone } = ctx;
+  const DEST = join(ROOT, 'plugins', 'flows', 'packs', 'paper-lookup', 'skills', 'paper-lookup');
+
   const up = sparseClone(UPSTREAM_URL, ['skills/paper-lookup']);
   const SRC = join(up, 'skills', 'paper-lookup');
   if (!existsSync(join(SRC, 'SKILL.md'))) fail('upstream skills/paper-lookup/SKILL.md not found');
   // A copied symlink would point outside the plugin once installed.
-  for (const f of readdirSync(SRC, { recursive: true })) {
+  for (const f of readdirSync(SRC, { recursive: true, encoding: 'utf8' })) {
     if (lstatSync(join(SRC, f)).isSymbolicLink()) fail(`upstream skills/paper-lookup/${f} is a symlink`);
   }
 
@@ -74,6 +76,5 @@ function main() {
   writeFileSync(join(DEST, 'SKILL.md'), out);
 
   finish('paper-lookup', git('-C', up, 'rev-parse', 'HEAD'), join(DEST, 'UPSTREAM'), DEST);
+  return ctx.result;
 }
-
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();

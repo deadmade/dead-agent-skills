@@ -1,15 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  BINLOG_MCP,
-  ROUTERS,
-  assignRouter,
-  dropBinlogMcp,
-  entrySummary,
-  isHidden,
-  renderRouter,
-} from './sync-csharp.mjs';
-import { frontmatterDescription } from './sync-lib.mjs';
+import { BINLOG_MCP, ROUTERS, assignRouter, dropBinlogMcp, entrySummary, isHidden, renderRouter } from './csharp.ts';
+import { frontmatterDescription } from '../text.ts';
 
 test('assignRouter maps upstream plugins to routers, unknown ones to core', () => {
   assert.equal(assignRouter('dotnet-blazor'), 'web');

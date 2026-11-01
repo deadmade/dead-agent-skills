@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PLUGINS, missingParts, releaseNotes, tagRange, unknownParts } from './sync-release.mjs';
+import { PLUGINS, missingParts, releaseNotes, tagRange, unknownParts } from './release.ts';
 
 const manifest = {
   name: 'ponytail',

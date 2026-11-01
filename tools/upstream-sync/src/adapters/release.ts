@@ -1,16 +1,15 @@
 // Vendor an upstream Claude Code plugin into plugins/flows/packs/<name>/ at upstream's newest stable vX.Y.Z tag, unchanged
 // but for plugin.json's version (ours: everything ships as one version). Upstreams also ship adapters for other hosts;
 // only what Claude Code loads is copied. Idempotent: re-running against the same tag gives no diff.
-// Usage: node scripts/sync-release.mjs <name>
-import { execFileSync } from 'node:child_process';
-import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+// Invoked through: npm run sync -- apply <name>
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { ROOT, fail, finish, git, sparseClone, stableTags } from './sync-lib.mjs';
+import { fail, stableTags } from '../text.ts';
+import type { SyncContext, AdapterResult } from '../types.ts';
 
 // repo: upstream on GitHub. skipped: default component folders upstream has but we leave out. otherHosts: other hosts'
 // hook configs in hooks/, next to the Claude Code ones. entry: a file the plugin can't work without.
-export const PLUGINS = {
+export const PLUGINS: Record<string, { repo: string; skipped: string[]; otherHosts: string[]; entry: string }> = {
   ponytail: {
     repo: 'DietrichGebert/ponytail',
     // shortcut: commands/ holds Gemini's .toml commands at v5.3.2 and is skipped whole; check its contents if upstream adds Claude .md commands.
@@ -34,7 +33,7 @@ const DEFAULTS = ['agents', 'bin', 'commands', 'hooks', 'monitors', 'output-styl
 const DEFAULT_FILES = ['.mcp.json', '.lsp.json', 'settings.json'];
 
 // The plugin.json keys and top-level paths that Claude Code would load but this sync neither copies nor skips.
-export function unknownParts(pluginJson, topLevel, skipped) {
+export function unknownParts(pluginJson: Record<string, unknown>, topLevel: string[], skipped: string[]) {
   const keys = Object.keys(pluginJson).filter((k) => !KEYS.includes(k) && !COPIED.includes(k));
   const paths = topLevel.filter(
     (p) => [...DEFAULTS, ...DEFAULT_FILES].includes(p) && !['hooks', 'skills', ...skipped].includes(p),
@@ -44,7 +43,7 @@ export function unknownParts(pluginJson, topLevel, skipped) {
 
 // The tags a sync from `oldSha` to `newTag` brings, newest first, and the old tag when `oldSha` is one. tags:
 // stableTags(), oldest first.
-export function tagRange(tags, oldSha, newTag) {
+export function tagRange(tags: { tag: string; sha: string }[], oldSha: string | undefined, newTag: string) {
   const to = tags.findIndex((t) => t.tag === newTag);
   const from = tags.findIndex((t) => t.sha === oldSha);
   if (from > to) throw new Error(`${newTag} is older than the vendored ${tags[from].tag}`);
@@ -60,7 +59,7 @@ export function tagRange(tags, oldSha, newTag) {
 
 // Upstream text pasted into our PR: its #123 would link to our issues, a link to upstream would put this PR on that
 // issue's timeline (redirect.github.com doesn't, as in Renovate's PRs), and its @name would ping from our repo.
-const inert = (text, repo) =>
+const inert = (text: string, repo: string) =>
   text
     .replaceAll('https://github.com/', 'https://redirect.github.com/')
     .replace(/(^|[^\w/&`[])#(\d+)\b/g, `$1[#$2](https://redirect.github.com/${repo}/issues/$2)`)
@@ -70,7 +69,11 @@ const LIMIT = 60_000; // GitHub refuses PR bodies over 65,536 characters
 
 // The sync PR's body: each tag's release notes (or, without any, its commit subjects), newest first, then the
 // compare link. entries: { tag, body: string | null, subjects: string[] }, newest first.
-export function releaseNotes(repo, entries, compare) {
+export function releaseNotes(
+  repo: string,
+  entries: { tag: string; body: string | null; subjects: string[] }[],
+  compare?: string,
+) {
   const sections = entries.map(({ tag, body, subjects }) => {
     if (body) return `## ${tag}\n\n${inert(body.trim(), repo)}\n`;
     const lines = subjects.filter((s) => !/^chore: release /.test(s)).map((s) => `- ${inert(s, repo)}`);
@@ -86,17 +89,18 @@ export function releaseNotes(repo, entries, compare) {
 }
 
 // What the copy needs from the clone `up` and the clone lacks, so nothing is deleted before the sync knows it can finish.
-export function missingParts(up, manifest, entry) {
+export function missingParts(up: string, manifest: { hooks?: unknown; types?: string }, entry: string) {
   const needed = ['hooks', ...hookFiles(manifest.hooks), ...(manifest.types ? [manifest.types] : [])];
   return [...needed, entry, 'LICENSE'].filter((f) => !existsSync(join(up, f)));
 }
 
 // The hook config files plugin.json names (a path, or a list of paths and inline objects).
-const hookFiles = (hooks) => [hooks ?? []].flat().filter((h) => typeof h === 'string');
+const hookFiles = (hooks: unknown) => [hooks ?? []].flat().filter((h) => typeof h === 'string');
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const name = process.argv[2];
-  if (!Object.hasOwn(PLUGINS, name)) fail(`usage: node scripts/sync-release.mjs <${Object.keys(PLUGINS).join('|')}>`);
+export function run(ctx: SyncContext): AdapterResult {
+  const { ROOT, finish, git, sparseClone } = ctx;
+  const name = ctx.argument;
+  if (!Object.hasOwn(PLUGINS, name)) fail(`usage: npm run sync -- apply <${Object.keys(PLUGINS).join('|')}>`);
   const { repo, skipped, otherHosts, entry } = PLUGINS[name];
   const tags = stableTags(git('ls-remote', '--tags', `https://github.com/${repo}.git`));
   const latest = tags.at(-1);
@@ -128,19 +132,16 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (unknown.length)
     fail(`upstream has parts this sync doesn't handle: ${unknown.join(', ')}; decide, then update KEYS/PLUGINS`);
 
-  const notesOf = (tag) => {
+  const notesOf = (tag: string) => {
     try {
-      const out = execFileSync('gh', ['api', `repos/${repo}/releases/tags/${tag}`, '--jq', '.body'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      });
+      const out = ctx.gh('api', `repos/${repo}/releases/tags/${tag}`, '--jq', '.body');
       const body = out.trim();
       return body && body !== 'null' ? body : null; // jq prints null for a release without notes
     } catch {
       return null; // no release for this tag, or no gh
     }
   };
-  const prevOf = (tag) => tags[tags.findIndex((t) => t.tag === tag) - 1]?.tag;
+  const prevOf = (tag: string) => tags[tags.findIndex((t) => t.tag === tag) - 1]?.tag;
   const entries = range.tags.map((tag) => ({
     tag,
     body: notesOf(tag),
@@ -163,7 +164,8 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   cpSync(join(up, 'LICENSE'), join(dest, 'LICENSE'));
   if (oldSha) writeFileSync(upstreamFile, oldSha + '\n'); // so finish() sees only real changes
 
-  if (process.env.PR_BODY_FILE) writeFileSync(process.env.PR_BODY_FILE, releaseNotes(repo, entries, compare));
+  ctx.result.body = releaseNotes(repo, entries, compare);
   finish(name, latest.sha, upstreamFile, dest);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `tag=${latest.tag}\nsha=${latest.sha}\n`);
+  ctx.result.values = { tag: latest.tag, sha: latest.sha };
+  return ctx.result;
 }

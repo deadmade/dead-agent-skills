@@ -1,18 +1,9 @@
 // Vendor every skill of Microsoft's dotnet/skills marketplace into plugins/opt-in/implementation/csharp-skills/library/, indexed by
 // six C#-only router skills under skills/ (ROUTERS). Idempotent: same upstream commit, same output.
-import {
-  appendFileSync,
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { ROOT, fail, finish, frontmatterDescription, git, sparseClone, summary } from './sync-lib.mjs';
+import { fail, frontmatterDescription, summary } from '../text.ts';
+import type { SyncContext, AdapterResult } from '../types.ts';
 
 const UPSTREAM_URL = 'https://github.com/dotnet/skills.git';
 const GLOBS = [
@@ -67,9 +58,17 @@ export const ROUTERS = [
   },
 ];
 
-export const assignRouter = (plugin) => ROUTERS.find((r) => r.plugins.includes(plugin))?.name ?? 'core';
+export const assignRouter = (plugin: string) => ROUTERS.find((r) => r.plugins.includes(plugin))?.name ?? 'core';
 
-export function renderRouter({ name, description, entries }) {
+export function renderRouter({
+  name,
+  description,
+  entries,
+}: {
+  name: string;
+  description: string;
+  entries: { name: string; summary: string }[];
+}) {
   const rows = [...entries]
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
     .map(
@@ -97,26 +96,26 @@ export function renderRouter({ name, description, entries }) {
   ].join('\n');
 }
 
-const frontmatter = (text) => /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? '';
-export const isHidden = (text) => /^disable-model-invocation:\s*true\s*$/m.test(frontmatter(text));
-const fmName = (text) => /^name:\s*['"]?([^'"\r\n]*?)['"]?\s*$/m.exec(frontmatter(text))?.[1];
+const frontmatter = (text: string) => /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? '';
+export const isHidden = (text: string) => /^disable-model-invocation:\s*true\s*$/m.test(frontmatter(text));
+const fmName = (text: string) => /^name:\s*['"]?([^'"\r\n]*?)['"]?\s*$/m.exec(frontmatter(text))?.[1];
 
 const INSTALLED =
   'All of these skills are already installed in the csharp-skills plugin, reached through its router skills ' +
   '(csharp-skills:core, :testing, :build, :web, :data, :desktop). Each one is at `../<skill>/SKILL.md` relative to ' +
   'this skill.';
 // Prepended to csharp-expert, which upstream wrote as an install guide for a marketplace of separate plugins.
-const note = (path) =>
+const note = (path: string) =>
   '**In the csharp-skills plugin:** every specialist named here is already installed. Specialists are not listed in ' +
   '/skills; find them in the csharp-skills router indexes (csharp-skills:core, :testing, :build, :web, :data, ' +
   `:desktop) or read \`${path}<skill>/SKILL.md\`. Ignore any install, marketplace, restart or reload steps below.`;
 // [file under library/, pattern, replacement]. Each must match, so an upstream rewording fails the sync.
-const REWRITES = [
-  ['csharp-expert/SKILL.md', /^---\n[\s\S]*?\n---\n/, (fm) => `${fm}\n${note('../')}\n`],
+const REWRITES: [string, RegExp, string | ((match: string) => string)][] = [
+  ['csharp-expert/SKILL.md', /^---\n[\s\S]*?\n---\n/, (fm: string) => `${fm}\n${note('../')}\n`],
   [
     'csharp-expert/references/dotnet-skills-marketplace.md',
     /^# dotnet\/skills Marketplace\n/,
-    (h) => `${h}\n${note('../../')}\n`,
+    (h: string) => `${h}\n${note('../../')}\n`,
   ],
   [
     'csharp-expert/SKILL.md',
@@ -165,10 +164,10 @@ const REWRITES = [
   ['check-bin-obj-clash/SKILL.md', /the same signals the MCP tools surface:/, 'the clash signals:'],
 ];
 // Index summaries that replace a skill's own description in the router.
-export const SUMMARY_OVERRIDES = {
+export const SUMMARY_OVERRIDES: Record<string, string> = {
   'csharp-expert': 'C# semantics, and routing to the right specialist skill in this plugin.',
 };
-export const entrySummary = (name, desc) => SUMMARY_OVERRIDES[name] ?? summary(desc);
+export const entrySummary = (name: string, desc: string | null) => SUMMARY_OVERRIDES[name] ?? summary(desc);
 
 // Upstream's binlog MCP server isn't vendored, so its troubleshooting skill isn't either, and the binlog skills keep
 // only their text-log replay workflows (dropBinlogMcp, then the binlog rewrites above).
@@ -178,19 +177,19 @@ export const BINLOG_MCP = /binlog MCP|BinlogMcp|binlog-mcp|MCP is unavailable|th
 
 // Drops each section whose heading names the binlog MCP, up to the next heading of the same or a higher level, and
 // strips the "fallback, when MCP is unavailable" wording from the replay headings left behind.
-export function dropBinlogMcp(text) {
+export function dropBinlogMcp(text: string) {
   let fence = false;
   let drop = 0; // level of the heading being dropped, 0 while keeping
   return text
     .split('\n')
-    .filter((line) => {
+    .filter((line: string) => {
       if (/^\s*(```|~~~)/.test(line)) fence = !fence;
       const h = !fence && /^(#+) /.exec(line);
       if (h && drop && h[1].length <= drop) drop = 0;
       if (h && !drop && /binlog MCP/.test(line)) drop = h[1].length;
       return !drop;
     })
-    .map((line) =>
+    .map((line: string) =>
       /^#+ /.test(line)
         ? line
             .replace(/ \(when MCP is unavailable\)$/, '')
@@ -203,28 +202,25 @@ export function dropBinlogMcp(text) {
 // Upstream plugin.json keys for parts we don't vendor.
 const UNVENDORED = ['agents', 'mcpServers', 'lspServers', 'hooks', 'commands'];
 
-const PLUGIN = join(ROOT, 'plugins', 'opt-in', 'implementation', 'csharp-skills');
-const LIBRARY = join(PLUGIN, 'library');
-
-function report(line) {
-  console.log(line);
-  if (process.env.SYNC_REPORT) appendFileSync(process.env.SYNC_REPORT, line + '\n');
-}
-
-function listFiles(dir) {
+function listFiles(dir: string) {
   return readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile())
     .map((e) => join(e.parentPath, e.name));
 }
 
-function main() {
+export function run(ctx: SyncContext): AdapterResult {
+  const { ROOT, finish, git, sparseClone, report } = ctx;
+  const PLUGIN = join(ROOT, 'plugins', 'opt-in', 'implementation', 'csharp-skills');
+  const LIBRARY = join(PLUGIN, 'library');
+
   // 1. Clone.
   const up = sparseClone(UPSTREAM_URL, ['.claude-plugin', 'plugins']);
-  const plugins = JSON.parse(readFileSync(join(up, '.claude-plugin', 'marketplace.json'), 'utf8')).plugins ?? [];
+  const plugins: { name: string }[] =
+    JSON.parse(readFileSync(join(up, '.claude-plugin', 'marketplace.json'), 'utf8')).plugins ?? [];
   if (!plugins.length) fail('upstream marketplace lists no plugins');
 
   // 2. Collect skills: name -> { plugin, src }.
-  const skills = new Map();
+  const skills = new Map<string, { plugin: string; src: string }>();
   for (const { name: plugin } of plugins) {
     const dir = join(up, 'plugins', plugin, 'skills');
     if (!existsSync(dir)) fail(`upstream plugins/${plugin} has no skills/`);
@@ -239,7 +235,7 @@ function main() {
       if (fmName(text) !== name) fail(`plugins/${plugin}/skills/${name}/SKILL.md: name is "${fmName(text)}"`);
       if (frontmatterDescription(text) === null)
         fail(`plugins/${plugin}/skills/${name}/SKILL.md: unsupported description form`);
-      if (skills.has(name)) fail(`skill ${name} is in both ${skills.get(name).plugin} and ${plugin}`);
+      if (skills.has(name)) fail(`skill ${name} is in both ${skills.get(name)!.plugin} and ${plugin}`);
       skills.set(name, { plugin, src: join(dir, name) });
     }
   }
@@ -250,7 +246,7 @@ function main() {
   for (const n of [...old].sort()) if (!skills.has(n)) report(`removed: ${n}`);
 
   // 4. Report what isn't vendored.
-  const agents = [];
+  const agents: string[] = [];
   for (const { name: plugin } of plugins) {
     const manifest = JSON.parse(readFileSync(join(up, 'plugins', plugin, '.claude-plugin', 'plugin.json'), 'utf8'));
     const keys = UNVENDORED.filter((k) => k in manifest);
@@ -277,14 +273,17 @@ function main() {
     const file = join(LIBRARY, rel);
     const text = readFileSync(file, 'utf8');
     if (!pattern.test(text)) fail(`rewrite ${pattern} found nothing in library/${rel} (upstream changed?)`);
-    writeFileSync(file, text.replace(pattern, replacement));
+    writeFileSync(
+      file,
+      typeof replacement === 'string' ? text.replace(pattern, replacement) : text.replace(pattern, replacement),
+    );
   }
   for (const f of listFiles(LIBRARY).filter((f) => f.endsWith('.md')))
     if (BINLOG_MCP.test(readFileSync(f, 'utf8')))
       fail(`library/${relative(LIBRARY, f).split(sep).join('/')} still names the binlog MCP (upstream changed?)`);
 
   // 7. Agent mentions. Hyphens count as word characters, since agent names are hyphenated.
-  const mentionPatterns = agents
+  const mentionPatterns: [string, RegExp][] = agents
     .sort()
     .map((a) => [
       a,
@@ -300,7 +299,7 @@ function main() {
   for (const r of ROUTERS) {
     const entries = [];
     for (const name of readdirSync(LIBRARY)) {
-      if (assignRouter(skills.get(name).plugin) !== r.name) continue;
+      if (assignRouter(skills.get(name)!.plugin) !== r.name) continue;
       const text = readFileSync(join(LIBRARY, name, 'SKILL.md'), 'utf8');
       if (!isHidden(text)) entries.push({ name, summary: entrySummary(name, frontmatterDescription(text)) });
     }
@@ -311,6 +310,5 @@ function main() {
   // 9. Finish.
   cpSync(join(up, 'LICENSE'), join(PLUGIN, 'LICENSE'));
   finish('csharp-skills', git('-C', up, 'rev-parse', 'HEAD'), join(PLUGIN, 'UPSTREAM'), PLUGIN);
+  return ctx.result;
 }
-
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();

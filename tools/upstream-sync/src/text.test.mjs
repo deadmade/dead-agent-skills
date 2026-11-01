@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { addPaths, frontmatterDescription, pinFrom, sparseClone, stableTags, summary } from './sync-lib.mjs';
+import { createContext } from './system/context.ts';
+const temporary = mkdtempSync(join(tmpdir(), 'sync-test-'));
+process.on('exit', () => rmSync(temporary, { recursive: true, force: true }));
+const { sparseClone } = createContext(process.cwd(), temporary);
+import { addPaths, frontmatterDescription, pinFrom, stableTags, summary } from './text.ts';
 
 test('frontmatterDescription', () => {
   assert.equal(

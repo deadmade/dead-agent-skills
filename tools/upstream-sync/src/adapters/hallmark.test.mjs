@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { trim } from './sync-hallmark.mjs';
+import { trim } from './hallmark.ts';
 
 test('trim drops the comp step and the edit-time hook from flow.md', () => {
   const flow = `The stamp says \`shape: app screen\`, which sloplint and the edit-time hook read as the app scope.

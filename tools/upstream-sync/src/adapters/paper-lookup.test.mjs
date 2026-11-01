@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { trimSkill } from './sync-paper-lookup.mjs';
-import { frontmatterDescription } from './sync-lib.mjs';
+import { trimSkill } from './paper-lookup.ts';
+import { frontmatterDescription } from '../text.ts';
 
 const SKILL = `---
 name: paper-lookup
