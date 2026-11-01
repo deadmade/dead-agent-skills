@@ -20,6 +20,14 @@ Claude proposes and recommends; the user decides.
 | 6 Execute    | superpowers `subagent-driven-development` or `executing-plans` | code, tests                               |
 | 7 Finish     | `/verify`, then `/learn`                                       | walkthrough, branch handled, lessons kept |
 
+- **Say how you know.** A claim the user decides on (in options, gate summaries, plan findings) is _measured_ (you
+  ran it), _verified_ (a source or `file:line` says so; what code does, read but not run, is inferred), _inferred_ (your
+  reasoning) or _assumed_. Check an inferred
+  or assumed claim an option rests on, or present it as a guess.
+- **Reviewers are independent.** Every checking agent (source check, plan reviewers, rulings, fix checks) is a fresh
+  subagent: never a fork, and no `name`. It gets only the files its prompt names, plus the findings it rules on or
+  checks: never this conversation, drafts, or which option the user leans to.
+
 ## Rules for the whole run
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack,
@@ -54,9 +62,9 @@ Ask nothing yet. In one message, start both:
   when the feature moves an existing concern. Also read the domain docs that
   `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists (the glossary and the ADRs).
 - **Prior art:** one background `general-purpose` agent with the prompt in
-  [references/prior-art.md](references/prior-art.md). Don't wait for it; Phase 2 starts with questions anyway.
+  [references/prior-art.md](references/prior-art.md), writing `docs/features/<slug>/prior-art.md`. Don't wait for it; Phase 2 starts with questions anyway. When it lands, run the source check in that reference and correct the report before presenting options.
 
-Write a short summary of each into flow.md under **Grounding** and **Prior art** as they land.
+Write a short summary of each into flow.md under **Grounding** and **Prior art** as they land, including the source check’s counts.
 
 ## Phase 2: Brainstorm
 

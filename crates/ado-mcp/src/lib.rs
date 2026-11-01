@@ -5,14 +5,14 @@ mod api;
 mod config;
 mod ctx;
 mod file;
-mod search;
-mod wiki;
 mod out;
 mod pipeline;
 mod pr;
 mod remote;
+mod search;
 mod tools;
 mod wi;
+mod wiki;
 
 pub use api::{Api, ApiError};
 pub use config::Config;

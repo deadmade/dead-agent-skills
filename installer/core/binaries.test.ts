@@ -75,6 +75,7 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   const dirs: Record<string, string> = {
     'tui-review': 'plugins/shared/tui-review',
     'web-mcp': 'plugins/shared/web-mcp',
+    'mcp-azure': 'plugins/opt-in/mcp/mcp-azure',
     'flow-cockpit': 'plugins/opt-in/flow-cockpit',
   };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))

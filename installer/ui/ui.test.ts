@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+// readline disables editing under TERM=dumb; these tests emulate an interactive terminal.
+process.env.TERM = 'xterm';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
 import { confirm, line, progress, screen, secret } from './ui.ts';

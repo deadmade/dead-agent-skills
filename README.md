@@ -6,7 +6,7 @@ My personal Claude Code setup as a plugin marketplace, so every machine (Linux, 
 built for me; use it if it fits, but expect it to change without notice.
 
 The default bundle, **[dead-skills](plugins/default/README.md)**, pulls in claude-code-setup, claude-md-management, security-guidance and
-claude-security, and itself carries Context7, Night City (a
+claude-security and agent-review, and itself carries Context7, Night City (a
 toned-down synthwave theme that everything else here is painted in), desktop notifications when a turn ends or Claude
 waits for you, and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, [Azure DevOps Server](plugins/opt-in/mcp/mcp-azure/README.md), Atlassian), skill packs

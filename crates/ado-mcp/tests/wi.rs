@@ -530,7 +530,6 @@ async fn mine_spans_the_collection() {
     let cfg = ado_mcp::Config {
         org_url: fx.url("/tfs/Coll/").parse().unwrap(),
         pat: "test-pat".into(),
-        default_project: None,
         project_dir: common::tempdir(),
     };
     let got = ado_mcp::mine(&ado_mcp::Api::new(&cfg).unwrap())

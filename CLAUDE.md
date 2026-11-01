@@ -157,7 +157,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `TIKTOKEN_CACHE_DIR`) under the plugin data dir, never `~` (only uv's own download cache and managed Python live in
   uv's folders); `PYTHONDONTWRITEBYTECODE=1` keeps `__pycache__` out of the install folder. A SessionStart launcher
   (`hooks/launcher.mjs`) finds uv (`<CONFIG>/bin`, then an absolute PATH entry; never a bare name), starts `uv run
-  --locked` detached with cwd = the data dir, output to `server.log`, and without the session's `UV_*`, `PYTHON*` and
+--locked` detached with cwd = the data dir, output to `server.log`, and without the session's `UV_*`, `PYTHON*` and
   `VIRTUAL_ENV` (the installer drops them too, `trimServerEnv`), and returns within about 300 ms. `/health` reports the
   server's identity (a hash of `uv.lock`, `pyproject.toml` and `server/*.py`) and plugin version; a launcher replaces a
   server of another identity unless that server's version is newer. A PostToolUse `http` hook posts to 127.0.0.1:47811;
@@ -215,7 +215,7 @@ entry's version from its `ref` (`shippedVersions`).
 ## Vendored content: don't edit
 
 These are copied from upstream by `scripts/sync-*.mjs` (the weekly `sync.yml` opens the PRs) and overwritten on every
-sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0; pstack-picks' `.claude-plugin/plugin.json` is hand-written), `plugins/flows/agents/`,
+sync: `plugins/shared/agent-review/skills/`, `plugins/shared/agent-review/LICENSE` and `UPSTREAM`, `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0; pstack-picks' `.claude-plugin/plugin.json` is hand-written), `plugins/flows/agents/`,
 `plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
 `plugins/flows/skills/self-review/references/upstream/` with its `LICENSE` and `LICENSE-MIT`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
 `crates/flow-cockpit/app/shell/vendor/` (marked, DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync script: it is copied unchanged from

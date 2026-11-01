@@ -311,4 +311,20 @@ export const SOURCES = [
       overlap: 'self-review, superpowers and the other picks',
     },
   },
+  {
+    name: 'agent-review',
+    script: 'sync-agent-review.mjs',
+    paths: ['plugins/shared/agent-review'],
+    check: () => {
+      const d = 'plugins/shared/agent-review';
+      json(`${d}/.claude-plugin/plugin.json`);
+      exists(`${d}/skills/agent-review/SKILL.md`, { nonEmpty: true });
+      assert(
+        read(`${d}/skills/agent-review/SKILL.md`).includes('disable-model-invocation: true'),
+        'agent-review must stay explicitly invoked',
+      );
+      return { sha: upstream(`${d}/UPSTREAM`) };
+    },
+    ...commitPr('agent-review', 'the agent-review skill', 'captivus/agent-review'),
+  },
 ];

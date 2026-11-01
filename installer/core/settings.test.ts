@@ -112,6 +112,10 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   const other = { matcher: 'Edit', hooks: [{ type: 'command', command: 'fmt.sh' }] };
   const before: Settings = {
     model: 'x',
+    pluginConfigs: {
+      [`mcp-azure@${M}`]: { ado_org_url: 'https://tfs.example/tfs/Coll', binPath: '/bin/ado-mcp' },
+      'x@other': {},
+    },
     permissions: { allow: ['Bash(ls)'] },
     hooks: { PreToolUse: [other, dcgEntry], Stop: [other] },
     enabledPlugins: { [`dead-skills@${M}`]: true, [`code-review@${O}`]: true, 'x@other': true },
@@ -122,6 +126,8 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   };
   const out = resetSettings(before, { statusLine: true, dcg: true });
   assert.equal(out.model, undefined);
+  assert.deepEqual(Object.keys(out.pluginConfigs!), [`mcp-azure@${M}`]);
+  assert.deepEqual(out.pluginConfigs![`mcp-azure@${M}`], before.pluginConfigs![`mcp-azure@${M}`]);
   assert.equal(out.env?.CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS, '8');
   assert.deepEqual(out.permissions!.allow, ['Read(~/.claude/plugins/**)']);
   assert.deepEqual(out.hooks, { PreToolUse: [dcgEntry] });

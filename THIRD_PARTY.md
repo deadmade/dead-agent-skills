@@ -199,6 +199,17 @@ The palette of `plugins/default/themes/night-city.json` is derived from the Cybe
 (`plugins/theme-gallery/themes/cyberpunk.json`) of [livlign/ccthemes](https://github.com/livlign/ccthemes) (MIT
 License, Copyright its authors), with changed and added colors. Nothing is vendored or synced.
 
+## agent-review
+
+`plugins/shared/agent-review/skills/agent-review/` is vendored from [captivus/agent-review](https://github.com/captivus/agent-review)
+(MIT License, Copyright (c) 2026 Corey Gallon; full text in `plugins/shared/agent-review/LICENSE`). It is synced by
+`scripts/sync-agent-review.mjs` (weekly via GitHub Actions; the synced commit is in `plugins/shared/agent-review/UPSTREAM`).
+The only local changes are in `SKILL.md`'s frontmatter (`disable-model-invocation: true` added, `effort` removed), one
+sentence pointing at the dead-skills `rules.md` instead of the upstream README, `references/tool-notes.md` without its
+install section (it describes the unmodified skill) and `SKILL.md`'s link to it no longer naming install options, and a
+source comment in each Markdown file. The self-audit lines in `plugins/default/rules.md` and the review steps in
+self-review and feature-flow are adapted from its method.
+
 ## Re-listed plugins
 
 The marketplace entry for Atlassian only points at its upstream repository; no code is vendored here. Anthropic's

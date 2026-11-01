@@ -18,6 +18,9 @@ excludes = [
   "crates/flow-cockpit/app/shell/vendor/**",
   # Test fixtures are real documents and templates, read as written.
   "crates/flow-cockpit/core/tests/fixtures/**",
+  "plugins/shared/agent-review/skills/**",
+  "plugins/shared/agent-review/LICENSE",
+  "plugins/shared/agent-review/UPSTREAM",
   ".pre-commit-config.yaml",
   # npm writes it.
   "package-lock.json",

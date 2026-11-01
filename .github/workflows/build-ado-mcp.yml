@@ -10,7 +10,7 @@ on:
     inputs:
       ref:
         type: string
-        default: ""
+        default: ''
 
 permissions:
   contents: read
@@ -41,13 +41,13 @@ jobs:
         if: contains(matrix.target, 'musl')
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: crates/ado-mcp
           key: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        run: cargo build --release --locked --bins --target ${{ matrix.target }}
 
       - name: Smoke test
         run: target/${{ matrix.target }}/release/ado-mcp --version
@@ -57,9 +57,9 @@ jobs:
           name=ado-mcp-${{ matrix.target }}
           mkdir -p "$RUNNER_TEMP/dist"
           if [ "${{ matrix.archive }}" = zip ]; then
-            7z a -tzip "$RUNNER_TEMP/dist/$name.zip" "./target/${{ matrix.target }}/release/ado-mcp.exe" > /dev/null
+            7z a -tzip "$RUNNER_TEMP/dist/$name.zip" "./target/${{ matrix.target }}/release/ado-mcp.exe" "./target/${{ matrix.target }}/release/timetrack.exe" > /dev/null
           else
-            tar -czf "$RUNNER_TEMP/dist/$name.tar.gz" -C "target/${{ matrix.target }}/release" ado-mcp
+            tar -czf "$RUNNER_TEMP/dist/$name.tar.gz" -C "target/${{ matrix.target }}/release" ado-mcp timetrack
           fi
           cd "$RUNNER_TEMP/dist"
           for f in "$name".*; do

@@ -22,6 +22,8 @@ now: <one plain sentence: where the run stands and what comes next>
 
 ## Artifacts
 
+- Prior art:
+
 - Spec:
 - Plan:
 - ADRs:
@@ -45,7 +47,7 @@ reopening is appended as `Reopened <date>: <why>`. A plan gate adds `, execution
 
 ## Prior art
 
-<!-- Approaches found, who uses them, key sources. -->
+<!-- Approaches found, who uses them, key sources; source check: confirmed / not supported / couldn't open. -->
 
 ## Options
 
@@ -54,7 +56,7 @@ offered and the recommendation. -->
 
 ## Plan review
 
-<!-- Round N: findings, the user's decision on each, what changed. -->
+<!-- Round N: findings, the user's decision on each, what changed, fix checks, fresh-eyes rounds. -->
 
 ## Tasks
 
