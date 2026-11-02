@@ -11,6 +11,12 @@ export interface UpstreamPin {
 }
 
 // [binary, needed for (plugin name), NixOS command, Windows command]
+// graphify's optional parsers and readers (sql: tree-sitter-sql, pdf, office: docx/xlsx, watch, leiden: clustering).
+export const GRAPHIFY_EXTRAS = ['sql', 'pdf', 'office', 'watch', 'leiden'];
+export const GRAPHIFY_SPEC = `"graphifyy[${GRAPHIFY_EXTRAS.join(',')}]"`;
+// The uv arguments that install or upgrade it; the unquoted spec, as no shell is involved.
+export const graphifyToolArgs = () => ['tool', 'install', '--upgrade', `graphifyy[${GRAPHIFY_EXTRAS.join(',')}]`];
+
 const BINARIES = [
   ['rust-analyzer', 'rust-analyzer-lsp', 'nix: rust-analyzer', 'rustup component add rust-analyzer'],
   ['csharp-ls', 'csharp-lsp', 'nix: csharp-ls dotnet-sdk', 'dotnet tool install --global csharp-ls'],
@@ -25,7 +31,7 @@ const BINARIES = [
   ['jq', BUNDLE, 'nix: jq', 'winget install -e --id jqlang.jq'],
   ['python3', BUNDLE, 'nix: python3', 'winget install -e --id Python.Python.3.13'],
   ['uv', 'graphify', 'nix: uv', 'winget install -e --id astral-sh.uv'],
-  ['graphify', 'graphify', 'uv tool install graphifyy', 'uv tool install graphifyy'],
+  ['graphify', 'graphify', `uv tool install ${GRAPHIFY_SPEC}`, `uv tool install ${GRAPHIFY_SPEC}`],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
 ];
 

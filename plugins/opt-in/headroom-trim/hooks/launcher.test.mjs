@@ -222,7 +222,7 @@ test('main spawns detached and hidden into server.log, logs the start, and unref
   const { o, child, cmd, args } = spawned[0];
   const uv = join('/cfg', 'bin', process.platform === 'win32' ? 'uv.exe' : 'uv');
   assert.equal(cmd, uv);
-  assert.equal(o.detached, true);
+  assert.equal(o.detached, process.platform !== 'win32');
   assert.equal(o.windowsHide, true);
   assert.equal(o.cwd, data);
   assert.equal(o.stdio[0], 'ignore');

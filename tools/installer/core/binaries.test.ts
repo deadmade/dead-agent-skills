@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  graphifyToolArgs,
   missingBinaries,
   newestChromeForTesting,
   upstreamAction,
@@ -266,4 +267,10 @@ test('windowProblem: no browser, no display on Linux, and the cases that are fin
   assert.equal(windowProblem({ ...ok, display: true }), undefined);
   assert.equal(windowProblem({ ...ok, xvfb: true }), undefined);
   assert.equal(windowProblem({ ...ok, platform: 'win32' }), undefined);
+});
+
+test('graphify installs with its extras through uv tool install', () => {
+  assert.deepEqual(graphifyToolArgs(), ['tool', 'install', '--upgrade', 'graphifyy[sql,pdf,office,watch,leiden]']);
+  const r = missingBinaries('win32', ['graphify'], () => false).find((m) => m.binary === 'graphify');
+  assert.equal(r?.command, 'uv tool install "graphifyy[sql,pdf,office,watch,leiden]"');
 });

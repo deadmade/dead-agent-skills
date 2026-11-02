@@ -140,7 +140,9 @@ export async function main({ argv, env, fetch, spawn, isFile }) {
       child = spawn(s.cmd, s.args, {
         cwd: data,
         env: serverEnv(env, s.env),
-        detached: true,
+        // Windows: detached starts uv with no console, so the python.exe it runs opens a visible one. Not detached, uv gets
+        // a hidden console (CREATE_NO_WINDOW) that python inherits, and Windows children outlive their parent anyway.
+        detached: process.platform !== 'win32',
         windowsHide: true,
         stdio: ['ignore', out, out],
       });
