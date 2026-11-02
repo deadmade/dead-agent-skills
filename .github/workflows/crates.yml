@@ -114,9 +114,11 @@ jobs:
 
       - name: Mod tests and speed budgets
         if: matrix.crate == 'tui-review'
-        working-directory: plugins/shared/tui-review
+        # The Claude package is generated from plugins/, which holds the sources and tests, so test it with them.
         run: |
           npm install -g @anthropic-ai/claude-code
+          cp -r ../../plugins/shared/tui-review/tests ../../.claude-plugin/tui-review/tests
+          cd ../../.claude-plugin/tui-review
           claude plugin validate .
           claude plugin test .
 
