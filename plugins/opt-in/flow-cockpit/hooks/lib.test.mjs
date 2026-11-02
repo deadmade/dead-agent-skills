@@ -296,11 +296,16 @@ test('parallel_appends_stay_whole', async () => {
     tool_use_id: 'x',
     tool_input: { questions },
   });
-  const code = `import { main } from ${JSON.stringify(lib)};
-for (let i = 0; i < 50; i++) await main({ stdin: process.argv[1], env: process.env, platform: process.platform, now: Date.now() });`;
+  // The payload goes by file: escaped into a command line it passes Windows' 32 K limit (ENAMETOOLONG).
+  const payloadFile = join(state, 'payload.json');
+  writeFileSync(payloadFile, payload);
+  const code = `import { readFileSync } from 'node:fs';
+import { main } from ${JSON.stringify(lib)};
+const stdin = readFileSync(process.argv[1], 'utf8');
+for (let i = 0; i < 50; i++) await main({ stdin, env: process.env, platform: process.platform, now: Date.now() });`;
   const writer = () =>
     new Promise((resolve) => {
-      const p = spawn(process.execPath, ['--input-type=module', '-e', code, payload], { env, stdio: 'ignore' });
+      const p = spawn(process.execPath, ['--input-type=module', '-e', code, payloadFile], { env, stdio: 'ignore' });
       p.on('close', resolve);
     });
   await Promise.all(Array.from({ length: 20 }, writer));
