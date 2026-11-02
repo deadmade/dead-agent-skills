@@ -1,0 +1,50 @@
+{
+  "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus core plugins from claude-plugins-official as dependencies.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "dependencies": [
+    {
+      "name": "claude-code-setup",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "claude-md-management",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "security-guidance",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "claude-security",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "agent-review",
+      "targets": ["claude-code"]
+    }
+  ],
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp"
+    }
+  },
+  "themes": [
+    {
+      "name": "night-city",
+      "palette": "themes/palette.json"
+    }
+  ],
+  "instructions": "rules.md",
+  "extensions": [
+    {
+      "kind": "ui-mod",
+      "entry": "hooks/register.tsx",
+      "copy": ["hooks/register.tsx", "hooks/background.ts", "hooks/words.ts", "assets"]
+    }
+  ],
+  "hooks": "hooks/hooks.json"
+}

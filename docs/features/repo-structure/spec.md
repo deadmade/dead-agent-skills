@@ -79,9 +79,9 @@ How each plugin was placed (all my call):
   - `.claude-plugin/marketplace.json` `source`s
   - `scripts/` `GROUPS` (plugin-dirs), check-repo `BUNDLE` and `CRATES`, release crate dirs, flows-uses `FLOWS`,
     draw-mascot `ASSETS` (plus its test), and every `sync-*.mjs` destination
-  - `installer/install.mjs:316` and `:372`, which are already broken by the last regroup (`plugins/tui-review`
+  - `tools/installer/install.mjs:316` and `:372`, which are already broken by the last regroup (`plugins/tui-review`
     doesn't exist), and `:519`
-  - `installer/core.test.mjs` path fixtures
+  - `tools/installer/core.test.mjs` path fixtures
   - the crate paths: `tests/make-fixture.mjs` usage line, the tui-review and web-mcp READMEs' build commands, the
     `brv/src/...` comments in tui-review hooks, `.gitignore` `target/` entries
   - `.github/workflows/`: the working directories and `paths` filters in test, tui-review, web-mcp, build-brv and

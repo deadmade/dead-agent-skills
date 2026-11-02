@@ -16,7 +16,7 @@ not more color. The other hard requirement: **it stays usable** for all-day work
    sign whose letter sputters. It plays for a few seconds, then folds away; it is not permanent.
 3. Short **reactions**: a failing tool result triggers a brief glitch; a finished turn flares briefly. Then still.
 4. **Flavor text**: Night City spinner words ("Breaching ICE", "Jacking in", …) and turn-end line.
-5. **Status line**: everything the installer's ccstatusline config shows today (`installer/ccstatusline.json`: model,
+5. **Status line**: everything the installer's ccstatusline config shows today (`tools/installer/ccstatusline.json`: model,
    thinking effort, context, cost, clock; cwd, branch, git changes, ahead/behind), restyled with Night City hex
    colors, gradient and/or powerline.
 6. ~~Installing the plugin switches to the theme automatically.~~ Dropped 2026-10-13 (deviation 1, user chose C):
@@ -74,8 +74,8 @@ not more color. The other hard requirement: **it stays usable** for all-day work
 - Mods cannot write raw escape sequences to the terminal themselves; a `$.process.run` child can, by writing to
   Claude's tty (POSIX) or `CONOUT$` (Windows).
 - ccstatusline 2.2.32 (installed) supports truecolor hex, line gradients with hex stops, and powerline (its README).
-- Repo: new plugin needs a marketplace entry, version = package.json, a `CATEGORIES` key in `installer/core.mjs`
-  (else `installer/core.test.mjs:372-379` fails), README opt-in list, THIRD_PARTY.md.
+- Repo: new plugin needs a marketplace entry, version = package.json, a `CATEGORIES` key in `tools/installer/core.mjs`
+  (else `tools/installer/core.test.mjs:372-379` fails), README opt-in list, THIRD_PARTY.md.
 
 ## Behaviour (proposed by Claude, confirmed by the user in the grill, 2026-10-13)
 

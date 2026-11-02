@@ -19,8 +19,8 @@ is the bug.
 | 5 Prose     | `flows:writing`                             | wording findings, changed docs only            |
 | 6 Report    | flow-rules **Reports**                      | `docs/audits/…-doc-audit-<scope>.md`. **Gate** |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (tob is
-its `tob-picks` folder).
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `<flow-root>/packs` (tob and
+pstack are its `-picks` folders).
 
 ## Phase 1: Scope
 
@@ -52,8 +52,8 @@ verdicts become findings:
 
 ## Phase 3: CLAUDE.md
 
-Skip when `/verify` called this flow (self-review already ran it). Otherwise invoke
-`claude-md-management:claude-md-improver`: discovery and assessment, proposed diffs as findings, apply nothing yet.
+Skip when `/verify` called this flow (self-review already ran it). Otherwise follow the host adapter's instruction-file review procedure (`claude-md-management:claude-md-improver` when available):
+discovery and assessment, proposed diffs as findings, apply nothing yet. Include applicable AGENTS.md and CLAUDE.md.
 Lead with statements the code makes untrue.
 
 ## Phase 4: Mechanics
@@ -66,7 +66,7 @@ In the scoped docs, check what can be checked by running something:
   Run a documented command only when it's read-only or the repo's own check; never one that installs, deletes,
   pushes or publishes.
 - **Versions and names:** versions, plugin and package names, env vars and config keys match their source.
-- **Claude Code plugin manifests:** `claude plugin validate <plugin folder>`, when `claude` is on PATH.
+- **Plugin manifests:** the host's plugin validator on the plugin folder, when the host provides one.
 
 ## Phase 5: Prose
 

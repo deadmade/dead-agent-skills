@@ -1,0 +1,18 @@
+{
+  "name": "flows",
+  "version": "0.6.0",
+  "description": "Conductor skills with approval gates and resumable state: build, audit, review, verify, integrate and learn. Includes the writing skill, copyedit pass and skill packs; Claude Code also runs the prose-check hook.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "dependencies": [
+    "claude-md-management@claude-plugins-official",
+    "claude-security@claude-plugins-official",
+    "dead-skills",
+    "graphify",
+    "web-mcp"
+  ],
+  "skills": "./skills/"
+}

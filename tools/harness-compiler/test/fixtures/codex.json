@@ -1,0 +1,88 @@
+[
+  {
+    "provenance": "captured-sanitized",
+    "kind": "session.started",
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "SessionStart",
+      "source": "startup",
+      "transcript_path": "/sanitized/profile/sessions/rollout.jsonl",
+      "model": "gpt-6.1-sol",
+      "permission_mode": "bypassPermissions"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": "turn.finished",
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "Stop",
+      "stop_hook_active": false,
+      "last_assistant_message": "Finished."
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": "question.asked",
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "PreToolUse",
+      "tool_name": "request_user_input",
+      "tool_input": {
+        "questions": [
+          {
+            "question": "Which database?"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": "permission.requested",
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "PermissionRequest",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "example"
+      },
+      "reason": "Network approval needed"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": null,
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "Notification",
+      "notification_type": "permission_prompt"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": null,
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "PreToolUse",
+      "tool_name": "other_tool"
+    }
+  },
+  {
+    "provenance": "documentation-derived",
+    "kind": null,
+    "raw": {
+      "session_id": "sanitized-session",
+      "cwd": "/sanitized/project",
+      "hook_event_name": "SubagentStop",
+      "agent_id": "child",
+      "stop_hook_active": false
+    }
+  }
+]

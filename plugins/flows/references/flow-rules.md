@@ -1,11 +1,26 @@
 # Flow rules
 
 Every conductor in this plugin follows these rules. A conductor's SKILL.md only says what it runs and what differs.
-Claude proposes and recommends; the user decides.
+The coding agent proposes and recommends; the user decides.
+
+## Host capabilities
+
+These rules apply to every supported coding agent. Use the current host's native tools for reading files,
+tracking tasks, asking the user, and dispatching subagents. Tool availability is determined by the
+current session, not by product name. If subagents are unavailable, skip every subagent-only step,
+including reviewer dispatch; do not replace it with a sequential review in the main session. Record
+the skipped steps in flow.md and the final report. A skipped check never counts as passed. Preserve
+all approval gates and wait for real user answers.
 
 Where these rules override a sentence of a pack, or paste a section of one, a marker quotes it:
 `<!-- overrides <pack>/<path inside the pack>: "<sentence>" -->`. `npm test` fails when the pack no longer holds the
 sentence, so an upstream change to an overridden or pasted rule is noticed at its sync.
+
+Read the adapter for the current host: [host.md](host.md).
+`<flow-root>` is the folder containing this `references/` directory. `<skill-dir>` is the directory
+of the SKILL.md currently being followed. Resolve resource paths relative to their containing document,
+never the shell working directory. A pack's own host variables mean that pack's directory as described below.
+Load [resource-index.md](resource-index.md) when resolving another package's skills.
 
 ## State
 
@@ -14,8 +29,13 @@ sentence, so an upstream change to an overridden or pasted rule is noticed at it
 upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it after every phase, with links to every
   artifact. It is how the next session resumes. feature-flow and research-flow have their own templates; the others
   use [build-template.md](build-template.md).
-- A flow.md started before the **Tasks** and **Rulings** sections or the **Run verdict** line existed gets them added
-  when it is resumed; none is required of it.
+- **`now:`** (frontmatter, one plain sentence) says where the run stands and what comes next. Rewrite it after every
+  phase and at every stop where you wait for the user; at such a stop it starts with `Waiting for you`, which is what
+  the flow cockpit reads as the run's status. A conductor called inline writes into its caller's `now:`.
+- A flow.md started before the **Tasks** and **Rulings** sections, the **Run verdict** line or `now:` existed gets
+  them added when it is resumed; none is required of it.
+- The user reads specs, plans and flow.md in the flow cockpit, which draws Mermaid: use a diagram where it explains
+  something better than prose; never required.
 - **Audits** (`/test-audit`, `/doc-audit`, `/harden`) write `docs/audits/<YYYY-MM-DD>-<flow>-<scope>.md`: the scope
   line, the findings table, the user's pick per finding, and what was fixed.
 - `/verify`, `/understand` and `/learn` keep no state file of their own; called from a build flow, they write their
@@ -34,9 +54,11 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Use superpowers:finishing-a-development-branch." -->
   <!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Use superpowers:finishing-a-development-branch." -->
 - **Gates:** a gate passes only on the user's explicit approval of the artifact it names, recorded with the date in
-  the state file. "Sounds good" to an idea isn't approval of a document. Nothing past a gate starts before it passes.
+  the state file as a line `- Gate <n>, <what>: <date>[, <extra>]`, the date empty while the gate is open; a
+  reopening is appended as `Reopened <date>: <why>`. "Sounds good" to an idea isn't approval of a document. Nothing
+  past a gate starts before it passes.
 - **Copyedit pass:** before a gate shows the user a `spec.md`, a `plan.md` or an audit report, copyedit it
-  (read `${CLAUDE_SKILL_DIR}/../writing/references/copyedit.md`), each time the document goes to a gate, and say in the gate message
+  (read `<flow-root>/skills/writing/references/copyedit.md`), each time the document goes to a gate, and say in the gate message
   that it was copyedited. When the copyedit refuses the edit (it lost something, or failed), the flow goes on: the gate
   shows the unedited document and the lines `compare.mjs` printed, and says the copyedit was refused. flow.md is never
   copyedited, and the prose check skips it: it changes after every phase.
@@ -49,11 +71,11 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   task's files aren't deviations. This holds in every build flow (`/feature-flow`, `/research-flow`, `/implement`,
   `/fix-flow`, `/upgrade`) and in `/harden`'s fixes.
   - **The fifth stop.** A deviation is never ruled on, by the coordinating session or by a subagent. The coordinating
-    session writes it under **Deviations** in flow.md (what, why the plan doesn't hold, options with a
-    recommendation) and asks the user with AskUserQuestion; the build waits for the answer. A decision that changes
+    session writes it under **Deviations** in flow.md as `### <deviation>` with `Status: open` (then what, why the plan
+    doesn't hold, options with a recommendation), sets `now:` to `Waiting for you: …`, and asks the user with the host question tool; the build waits for the answer. A decision that changes
     the plan needs the user's approval of that change before work continues. Only the main session can ask: a
     subagent that meets a deviation stops and reports `NEEDS_CONTEXT` with the decision, the options and its
-    recommendation, and the coordinating session asks. This is a fifth stop next to the four that
+    recommendation, and the coordinating session asks. The answer is recorded as `Status: decided <date>: <what>`. This is a fifth stop next to the four that
     `subagent-driven-development` and `executing-plans` name. For deviations it overrides their continuous execution
     and their rulings, and a plan correction that is a deviation goes to the user too.
     <!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
@@ -63,6 +85,9 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Rulings, not stalls. Conflicts, ambiguities, plan defects — decide them." -->
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
+  - **Added tasks.** A task a decision adds during the build takes the number of the task it follows plus a letter
+    (`8b`, then `8c`). It goes into plan.md right after that task. Below its `**Depends on:**` line, which may name
+    lettered tasks, write `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
   - **Review findings and reports.** Where `subagent-driven-development` rules on what review or a subagent turns up,
     a deviation still goes to the user. In the fix loop (a plan-mandated finding), at the breaker and in the final
     review's fix wave, a finding whose fix is deviation-class goes to the user, not a ruling. A `NEEDS_CONTEXT` that
@@ -125,7 +150,7 @@ review).
   doesn't know them:
   - A pack skill is read by path, `<packs>/<pack>/skills/<name>/SKILL.md`, and followed. Never through the Skill tool.
   - Inside a pack file, `<pack>:<name>` (`superpowers:writing-plans`) means `<packs>/<pack>/skills/<name>/SKILL.md`,
-    and "invoke" or "use" it means read it there. `${CLAUDE_SKILL_DIR}` and relative paths (`./implementer-prompt.md`,
+    and "invoke" or "use" it means read it there. `<skill-dir>` and relative paths (`./implementer-prompt.md`,
     `scripts/sdd-workspace`) mean the folder of the file being read. `{baseDir}` means that pack's root folder,
     `<packs>/<pack>`.
   - A pack's agent runs as `general-purpose`, with the text of `<packs>/<pack>/agents/<name>.md` as its prompt,
@@ -133,19 +158,19 @@ review).
   - tob's spec-compliance checker ships as flows' own agent: `tob-picks:spec-compliance-checker` means
     `flows:spec-compliance-checker`.
     <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "For a single requirement, dispatch the `tob-picks:spec-compliance-checker` agent at it." -->
-  - tob's spec-compliance workflow runs from the main session through the Workflow tool with its path:
-    `Workflow({scriptPath: "<packs>/tob-picks/workflows/spec-compliance.js", args: {path, spec, limit}})`, with
-    `args` as a JSON object (or just the path as a string).
+  - For tob's spec-compliance workflow, follow [spec-compliance.md](spec-compliance.md) with
+    the target path, optional spec and limit. It uses native subagents, without a host-specific Workflow runtime.
     <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Run `/tob-picks:spec-compliance <path>`." -->
-- **Installed plugins:** a skill the model may invoke, use the Skill tool. flows' own `writing` skill is one:
-  `flows:writing` loads through the Skill tool. A skill with
-  `disable-model-invocation: true` can't be loaded that way (every conductor here, `/self-review` too): read its SKILL.md
-  and follow it:
-  - another plugin: `${CLAUDE_SKILL_DIR}/../../../../<plugin>/*/skills/<name>/SKILL.md` (in a checkout of this
-    marketplace: the folder the plugin's marketplace `source` names, then `skills/<name>/SKILL.md`)
-  - a conductor of this plugin: `${CLAUDE_SKILL_DIR}/../<name>/SKILL.md`
+- **Installed skills:** load them with the host's skill tool when available, otherwise read their SKILL.md.
+  Skills restricted to explicit invocation are read directly when a conductor calls them. Use the host adapter
+  and resource index for cross-package lookup; never guess plugin-cache paths. Other conductors are at
+  `<flow-root>/skills/<name>/SKILL.md`.
+
+Flows' `flows:writing` skill may be invoked by the host skill tool; it supplies the copyedit pass.
+
 - **Calling another conductor** (`/fix-flow` → `/verify`): read its SKILL.md and run it inline. Skip its start and
-  resume step (the caller hands it the input), keep its gates, then return to the caller's next phase.
+  resume step (the caller hands it the input), keep its gates, then return to the caller's next phase. Its `now:`
+  goes into the caller's flow.md.
 
 ## ponytail at chosen steps
 
@@ -189,24 +214,22 @@ builder and review briefs, by name, for the subagent to load with the Skill tool
 
 Say which plugin provides it, then use the fallback:
 
-| Missing                                  | Plugin                 | Fallback                                                  |
-| ---------------------------------------- | ---------------------- | --------------------------------------------------------- |
-| a pack file (`<packs>/…`)                | flows                  | none: flows is broken, reinstall it                       |
-| `search`, `fetch`, papers                | web-mcp                | paper-lookup for papers, WebSearch/WebFetch for the rest  |
-| a knowledge graph                        | graphify               | Explore agents                                            |
-| library docs                             | dead-skills (context7) | the library's docs via web-mcp `fetch` or WebFetch        |
-| the diff pane                            | tui-review             | `git diff --stat`, then offer to walk the user through it |
-| a desktop ping                           | dead-skills            | nothing                                                   |
-| `claude-security`                        | claude-security        | the built-in `security-review`                            |
-| `claude-md-improver`, `revise-claude-md` | claude-md-management   | read each CLAUDE.md against the code yourself             |
-| a stack pack                             | its plugin             | go on without it                                          |
+| Missing                                  | Plugin                 | Fallback                                                               |
+| ---------------------------------------- | ---------------------- | ---------------------------------------------------------------------- |
+| a pack file (`<packs>/…`)                | flows                  | none: flows is broken, reinstall it                                    |
+| `search`, `fetch`, papers                | web-mcp                | paper-lookup for papers, WebSearch/WebFetch for the rest               |
+| a knowledge graph                        | graphify               | Explore agents                                                         |
+| library docs                             | dead-skills (context7) | the library's docs via web-mcp `fetch` or WebFetch                     |
+| a desktop ping                           | dead-skills            | nothing                                                                |
+| security review                          | host security skill    | review the diff for exploitable vulnerabilities using the host adapter |
+| `claude-md-improver`, `revise-claude-md` | claude-md-management   | read applicable AGENTS.md and CLAUDE.md against the code yourself      |
+| a stack pack                             | its plugin             | go on without it                                                       |
 
 ## Scope (audits)
 
 The argument is `branch` (default) or `all`.
 
-- **branch:** the base is a named base, else `git config branch.<current>.tuiReviewBase` (tui-review's remembered base),
-  else `origin/HEAD`, else `origin/main` or `origin/master`. The scope is the working tree against
+- **branch:** the base is a named base, else `origin/HEAD`, else `origin/main` or `origin/master`. The scope is the working tree against
   `git merge-base <base> HEAD`, untracked files included, plus what the change should have touched and didn't: the
   tests of changed code, the docs that describe it.
 - **all:** every tracked file.
@@ -224,4 +247,5 @@ One ranked table, most severe first:
 
 Every finding has evidence produced in this run: a command and its output, a quote with its line, a failing test.
 Nothing from memory. Then the user picks by number (`1,3`, `all high`, `none`). Fix only those, then re-run the check
-that found each one and show it passes. Record picks and results in the report file.
+that found each one and show it passes. Record picks and results in the report file as `Picks: <finding numbers> |
+none`, then one line `Fixed <date>: <number>` per pick once its check passes.

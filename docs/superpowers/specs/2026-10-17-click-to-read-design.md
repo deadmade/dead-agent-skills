@@ -57,7 +57,7 @@ conversation in view.
 - Limits: 100 000 characters per drawing, `pressableLinks` ≤ 256 entries of ≤ 2048 characters. Past either, the
   reply draws without interception (paths may still be links for ctrl+click) rather than failing.
 - Opt-in plugin: marketplace entry (description ends "Opt-in."), installer `CATEGORIES` `tools` page, the opt-in list
-  in `installer/core.test.mjs`, root README plugin prose, `claude plugin test .` step in `.github/workflows/test.yml`
+  in `tools/installer/core.test.mjs`, root README plugin prose, `claude plugin test .` step in `.github/workflows/test.yml`
   (Linux and Windows) like cswap/night-city. Not in the dead-skills bundle. Version stays the repo's one version.
 
 ## Decided by the user

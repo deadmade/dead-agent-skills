@@ -3,9 +3,9 @@
 The default bundle, on every machine:
 
 - **Global rules**: `rules.md`, added to the context at session start.
-- **Context7** (`.mcp.json`): up-to-date library docs.
+- **Context7**: up-to-date library docs.
 - **Night City**: the theme and its mod, below.
-- **Notifications**: a desktop popup when a turn ends or Claude waits for you, below.
+- **Notifications**: a desktop popup when a turn ends or the harness reports a supported waiting event, below.
 - The core plugins as dependencies: claude-code-setup, claude-md-management, security-guidance and claude-security.
 
 It no longer depends on superpowers, ponytail or code-review. superpowers and ponytail are skill packs inside the
@@ -23,7 +23,7 @@ peach inline code and permission prompts, soft teal suggestions and bash, muted 
 the notifications and the installer's screens use the same palette. Pick it in `/theme` (Claude Code does not let a plugin
 select a custom theme).
 
-Beyond the theme:
+Claude-only additions beyond the theme:
 
 - While Night City is the selected theme, the terminal's own background turns the theme's dusk indigo, so
   the empty space matches (OSC 11, reset when Claude exits or you pick another theme). Linux; Windows
@@ -76,9 +76,9 @@ monitor) and come back when it's your move.
 
 It fires on:
 
-- a finished turn of the main agent (`Stop`): a Night City line ("Come look at your Agent") and the first line of Claude's answer;
-- a permission prompt or an MCP elicitation (`Notification`): a Night City line ("Songbird requests your help") and Claude Code's message;
-- a question from Claude (`PreToolUse` on `AskUserQuestion`, which raises no notification of its own): a waiting line and the
+- a finished turn of the main agent (`turn.finished`): a Night City line ("Come look at your Agent") and the first line of Claude's answer;
+- a permission prompt or an MCP elicitation (`permission.requested`): a Night City line ("Songbird requests your help") and Claude Code's message;
+- a question from Claude (`question.asked`, which raises no notification of its own): a waiting line and the
   question.
 
 The popup comes from Onibi, Night City's pixel-art netrunner: her face is the icon (`icon.png`, a brightened crop
@@ -107,7 +107,22 @@ Talking to the notification daemon directly means tmux needs no `allow-passthrou
 (`async`), so a slow PowerShell start doesn't hold up the turn. Claude's text reaches the notifier as an argument or
 an environment variable, never as script source.
 
-### Claude Code's own notification
+### The agent's own notification
 
-The installer sets `"preferredNotifChannel": "notifications_disabled"` in `~/.claude/settings.json`, so Claude Code's
-own notification doesn't double up. Installed by hand, set it yourself.
+If the agent has a built-in desktop notification, turn it off so it doesn't double up with this one. The installer does
+this where it can.
+
+## Hooks and the theme
+
+`hooks/hooks.json` declares the hooks in neutral events (`session.started`, `turn.finished`, `permission.requested`,
+`question.asked`, `notification.received`). Each distribution maps them to the events its agent supports and drops the
+rest, so a missing optional event is only reported at build time. Small packaged adapters decode the agent's input, run
+the rules or notification behavior and encode the agent's context. No transcript parsing is required. Node must be on
+PATH.
+
+Fresh installs receive the rules through the start-of-session hook rather than a second global block. Unrelated or
+changed global instructions stay untouched.
+
+The Night City palette is `themes/palette.json`; each distribution generates the theme format its agent reads, plus a
+`setup-night-city` skill that says how to select it. Agent-specific effects (spinner words, shimmer, UI mods) exist only
+where the agent supports them. Contributors run `npm run build:harnesses` and review every output before committing.

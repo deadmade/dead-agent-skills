@@ -1,0 +1,13 @@
+{
+  "name": "@dead-claude-skills/upstream-sync",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test \"src/**/*.test.ts\" \"src/**/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=26"
+  }
+}

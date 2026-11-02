@@ -153,7 +153,7 @@ default", not "Less noise"):
   `ponytail@dead-claude-skills` at **5.2.0** (old upstream copy, `installPath …/ponytail/5.2.0`) and
   `superpowers@dead-claude-skills` at **7.0.0**, while the marketplace ships both vendored as **0.5.0**. The
   installer's `outdated()` skips any install whose version is newer than the shipped one
-  (`installer/core/plugins.ts:108` "A newer install isn't downgraded", `:115`), so it never moves this machine to the
+  (`tools/installer/core/plugins.ts:108` "A newer install isn't downgraded", `:115`), so it never moves this machine to the
   vendored ponytail, and won't move it to the vendored superpowers once that's released. One concrete way ponytail ends
   up "off", and a blocker for any change this flow makes through the vendored copies.
   - Decision (user, 2026-10-22): fixed later through ADR 0003's per-plugin versions ("I will add B down the line");
@@ -474,7 +474,7 @@ Calls the build made on its own (not deviation-class), one line each, as they ar
 - 2026-10-23, Task 9: the README conductor-table row added outside the Files list stays — CLAUDE.md requires READMEs to match the code — cost if wrong: one row to revert. Put to the owner in the final review.
 - 2026-10-23, Task 10: adds .gitattributes, the marketplace description and feature-flow's long lines — deferred minors from earlier reviews, all docs and config text — cost if wrong: none. Put to the owner in the final review.
 - 2026-10-23, Task 10: the extra READMEs that still told users to `/plugin install` are in scope — the owner said to remove that route, UI only — cost if wrong: none. Put to the owner in the final review.
-- 2026-10-23, Task 10: installer/install.ts:297's `/plugin install` handoff for token plugins stays — it is deliberate runtime output — cost if wrong: a stale instruction at install time.
+- 2026-10-23, Task 10: tools/installer/install.ts:297's `/plugin install` handoff for token plugins stays — it is deliberate runtime output — cost if wrong: a stale instruction at install time.
 
 ## Deviations
 

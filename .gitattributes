@@ -1,3 +1,19 @@
 # Upstream forces LF on these: run-hook.cmd is read by both cmd and bash.
 plugins/flows/packs/superpowers/hooks/run-hook.cmd text eol=lf
 plugins/flows/packs/superpowers/hooks/session-start text eol=lf
+
+# Checked-in native packages are generated canonically on every platform.
+.claude-plugin/** text=auto eol=lf
+.agents/plugins/** text=auto eol=lf
+
+plugins/catalog.json text eol=lf
+.agents/plugins/marketplace.json text eol=lf
+.claude-plugin/marketplace.json text eol=lf
+plugins/default/hooks/** text eol=lf
+tools/harness-compiler/src/runtime/** text eol=lf
+plugins/default/themes/*.json text eol=lf
+# Generated TypeScript types: the bindings_are_current test compares them ignoring line endings.
+crates/flow-cockpit/bindings/** text eol=lf
+
+# The views' libraries, copied unchanged from their npm releases.
+crates/flow-cockpit/app/shell/vendor/** text eol=lf

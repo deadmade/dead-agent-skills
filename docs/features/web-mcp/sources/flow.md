@@ -51,7 +51,7 @@ Result<Vec<WebResult{url,title}>, SearchError> }`; the only impl is `SearxNg` (`
   the backend only decides which 5 pages get fetched. Snippets from the backend are dropped.
 - **SearXNG unreachable fails the call** (`SearchError::Unreachable`, spec goal 2). The source line names "SearXNG +
   archive" (`search.rs:170`).
-- **SearXNG engines** come from `installer/searxng.yml`: Bing and Yahoo on, DuckDuckGo, Brave and Google CSE off
+- **SearXNG engines** come from `tools/installer/searxng.yml`: Bing and Yahoo on, DuckDuckGo, Brave and Google CSE off
   because they CAPTCHA or rate-limit a scraper. So "more engines" can already be done in that file, without code.
 - **Papers** (`papers.rs`): OpenAlex, arXiv, Crossref, merged by DOI/arXiv id, each source with its own 8 s deadline
   (`config.rs:14-16`, `WEB_MCP_PAPERS_MS`), rate-limited per host.
@@ -219,7 +219,7 @@ Rulings the controller made during execution (2026-10-17). The full ledger was i
   archive files stay byte-identical.
 - **R2:** the user's SearXNG wasn't reachable from the sandbox.
   - `/config` is parsed per SearXNG master's `webapp.py`.
-  - `installer/searxng.yml` is unchanged.
+  - `tools/installer/searxng.yml` is unchanged.
   - The README says how to enable a disabled engine by hand.
   - **Still to confirm against the real instance.**
 - **R3:** `bad_since_is_rejected` asserts rmcp 3.5.1's real behaviour. A bad `since` comes back as an `isError` tool

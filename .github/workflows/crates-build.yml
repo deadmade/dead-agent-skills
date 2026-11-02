@@ -1,11 +1,10 @@
 name: Build crates
 
-# The tui-review plugin's binary and web-mcp's server, for Windows and Linux x64 (no macOS or ARM builds): archives plus
-# their checksums. release.yml calls this and attaches them to the vX.Y.Z release the installer downloads from
-# (BIN_TARGETS in installer/core/binaries.ts). A PR that changes this file, or a run by hand, builds only.
+# Build release archives and checksums for all binaries; cockpit includes its default extensions.
+# release.yml calls this with the release tag. PR and manual runs only build.
 on:
   pull_request:
-    paths: ['.github/workflows/crates-build.yml']
+    paths: ['.github/workflows/crates-build.yml', 'crates/**']
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -22,10 +21,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [tui-review, web-mcp]
+        crate: [tui-review, web-mcp, ado-mcp, flow-cockpit]
         platform:
           - { os: windows-latest, target: x86_64-pc-windows-msvc, archive: zip }
           - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, archive: tar.gz }
+        exclude:
+          - crate: flow-cockpit
+            platform: { os: ubuntu-latest, target: x86_64-unknown-linux-musl, archive: tar.gz }
     runs-on: ${{ matrix.platform.os }}
     env:
       CRATE: ${{ matrix.crate }}
@@ -58,6 +60,7 @@ jobs:
         run: '"target/$TARGET/release/$CRATE" --version'
 
       - name: Package
+        if: matrix.crate != 'flow-cockpit'
         run: |
           name=$CRATE-$TARGET
           mkdir -p "$RUNNER_TEMP/dist"
@@ -68,6 +71,22 @@ jobs:
           fi
           cd "$RUNNER_TEMP/dist"
           for f in "$name".*; do sha256sum "$f" > "$f.sha256"; done
+
+      - name: Package cockpit
+        if: matrix.crate == 'flow-cockpit'
+        run: |
+          name=flow-cockpit-$TARGET
+          stage="$RUNNER_TEMP/stage"
+          mkdir -p "$stage/extensions" "$RUNNER_TEMP/dist"
+          cp "target/$TARGET/release/flow-cockpit.exe" "$stage/"
+          for dir in extensions/*/; do
+            ext=$(basename "$dir")
+            [ "$ext" = tests ] || cp -r "$dir" "$stage/extensions/$ext"
+          done
+          for ext in activity docs list run; do test -d "$stage/extensions/$ext"; done
+          (cd "$stage" && 7z a -tzip "$RUNNER_TEMP/dist/$name.zip" flow-cockpit.exe extensions > /dev/null)
+          cd "$RUNNER_TEMP/dist"
+          sha256sum "$name.zip" > "$name.zip.sha256"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

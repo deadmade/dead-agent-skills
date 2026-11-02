@@ -77,19 +77,19 @@ branches, the call chains, and the paths where enforcement goes missing.
 Two things, and they hold different content:
 
 1. **The analysis**, written with the Write tool to the path you are given. This is the deliverable. Follow
-   `${CLAUDE_PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/ANALYSIS_FORMAT.md`.
+   `${PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/ANALYSIS_FORMAT.md`.
 2. **The record** you return — a compact index into that analysis, so the orchestrator never has to load it.
    Do not summarize the prose into it; it holds different, shorter content.
 
 ## Reference
 
-- Output format: `${CLAUDE_PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/ANALYSIS_FORMAT.md`
-- Per-domain mapping: `${CLAUDE_PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/DOMAIN_NOTES.md` — read this before
+- Output format: `${PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/ANALYSIS_FORMAT.md`
+- Per-domain mapping: `${PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/DOMAIN_NOTES.md` — read this before
   deciding where enforcement should have been. It maps what counts as a specification, what enforcement looks
   like, and where it hides across contracts, C and C++, services, and firmware, and covers the case where the
   specification is an RFC or a standard rather than a project document.
-- Worked examples: `${CLAUDE_PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/WORKED_EXAMPLE.md` — three requirements
+- Worked examples: `${PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/WORKED_EXAMPLE.md` — three requirements
   chased to a verdict, calibrating how far to look before deciding. Read when the verdict is not obvious.
-- Severity: `${CLAUDE_PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/DIVERGENCE_RUBRIC.md` — the line between a
+- Severity: `${PLUGIN_ROOT}/packs/tob-picks/skills/spec-to-code-compliance/resources/DIVERGENCE_RUBRIC.md` — the line between a
   divergence that matters and documentation drift. Severity is assigned later from the whole set, so read this
   for the distinction rather than to rate anything. Your job is the verdict and the evidence.

@@ -43,7 +43,7 @@ Phases 3–7 (2026-10-22): brainstorming sized this a small change (it copies po
   local plugin; vendored-path lists in `flake.nix:20`, `.pre-commit-config.yaml:58`, `treefmt.toml:11`; CLAUDE.md
   (vendored list, the url-pin paragraph), THIRD_PARTY.md ("Re-listed plugins"), README.md:9,
   `plugins/default/README.md:10`. Installer: `shippedVersions` reads url refs; with superpowers local, no pinned url
-  entry is left (`installer/core/plugins.test.ts` uses superpowers only as fixture data).
+  entry is left (`tools/installer/core/plugins.test.ts` uses superpowers only as fixture data).
 - Versions: one version for everything (check-repo:63-88), so the vendored copy would be 0.5.x while installs carry
   7.0.0. The installer's `outdated()` never offers a downgrade (`plugins.ts:115`), but `claude plugin update` replaces
   on any version difference, settings and data kept (verified for ponytail 5.3.2 → 0.4.0 on 2.1.304,

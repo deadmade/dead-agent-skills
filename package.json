@@ -1,33 +1,41 @@
 {
-  "name": "dead-claude-skills",
+  "name": "dead-agent-skills",
   "version": "0.6.0",
   "private": true,
-  "description": "Interactive installer for the dead-claude-skills Claude Code marketplace.",
+  "description": "Personal skills, flows and integrations for Claude Code and Codex.",
   "type": "module",
   "scripts": {
     "release": "node scripts/release.mjs",
-    "test": "node scripts/check-repo.mjs && node --test --experimental-test-coverage --test-coverage-include=\"installer/**\" --test-coverage-exclude=\"installer/**/*.test.ts\" --test-coverage-lines=79 \"installer/**/*.test.ts\" && node --test \"scripts/*.test.mjs\" \"plugins/default/hooks/*.test.mjs\" \"plugins/flows/hooks/*.test.mjs\" \"plugins/opt-in/headroom-trim/hooks/*.test.mjs\"",
-    "typecheck": "tsc --noEmit",
+    "test": "node scripts/check-repo.mjs && node --test --experimental-test-coverage --test-coverage-include=\"tools/installer/**\" --test-coverage-exclude=\"tools/installer/**/*.test.ts\" --test-coverage-lines=79 \"tools/installer/**/*.test.ts\" && npm test --workspace=@dead-claude-skills/harness-compiler && node --test \"scripts/*.test.mjs\" \"plugins/flows/skills/writing/tests/*.test.mjs\" \"plugins/default/hooks/*.test.mjs\" \"plugins/flows/hooks/*.test.mjs\" \"plugins/opt-in/headroom-trim/hooks/*.test.mjs\" \"plugins/opt-in/flow-cockpit/hooks/*.test.mjs\" && npm test --workspace=@dead-claude-skills/upstream-sync",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspace=@dead-claude-skills/harness-compiler && npm run typecheck --workspace=@dead-claude-skills/upstream-sync",
+    "prepack": "node tools/harness-compiler/src/cli.ts check && tsc",
+    "build:harnesses": "node tools/harness-compiler/src/cli.ts build",
+    "check:harnesses": "node tools/harness-compiler/src/cli.ts check",
     "scan-skills": "pipx run --spec cisco-ai-skill-scanner==2.3.2 skill-scanner scan-all plugins --recursive --policy .github/skill-scanner.yaml --fail-on-severity high",
-    "prepack": "tsc"
+    "sync": "node tools/upstream-sync/src/cli.ts"
   },
   "bin": {
-    "dead-claude-skills": "installer/install.js"
+    "dead-agent-skills": "tools/installer/install.js",
+    "dead-claude-skills": "tools/installer/install.js"
   },
   "files": [
-    "installer/**/*.js",
-    "!installer/**/*.test.js",
-    "installer/assets/",
-    ".claude-plugin/marketplace.json",
-    "plugins/*/.claude-plugin/plugin.json",
-    "plugins/*/*/.claude-plugin/plugin.json",
-    "plugins/*/*/*/.claude-plugin/plugin.json"
+    "tools/installer/**/*.js",
+    "!tools/installer/**/*.test.js",
+    "tools/installer/assets/",
+    "plugins/catalog.json",
+    ".agents/plugins/",
+    ".claude-plugin/"
   ],
   "engines": {
     "node": ">=26"
   },
   "devDependencies": {
     "@types/node": "26.6.5",
+    "jsdom": "30.1.2",
     "typescript": "7.0.2"
-  }
+  },
+  "workspaces": [
+    "tools/upstream-sync",
+    "tools/harness-compiler"
+  ]
 }

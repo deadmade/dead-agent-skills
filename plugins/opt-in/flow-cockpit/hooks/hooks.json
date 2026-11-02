@@ -1,0 +1,71 @@
+{
+  "description": "Watch only: records questions, permission prompts, agents starting and stopping and turns ending into a capture file per session, for the flow cockpit. Prints nothing and decides nothing.",
+  "hooks": [
+    {
+      "event": "session.started",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "session.ended",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "prompt.submitted",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "turn.finished",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "subagent.started",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "subagent.stopped",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "notification.any",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "permission.prompted",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "question.asked",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "question.answered",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    },
+    {
+      "event": "question.failed",
+      "script": "hooks/capture.mjs",
+      "required": false,
+      "background": true
+    }
+  ]
+}

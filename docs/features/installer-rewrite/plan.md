@@ -5,10 +5,10 @@
 **Goal:** Replace the clack UI with a zero-dependency framed start screen (category lines with current values,
 updates, changes-only review) on Node's stdlib, and add updating outdated plugins.
 
-**Architecture:** `installer/core.mjs` gains one pure function (`outdated`). New `installer/view.mjs` is pure:
+**Architecture:** `tools/installer/core.mjs` gains one pure function (`outdated`). New `tools/installer/view.mjs` is pure:
 `frame`, `wrap`, `changeList`, the screen state machine `move`, and `render` for the start, category, updates and
-review screens. New `installer/ui.mjs` is the only code touching the TTY (`screen`, `confirm`, `line`, `note`,
-`progress`, `log`). `installer/install.mjs` swaps every `p.*` call for `ui.mjs`; `tabs.mjs`, the dependencies and
+review screens. New `tools/installer/ui.mjs` is the only code touching the TTY (`screen`, `confirm`, `line`, `note`,
+`progress`, `log`). `tools/installer/install.mjs` swaps every `p.*` call for `ui.mjs`; `tabs.mjs`, the dependencies and
 `npm-shrinkwrap.json` go.
 
 **Tech Stack:** Node >=20.12 ESM, `node:readline` + `node:readline/promises`, TTY raw mode, `node:util`
@@ -32,7 +32,7 @@ review screens. New `installer/ui.mjs` is the only code touching the TTY (`scree
   `Quit without applying N changes?`, `Cancelled before installing anything.`, `Type "clean" to continue:`.
 - Every rendered line's visible width (`stripVTControlCharacters(l).length`) ≤ `columns - 1` (a full-width line
   makes some terminals wrap, which breaks the redraw count); line count ≤ `rows`.
-- Tests: `node --test installer/*.test.mjs`. `view.test.mjs` sets `process.env.FORCE_COLOR = '1'` as its first
+- Tests: `node --test tools/installer/*.test.mjs`. `view.test.mjs` sets `process.env.FORCE_COLOR = '1'` as its first
   statement and imports dynamically (as `tabs.test.mjs` does today) so color asserts see escape codes.
 - Commit messages are one sentence, no co-author lines.
 
@@ -54,7 +54,7 @@ review screens. New `installer/ui.mjs` is the only code touching the TTY (`scree
 
 **Files:**
 
-- Modify: `installer/core.mjs` (append after `unavailable`), `installer/core.test.mjs`
+- Modify: `tools/installer/core.mjs` (append after `unavailable`), `tools/installer/core.test.mjs`
 
 **Interfaces:**
 
@@ -93,10 +93,10 @@ test('outdated compares our shipped versions only, once per id, never downgradin
 });
 ```
 
-- [ ] **Step 2: Run** `node --test installer/core.test.mjs`. Expected: FAIL, `outdated` is not exported.
+- [ ] **Step 2: Run** `node --test tools/installer/core.test.mjs`. Expected: FAIL, `outdated` is not exported.
 - [ ] **Step 3: Implement** `outdated` in `core.mjs`, exported, pure.
-- [ ] **Step 4: Run** `node --test installer/core.test.mjs`. Expected: all pass.
-- [ ] **Step 5: Commit** `git add installer/core.mjs installer/core.test.mjs && git commit -m "Add outdated to the installer core."`
+- [ ] **Step 4: Run** `node --test tools/installer/core.test.mjs`. Expected: all pass.
+- [ ] **Step 5: Commit** `git add tools/installer/core.mjs tools/installer/core.test.mjs && git commit -m "Add outdated to the installer core."`
 
 ---
 
@@ -104,7 +104,7 @@ test('outdated compares our shipped versions only, once per id, never downgradin
 
 **Files:**
 
-- Create: `installer/view.mjs`, `installer/view.test.mjs`
+- Create: `tools/installer/view.mjs`, `tools/installer/view.test.mjs`
 
 **Interfaces:**
 
@@ -201,10 +201,10 @@ test('frame cuts long lines and stays one under the width; wrap never cuts', () 
 });
 ```
 
-- [ ] **Step 2: Run** `node --test installer/view.test.mjs`. Expected: FAIL, module not found.
-- [ ] **Step 3: Implement** `frame`, `wrap`, `initial`, `changeList` and `move` in `installer/view.mjs`.
-- [ ] **Step 4: Run** `node --test installer/view.test.mjs`. Expected: all pass.
-- [ ] **Step 5: Commit** `git add installer/view.mjs installer/view.test.mjs && git commit -m "Add the installer's pure screen state machine and frame."`
+- [ ] **Step 2: Run** `node --test tools/installer/view.test.mjs`. Expected: FAIL, module not found.
+- [ ] **Step 3: Implement** `frame`, `wrap`, `initial`, `changeList` and `move` in `tools/installer/view.mjs`.
+- [ ] **Step 4: Run** `node --test tools/installer/view.test.mjs`. Expected: all pass.
+- [ ] **Step 5: Commit** `git add tools/installer/view.mjs tools/installer/view.test.mjs && git commit -m "Add the installer's pure screen state machine and frame."`
 
 ---
 
@@ -212,7 +212,7 @@ test('frame cuts long lines and stays one under the width; wrap never cuts', () 
 
 **Files:**
 
-- Modify: `installer/view.mjs`, `installer/view.test.mjs`
+- Modify: `tools/installer/view.mjs`, `tools/installer/view.test.mjs`
 
 **Interfaces:**
 
@@ -308,10 +308,10 @@ test('short terminals scroll the list and keep the cursor row', () => {
 });
 ```
 
-- [ ] **Step 2: Run** `node --test installer/view.test.mjs`. Expected: new tests FAIL, `render` not exported.
-- [ ] **Step 3: Implement** `render` in `installer/view.mjs`.
-- [ ] **Step 4: Run** `node --test installer/view.test.mjs`. Expected: all pass.
-- [ ] **Step 5: Commit** `git add installer/view.mjs installer/view.test.mjs && git commit -m "Render the installer's start, category, updates and review screens."`
+- [ ] **Step 2: Run** `node --test tools/installer/view.test.mjs`. Expected: new tests FAIL, `render` not exported.
+- [ ] **Step 3: Implement** `render` in `tools/installer/view.mjs`.
+- [ ] **Step 4: Run** `node --test tools/installer/view.test.mjs`. Expected: all pass.
+- [ ] **Step 5: Commit** `git add tools/installer/view.mjs tools/installer/view.test.mjs && git commit -m "Render the installer's start, category, updates and review screens."`
 
 ---
 
@@ -319,7 +319,7 @@ test('short terminals scroll the list and keep the cursor row', () => {
 
 **Files:**
 
-- Create: `installer/ui.mjs`, `installer/ui.test.mjs`
+- Create: `tools/installer/ui.mjs`, `tools/installer/ui.test.mjs`
 
 **Interfaces:**
 
@@ -393,10 +393,10 @@ test('progress turns a throw into failed', async () => {
 });
 ```
 
-- [ ] **Step 2: Run** `node --test installer/ui.test.mjs`. Expected: FAIL, module not found.
-- [ ] **Step 3: Implement** `installer/ui.mjs`.
-- [ ] **Step 4: Run** `node --test installer/ui.test.mjs`. Expected: all pass.
-- [ ] **Step 5: Commit** `git add installer/ui.mjs installer/ui.test.mjs && git commit -m "Add the installer's zero-dependency terminal I/O."`
+- [ ] **Step 2: Run** `node --test tools/installer/ui.test.mjs`. Expected: FAIL, module not found.
+- [ ] **Step 3: Implement** `tools/installer/ui.mjs`.
+- [ ] **Step 4: Run** `node --test tools/installer/ui.test.mjs`. Expected: all pass.
+- [ ] **Step 5: Commit** `git add tools/installer/ui.mjs tools/installer/ui.test.mjs && git commit -m "Add the installer's zero-dependency terminal I/O."`
 
 ---
 
@@ -404,9 +404,9 @@ test('progress turns a throw into failed', async () => {
 
 **Files:**
 
-- Modify: `installer/install.mjs`: every `p.*` call; `dim` at `:40` and its uses at `:124`, `:412`, `:429-431`,
+- Modify: `tools/installer/install.mjs`: every `p.*` call; `dim` at `:40` and its uses at `:124`, `:412`, `:429-431`,
   `:512`, `:516`, `:521`; the chooser loop at `:419-447`; the plugin steps at `:487-495`.
-- Delete: `installer/tabs.mjs`, `installer/tabs.test.mjs`.
+- Delete: `tools/installer/tabs.mjs`, `tools/installer/tabs.test.mjs`.
 
 **Interfaces:**
 
@@ -456,13 +456,13 @@ No re-enters with`result` cleared.
 - [ ] **Step 3: Add the update step** after the install/uninstall loops, before prune. For each
       `changeList(state, data).update` row, run
       ``run(`Updating ${nameOf(id)} ${from} → ${to}`, `updated ${id} ${from} → ${to}`, 'plugin', 'update', id, '--json')``.
-- [ ] **Step 4: Delete** with `git rm installer/tabs.mjs installer/tabs.test.mjs`.
-- [ ] **Step 5: Check for leftovers** with `grep -nE '\bp\.|\bdim\b|clack' installer/*.mjs`. Expected: no output.
-- [ ] **Step 6: Run the tests** with `node --test installer/*.test.mjs`. Expected: all pass.
+- [ ] **Step 4: Delete** with `git rm tools/installer/tabs.mjs tools/installer/tabs.test.mjs`.
+- [ ] **Step 5: Check for leftovers** with `grep -nE '\bp\.|\bdim\b|clack' tools/installer/*.mjs`. Expected: no output.
+- [ ] **Step 6: Run the tests** with `node --test tools/installer/*.test.mjs`. Expected: all pass.
 - [ ] **Step 7: Manual pty run**, with a fake `claude` and a scratch home, as in the previous feature's Task 4.
   - Set-up: the fake `claude` is a script on PATH. It answers `plugin list --json` with cswap 0.1.0, atlassian 0.1.0
     and graphify with a sha version, and logs every other call to a file.
-  1. Run `HOME=$scratch CLAUDE_CONFIG_DIR=$scratch/.claude node installer/install.mjs` at 80×24.
+  1. Run `HOME=$scratch CLAUDE_CONFIG_DIR=$scratch/.claude node tools/installer/install.mjs` at 80×24.
   2. Walk start → Integrations → toggle mcp-azure → esc → Updates → skip graphify → esc → Apply → Back → esc.
      Expected: it asks whether to quit; answer Yes. The run exits 0, prints `Cancelled before installing anything.`,
      and the log has only `marketplace` and `list` calls.
@@ -502,7 +502,7 @@ No re-enters with`result` cleared.
   Replace the clack/shrinkwrap sentence with: the installer has no npm dependencies.
 
 - [ ] **Step 4: Run the checks**: `grep -rn 'shrinkwrap\|clack' package.json scripts flake.nix README.md installer`
-      should give no output. Then run `node scripts/check-repo.mjs && node --test installer/*.test.mjs`. Expected: no
+      should give no output. Then run `node scripts/check-repo.mjs && node --test tools/installer/*.test.mjs`. Expected: no
       problems, all tests pass.
 - [ ] **Step 5: Commit** with `git add -A package.json scripts flake.nix README.md npm-shrinkwrap.json && git commit -m "Drop the installer's npm dependencies and the shrinkwrap."`
 

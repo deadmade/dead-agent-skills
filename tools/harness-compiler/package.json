@@ -1,0 +1,17 @@
+{
+  "name": "@dead-claude-skills/harness-compiler",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Compiles the neutral plugin definitions under plugins/ into native Claude Code and Codex distributions.",
+  "bin": {
+    "harness-compiler": "src/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "engines": {
+    "node": ">=26"
+  }
+}

@@ -48,8 +48,8 @@ phase: execute
   `paginate.py` (bioRxiv, medRxiv, Europe PMC, OpenAlex, Crossref with count reconciliation). The network calls are
   plain `curl` in the skill text. Its SKILL.md lists the HTTP-200 failure modes the Rust port must keep as tests, and
   the rate limits (arXiv 1 request / 3 s, Crossref 1–3/s, OpenCitations 180/min).
-- **Packaging precedent:** brv targets and `brvAsset()` at `installer/core.mjs:304-321`, release asset per platform
-  from `.github/workflows/build-brv.yml` via `release.yml:71-98`. A pinned external tool: `installer/cswap.json`
+- **Packaging precedent:** brv targets and `brvAsset()` at `tools/installer/core.mjs:304-321`, release asset per platform
+  from `.github/workflows/build-brv.yml` via `release.yml:71-98`. A pinned external tool: `tools/installer/cswap.json`
   (`{"upstream": "v0.26.0"}`), bumped by `sync-cswap.yml`. The only `.mcp.json` today is `plugins/mcp-basic` (an
   http server).
 - **rmcp 3.5.1 handles requests concurrently** (source read and spike, 2026-10-16):
@@ -164,7 +164,7 @@ Rounds 1 and 2, 2026-10-16 (answers by the user; folded into spec.md, which cite
 - **Q2** `search` ranks over every run in the project; the fetch cache applies only within a run. Yes.
 - **Q3** H4 runs first as a bench experiment; model2vec and its download come only if it holds. Yes.
 - **Q4** the installer starts SearXNG with Docker (127.0.0.1 only, JSON format on); prints instructions without Docker. Yes.
-- **Q5** agent-browser pinned like cswap (`installer/agent-browser.json`, weekly sync). Yes.
+- **Q5** agent-browser pinned like cswap (`tools/installer/agent-browser.json`, weekly sync). Yes.
 - **Q6** `search` fetches the top 5 results, 3 s each, and answers with what has finished. Yes ("3s sound alright").
 - **Q7** H5 runs against a stub SearXNG and local pages; the live run is reported but not judged. Yes.
 - **Q8** "run" is one server process's archive folder; "session" is used only for agent-browser. Yes.
@@ -222,7 +222,7 @@ spec; screenshots through `Archive::put`; SearXNG steps printed without Docker.
 
 ## Deviations
 
-- **2026-10-17, SearXNG template returns nothing (decided: (a)).** `installer/searxng.yml` keeps SearXNG's
+- **2026-10-17, SearXNG template returns nothing (decided: (a)).** `tools/installer/searxng.yml` keeps SearXNG's
   default engines. On deadPc (SearXNG 2026.10.17) the default general engines are duckduckgo (CAPTCHA), brave (429,
   suspended) and google cse (timeout), so every search answers 0 results after 3 s and `search` finds no pages. Probed
   one engine at a time: bing 10 results in 0.42 s, yahoo 7 in 0.94 s; startpage, mojeek and presearch suspended (429),

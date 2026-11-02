@@ -91,7 +91,7 @@ review, the user's call). Task 10 is split accordingly.
     `time_range_support`. Adapt the parse to the shape you see. If `/config` is missing, the cell holds `None`.
   - `curl -s 'localhost:8888/search?q=serde&format=json&engines=crates.io' | jq '[.results[].engine]'`. If it
     returns no `crates.io` results, Task 10 documents enabling `crates.io`, `npm`, `pkg.go.dev`, `gitlab` and
-    `codeberg` by hand, and `installer/searxng.yml` gets the same `disabled: false` entries for new installs.
+    `codeberg` by hand, and `tools/installer/searxng.yml` gets the same `disabled: false` entries for new installs.
   - Confirm that each result has `engine` (a string) and `engines` (an array).
   - Record the outcomes in flow.md under Deviations, if any differ.
 - [ ] **Step 2: Write failing tests.**
@@ -525,7 +525,7 @@ Hex`.
 - `.claude-plugin/marketplace.json:167`
 - `plugins/web-mcp/server/Cargo.toml` (`description`)
 - `README.md:13`
-- `installer/searxng.yml`, only if Task 1 Step 1 required it
+- `tools/installer/searxng.yml`, only if Task 1 Step 1 required it
 
 - [ ] **Step 1: Filter docs** (these go in Task 2's PR).
   - The README's `search` bullet gains `engines`, `category` and `since`, says a filtered search ranks only its own

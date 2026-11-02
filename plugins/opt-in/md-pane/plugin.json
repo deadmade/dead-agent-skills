@@ -1,0 +1,16 @@
+{
+  "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal).",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "extensions": [
+    {
+      "kind": "ui-mod",
+      "entry": "hooks/register.tsx",
+      "copy": ["hooks/register.tsx", "hooks/paths.ts"],
+      "types": "types/index.d.ts"
+    }
+  ]
+}

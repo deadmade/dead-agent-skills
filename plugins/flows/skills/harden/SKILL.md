@@ -14,7 +14,7 @@ argument-hint: '[branch|all] [base]'
 | 3 Report | flow-rules **Reports**                                                    | `docs/audits/…-harden-<scope>.md`. **Gate** |
 | 4 Fix    | per pick, test-first where behaviour changes                              | fixes, re-checked                           |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (tob,
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `<flow-root>/packs` (tob,
 mattpocock and pstack are its `-picks` folders; cloudflare is `security-audit`).
 
 ## Phase 2: Passes

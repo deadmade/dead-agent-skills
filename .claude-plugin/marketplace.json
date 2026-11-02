@@ -9,35 +9,73 @@
     "name": "deadmade",
     "url": "https://github.com/deadmade"
   },
-  "allowCrossMarketplaceDependenciesOn": ["claude-plugins-official"],
+  "allowCrossMarketplaceDependenciesOn": [
+    "claude-plugins-official"
+  ],
   "plugins": [
     {
       "name": "dead-skills",
-      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions), desktop notifications, Context7, and core plugins from claude-plugins-official as dependencies.",
-      "source": "./plugins/default",
+      "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus core plugins from claude-plugins-official as dependencies.",
+      "source": "./.claude-plugin/dead-skills",
       "category": "productivity"
     },
     {
-      "name": "nix-lsp",
-      "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
-      "source": "./plugins/opt-in/implementation/nix-lsp",
+      "name": "flows",
+      "description": "Conductor skills with approval gates and resumable state: build, audit, review, verify, integrate and learn. Includes the writing skill, copyedit pass and skill packs; Claude Code also runs the prose-check hook.",
+      "source": "./.claude-plugin/flows",
+      "category": "development"
+    },
+    {
+      "name": "graphify",
+      "description": "Graphify: turn a codebase, docs and papers into a queryable knowledge graph (/graphify), plus hooks that nudge Claude to query the graph before reading files. Needs the graphify CLI (uv tool install graphifyy). Vendored from Graphify-Labs/graphify, synced weekly.",
+      "source": "./.claude-plugin/graphify",
+      "category": "development"
+    },
+    {
+      "name": "hallmark",
+      "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark, synced weekly.",
+      "source": "./.claude-plugin/hallmark",
+      "category": "development"
+    },
+    {
+      "name": "rust-skills",
+      "description": "Apollo GraphQL's Rust best practices handbook as a skill. Vendored from apollographql/skills, synced weekly.",
+      "source": "./.claude-plugin/rust-skills",
+      "category": "development"
+    },
+    {
+      "name": "csharp-skills",
+      "description": "Microsoft's .NET skills (dotnet/skills) behind six C#-only router skills. Vendored from dotnet/skills, synced weekly.",
+      "source": "./.claude-plugin/csharp-skills",
+      "category": "development"
+    },
+    {
+      "name": "postgres",
+      "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
+      "source": "./.claude-plugin/postgres",
+      "category": "development"
+    },
+    {
+      "name": "web-mcp",
+      "description": "Web research tools for Claude: search (Google, Bing, DuckDuckGo and Brave read in web-mcp's own browser, paper APIs plus Google Scholar and Semantic Scholar, ranked with BM25), fetch (whole pages as markdown), browser (agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records), all archived in .web/. Needs the web-mcp binary and agent-browser.",
+      "source": "./.claude-plugin/web-mcp",
       "category": "development"
     },
     {
       "name": "mcp-github",
-      "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions). Opt-in per machine.",
-      "source": "./plugins/opt-in/mcp/mcp-github",
+      "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions, code search). Opt-in per machine; needs a GitHub PAT.",
+      "source": "./.claude-plugin/mcp-github",
       "category": "productivity"
     },
     {
       "name": "mcp-azure",
-      "description": "Azure DevOps Server MCP server (self-hosted, PAT). Opt-in per machine, configure with /plugin configure.",
-      "source": "./plugins/opt-in/mcp/mcp-azure",
+      "description": "Azure DevOps Server tools through the ado-mcp release binary: pull requests, work items, pipelines, search, wikis and repository files. Self-hosted, PAT authentication; opt-in.",
+      "source": "./.claude-plugin/mcp-azure",
       "category": "productivity"
     },
     {
       "name": "atlassian",
-      "description": "Atlassian's official plugin: Rovo MCP server for Jira and Confluence (OAuth sign-in via /mcp) plus skills. Opt-in.",
+      "description": "Atlassian MCP integration for Jira and Confluence.",
       "source": {
         "source": "url",
         "url": "https://github.com/atlassian/atlassian-mcp-server.git"
@@ -45,64 +83,40 @@
       "category": "productivity"
     },
     {
-      "name": "rust-skills",
-      "description": "Rust best practices from Apollo GraphQL's handbook (rust-best-practices): ownership, errors, clippy, testing, dispatch. Vendored, synced weekly. Opt-in.",
-      "source": "./plugins/opt-in/implementation/rust-skills",
-      "category": "development"
-    },
-    {
-      "name": "csharp-skills",
-      "description": "Microsoft's .NET skills (dotnet/skills): C#, testing, MSBuild/NuGet, ASP.NET Core, Blazor, EF Core, MAUI, WinForms, behind six C#-only router skills. Vendored, synced weekly. Opt-in.",
-      "source": "./plugins/opt-in/implementation/csharp-skills",
-      "category": "development"
-    },
-    {
-      "name": "postgres",
-      "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
-      "source": "./plugins/opt-in/implementation/postgres",
-      "category": "development"
-    },
-    {
-      "name": "graphify",
-      "description": "Graphify: turn a codebase into a queryable knowledge graph (/graphify). Needs the graphify CLI (uv tool install graphifyy). Opt-in.",
-      "source": "./plugins/shared/graphify",
-      "category": "development"
-    },
-    {
-      "name": "flows",
-      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /self-review reviews your branch before a PR and /verify proves it is ready for one; /understand teaches a codebase; /learn saves what a flow taught. Also a writing skill (Williams and Bizup's Style) with a copyedit in which an Opus editor revises a document by that skill, and a code-only prose check on each Write or Edit of a Markdown file. Carries its skill packs, which only its conductors read, and installs the other plugins they use. Opt-in.",
-      "source": "./plugins/flows",
-      "category": "development"
-    },
-    {
-      "name": "hallmark",
-      "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark. Opt-in.",
-      "source": "./plugins/opt-in/hallmark",
+      "name": "nix-lsp",
+      "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
+      "source": "./.claude-plugin/nix-lsp",
       "category": "development"
     },
     {
       "name": "tui-review",
-      "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the tui-review binary, which the installer downloads. Opt-in.",
-      "source": "./plugins/shared/tui-review",
-      "category": "development"
-    },
-    {
-      "name": "web-mcp",
-      "description": "Web research tools for Claude: search (Google, Bing, DuckDuckGo and Brave read in web-mcp's own browser, paper APIs plus Google Scholar and Semantic Scholar, ranked with BM25), fetch (whole pages as markdown, optionally with images), browser (via agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records). Everything is archived in .web/. Needs the web-mcp binary and agent-browser, which the installer downloads. Opt-in.",
-      "source": "./plugins/shared/web-mcp",
+      "description": "/tui-review: a fast diff pane for the current branch, next to the chat, so you can ask Claude about what you read. Needs the tui-review binary.",
+      "source": "./.claude-plugin/tui-review",
       "category": "development"
     },
     {
       "name": "md-pane",
-      "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal). Opt-in.",
-      "source": "./plugins/opt-in/md-pane",
+      "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal).",
+      "source": "./.claude-plugin/md-pane",
       "category": "productivity"
     },
     {
       "name": "headroom-trim",
       "description": "Shrinks every tool result with headroom's no-ML lossy compression before Claude reads it, through a local trim server that runs offline. Needs uv, which the installer downloads. Opt-in.",
-      "source": "./plugins/opt-in/headroom-trim",
-      "category": "productivity"
+      "source": "./.claude-plugin/headroom-trim",
+      "category": "development"
+    },
+    {
+      "name": "flow-cockpit",
+      "description": "Teaches Claude to write and change the flow cockpit's views: the TypeScript views of the window that shows your flow runs, audits and Claude sessions (Linux from the flake, Windows from the installer). Also installs hooks that record questions, permission prompts and agent starts and stops per session into a local capture folder, which only the window reads. Opt-in.",
+      "source": "./.claude-plugin/flow-cockpit",
+      "category": "development"
+    },
+    {
+      "name": "agent-review",
+      "description": "Checks agent work through verified artifacts, independent extractions and cold reviews. Used by the default bundle and flows.",
+      "source": "./.claude-plugin/agent-review",
+      "category": "development"
     }
   ]
 }

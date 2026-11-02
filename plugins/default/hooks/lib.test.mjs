@@ -7,18 +7,13 @@ import { DONE, WAITING, shouldNotify, tmuxFocused, message, notifiers, TMUX_ARGV
 const first = (l) => l[0];
 const plain = { pick: first };
 
-test('skips continuations, subagents and headless runs', () => {
-  assert.equal(shouldNotify({ stop_hook_active: true }, {}), false);
-  assert.equal(shouldNotify({ hook_event_name: 'Stop', agent_id: 'a1' }, {}), false);
-  for (const ep of ['sdk-cli', 'sdk-ts', 'sdk-py'])
-    assert.equal(shouldNotify({}, { CLAUDE_CODE_ENTRYPOINT: ep }), false);
-  assert.equal(shouldNotify({}, { CLAUDE_CODE_ENTRYPOINT: 'cli' }), true);
-  assert.equal(shouldNotify({}, {}), true);
-});
-
-test('a subagent waiting on a permission or question still notifies', () => {
-  assert.equal(shouldNotify({ hook_event_name: 'Notification', agent_id: 'a1' }, {}), true);
-  assert.equal(shouldNotify({ hook_event_name: 'PreToolUse', agent_id: 'a1' }, {}), true);
+test('normalized policy skips continuation, child completion and headless events', () => {
+  assert.equal(shouldNotify({ continuation: true, interactive: true }), false);
+  assert.equal(shouldNotify({ kind: 'turn.finished', agentId: 'a1', interactive: true }), false);
+  assert.equal(shouldNotify({ interactive: false }), false);
+  assert.equal(shouldNotify({ kind: 'turn.finished', interactive: true }), true);
+  for (const kind of ['permission.requested', 'question.asked'])
+    assert.equal(shouldNotify({ kind, agentId: 'a1', interactive: true }), true);
 });
 
 test('tmux focus needs active pane, active window and a focused client', () => {
@@ -32,15 +27,15 @@ test('tmux focus needs active pane, active window and a focused client', () => {
 
 test('stop message', () => {
   const input = {
-    hook_event_name: 'Stop',
+    kind: 'turn.finished',
     cwd: '/home/u/dead-claude-skills',
-    last_assistant_message: '\nAll tests pass.\nDetails',
+    detail: '\nAll tests pass.\nDetails',
   };
   assert.deepEqual(message(input, plain), { title: 'dead-claude-skills', status: DONE[0], detail: 'All tests pass.' });
 });
 
 test('waiting message', () => {
-  const input = { hook_event_name: 'Notification', message: 'Claude needs your permission to use Bash' };
+  const input = { kind: 'notification.received', detail: 'Claude needs your permission to use Bash' };
   assert.deepEqual(
     [message(input, plain).status, message(input, plain).detail],
     [WAITING[0], 'Claude needs your permission to use Bash'],
@@ -48,24 +43,24 @@ test('waiting message', () => {
 });
 
 test('question message', () => {
-  const ask = (tool_input) => ({ hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', tool_input });
+  const ask = (tool_input) => ({ kind: 'question.asked', detail: tool_input.questions?.[0]?.question });
   assert.equal(message(ask({ questions: [{ question: 'Which DB?' }] }), plain).detail, 'Which DB?');
   assert.equal(message(ask({}), plain).detail, '');
 });
 
 test('night-city wording', () => {
-  assert.equal(message({ hook_event_name: 'Stop' }, plain).status, DONE[0]);
-  assert.equal(message({ hook_event_name: 'Notification', message: 'x' }, plain).status, WAITING[0]);
-  assert.equal(message({ hook_event_name: 'PreToolUse', tool_input: {} }, plain).status, WAITING[0]);
+  assert.equal(message({ kind: 'turn.finished' }, plain).status, DONE[0]);
+  assert.equal(message({ kind: 'notification.received', detail: 'x' }, plain).status, WAITING[0]);
+  assert.equal(message({ kind: 'question.asked', tool_input: {} }, plain).status, WAITING[0]);
 });
 
 test('empty answer gives no detail', () => {
-  assert.equal(message({ hook_event_name: 'Stop' }, plain).detail, '');
-  assert.equal(message({ hook_event_name: 'Stop', last_assistant_message: '\n\n' }, plain).detail, '');
+  assert.equal(message({ kind: 'turn.finished' }, plain).detail, '');
+  assert.equal(message({ kind: 'turn.finished', detail: '\n\n' }, plain).detail, '');
 });
 
 test('truncation keeps whole characters', () => {
-  const line = (s) => message({ hook_event_name: 'Stop', last_assistant_message: s }, plain).detail;
+  const line = (s) => message({ kind: 'turn.finished', detail: s }, plain).detail;
   const long = line('x'.repeat(300));
   assert.equal([...long].length, 120);
   assert.ok(long.endsWith('…'));
@@ -167,12 +162,4 @@ test('tmux is asked for our pane and every client of its session', () => {
     '-F',
     '#{client_flags}',
   ]);
-});
-
-test('main exits quietly on bad input', () => {
-  const script = fileURLToPath(new URL('./notify.mjs', import.meta.url));
-  for (const input of ['not json', '{}']) {
-    const r = spawnSync(process.execPath, [script], { input, env: { ...process.env, PATH: '' }, timeout: 10000 });
-    assert.equal(r.status, 0, String(r.stderr));
-  }
 });

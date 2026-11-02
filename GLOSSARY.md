@@ -1,8 +1,28 @@
 # dead-claude-skills
 
-A personal Claude Code plugin marketplace and the installer that sets up a machine from it.
+Personal native Claude Code and Codex marketplaces and the installer that sets up a machine from it.
 
 ## Language
+
+**Harness**:
+The coding-agent application that runs a conversation and hosts plugins, such as Claude Code or Codex.
+_Avoid_: model (the model is selected within a harness), cockpit (the separate observing app)
+
+**Plugin definition**:
+The authored description of a plugin's shared resources, behavior and integration needs across harnesses.
+_Avoid_: native manifest (a particular harness's package description)
+
+**Harness adapter**:
+The integration that translates shared plugin definitions and behavior to one harness's supported features.
+_Avoid_: plugin (the feature being integrated), harness (the application being integrated with)
+
+**Native package**:
+A plugin's distribution in the form a particular harness can install and run.
+_Avoid_: plugin definition (the shared authored description)
+
+**Native extension**:
+A plugin feature available through a particular harness's integration facilities without a shared equivalent.
+_Avoid_: fallback (a substitute for another feature)
 
 **Picks plugin**:
 A vendored plugin that carries a hand-chosen subset of one upstream's skills (`tob-picks`, `mattpocock-picks`).
@@ -125,3 +145,123 @@ _Avoid_: starter, bootstrap
 **Trim**:
 headroom's lossy shrinking of one tool result; what it cuts is gone for good.
 _Avoid_: compress (headroom's word for all of its modes), compact
+
+## Flow cockpit
+
+**Flow cockpit**:
+The desktop window that shows what the conductors and Claude sessions are doing, read from their documents and the
+capture. It can also start and host Claude sessions itself.
+_Avoid_: dashboard, board
+
+**Flow run**:
+One conductor run, recorded in a `docs/features/<slug>/flow.md`, from its start to `phase: done`.
+_Avoid_: run (alone; a web-mcp run is something else), flow (alone; that's the conductor), ticket
+
+**Audit**:
+One `docs/audits/<date>-<flow>-<scope>.md` report written by `/test-audit`, `/doc-audit` or `/harden`.
+_Avoid_: audit run, report (alone)
+
+**Claude session**:
+One Claude Code conversation together with the subagents it starts.
+_Avoid_: session (alone; a web-mcp session is a browser), chat
+
+**Loose session**:
+A Claude session that belongs to no flow run or audit.
+_Avoid_: orphan session, ad-hoc session
+
+**Hosted session**:
+A Claude session the flow cockpit started and owns the process for, running in its own PTY.
+_Avoid_: embedded session, live session (that's a status), background session (Claude Code's own term for `--bg`)
+
+**Capture**:
+The record of what one Claude session did, written event by event by the flow-cockpit plugin's hooks.
+_Avoid_: log, telemetry, trace
+
+**Capability diagnostic**:
+A target-specific explanation of an optional feature omitted during package generation. Required unsupported
+features fail the build; matching event names alone do not establish support.
+
+**Rules receipt**:
+A runtime record tying startup rule handling to exact packaged rules/adapter bytes, version and effective instruction
+source. It supports migration checks; installation alone is not hook trust or consent to remove instructions.
+
+**Owned generated output**:
+Both native distributions (`.agents/plugins/` and `.claude-plugin/`), both root marketplaces and the Claude theme rendered from the shared
+palette. Author sources, rebuild, review and commit outputs together; freshness checks do not rewrite them.
+**View**:
+One screen or tab of the flow cockpit: a TypeScript file that `export default`s a `View`, drawn by the window.
+_Avoid_: page, panel, widget
+
+**Run bar**:
+The flow cockpit's view of a hosted session's linked flow run: the phase stepper, the plan's task segments, the task
+in progress, and the flow.md `now:` line, shown on that session's Session tab.
+_Avoid_: toolbar, status bar
+
+**Extension**:
+A folder of views (and an optional `style.css`) the flow cockpit loads from disk; one can add views or replace others.
+_Avoid_: plugin (that's Claude Code's), theme, add-on
+
+**Default extension**:
+One of the four extensions that ship with the flow cockpit: `list`, `run`, `docs` and `activity`.
+_Avoid_: built-in view, core view
+
+**Trusted repository**:
+A checkout named under `trusted` in the flow cockpit's `config.toml`, and the worktrees git links to it; only then do
+the extensions in its `.flow-cockpit/extensions/` load.
+_Avoid_: allowed repository, safe repository
+
+## Azure DevOps (mcp-azure)
+
+**Collection**:
+The top level of an Azure DevOps Server instance, holding projects; it is the first path segment after the server
+(`https://server/tfs/DefaultCollection`). The cloud service calls the same level an organization.
+_Avoid_: organization, org (for the self-hosted server)
+
+**Pull request iteration**:
+One push to a pull request's source branch, as the server numbers them; "the PR's files" means the files changed as
+of the latest iteration.
+_Avoid_: revision, update
+
+**Thread**:
+A conversation on a pull request: one or more comments with a status (active, fixed, won't fix, closed, by design,
+pending), optionally anchored to a file and line.
+_Avoid_: comment (for the whole conversation), discussion
+
+**System thread**:
+A thread the server writes itself to record an event, such as a vote, a reviewer change or a push; never shown to
+Claude.
+_Avoid_: activity, event comment
+
+**Pipeline**:
+A YAML pipeline definition in a project. Classic release pipelines are not meant.
+_Avoid_: build definition, release
+
+**Run** (pipeline):
+One execution of a pipeline, with a result. The REST API calls it a build. web-mcp's Run is a different thing.
+_Avoid_: build, job (a job is one part of a run)
+
+**Test run**:
+One set of test results a pipeline run published: one per job and attempt, and one per result file unless the
+publishing task merges them; a run can publish several.
+_Avoid_: run (alone), test pass
+
+**Hit**:
+One search result: a file, a work item or a wiki page. A place inside a file that matched is a match.
+_Avoid_: result, match (for the whole hit)
+
+**Step**:
+One task inside a run's job, with its own result and log.
+_Avoid_: task, timeline record
+
+**Work item**:
+A tracked unit of work of some type (bug, user story, task, …) in a project's process.
+_Avoid_: issue, ticket
+
+**Read tool**:
+An mcp-azure tool that never changes anything on the server; the user may allow it once for good.
+_Avoid_: query tool
+
+**Write tool**:
+An mcp-azure tool that changes something on the server; Claude Code asks the user before every call, in every
+permission mode but `dontAsk`, which denies it.
+_Avoid_: action, mutation

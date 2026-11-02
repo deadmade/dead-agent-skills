@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import { decide, findUv, identityOf, main, openServerLog, pluginVersion, serverEnv, startArgs } from './launcher.mjs';
 
 const json = (body) => ({ ok: true, json: async () => body });
@@ -42,16 +42,24 @@ test('identityOf hashes uv.lock, pyproject.toml and *.py by name, nothing else',
   assert.match(id, /^[0-9a-f]{64}$/);
   assert.equal(identityOf(serverDir(base)), id, 'deterministic');
   assert.equal(identityOf(serverDir({ ...base, 'README.md': 'x', 'notes.txt': 'y' })), id, 'other files ignored');
-  for (const name of Object.keys(base)) assert.notEqual(identityOf(serverDir({ ...base, [name]: 'changed' })), id, name);
+  for (const name of Object.keys(base))
+    assert.notEqual(identityOf(serverDir({ ...base, [name]: 'changed' })), id, name);
   assert.notEqual(identityOf(serverDir({ ...base, 'new.py': '' })), id, 'a new module counts');
-  assert.notEqual(identityOf(serverDir({ ...base, 'guard.py': 'gs', 'server.py': '' })), id, 'bytes moved between files');
+  assert.notEqual(
+    identityOf(serverDir({ ...base, 'guard.py': 'gs', 'server.py': '' })),
+    id,
+    'bytes moved between files',
+  );
 });
 
 test('pluginVersion reads .claude-plugin/plugin.json, 0.0.0 without one', () => {
   const root = mkdtempSync(join(tmpdir(), 'ht-root-'));
   assert.equal(pluginVersion(root), '0.0.0');
   mkdirSync(join(root, '.claude-plugin'));
-  writeFileSync(join(root, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: 'headroom-trim', version: '1.2.3' }));
+  writeFileSync(
+    join(root, '.claude-plugin', 'plugin.json'),
+    JSON.stringify({ name: 'headroom-trim', version: '1.2.3' }),
+  );
   assert.equal(pluginVersion(root), '1.2.3');
 });
 
@@ -98,12 +106,22 @@ test('findUv: config bin first, then the first absolute PATH entry, never a rela
     'C:\\y\\uv.exe',
   );
   assert.equal(findUv({ config, path: '.', platform: 'win32', isFile: () => true }), 'C:\\cfg\\bin\\uv.exe');
-  assert.equal(findUv({ config, path: '.;rel', platform: 'win32', isFile: have('.\\uv.exe', 'rel\\uv.exe') }), undefined);
+  assert.equal(
+    findUv({ config, path: '.;rel', platform: 'win32', isFile: have('.\\uv.exe', 'rel\\uv.exe') }),
+    undefined,
+  );
   assert.equal(findUv({ config: '/c', path: '/a:/b', platform: 'linux', isFile: have('/b/uv') }), '/b/uv');
 });
 
 test('startArgs builds uv run --locked with an absolute script, the identity and version, and the venv in data', () => {
-  const r = startArgs({ uv: '/u/uv', serverDir: '/p/server', port: 47811, data: '/d', identity: 'hh', version: '0.6.0' });
+  const r = startArgs({
+    uv: '/u/uv',
+    serverDir: '/p/server',
+    port: 47811,
+    data: '/d',
+    identity: 'hh',
+    version: '0.6.0',
+  });
   assert.equal(r.cmd, '/u/uv');
   assert.deepEqual(r.args, [
     'run',
@@ -182,11 +200,19 @@ test('main without uv writes one line to launcher.log, creating the data folder'
   assert.equal(spawned.length, 0);
 });
 
+// In virtual time, so a slow disk or a busy runner cannot fail it: the only wait is the 250 ms health timeout.
 test('main returns within 400 ms when /health never answers', async () => {
   const { opts } = setup({ fetch: never });
-  const t = Date.now();
-  await main(opts);
-  assert.ok(Date.now() - t < 400, `${Date.now() - t} ms`);
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const done = main(opts).then(() => true);
+    mock.timers.tick(249);
+    assert.equal(await Promise.race([done, new Promise((r) => setImmediate(() => r(false)))]), false, 'waits for it');
+    mock.timers.tick(151);
+    assert.equal(await Promise.race([done, new Promise((r) => setImmediate(() => r(false)))]), true, 'done by 400 ms');
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 test('main spawns detached and hidden into server.log, logs the start, and unrefs', async () => {

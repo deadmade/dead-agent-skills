@@ -23,6 +23,7 @@ Grammar labels don't predict difficulty: a "simple" sentence of stacked nominali
 Always mark where one grammatical sentence ends. Ten ways, in three tiers.
 
 **Common**
+
 1. **Period.** Too many short sentences read as choppy; merge some into clauses, short of sprawl.
 2. **Semicolon.** When the first sentence is under about fifteen words and the second is closely tied to it. Occasionally.
 3. **Comma + coordinating conjunction.** For long clauses with internal commas, use a period or semicolon. Three or more short clauses can take commas; with internal commas, semicolons. Don't chain clauses with _and_. When one opening modifier covers two short clauses, omit the comma between them.
@@ -32,18 +33,11 @@ A clause starting with _however_ needs a period or semicolon before it, never a 
 - Before: "The cache is valid, however, the installer rebuilds it."
 - After: "The cache is valid; however, the installer rebuilds it."
 
-**Accepted, though some readers object**
-4. **Period + _And_/_But_.** Correct; once or twice a page.
-5. **Semicolon + conjunction.** For long clauses with their own commas; a period is often better.
-6. **Conjunction, no comma.** Short, closely linked clauses.
-7. **Comma alone.** Only short, tightly linked clauses (cause and effect, if and then) without internal commas. Many readers call it a splice; know your reader.
+**Accepted, though some readers object** 4. **Period + _And_/_But_.** Correct; once or twice a page. 5. **Semicolon + conjunction.** For long clauses with their own commas; a period is often better. 6. **Conjunction, no comma.** Short, closely linked clauses. 7. **Comma alone.** Only short, tightly linked clauses (cause and effect, if and then) without internal commas. Many readers call it a splice; know your reader.
 
 Use period + _But_ when what follows matters and the next sentences develop it; comma + _but_ when it only qualifies.
 
-**Marked**
-8. **Colon.** Reads as "that is", "for example" or "therefore", or balances two clauses. Capitalize after it by emphasis. Put it only after a complete clause: "The release needs three things:", not "The release needs:".
-9. **Dash.** An informal afterthought.
-10. **Parentheses.** A short aside sentence inside another; the period goes outside.
+**Marked** 8. **Colon.** Reads as "that is", "for example" or "therefore", or balances two clauses. Capitalize after it by emphasis. Put it only after a complete clause: "The release needs three things:", not "The release needs:". 9. **Dash.** An informal afterthought. 10. **Parentheses.** A short aside sentence inside another; the period goes outside.
 
 **Fragments** work only when short and deliberate, and rarely in formal prose.
 
@@ -52,6 +46,7 @@ Use period + _But_ when what follows matters and the next sentences develop it; 
 If a sentence opens with a pile of phrases and clauses, revise it instead of punctuating it.
 
 Rules:
+
 1. Comma after an opening element whenever the reader could misread where it ends.
 2. Never a semicolon after an opening element.
 3. No comma right after _although_, _because_ and the like when the subject follows.
@@ -63,7 +58,7 @@ Principles: after a short opening phrase the comma is optional and omitting it r
 ## Middles
 
 1. No comma between subject and verb, or verb and object. Shorten the subject instead.
-2. A long list as subject: end it with a colon or dash and a summative subject. "The hooks, the mods and both binaries: all read `CLAUDE_PLUGIN_ROOT`."
+2. A long list as subject: end it with a colon or dash and a summative subject. "The hooks, the mods and both binaries: all read `PLUGIN_ROOT`."
 3. Avoid interruptions except for emphasis. One longer than a few words takes paired commas, never semicolons.
 4. A subordinate clause added at the end takes no comma when the meaning depends on it, a comma when it doesn't.
 5. An adverbial phrase can open, interrupt or close a clause; each spot stresses something different. Mid-clause, use paired commas.
@@ -77,6 +72,7 @@ Principles: after a short opening phrase the comma is optional and omitting it r
 ## Apostrophes
 
 Rules, not choices.
+
 - Contractions take one.
 - Plurals take none, except lower-case letters and capital _A_, _I_, _U_. Acronyms and numbers add _s_: `URLs`, `PRs`, `the 2020s`.
 - Possessives: _'s_ for singulars ("the installer's check"); for singulars ending in _s_, pick _'s_ or a bare apostrophe consistently; _s'_ for plurals ("the plugins' manifests"); compounds on the last word.

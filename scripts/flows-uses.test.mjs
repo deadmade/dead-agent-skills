@@ -1,12 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   checkOverrides,
   checkPackPaths,
+  checkTemplates,
   checkUses,
+  currentDeps,
   expectedDeps,
   packs,
   readUses,
@@ -29,8 +31,8 @@ function repo(uses, skillText = conductor('how reviewer docs search general-purp
   if (uses !== undefined) put('plugins/flows/skills/fix/uses.json', JSON.stringify(uses));
   put('plugins/picks/skills/how/SKILL.md', '');
   put('plugins/picks/agents/reviewer.md', '');
-  put('plugins/picks/.mcp.json', JSON.stringify({ docs: { type: 'http' } }));
-  put('plugins/web/.mcp.json', '{}');
+  put('plugins/picks/plugin.json', JSON.stringify({ mcpServers: { docs: { url: 'https://x.invalid' } } }));
+  put('plugins/web/plugin.json', '{}');
   put('plugins/flows/packs/superpowers/skills/writing-plans/SKILL.md', '');
   return fx;
 }
@@ -43,7 +45,15 @@ function fixture(uses, skillText, files) {
       { name: 'remote', source: { source: 'url', url: 'https://example.invalid/remote.git' } },
     ],
   };
-  return checkUses(repo(uses, skillText, files), marketplace);
+  const fx = repo(uses, skillText, files);
+  mkdirSync(join(fx, 'plugins'), { recursive: true });
+  writeFileSync(join(fx, 'plugins/catalog.json'), JSON.stringify(marketplace.plugins));
+  return checkUses(fx, {
+    plugins: marketplace.plugins.map((p) => ({
+      ...p,
+      source: typeof p.source === 'string' ? './.claude-plugin/' + p.name : p.source,
+    })),
+  });
 }
 
 test('a valid map has no problems: local skill and agent, MCP tool, url plugin, official, builtin', () => {
@@ -144,8 +154,7 @@ test('withTree replaces only the marked block, and refuses a README without one'
 test('the real conductors pass, and flows depends on exactly what they use', () => {
   const marketplace = JSON.parse(readFileSync(join(ROOT, '.claude-plugin/marketplace.json'), 'utf8'));
   assert.deepEqual(checkUses(ROOT, marketplace), []);
-  const deps = JSON.parse(readFileSync(join(ROOT, 'plugins/flows/.claude-plugin/plugin.json'), 'utf8')).dependencies;
-  assert.deepEqual(deps, expectedDeps(readUses(ROOT), packs(ROOT)));
+  assert.deepEqual(currentDeps(ROOT), expectedDeps(readUses(ROOT), packs(ROOT)));
   assert.deepEqual(checkOverrides(ROOT), []);
   assert.deepEqual(checkPackPaths(ROOT), []);
 });
@@ -211,3 +220,65 @@ test('checkPackPaths: a missing path fails, naming file and line', () => {
     'plugins/flows/skills/fix/SKILL.md:2: <packs>/q/x.md does not exist',
   ]);
 });
+
+// checkTemplates: the parts the flow cockpit reads must stay in the templates and the conductor text.
+const TEMPLATES = [
+  'plugins/flows/skills/feature-flow/references/flow-template.md',
+  'plugins/flows/skills/research-flow/references/research-template.md',
+  'plugins/flows/references/build-template.md',
+];
+const RULES = 'plugins/flows/references/flow-rules.md';
+const PLANNERS = ['feature-flow', 'implement', 'upgrade'].map((n) => `plugins/flows/skills/${n}/SKILL.md`);
+
+// A copy of the real files with `needle` taken out of `file`.
+function without(file, needle) {
+  const fx = mkdtempSync(join(tmpdir(), 'ct-'));
+  for (const f of [...TEMPLATES, RULES, ...PLANNERS]) {
+    mkdirSync(dirname(join(fx, f)), { recursive: true });
+    cpSync(join(ROOT, f), join(fx, f));
+  }
+  const text = readFileSync(join(fx, file), 'utf8');
+  assert.ok(text.includes(needle), `${file} has ${needle}`);
+  writeFileSync(join(fx, file), text.split(needle).join('<removed>'));
+  return checkTemplates(fx);
+}
+
+test('checkTemplates on the real repo returns []', () => {
+  assert.deepEqual(checkTemplates(ROOT), []);
+});
+
+for (const t of TEMPLATES) {
+  for (const [what, needle] of [
+    ['now:', 'now: <'],
+    ['the Gates line shape', '- Gate <n>, <what>:'],
+    ['Picked:', 'Picked:'],
+    ['Status:', 'Status: open'],
+  ]) {
+    test(`checkTemplates names ${t} without ${what}`, () => {
+      const problems = without(t, needle);
+      assert.equal(problems.length, 1, problems.join('\n'));
+      assert.ok(problems[0].startsWith(t), problems[0]);
+    });
+  }
+}
+
+for (const [what, needle] of [
+  ['the Waiting for you rule', 'Waiting for you'],
+  ['Picks:', 'Picks:'],
+  ['Fixed', 'Fixed <date>'],
+]) {
+  test(`checkTemplates names flow-rules without ${what}`, () => {
+    const problems = without(RULES, needle);
+    assert.ok(problems.length >= 1 && problems.every((p) => p.startsWith(RULES)), problems.join('\n'));
+  });
+}
+
+for (const f of PLANNERS) {
+  for (const needle of ['**Does:**', '**Depends on:**']) {
+    test(`checkTemplates names ${f} without ${needle}`, () => {
+      const problems = without(f, needle);
+      assert.equal(problems.length, 1, problems.join('\n'));
+      assert.ok(problems[0].startsWith(f) && problems[0].includes(needle), problems[0]);
+    });
+  }
+}

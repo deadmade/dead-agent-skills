@@ -26,25 +26,25 @@ lets fix these issus
 
 ## Findings
 
-- 1: `installer/install.mjs:377`: with a current agent-browser on PATH (`plan.use === 'path'`) the installer returns
+- 1: `tools/installer/install.mjs:377`: with a current agent-browser on PATH (`plan.use === 'path'`) the installer returns
   before `agent-browser install`, so a failed browser download is never retried for an old npm copy, or for our own
   copy when `~/.claude/bin` is on PATH. By reading.
 - 2: `docs/features/agent-browser-review-fixes/flow.md:38`: item 9 says the branch doesn't touch `.web/index`, but
   17cd70a and e4b3139 change `rank::Index::open` and `Writer::commit`; Artifacts names only e564369.
-- 3: `installer/files.mjs` `replaceBin`: `rmSync(staged)` in the `finally` throws past `throw e`, so its error
+- 3: `tools/installer/files.mjs` `replaceBin`: `rmSync(staged)` in the `finally` throws past `throw e`, so its error
   replaces the swap's. Reproduced: a staged directory that can't be renamed onto `bin` reports
   `ERR_FS_EISDIR … rm returned EISDIR` instead of the rename's ENOTDIR.
-- 4: `installer/install.mjs:293-302` `downloadBin`: the comparison of the download's sha256 with the pinned or
+- 4: `tools/installer/install.mjs:293-302` `downloadBin`: the comparison of the download's sha256 with the pinned or
   fetched digest has no test.
 
 ## Fix
 
-- 1: `useAgentBrowser` (`installer/install.mjs`) runs `agent-browser install` on the copy in use, PATH (with `shell`
+- 1: `useAgentBrowser` (`tools/installer/install.mjs`) runs `agent-browser install` on the copy in use, PATH (with `shell`
   on Windows) or ours, then sets `agentBrowserPath`. No unit test: it is I/O; the copy choice stays in
   `agentBrowserPlan`.
 - 2: the old flow.md's item 9 and Artifacts.
 - 3: `replaceBin`'s staged cleanup in its own try; test sends a staged directory, failed first with `ERR_FS_EISDIR`.
-- 4: `sha256Matches` (`installer/core.mjs`) used by `downloadBin`; test failed first (missing export).
+- 4: `sha256Matches` (`tools/installer/core.mjs`) used by `downloadBin`; test failed first (missing export).
 - Docs: web-mcp README agent-browser bullet, `docs/solutions/agent-browser-install-never-retried.md`.
 
 ## Deviations

@@ -17,7 +17,7 @@ document, has a fresh Opus agent edit it into a scratchpad file, checks that fil
 (`scripts/compare.mjs`) before copying it over, and shows the diff. Its measures run through one Node entry
 (`scripts/measure.mjs`): masking shared with `prose.mjs` and the phrase candidates in Node, the spaCy candidates from
 `scripts/measure.py` when the environment exists. `flow-rules.md` runs `/copyedit` before spec, plan and audit-report
-gates. The installer's `prose` toggle syncs a locked uv project (`installer/assets/prose/`) into
+gates. The installer's `prose` toggle syncs a locked uv project (`tools/installer/assets/prose/`) into
 `<config>/flows-prose/`.
 
 **Tech Stack:** Node's standard library (`node:test`), Claude Code plugin hooks and skills, Python 3.13 with spaCy 3.8
@@ -78,7 +78,7 @@ the measures; Task 13 is acceptance.
   `https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.8.0/en_core_web_trf-3.8.0-py3-none-any.whl`
   (sha256 `272a31e9d8530d1e075351d30a462d7e80e31da23574f1b274e200f3fff35bf5`), `torch` from the explicit index
   `https://download.pytorch.org/whl/cpu`. uv comes from PATH.
-- The environment: `<CONFIG>/flows-prose/` (`CONFIG` is `installer/context.ts:10`: `CLAUDE_CONFIG_DIR` or `~/.claude`),
+- The environment: `<CONFIG>/flows-prose/` (`CONFIG` is `tools/installer/context.ts:10`: `CLAUDE_CONFIG_DIR` or `~/.claude`),
   holding `env/` (the venv; Python at `env/bin/python`, or `env\Scripts\python.exe` on Windows), `cache/` and
   `python/` (uv's cache and managed Pythons). The opt-out marker is `<CONFIG>/flows-prose.off`. NixOS (`/etc/NIXOS`
   exists) isn't supported yet: the toggle is hidden there.
@@ -96,7 +96,7 @@ the measures; Task 13 is acceptance.
 - THIRD_PARTY.md changes in the task that adds what it credits.
 - Commit messages are one sentence, with no co-author lines. Stage with `git add -u` plus new paths by name, never
   `git add -A`.
-- The sandbox runs Node 22.22; `node --test "installer/**/*.test.ts"` runs there (checked 2026-10-28: 121 tests, 0
+- The sandbox runs Node 22.22; `node --test "tools/installer/**/*.test.ts"` runs there (checked 2026-10-28: 121 tests, 0
   failing). Typecheck with `npm ci` once, then `npm run typecheck`. The sandbox runs as root.
 - Before you write (ponytail, verbatim): "Read the task and the code it touches. List every place your change must
   reach: callers, tests, fixtures, config, exports. Check what your change could break for users: data it would
@@ -517,10 +517,10 @@ TSV`; `formatCandidates sorts by line`.
 **Files:**
 
 - Create: `plugins/flows/skills/copyedit/scripts/measure.py`
-- Create: `installer/assets/prose/pyproject.toml`, `installer/assets/prose/uv.lock`
+- Create: `tools/installer/assets/prose/pyproject.toml`, `tools/installer/assets/prose/uv.lock`
 - Create: `scripts/fixtures/prose-sample.md`
 - Test: `scripts/copyedit.test.mjs`
-- Modify: `.github/workflows/test.yml:48` (also `grep -qx package/installer/assets/prose/uv.lock packed.txt`)
+- Modify: `.github/workflows/test.yml:48` (also `grep -qx package/tools/installer/assets/prose/uv.lock packed.txt`)
 - Modify: `THIRD_PARTY.md` (downloaded at install, not vendored: CPython, spaCy, `en_core_web_trf`, PyTorch and their
   dependencies, with their licenses)
 
@@ -555,9 +555,9 @@ TSV`; `formatCandidates sorts by line`.
   explicit = true
   ```
 
-  Run `uv lock --project installer/assets/prose`. Expected: torch resolves to a `+cpu` version for both
+  Run `uv lock --project tools/installer/assets/prose`. Expected: torch resolves to a `+cpu` version for both
   environments, the model wheel carries sha256 `272a31e9…5bf5`, and no `nvidia-*` package is in the lock. Then build
-  the test environment from them: `UV_PROJECT=installer/assets/prose
+  the test environment from them: `UV_PROJECT=tools/installer/assets/prose
 UV_PROJECT_ENVIRONMENT=<scratchpad>/flows-prose/env UV_CACHE_DIR=<scratchpad>/flows-prose/cache
 UV_PYTHON_INSTALL_DIR=<scratchpad>/flows-prose/python uv sync --frozen --managed-python --no-dev`. Keep this
   environment until Task 13.
@@ -577,7 +577,7 @@ UV_PYTHON_INSTALL_DIR=<scratchpad>/flows-prose/python uv sync --frozen --managed
 - [ ] **Step 5: Commit**
 
   ```bash
-  git add -u && git add plugins/flows/skills/copyedit/scripts/measure.py installer/assets/prose scripts/fixtures/prose-sample.md
+  git add -u && git add plugins/flows/skills/copyedit/scripts/measure.py tools/installer/assets/prose scripts/fixtures/prose-sample.md
   git commit -m "Add /copyedit's spaCy measures with a locked uv project for its environment."
   ```
 
@@ -585,15 +585,15 @@ UV_PYTHON_INSTALL_DIR=<scratchpad>/flows-prose/python uv sync --frozen --managed
 
 **Files:**
 
-- Create: `installer/core/prose.ts`, `installer/core/prose.test.ts`
-- Create: `installer/steps/prose.ts`
-- Modify: `installer/system/files.ts` (a `removeDir` helper), `installer/system/files.test.ts`
-- Modify: `installer/core/binaries.ts` (`BINARIES` rows' "needed for" may be a list, so the `uv` row serves graphify
+- Create: `tools/installer/core/prose.ts`, `tools/installer/core/prose.test.ts`
+- Create: `tools/installer/steps/prose.ts`
+- Modify: `tools/installer/system/files.ts` (a `removeDir` helper), `tools/installer/system/files.test.ts`
+- Modify: `tools/installer/core/binaries.ts` (`BINARIES` rows' "needed for" may be a list, so the `uv` row serves graphify
   and prose; `missingBinaries` reports each binary once; export `hasBuild(platform, arch)` over `BIN_TARGETS`)
-- Modify: `installer/core/options.ts:32` (`TOGGLES` gains `prose`), `:70` (the tools page), `HINTS`, `unavailable`
+- Modify: `tools/installer/core/options.ts:32` (`TOGGLES` gains `prose`), `:70` (the tools page), `HINTS`, `unavailable`
   (`prose` needs `hasBuild` and not NixOS)
-- Modify: `installer/install.ts` (`current`, `chosen`, the step call last before the summary)
-- Test: `installer/core/binaries.test.ts`, `installer/core/options.test.ts`
+- Modify: `tools/installer/install.ts` (`current`, `chosen`, the step call last before the summary)
+- Test: `tools/installer/core/binaries.test.ts`, `tools/installer/core/options.test.ts`
 
 **Interfaces:**
 
@@ -627,8 +627,8 @@ files inside flows-prose`; `proseState reads the python and the marker`; `proseD
 on NixOS and off linux-x64 and win32-x64`. `files.test.ts`: `removeDir removes a tree` and `removeDir returns
 the code instead of throwing` (with a stub `rm` that throws `EBUSY`).
 
-- [ ] **Step 2: Run them to verify they fail.** Run: `node --test installer/core/prose.test.ts
-installer/core/binaries.test.ts installer/core/options.test.ts installer/system/files.test.ts`. Expected: FAIL,
+- [ ] **Step 2: Run them to verify they fail.** Run: `node --test tools/installer/core/prose.test.ts
+tools/installer/core/binaries.test.ts tools/installer/core/options.test.ts tools/installer/system/files.test.ts`. Expected: FAIL,
       `core/prose.ts` not found and the new cases.
 
 - [ ] **Step 3: Implement.** The step, by `proseDecision`:
@@ -645,12 +645,12 @@ installer/core/binaries.test.ts installer/core/options.test.ts installer/system/
   `existsSync('/etc/NIXOS')`; `wanted` gains `prose` when it is on and flows is selected; call `applyProse` last,
   before the summary, with `unticked: started.prose && !on('prose')`, where `const started = { ...chosen }` is taken next to `initial({ ...chosen })` (`install.ts:211`): after `Object.assign(chosen, state.chosen)` (`:225`) `chosen` holds the screens' result, so comparing it with itself would never write the marker.
 
-- [ ] **Step 4: Run the checks.** Run: `node --test "installer/**/*.test.ts"` with the coverage flags of
+- [ ] **Step 4: Run the checks.** Run: `node --test "tools/installer/**/*.test.ts"` with the coverage flags of
       `package.json:9`, then `npm ci && npm run typecheck`. Expected: every test passes, coverage at or above the
       floor, no type errors.
 
 - [ ] **Step 5: Run the step for real on Linux** against a scratchpad config folder:
-      `CLAUDE_CONFIG_DIR=<scratchpad>/cfg node --input-type=module -e "import('./installer/steps/prose.ts').then(m =>
+      `CLAUDE_CONFIG_DIR=<scratchpad>/cfg node --input-type=module -e "import('./tools/installer/steps/prose.ts').then(m =>
 m.applyProse({ toggle: true, flows: true, unticked: false }))"`, twice, then with `toggle: false, unticked:
 true`.
 
@@ -660,7 +660,7 @@ true`.
 - [ ] **Step 6: Commit**
 
   ```bash
-  git add -u && git add installer/core/prose.ts installer/core/prose.test.ts installer/steps/prose.ts
+  git add -u && git add tools/installer/core/prose.ts tools/installer/core/prose.test.ts tools/installer/steps/prose.ts
   git commit -m "Add the installer's prose toggle, which syncs /copyedit's spaCy environment with uv."
   ```
 

@@ -17,7 +17,7 @@ Passing tests prove little on their own. This flow asks what a bug would have to
 | 4 Report | flow-rules **Reports**                                              | `docs/audits/…-test-audit-<scope>.md`. **Gate** |
 | 5 Fill   | superpowers `test-driven-development`, tob `property-based-testing` | new tests, mutants killed                       |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (tob is
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `<flow-root>/packs` (tob is
 its `tob-picks` folder). flow-rules **Stack packs** applies to the probes and Fill (a `*.csproj`: the csharp-skills
 `testing` router, whose find-untested-sources, run-tests and test-gap-analysis fit Phases 1, 2 and 3).
 

@@ -6,7 +6,7 @@ Approved 2026-10-11 (Gate 1).
 
 The installer's UI is `@clack/prompts` 1.8.1 + `@clack/core` 1.5.1 (the package's only dependencies, plus their
 transitive `sisteransi`, `fast-wrap-ansi`, …). The user wants no npm dependency an attacker could compromise, and a
-flow that is readable: today's tabbed checkbox chooser (`installer/tabs.mjs`) packs "installed" and "selected" into one
+flow that is readable: today's tabbed checkbox chooser (`tools/installer/tabs.mjs`) packs "installed" and "selected" into one
 glyph per row (◼ + −), uses six keys, shows no versions and so nothing as outdated. The user can't tell what's
 installed.
 
@@ -15,11 +15,11 @@ category, with versions and pending updates, and a review that lists only what c
 
 ## Grounding
 
-- `installer/core.mjs`: pure decisions (`CATEGORIES`, `categorize`, `HINTS`, `TOGGLES`, `unavailable`, `planPlugins`, …),
+- `tools/installer/core.mjs`: pure decisions (`CATEGORIES`, `categorize`, `HINTS`, `TOGGLES`, `unavailable`, `planPlugins`, …),
   no deps; stays as is apart from the additions below.
-- `installer/install.mjs`: I/O. clack is used for intro/outro, spinners, notes, `log.*`, `confirm`, `select`, `text`
+- `tools/installer/install.mjs`: I/O. clack is used for intro/outro, spinners, notes, `log.*`, `confirm`, `select`, `text`
   (clean-slate word) and `isCancel`; the chooser loop is `install.mjs:419-447`.
-- `installer/tabs.mjs` + `tabs.test.mjs`: the clack chooser; removed.
+- `tools/installer/tabs.mjs` + `tabs.test.mjs`: the clack chooser; removed.
 - `claude plugin list --json` gives each installed plugin's `version` and `enabled`. Plugins from this repo ship
   `plugins/<name>/.claude-plugin/plugin.json` with the release version (all `0.1.1` now); the user's machine has
   `0.1.0` and git-sha versions for them. Plugins from a url source (superpowers, ponytail, …) and the official ones
@@ -181,19 +181,19 @@ category, with versions and pending updates, and a review that lists only what c
 
 (Amended 2026-10-11 after plan review: signatures from the plan; shrinkwrap deleted.)
 
-- `installer/ui.mjs` (new), the only code touching the TTY: `screen(state, { move, render }, io)`,
+- `tools/installer/ui.mjs` (new), the only code touching the TTY: `screen(state, { move, render }, io)`,
   `confirm(message, initial, io)` (built on `screen`), `line(message, io)`, `note(title, lines)` (wraps, never cuts),
   `progress(label, fn)`, `log(kind, text)`.
-- `installer/view.mjs` (new), pure and tested: `frame`, `wrap`, `initial`, `changeList(state, data)` (the review
+- `tools/installer/view.mjs` (new), pure and tested: `frame`, `wrap`, `initial`, `changeList(state, data)` (the review
   grouping), `move(state, key, data)` and `render(state, data, { columns, rows })` for the start, category, updates
   and review screens.
-- `installer/core.mjs`: adds `outdated(rows, shipped)`. It is pure and returns installed plugins of this repo whose
+- `tools/installer/core.mjs`: adds `outdated(rows, shipped)`. It is pure and returns installed plugins of this repo whose
   version differs from the shipped one, once per id. An installed `X.Y.Z` newer than the shipped one doesn't count.
   Tested.
-- `installer/install.mjs`: every `p.*` call and `dim` is replaced with `ui.mjs` calls or plain text. The chooser loop
+- `tools/installer/install.mjs`: every `p.*` call and `dim` is replaced with `ui.mjs` calls or plain text. The chooser loop
   becomes start screen → sub-screens → review. The apply steps keep their logic, and the update step
   (`claude plugin update <id> --json`) is added.
-- Deleted: `installer/tabs.mjs`, `installer/tabs.test.mjs`, `npm-shrinkwrap.json`.
+- Deleted: `tools/installer/tabs.mjs`, `tools/installer/tabs.test.mjs`, `npm-shrinkwrap.json`.
 - `package.json`: `dependencies` removed, so `@clack/prompts` and `@clack/core` are gone and nothing imports them.
   The shrinkwrap entry leaves `files`. Its bump and check go from `scripts/release.mjs` and `scripts/check-repo.mjs`,
   and from the `flake.nix` hook regex. Engines stays `>=20.12`.
@@ -201,7 +201,7 @@ category, with versions and pending updates, and a review that lists only what c
 
 ### Testing
 
-- `installer/view.test.mjs` (`node:test`, `FORCE_COLOR=1` for color asserts):
+- `tools/installer/view.test.mjs` (`node:test`, `FORCE_COLOR=1` for color asserts):
   - start screen values with pending + and −, and `none` for empty categories
   - the Apply count
   - value column cut with `…` at 40 columns, frame width ≤ columns
@@ -213,7 +213,7 @@ category, with versions and pending updates, and a review that lists only what c
 - `core.test.mjs`: tests for `outdated` (shipped vs. installed, url-sourced never outdated, no downgrade, deduped).
 - `ui.mjs`: one test that runs `screen()` on a fake TTY stream pair (`PassThrough` with `isTTY`, `setRawMode` stubs).
   Pressing ↓ then enter resolves, and raw mode is off again afterwards.
-- Manual: `node installer/install.mjs` in a pty against a fake `claude` and a scratch home (as in the previous
+- Manual: `node tools/installer/install.mjs` in a pty against a fake `claude` and a scratch home (as in the previous
   feature's Task 4). Walk start → category → toggle → back → updates → review → Back → Quit, and check no changes
   were made. Repeat at 40 columns.
 

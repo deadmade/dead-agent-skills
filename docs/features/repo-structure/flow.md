@@ -34,7 +34,7 @@ phase: done
   `.gitignore` (`plugins/*/.claude-plugin/types/` misses grouped plugins).
 - Path-agnostic already: installer `manifestPath` (core.mjs:45), `flows-uses.mjs` (via marketplace `source`),
   `BIN_ONLY`/`INCLUDED` (by name).
-- **Live bug from the last regroup:** `installer/install.mjs:316` reads `plugins/tui-review/.claude-plugin/plugin.json`,
+- **Live bug from the last regroup:** `tools/installer/install.mjs:316` reads `plugins/tui-review/.claude-plugin/plugin.json`,
   which no longer exists (now `plugins/mods/tui-review`), so the installer throws at load. `install.mjs:372` hint also
   omits the group. `install.mjs:519` assumes `plugins/dead-skills`. No test covers install.mjs.
 - `flows/references/flow-rules.md:44` hops `../../../../<plugin>/*/skills/...` in the install cache, which is
@@ -48,7 +48,7 @@ phase: done
 - CI: 20 workflows, 1,105 lines; 10 weekly `sync-*.yml` are near copies (e.g. sync-rust vs sync-hallmark differ only
   in names, cron, sanity grep, PR body). 10 sync scripts share `sync-lib.mjs` but each repeats the copy block.
   UPSTREAM/LICENSE placement differs per vendored plugin (root, `skills/<name>/`, per skill).
-- `installer/` mixes code with shipped data (`ccstatusline*.json`, `searxng.yml`) and pins (`cswap.json`,
+- `tools/installer/` mixes code with shipped data (`ccstatusline*.json`, `searxng.yml`) and pins (`cswap.json`,
   `agent-browser.json`).
 - docs: `docs/features/<slug>/` is current (parsed by the flows mod); `docs/superpowers/{specs,plans}` holds 2 older
   pairs; `docs/adr/` 1 ADR. Empty untracked dirs: `docs/features/{band-test,band-test-research,code-rules}`,
@@ -145,7 +145,7 @@ too). Findings, recommendation in brackets. **User: "apply all of them"** (2026-
 | -------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Four layers in `plugins/`                                | Task 3     | `scripts/plugin-dirs.mjs:5`, `.claude-plugin/marketplace.json:17`                        | `scripts/plugin-dirs.test.mjs`, check-repo                                           |
 | Crates in `crates/`                                      | Task 2     | `scripts/check-repo.mjs:74`, `flake.nix:82-102`, `.github/workflows/tui-review.yml:6,24` | cargo test + clippy both crates, tui-review mod 27/27                                |
-| Installer without fixed paths (fixes `main`)             | Task 1     | `installer/install.mjs:361,517`                                                          | `installer/core.test.mjs:401`                                                        |
+| Installer without fixed paths (fixes `main`)             | Task 1     | `tools/installer/install.mjs:361,517`                                                    | `tools/installer/core.test.mjs:401`                                                  |
 | Every layout path follows (CI, nix, pre-commit)          | Tasks 2–4  | `flake.nix:20`, `treefmt.toml:5-17`, `.github/workflows/*`                               | pre-commit all-files, `nix fmt` clean, 4 stale-path greps empty, workflow-path check |
 | npx package keeps every manifest                         | Task 3     | `package.json` `files`                                                                   | `npm pack --dry-run`: 21 = 21                                                        |
 | Installed users unaffected (names unchanged)             | Task 3     | marketplace `name`s                                                                      | check-repo, mod tests cswap 9 / night-city 21 / flows 43                             |

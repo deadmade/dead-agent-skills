@@ -77,8 +77,7 @@ by a separate explainer.
   - `CLAUDE_PLUGIN_DATA` is `~/.claude/plugins/data/<id>/`; it is kept across updates and deleted on uninstall.
   - `CLAUDE_PLUGIN_ROOT` moves with each update.
 - **Retrieve markers (checked 2026-10-30 on the 200-result speed sample, no ML):**
-  - 57 of 200 results changed, and 2 of those carry a `Retrieve more: hash=…` marker, e.g. "[99 lines compressed to
-    35. Retrieve more: hash=…]".
+  - 57 of 200 results changed, and 2 of those carry a `Retrieve more: hash=…` marker, e.g. "[99 lines compressed to 35. Retrieve more: hash=…]".
   - Without headroom's MCP server or proxy the model has no way to follow that marker.
 - **Probe** (2026-10-30, Claude Code 2.1.292, Windows, `claude -p` with a plugin-dir http PostToolUse `*` hook, no
   `allowedHttpHookUrls`): the hook is dispatched for every tool and a same-shaped `updatedToolOutput` (strings of 20+
@@ -127,7 +126,7 @@ Background agent, 2026-10-30. Nothing found that pairs a hook with a shared help
   Python router), ML (no gain worth its cost).
 - **Packaging, 2026-10-30. Picked D:** the server is one PEP 723 script (`server.py` + `server.py.lock` from
   `uv lock --script`), run with `uv run --locked --offline`. The installer keeps a pinned uv the way it keeps
-  agent-browser (version + per-platform sha256 in `installer/assets/uv.json`, a PATH copy at or above the pin wins,
+  agent-browser (version + per-platform sha256 in `tools/installer/assets/uv.json`, a PATH copy at or above the pin wins,
   otherwise `~/.claude/bin`, path into the plugin's `userConfig`, a sync script bumps the pin), then pre-builds the
   environment with `uv sync --script`. uv 0.13.6 ships `x86_64-pc-windows-msvc.zip` and
   `x86_64-unknown-linux-musl.tar.gz` with `.sha256` files. Rejected:
@@ -146,8 +145,8 @@ Background agent, 2026-10-30. Nothing found that pairs a hook with a shared help
   - Updates: headroom is bumped like any other dependency. The server becomes a uv project so Dependabot's `uv`
     ecosystem can bump it, and the launcher replaces an outdated server and runs `uv sync` once.
   - Local port: no secret, the README says so.
-  My calls: a per-session off switch via the `X-Headroom-Trim` header; a first-task probe of `updatedToolOutput`
-  that stops the build if Bash, PowerShell or Grep isn't honoured; silent, with a before/after log in plugin data.
+    My calls: a per-session off switch via the `X-Headroom-Trim` header; a first-task probe of `updatedToolOutput`
+    that stops the build if Bash, PowerShell or Grep isn't honoured; silent, with a before/after log in plugin data.
 
 ## Plan review
 
@@ -221,15 +220,15 @@ entry's `check` and `body`; `uv` in the dev shell; `uv.json` in the package chec
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
-| Shrink tool output with headroom's no-ML lossy compression | 2, 3 | `plugins/opt-in/headroom-trim/server/trim.py:33`, `server/server.py:79` | `test_trim.py:58` `test_headroom_trims_a_long_log`, `test_server.py` `test_hook_trims` |
-| headroom decides, no rules of ours; Read stays exact; images untouched | 2 | `server/trim.py:11` | `test_trim.py:64` `test_headroom_keeps_read`, `test_trim.py:48` `test_mcp_image_left_alone` |
-| No noticeable slowdown; every failure keeps the original output | 3, 4, final fixes | `server/server.py:86` (4 s queue deadline), `hooks/launcher.mjs:101` (bounded `main`) | `test_server.py:153`, `:96`, `:103`; `launcher.test.mjs:185`, `:268`; measured p50 14–16 ms per call (Task 3 report) |
-| No network from the compression process | 3 | `server/guard.py:35`, `server/server.py` (env and telemetry before the headroom import) | `test_guard.py:62`, `test_server.py:257`, `:281` |
-| Works on Windows x64 and Linux x64 without Python or uv | 5, 6 | `installer/core/binaries.ts:148` `uvAsset`, `:158` `uvPlan`, `installer/steps/uv.ts:26`, `:74` | `binaries.test.ts:120`, `:148`; CI runs the server tests on both runners (`test.yml`) |
-| Updates like any other dependency; a newer server is never replaced by an older one | 4, 6, final fixes | `hooks/launcher.mjs:18` `decide`, `:28` `identityOf`; `.github/dependabot.yml` (uv); `scripts/sync-uv.mjs` | `launcher.test.mjs:11`, `:217`, `:239`; `sync-lib.test.mjs` |
-| Silent, with a log that explains an untrimmed session | 3, final fixes | `server/server.py` (`trim.log`), `hooks/launcher.mjs:74` `openServerLog` | `test_server.py` `test_log_line`; `launcher.test.mjs:127`, `:192` |
+| spec goal                                                                           | plan task         | file:line                                                                                                  | test                                                                                                                 |
+| ----------------------------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Shrink tool output with headroom's no-ML lossy compression                          | 2, 3              | `plugins/opt-in/headroom-trim/server/trim.py:33`, `server/server.py:79`                                    | `test_trim.py:58` `test_headroom_trims_a_long_log`, `test_server.py` `test_hook_trims`                               |
+| headroom decides, no rules of ours; Read stays exact; images untouched              | 2                 | `server/trim.py:11`                                                                                        | `test_trim.py:64` `test_headroom_keeps_read`, `test_trim.py:48` `test_mcp_image_left_alone`                          |
+| No noticeable slowdown; every failure keeps the original output                     | 3, 4, final fixes | `server/server.py:86` (4 s queue deadline), `hooks/launcher.mjs:101` (bounded `main`)                      | `test_server.py:153`, `:96`, `:103`; `launcher.test.mjs:185`, `:268`; measured p50 14–16 ms per call (Task 3 report) |
+| No network from the compression process                                             | 3                 | `server/guard.py:35`, `server/server.py` (env and telemetry before the headroom import)                    | `test_guard.py:62`, `test_server.py:257`, `:281`                                                                     |
+| Works on Windows x64 and Linux x64 without Python or uv                             | 5, 6              | `tools/installer/core/binaries.ts:148` `uvAsset`, `:158` `uvPlan`, `tools/installer/steps/uv.ts:26`, `:74` | `binaries.test.ts:120`, `:148`; CI runs the server tests on both runners (`test.yml`)                                |
+| Updates like any other dependency; a newer server is never replaced by an older one | 4, 6, final fixes | `hooks/launcher.mjs:18` `decide`, `:28` `identityOf`; `.github/dependabot.yml` (uv); `scripts/sync-uv.mjs` | `launcher.test.mjs:11`, `:217`, `:239`; `sync-lib.test.mjs`                                                          |
+| Silent, with a log that explains an untrimmed session                               | 3, final fixes    | `server/server.py` (`trim.log`), `hooks/launcher.mjs:74` `openServerLog`                                   | `test_server.py` `test_log_line`; `launcher.test.mjs:127`, `:192`                                                    |
 
 No goal without code; no code without a goal. End-to-end on a released build (Task 7) is still open by plan.
 
@@ -237,12 +236,12 @@ No goal without code; no code without a goal. End-to-end on a released build (Ta
 
 /verify, 2026-10-30, on fa2c450 (tree clean):
 
-| Part        | State |
-| ----------- | ----- |
+| Part        | State                                                                                                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Checks      | green except the known `claude plugin validate plugins/default` failure (on main too) and the Windows clean-slate symlink EPERM; headroom-trim validates; installer coverage 79.83%; server tests 30 OK |
-| Review      | per-task reviews, a whole-branch review and its fix wave (9 findings fixed, re-review clean); `/self-review` skipped by the user |
-| Docs        | doc audit skipped by the user; the reviews checked README, CLAUDE.md, THIRD_PARTY.md and the marketplace entry |
-| Tests       | not audited (skipped with self-review) |
-| Read        | skipped |
-| Decisions   | the 12 rulings above confirmed by the user, none reopened |
-| Not checked | a real session on a released build (Task 7, with Step 4b); Linux runs of the server tests until CI |
+| Review      | per-task reviews, a whole-branch review and its fix wave (9 findings fixed, re-review clean); `/self-review` skipped by the user                                                                        |
+| Docs        | doc audit skipped by the user; the reviews checked README, CLAUDE.md, THIRD_PARTY.md and the marketplace entry                                                                                          |
+| Tests       | not audited (skipped with self-review)                                                                                                                                                                  |
+| Read        | skipped                                                                                                                                                                                                 |
+| Decisions   | the 12 rulings above confirmed by the user, none reopened                                                                                                                                               |
+| Not checked | a real session on a released build (Task 7, with Step 4b); Linux runs of the server tests until CI                                                                                                      |

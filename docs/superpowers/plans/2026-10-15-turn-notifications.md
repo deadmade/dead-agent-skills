@@ -65,8 +65,8 @@ while the plugin is selected.
 - Modify: `.claude-plugin/marketplace.json`: entry after night-city: `name: notify`, `source: ./plugins/notify`,
   `category: development`, description `"Desktop notifications when a turn ends or Claude needs you, on Linux,
 Windows and macOS; quiet while you're looking at the session. Opt-in."`
-- Modify: `installer/core.mjs:385` system page: add `'notify'` to keys; blurb `'Status line, sandbox, command
-guard, notifications and the Night City theme.'` (the test at `installer/core.test.mjs:376-383` requires every
+- Modify: `tools/installer/core.mjs:385` system page: add `'notify'` to keys; blurb `'Status line, sandbox, command
+guard, notifications and the Night City theme.'` (the test at `tools/installer/core.test.mjs:376-383` requires every
   marketplace plugin on a page)
 - Modify: `CLAUDE.md` Checks line for `npm test` (also runs `plugins/notify/hooks/*.test.mjs`)
 
@@ -83,7 +83,7 @@ guard, notifications and the Night City theme.'` (the test at `installer/core.te
 - `message(input, { nightCity: boolean, pick: (list: string[]) => string }) -> { title: string, body: string }`:
   raw text, no escaping.
 
-- [ ] **Step 1: Write the failing tests** (`node:test` + `node:assert/strict`, like `installer/core.test.mjs`):
+- [ ] **Step 1: Write the failing tests** (`node:test` + `node:assert/strict`, like `tools/installer/core.test.mjs`):
   - `skips continuations, subagents and headless runs`: `shouldNotify({stop_hook_active:true}, {})` false;
     `({agent_id:'a1'}, {})` false; `({}, {CLAUDE_CODE_ENTRYPOINT:'sdk-cli'})`, `'sdk-ts'`, `'sdk-py'` false;
     `({}, {CLAUDE_CODE_ENTRYPOINT:'cli'})` true; `({}, {})` true.
@@ -116,7 +116,7 @@ done. Back to you`.
 eyes on this, choom`, `Netrunner awaits your authorization`, `The daemon won't move without you`.
 - [ ] **Step 4: Run** `npm test`. Expected: PASS.
 - [ ] **Step 5: Commit** `git add plugins/notify package.json flake.nix .claude-plugin/marketplace.json
-installer/core.mjs CLAUDE.md && git commit -m "Add the notify plugin's message and focus decisions."`
+tools/installer/core.mjs CLAUDE.md && git commit -m "Add the notify plugin's message and focus decisions."`
 
 ### Task 2: Delivery: hooks.json, notifiers, icon
 
@@ -182,8 +182,8 @@ toast or osascript."`
 
 **Files:**
 
-- Modify: `installer/core.mjs:113` `mergeSettings` (new option `notify`), `installer/install.mjs:583-584`
-- Test: `installer/core.test.mjs` (next to the nightCity tests, ~:513)
+- Modify: `tools/installer/core.mjs:113` `mergeSettings` (new option `notify`), `tools/installer/install.mjs:583-584`
+- Test: `tools/installer/core.test.mjs` (next to the nightCity tests, ~:513)
 - Create: `plugins/notify/README.md`
 - Modify: `README.md` (plugin list), `CLAUDE.md` (Layout: one line on `plugins/notify/`)
 
@@ -196,7 +196,7 @@ toast or osascript."`
       `mergeSettings({preferredNotifChannel:'notifications_disabled'}, {notify:false}).preferredNotifChannel ===
 undefined`; `({preferredNotifChannel:'kitty'}, {notify:false})` keeps `'kitty'`; `({preferredNotifChannel:'kitty'},
 {notify:true})` gives `'notifications_disabled'`.
-- [ ] **Step 2: Run** `node --test installer/core.test.mjs`. Expected: the new test FAILS.
+- [ ] **Step 2: Run** `node --test tools/installer/core.test.mjs`. Expected: the new test FAILS.
 - [ ] **Step 3: Implement** beside the nightCity block: a one-line why comment, a `shortcut:` comment like the
       syntax-highlighting one (deselecting clears a `notifications_disabled` the user set themselves), and a comment that
       retiring notify from the marketplace leaves the setting behind. In `install.mjs` pass

@@ -1,6 +1,6 @@
 ---
 name: self-review
-description: 'Review your own branch before opening a PR: a confidence-scored bug pass, a spec pass, a standards pass, a security pass, a CLAUDE.md audit, and specialist agents for error handling, tests, types and comments, all in parallel, then one ranked report and fixes for the findings you pick. Never posts anything. Use for /self-review [base].'
+description: 'Review your own branch before opening a PR: a confidence-scored bug pass, a spec pass, a standards pass, a security pass, a CLAUDE.md audit, and specialist agents for error handling, tests, types and comments, all in parallel, then one ranked report, fixes for the findings you pick, and an independent check of each fix. Never posts anything. Use for /self-review [base].'
 disable-model-invocation: true
 argument-hint: '[base branch or commit]'
 ---
@@ -29,12 +29,17 @@ and the claude-md-management plugin:
 - **The diff is the working tree** against the merge-base, so uncommitted work counts: `git diff <merge-base>` plus
   untracked files (`git ls-files --others --exclude-standard`). Wherever an upstream file says `git diff X...HEAD` or
   `gh pr diff`, use this instead.
+- **Reviewers are independent.** Every agent this skill starts is a fresh subagent: never a fork, and no `name` (a
+  named agent can message its siblings). It gets only what its job needs: the diff command, the file list, the
+  intent, the standards, and the findings it is asked to rule on or check. Never this conversation's account of why
+  the code is right, or earlier drafts; a pass never sees another pass's findings. The session that wrote the code is
+  the author, not a reviewer.
 - Don't change code before the user picks findings in Phase 5.
 - Commit only when the user asks.
 
 ## Phase 1: Scope
 
-1. The base is the argument if given. Otherwise `git config branch.<current>.tuiReviewBase` (tui-review's remembered base).
+1. The base is the argument if given. Otherwise use the base selection in flow-rules.md.
    Otherwise the default branch: `origin/HEAD`, else `origin/main` or `origin/master`.
 2. Run `git merge-base <base> HEAD`. If that fails, say why and stop.
 3. List the changed and untracked files, with their `+/−` counts and the commits (`git log <merge-base>..HEAD
@@ -51,7 +56,7 @@ and the claude-md-management plugin:
   - a path the user named
 - No spec found: ask once, in one line. "None" skips the Spec pass, and the report says so. Don't block the other
   passes on the answer; start them, and start the Spec pass when it arrives.
-- **Standards:** every CLAUDE.md in the repo root and in the changed directories, plus CONTRIBUTING.md,
+- **Standards:** every applicable AGENTS.md and CLAUDE.md in the repo root and in the changed directories, plus CONTRIBUTING.md,
   CODING_STANDARDS.md and anything similar under `docs/`.
 
 ## Phase 3: Fan out
@@ -64,11 +69,10 @@ One message, every agent in parallel:
 - **Spec and Standards:** follow the upstream spec-standards-review.md, steps 3 and 4, with the diff, spec and
   standards from Phases 1 and 2. Its tracker setup (`/setup-matt-pocock-skills`) isn't needed: Phase 2 found the
   spec.
-- **Security**, always: an agent that loads the built-in `security-review` skill and follows it, with the diff from
+- **Security**, always: an agent that follows the security review procedure in the host adapter, with the diff from
   Phase 1 in place of the branch diff the skill builds itself (that one leaves out uncommitted work).
-- **CLAUDE.md**, always, when claude-md-management is installed: an agent that loads
-  `claude-md-management:claude-md-improver` and runs its discovery, assessment and proposed diffs, but applies
-  nothing. Give it the diff too, and have it lead with the statements in any CLAUDE.md that the diff made untrue.
+- **Instruction files**, always: an agent that follows the instruction-file review procedure in the host adapter,
+  proposes corrections, and applies nothing. Give it the diff too, and have it lead with the statements in any CLAUDE.md that the diff made untrue.
   Its proposed diffs are findings like any other and get applied in Phase 5.
 - **Specialists**, by what the diff touches. Give each the diff command, the file list and the intent:
   - `flows:silent-failure-hunter`: try/catch, error returns, fallbacks, retries, default values on failure
@@ -78,15 +82,19 @@ One message, every agent in parallel:
 - **Optional**, only when the diff calls for it:
   - pstack `blast-radius`, for changes to shared code, public interfaces, data, wire formats or config. pstack is a
     pack of this plugin and can't be loaded with the Skill tool: read
-    `${CLAUDE_PLUGIN_ROOT}/packs/pstack-picks/skills/blast-radius/SKILL.md` and follow it.
+    `<flow-root>/packs/pstack-picks/skills/blast-radius/SKILL.md` and follow it.
 
 Tell the user which passes are running and which were skipped, and why, in one line.
 
 **Small diff** (at most 3 files and about 50 changed lines of code): agents cost more than they find here. Run the
 passes yourself, one after another, each with its own checklist (the bug pass's angles and false-positive list, both
-upstream axes, each applicable specialist's agent file under `${CLAUDE_SKILL_DIR}/../../agents/`, and the security and
-CLAUDE.md skills loaded with the Skill tool), and say you did.
+upstream axes, each applicable specialist's agent file under `<flow-root>/agents/`, and the security and
+project instruction skills loaded with the host skill tool), and say you did. If this session wrote the code, the bug pass still goes
+to one fresh agent: an author re-reading its own diff in the same context isn't a review.
 Everything else stays the same, the report format included.
+
+If subagents are unavailable, skip Phase 3's agent passes and list them as not checked. Do not run
+those passes sequentially in the main session. Continue to the report and approval gates.
 
 ## Phase 4: Report
 
@@ -98,9 +106,26 @@ Ask which findings to fix: "all fix-before-PR", numbers, or none. Then:
 
 1. Fix them. A fix that would change the design or the spec goes back to the user first. A finding that needs a
    cause before a fix (a failing test, a symptom whose root cause isn't known, a fix that would only hide it): offer
-   `/fix-flow` on it, with your recommendation. On the user's yes, read `${CLAUDE_SKILL_DIR}/../fix-flow/SKILL.md`
+   `/fix-flow` on it, with your recommendation. On the user's yes, read `<skill-dir>/../fix-flow/SKILL.md`
    and follow it.
 2. Run the repo's tests, lint and typecheck, and read the output. Report what passed and what didn't.
 3. Offer the `flows:code-simplifier` agent on the changed files, as a last polish. Only on the user's yes.
-4. Re-run only the passes whose findings were fixed, if the user wants a check.
-5. Say when the branch is ready for a PR. Commit only when asked.
+4. **Check the fixes.** One fresh agent (it wrote none of them) gets each fixed finding (as reported), the fix diff
+   and the cited places, with this prompt:
+
+   ```
+   For each finding, check whether the fix resolves it at the cited place and wherever the same problem appears in
+   the diff. Look for regressions next to the change. Run a test or a command where reading can't settle it;
+   otherwise say what you couldn't check. Per finding: PASS or FAIL, with the line you read or the command you ran
+   and its output. Don't rewrite the code.
+   ```
+
+   A FAIL goes back to step 1. When the same finding fails twice, stop and hand it to the user with both attempts.
+
+5. **Fresh eyes**, offered; recommend it when a fix changed behavior beyond a few lines, or fixed a security finding.
+   Two new agents that took no part so far, one on a different model (the Agent tool's `model`), each get the final
+   diff, the intent and the standards, and the bug pass's angles and false-positive list. Not the report, the
+   findings or the fix history. Their findings go through the synthesis Check, then Phase 5 again. Stop when a round
+   raises nothing for Fix before PR.
+6. Say when the branch is ready for a PR, and which checks ran: fix check, fresh eyes (rounds), or neither. Commit
+   only when asked.

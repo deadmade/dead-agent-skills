@@ -208,7 +208,7 @@ origin/main d1428c6.
   Important, which went to the user as D-T6; fix a5e009e.
 - Task 7: base a5e009e. Untracked at start: the same. Commit e3b040f (docs, ADR, feature docs). Its live check found
   D-T7.
-- Task 8: base e3b040f. Commit d09fd2e touches `profile.rs`, `installer/system/browser.ts` and its test, so
+- Task 8: base e3b040f. Commit d09fd2e touches `profile.rs`, `tools/installer/system/browser.ts` and its test, so
   the files are clean. The review was clean.
 - Final review (whole branch, d1428c6..8525c2a): "With fixes". No Critical. The one Important (GLOSSARY.md never
   updated) was already done in the main checkout's uncommitted GLOSSARY.md, which the user commits. The doc Minors,
@@ -381,22 +381,22 @@ windows, tabs from CDP `/json/list`.
 
 ## Walkthrough
 
-Paths are under `crates/web-mcp/` unless they start with `installer/`.
+Paths are under `crates/web-mcp/` unless they start with `tools/installer/`.
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
-| One window per web-mcp process | 4, 5 | `src/window.rs:58` (`live`), `src/browser.rs:276` (`warm`) | `window.rs:206` `live_starts_once_for_parallel_callers` |
-| Opens on the first call that needs a browser, never at startup | 4, 5 | `src/browser.rs:276`, `src/search.rs:265`, `src/papers.rs:647`, `src/browser.rs:631` | `tests/browser.rs:252` `browser_starts_no_window_until_used` |
-| Stays open until shutdown, then closes | 4, 5 | `src/main.rs:70` (`close_all`), `src/browser.rs:430`, `src/window.rs:110` (`tie_to_process`, `main.rs:41`) | `tests/browser.rs:126` `opened_sessions_are_closed_on_shutdown_unless_closed`, `window.rs:281` `tie_to_process_kills_children` |
-| Every engine is a tab | 5 | `src/browser.rs:268` (`engine_session`), `src/browser.rs:339` (`attached`) | `tests/search.rs:128` `search_fuses_all_four_engines`, `:221` `engine_tab_stays_between_searches` |
-| Every `browser` session is a tab | 5 | `src/browser.rs:156` (`name`), `src/browser.rs:339` | `tests/browser.rs:162` `gone_tab_is_rebound_once` |
-| Every fetch fallback is a tab | 5 | `src/browser.rs:631` | `tests/browser.rs:340` `parallel_fallbacks_use_separate_sessions`, `:559` `slow_fallback_still_closes_its_session` |
-| One window per Claude Code session, never shared | 3 | `src/profile.rs:164` (`slot`) | `tests/search.rs:309` `two_servers_take_two_slots` |
-| Searches stay as fast: engines in parallel, each in its own tab | 5 | `src/search.rs:265` (warm before the deadline) | `tests/search.rs:328` `window_start_is_outside_the_engine_deadline` |
-| A closed window or dead Chrome recovers | 4, 5 | `src/window.rs:58`, `src/browser.rs:304` (`retire`), `:339` | `tests/search.rs:252` `dead_chrome_is_replaced`, `:289` `closed_window_rebinds_every_engine`, `tests/browser.rs:187` `dead_chrome_is_replaced_mid_call`, `window.rs:244` `changed_url_starts_next_generation` |
-| I still don't care about cookies for every engine | 2 | `src/profile.rs:21`, `:324` | `profile.rs:681` `bad_extension_hash_is_refused`, `tests/search.rs:378` `consent_clears_by_the_next_search` |
-| Installer warns when the window can't open | 6 | `installer/core/binaries.ts:107` (`windowProblem`), `installer/steps/agent-browser.ts` (`windowWorks`) | `installer/core/binaries.test.ts:156` |
-| Chrome for Testing is found on Windows (D-T7) | 8 | `src/profile.rs` (`version`, `pick`), `installer/system/browser.ts` | `installer/system/browser.test.ts`, profile.rs's `pick` tests |
+| spec goal                                                       | plan task | file:line                                                                                                          | test                                                                                                                                                                                                          |
+| --------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One window per web-mcp process                                  | 4, 5      | `src/window.rs:58` (`live`), `src/browser.rs:276` (`warm`)                                                         | `window.rs:206` `live_starts_once_for_parallel_callers`                                                                                                                                                       |
+| Opens on the first call that needs a browser, never at startup  | 4, 5      | `src/browser.rs:276`, `src/search.rs:265`, `src/papers.rs:647`, `src/browser.rs:631`                               | `tests/browser.rs:252` `browser_starts_no_window_until_used`                                                                                                                                                  |
+| Stays open until shutdown, then closes                          | 4, 5      | `src/main.rs:70` (`close_all`), `src/browser.rs:430`, `src/window.rs:110` (`tie_to_process`, `main.rs:41`)         | `tests/browser.rs:126` `opened_sessions_are_closed_on_shutdown_unless_closed`, `window.rs:281` `tie_to_process_kills_children`                                                                                |
+| Every engine is a tab                                           | 5         | `src/browser.rs:268` (`engine_session`), `src/browser.rs:339` (`attached`)                                         | `tests/search.rs:128` `search_fuses_all_four_engines`, `:221` `engine_tab_stays_between_searches`                                                                                                             |
+| Every `browser` session is a tab                                | 5         | `src/browser.rs:156` (`name`), `src/browser.rs:339`                                                                | `tests/browser.rs:162` `gone_tab_is_rebound_once`                                                                                                                                                             |
+| Every fetch fallback is a tab                                   | 5         | `src/browser.rs:631`                                                                                               | `tests/browser.rs:340` `parallel_fallbacks_use_separate_sessions`, `:559` `slow_fallback_still_closes_its_session`                                                                                            |
+| One window per Claude Code session, never shared                | 3         | `src/profile.rs:164` (`slot`)                                                                                      | `tests/search.rs:309` `two_servers_take_two_slots`                                                                                                                                                            |
+| Searches stay as fast: engines in parallel, each in its own tab | 5         | `src/search.rs:265` (warm before the deadline)                                                                     | `tests/search.rs:328` `window_start_is_outside_the_engine_deadline`                                                                                                                                           |
+| A closed window or dead Chrome recovers                         | 4, 5      | `src/window.rs:58`, `src/browser.rs:304` (`retire`), `:339`                                                        | `tests/search.rs:252` `dead_chrome_is_replaced`, `:289` `closed_window_rebinds_every_engine`, `tests/browser.rs:187` `dead_chrome_is_replaced_mid_call`, `window.rs:244` `changed_url_starts_next_generation` |
+| I still don't care about cookies for every engine               | 2         | `src/profile.rs:21`, `:324`                                                                                        | `profile.rs:681` `bad_extension_hash_is_refused`, `tests/search.rs:378` `consent_clears_by_the_next_search`                                                                                                   |
+| Installer warns when the window can't open                      | 6         | `tools/installer/core/binaries.ts:107` (`windowProblem`), `tools/installer/steps/agent-browser.ts` (`windowWorks`) | `tools/installer/core/binaries.test.ts:156`                                                                                                                                                                   |
+| Chrome for Testing is found on Windows (D-T7)                   | 8         | `src/profile.rs` (`version`, `pick`), `tools/installer/system/browser.ts`                                          | `tools/installer/system/browser.test.ts`, profile.rs's `pick` tests                                                                                                                                           |
 
 No goal is without code, and no code is without a goal: the docs (Task 7) and the spike (Task 1) carry no goal of
 their own.

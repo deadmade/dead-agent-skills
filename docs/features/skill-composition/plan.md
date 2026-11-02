@@ -76,7 +76,7 @@ round 1".
 
 - [ ] Show the owner the file list, then commit only that session's files with a one-sentence message:
   - the superpowers vendoring and the sync-release rename;
-  - the installer/scripts/docs edits;
+  - the tools/installer/scripts/docs edits;
   - `.gitattributes` and `docs/features/vendor-superpowers/flow.md`.
 - [ ] Do not commit sandbox placeholder paths (`.claude/*`, dotfiles, `.idea`, `.vscode`), other flows' folders, or
       this flow's folder.
@@ -165,16 +165,16 @@ vendored. The line is our own text in Task 6.
 
 - `.claude-plugin/marketplace.json`: remove the six entries and update flows' `description`.
 - `plugins/default/.claude-plugin/plugin.json:10-18`: dependencies.
-- `installer/core/plugins.ts:72`: `INCLUDED` becomes `['self-review']`.
-- `installer/core/plugins.test.ts:30-55,63`, `installer/core/options.test.ts:24-31`: expectations.
-- `installer/steps/plugins.ts` (`applyPlugins`): after it runs, read `claude plugin list --json` and record a failure
+- `tools/installer/core/plugins.ts:72`: `INCLUDED` becomes `['self-review']`.
+- `tools/installer/core/plugins.test.ts:30-55,63`, `tools/installer/core/options.test.ts:24-31`: expectations.
+- `tools/installer/steps/plugins.ts` (`applyPlugins`): after it runs, read `claude plugin list --json` and record a failure
   naming any pack still installed (Review Focus 4). The pure check `stillInstalled(rows, packs)` goes in `core/plugins.ts`
   with a test.
 - `scripts/flows-uses.mjs` and its test:
   - `packs(root)` lists `plugins/flows/packs/*`;
   - `checkUses` resolves a `uses.json` key that is a pack to its folder;
   - `expectedDeps` leaves packs out.
-- `installer/install.ts:149`: comment that the flows default now keys on self-review only.
+- `tools/installer/install.ts:149`: comment that the flows default now keys on self-review only.
 
 - [ ] Failing tests first:
   - `checkUses` accepts `{"superpowers": ["writing-plans"]}` with no marketplace entry and rejects
@@ -321,7 +321,7 @@ Changes per conductor:
 ### Task 11: Final measurement and the owner's verdict
 
 - [ ] The owner merges and cuts a release (`npm run release -- patch`, then `! git push --follow-tags origin main`).
-      The installer pins the marketplace to its own release tag (`installer/core/release.ts:10`), so a branch build would
+      The installer pins the marketplace to its own release tag (`tools/installer/core/release.ts:10`), so a branch build would
       install the old flows.
 - [ ] The owner runs that release's installer. Then `claude plugin list --json` must show no pack installed and flows
       at the new version.

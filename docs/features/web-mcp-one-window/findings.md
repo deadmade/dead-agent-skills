@@ -10,7 +10,7 @@ Task 1's throwaway spike, run 2026-10-30.
 ## Downloads
 
 - **agent-browser:** `agent-browser-win32-x64.exe` v0.39.4, sha256
-  `be19a109a004f84c367d7913c22b8046390b3e0e5241f9f6c7e83c7bacd22aae`. It matches `installer/assets/agent-browser.json`.
+  `be19a109a004f84c367d7913c22b8046390b3e0e5241f9f6c7e83c7bacd22aae`. It matches `tools/installer/assets/agent-browser.json`.
 - **The extension zip:** `ISDCAC-chrome-source.zip` v1.1.9, 539792 bytes, `EXTENSION_SHA256`
   `8f70ab947cb2d274f4022a970f5dd3cecd8ec02b060e05187bef9ee3cb18bbcb`.
 - **Its layout:**
@@ -57,7 +57,7 @@ Task 1's throwaway spike, run 2026-10-30.
 The tab was closed from outside, through CDP `Target.closeTarget`.
 
 - **A single call** (`get url`, and also `open` and `tab close`) exits 1 with:
-  `{"success":false,"data":{"lastUrl":"https://html.duckduckgo.com/html/","targetId":"1286B38370EA2D730F17516A9B3639FD"},"error":"tab_gone: bound tab is gone (target 1286B38370EA2D730F17516A9B3639FD, last url https://html.duckduckgo.com/html/). Run `agent-browser tab new <url>` to bind a new tab, or `agent-browser tab list` to pick an existing one","code":"tab_gone"}`
+  `{"success":false,"data":{"lastUrl":"https://html.duckduckgo.com/html/","targetId":"1286B38370EA2D730F17516A9B3639FD"},"error":"tab_gone: bound tab is gone (target 1286B38370EA2D730F17516A9B3639FD, last url https://html.duckduckgo.com/html/). Run `agent-browser tab new <url>`to bind a new tab, or`agent-browser tab list` to pick an existing one","code":"tab_gone"}`
 - **A batch** fails every entry the same way, and exits 1:
   `{"code":"tab_gone","command":["get","url"],"error":"tab_gone: bound tab is gone (…same text…)","result":{"lastUrl":"https://html.duckduckgo.com/html/","targetId":"1286B38370EA2D730F17516A9B3639FD"},"success":false}`
 - **`tab new` rebinds:** it answered `{"success":true,"data":{…,"tabId":"t4","targetId":"DE8D…","total":2,"url":"about:blank"}}`,
@@ -127,24 +127,24 @@ A harness in a `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` job, holding a non-inherited
 
 ## Assumptions
 
-| assumption | holds? | evidence |
-| --- | --- | --- |
-| The zip unpacks to a loadable extension | yes | manifest at the root; CDP lists the service worker |
-| The owner config opens one headed window, and `get cdp-url` gives a ws url | yes | one window, `ws://127.0.0.1:33853/devtools/browser/…` |
-| Attached sessions overlap, each in its own tab of that window | yes | parallel batches, distinct targetIds, one windowId |
-| `wait --timeout 3000` bounds the wait under `DEFAULT_TIMEOUT=8000` | yes | `Wait timed out after 3000ms` |
-| `tab close` + `close` of one session leave the owner and the window | yes | the other tabs and the owner answered afterwards |
-| `close` on `--cdp` only disconnects, never closes the tab | yes | session `e`'s tab stayed |
-| `tab_gone` is a top-level `code`, and a `code` per batch entry | yes | the JSON above |
-| `tab new` rebinds after `tab_gone` | yes | `tab new`, then `open`, succeeded |
-| A window closed by hand makes a TCP connect to the port fail | **no** | Chrome stays alive without a window and the port accepts; calls get `tab_gone`, and `tab new` opens a new window |
-| A dead Chrome makes the probe fail within 500 ms | yes, by timeout | Windows reports the refusal after about 2 s |
-| `close` of an old generation's attached session works after its Chrome died | **no** | it returns the connect fixture and the daemon stays; it works without `--cdp` |
-| `close` on a session without a daemon starts no daemon or Chrome | **no**, for attached sessions | the owner starts none; an attached session starts a daemon and leaks a tab (Chrome live) or the daemon (Chrome dead) |
-| Owner calls never relaunch Chrome on their own | **no** | the owner's `get url` after the kill relaunched Chrome on a new port |
-| Bing shows results with the extension | yes | 10 results, no banner |
-| Google's consent is handled | answered | `SOCS` set, dialogs hidden; the search was blocked by `/sorry` |
-| The kill-on-close job takes the daemon and Chrome | yes | all gone after the hard kill |
+| assumption                                                                  | holds?                        | evidence                                                                                                             |
+| --------------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| The zip unpacks to a loadable extension                                     | yes                           | manifest at the root; CDP lists the service worker                                                                   |
+| The owner config opens one headed window, and `get cdp-url` gives a ws url  | yes                           | one window, `ws://127.0.0.1:33853/devtools/browser/…`                                                                |
+| Attached sessions overlap, each in its own tab of that window               | yes                           | parallel batches, distinct targetIds, one windowId                                                                   |
+| `wait --timeout 3000` bounds the wait under `DEFAULT_TIMEOUT=8000`          | yes                           | `Wait timed out after 3000ms`                                                                                        |
+| `tab close` + `close` of one session leave the owner and the window         | yes                           | the other tabs and the owner answered afterwards                                                                     |
+| `close` on `--cdp` only disconnects, never closes the tab                   | yes                           | session `e`'s tab stayed                                                                                             |
+| `tab_gone` is a top-level `code`, and a `code` per batch entry              | yes                           | the JSON above                                                                                                       |
+| `tab new` rebinds after `tab_gone`                                          | yes                           | `tab new`, then `open`, succeeded                                                                                    |
+| A window closed by hand makes a TCP connect to the port fail                | **no**                        | Chrome stays alive without a window and the port accepts; calls get `tab_gone`, and `tab new` opens a new window     |
+| A dead Chrome makes the probe fail within 500 ms                            | yes, by timeout               | Windows reports the refusal after about 2 s                                                                          |
+| `close` of an old generation's attached session works after its Chrome died | **no**                        | it returns the connect fixture and the daemon stays; it works without `--cdp`                                        |
+| `close` on a session without a daemon starts no daemon or Chrome            | **no**, for attached sessions | the owner starts none; an attached session starts a daemon and leaks a tab (Chrome live) or the daemon (Chrome dead) |
+| Owner calls never relaunch Chrome on their own                              | **no**                        | the owner's `get url` after the kill relaunched Chrome on a new port                                                 |
+| Bing shows results with the extension                                       | yes                           | 10 results, no banner                                                                                                |
+| Google's consent is handled                                                 | answered                      | `SOCS` set, dialogs hidden; the search was blocked by `/sorry`                                                       |
+| The kill-on-close job takes the daemon and Chrome                           | yes                           | all gone after the hard kill                                                                                         |
 
 The spike's scripts are in the session scratchpad (`spike/scripts`). The tab closed by hand and the window closed by
 hand were simulated: the tab with CDP `Target.closeTarget`, and the window with WM_CLOSE through `CloseMainWindow`.

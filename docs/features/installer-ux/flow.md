@@ -28,10 +28,10 @@ and I cant even navigate back a page. Also enter and space can be a bit confusin
 
 ## Grounding
 
-- `installer/install.mjs` (543 lines): I/O + UI; page loop + review loop at `install.mjs:408-462`.
-- `installer/core.mjs`: pure decisions; `CATEGORIES` / `categorize` at `core.mjs:240-262`, `HINTS` at `core.mjs:265`.
+- `tools/installer/install.mjs` (543 lines): I/O + UI; page loop + review loop at `install.mjs:408-462`.
+- `tools/installer/core.mjs`: pure decisions; `CATEGORIES` / `categorize` at `core.mjs:240-262`, `HINTS` at `core.mjs:265`.
 - `@clack/prompts` 1.8.1, `@clack/core` 1.5.1 (transitive) pinned in `npm-shrinkwrap.json`.
-- Tests: `node --test installer/*.test.mjs` (release.yml, flake.nix).
+- Tests: `node --test tools/installer/*.test.mjs` (release.yml, flake.nix).
 
 ## Prior art
 
@@ -73,19 +73,19 @@ None that change an interface or add a library. Rulings made during execution (l
 
 ## Walkthrough
 
-| spec goal                                                     | plan task | file:line                                               | test                                                                                                       |
-| ------------------------------------------------------------- | --------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Tab bar, active tab highlighted, per-tab counts               | 2         | `installer/tabs.mjs:51-57`                              | render shows full tab bar with counts                                                                      |
-| Short labels on narrow terminals                              | 2         | `installer/tabs.mjs:53,57`                              | render falls back to short labels                                                                          |
-| ←/→ switch tabs (wrap), cursor clamps                         | 1         | `installer/tabs.mjs:18-22`                              | move tabs wrap; move clamps cursor on tab switch                                                           |
-| ↑/↓ move (wrap), space toggles                                | 1         | `installer/tabs.mjs:23-27`                              | move up/down wrap; move space toggles focused item                                                         |
-| `a` toggles all, not on Danger                                | 1         | `installer/tabs.mjs:28-31`, `installer/core.mjs:253`    | move all selects all, then clears; move all is a no-op without bulk; categorize keeps bulk:false on danger |
-| Footer key legend, no `a all` on Danger                       | 2         | `installer/tabs.mjs:59`                                 | render shows blurb, detail and footer; render drops "a all" without bulk                                   |
-| Full description of focused item, normal color, no clipping   | 2, 4      | `installer/tabs.mjs:62`, `installer/install.mjs:403`    | render shows blurb, detail and footer                                                                      |
-| Danger items red                                              | 2         | `installer/tabs.mjs:66`                                 | render colors danger items red                                                                             |
-| Frame fits the terminal, list scrolls                         | 2 + fix   | `installer/tabs.mjs:68-73`                              | render fits short terminals; render fits narrow terminals once clack word-wraps it                         |
-| Enter → review; esc/ctrl-c quits                              | 3, 4      | `installer/tabs.mjs:80-93`, `installer/install.mjs:424` | chooseTabs returns picks and last tab; chooseTabs cancels on escape                                        |
-| Review: Apply / Back to choices (same tab, picks kept) / Quit | 3, 4      | `installer/install.mjs:422-447`                         | chooseTabs resolves its input on plain enter; pty run (ledger Task 4)                                      |
-| Always-installed note kept                                    | 4         | `installer/install.mjs:420-421`                         | pty run                                                                                                    |
-| `@clack/core` pinned 1.5.1                                    | 3         | `package.json`, `npm-shrinkwrap.json`                   | repo checks                                                                                                |
-| README describes the new flow                                 | 4         | `README.md:31-33`                                       | —                                                                                                          |
+| spec goal                                                     | plan task | file:line                                                           | test                                                                                                       |
+| ------------------------------------------------------------- | --------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Tab bar, active tab highlighted, per-tab counts               | 2         | `tools/installer/tabs.mjs:51-57`                                    | render shows full tab bar with counts                                                                      |
+| Short labels on narrow terminals                              | 2         | `tools/installer/tabs.mjs:53,57`                                    | render falls back to short labels                                                                          |
+| ←/→ switch tabs (wrap), cursor clamps                         | 1         | `tools/installer/tabs.mjs:18-22`                                    | move tabs wrap; move clamps cursor on tab switch                                                           |
+| ↑/↓ move (wrap), space toggles                                | 1         | `tools/installer/tabs.mjs:23-27`                                    | move up/down wrap; move space toggles focused item                                                         |
+| `a` toggles all, not on Danger                                | 1         | `tools/installer/tabs.mjs:28-31`, `tools/installer/core.mjs:253`    | move all selects all, then clears; move all is a no-op without bulk; categorize keeps bulk:false on danger |
+| Footer key legend, no `a all` on Danger                       | 2         | `tools/installer/tabs.mjs:59`                                       | render shows blurb, detail and footer; render drops "a all" without bulk                                   |
+| Full description of focused item, normal color, no clipping   | 2, 4      | `tools/installer/tabs.mjs:62`, `tools/installer/install.mjs:403`    | render shows blurb, detail and footer                                                                      |
+| Danger items red                                              | 2         | `tools/installer/tabs.mjs:66`                                       | render colors danger items red                                                                             |
+| Frame fits the terminal, list scrolls                         | 2 + fix   | `tools/installer/tabs.mjs:68-73`                                    | render fits short terminals; render fits narrow terminals once clack word-wraps it                         |
+| Enter → review; esc/ctrl-c quits                              | 3, 4      | `tools/installer/tabs.mjs:80-93`, `tools/installer/install.mjs:424` | chooseTabs returns picks and last tab; chooseTabs cancels on escape                                        |
+| Review: Apply / Back to choices (same tab, picks kept) / Quit | 3, 4      | `tools/installer/install.mjs:422-447`                               | chooseTabs resolves its input on plain enter; pty run (ledger Task 4)                                      |
+| Always-installed note kept                                    | 4         | `tools/installer/install.mjs:420-421`                               | pty run                                                                                                    |
+| `@clack/core` pinned 1.5.1                                    | 3         | `package.json`, `npm-shrinkwrap.json`                               | repo checks                                                                                                |
+| README describes the new flow                                 | 4         | `README.md:31-33`                                                   | —                                                                                                          |

@@ -27,13 +27,13 @@ phase: done
 ## Grounding
 
 - Language support today is only the LSP opt-ins: `rust-analyzer-lsp` and `csharp-lsp` from claude-plugins-official
-  (`installer/core.mjs:6-13`, binary table `:234-243`, `lsp` category `:313-318`). No plugin skill targets one
+  (`tools/installer/core.mjs:6-13`, binary table `:234-243`, `lsp` category `:313-318`). No plugin skill targets one
   language. tob-picks (staged on `feat/tob-picks`) only has language references inside sharp-edges
   (`lang-rust.md`, `lang-csharp.md`). Its sync skips trailofbits `rust-review`, `modern-cpp` and `modern-python`
   (`scripts/sync-tob.mjs` `SKIPPED`).
 - What a new plugin has to touch: a `marketplace.json` entry, `plugins/<name>/.claude-plugin/plugin.json` (same
-  version as package.json), an `installer/core.mjs` `CATEGORIES` key (`:299-311`, otherwise it lands in "Other"),
-  the opt-ins list in `installer/core.test.mjs:53-70`, and the README opt-in list. A vendored plugin also needs
+  version as package.json), an `tools/installer/core.mjs` `CATEGORIES` key (`:299-311`, otherwise it lands in "Other"),
+  the opt-ins list in `tools/installer/core.test.mjs:53-70`, and the README opt-in list. A vendored plugin also needs
   `scripts/sync-<x>.mjs` (shape: sparseClone → fail on missing → reportNew → copy → REWRITES → finish),
   `.github/workflows/sync-<x>.yml`, UPSTREAM/LICENSE, THIRD_PARTY.md, the CLAUDE.md vendored list, and the
   `flake.nix:20`/`treefmt.toml:8` excludes. `check-repo.mjs` needs no change.
@@ -212,16 +212,16 @@ Each of these was ruled during execution and logged in the SDD ledger. None chan
 
 ## Walkthrough
 
-| spec goal                                                       | plan task | file:line                                                                                                         | test                                                                       |
-| --------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Two opt-in plugins under `plugins/languages/`                   | T5, T6    | `.claude-plugin/marketplace.json`, `plugins/languages/*/.claude-plugin/plugin.json`                               | `installer/core.test.mjs` opt-ins, check-repo                              |
-| Routers over an unscanned library; `paths` kept                 | T1, T6    | `scripts/sync-csharp.mjs` (`ROUTERS`, `renderRouter`), `plugins/languages/csharp-skills/skills/*/SKILL.md`        | `scripts/sync-csharp.test.mjs`; `claude -p` listing check (6 routers only) |
-| Weekly sync from main, fails loudly on drift                    | T5, T6    | `scripts/sync-rust.mjs`, `scripts/sync-csharp.mjs`, `.github/workflows/sync-{rust,csharp}.yml`                    | idempotence reruns; sync-csharp tests                                      |
-| New upstream skills and plugins picked up (unmapped go to core) | T6        | `scripts/sync-csharp.mjs` (`assignRouter`)                                                                        | `assignRouter` test                                                        |
-| Hidden skills out of the indexes                                | T6        | `scripts/sync-csharp.mjs` (`isHidden`)                                                                            | `isHidden` test; 98 of 102 indexed                                         |
-| csharp-expert install advice rewritten                          | T6        | `scripts/sync-csharp.mjs` (`REWRITES`, `SUMMARY_OVERRIDES`)                                                       | must-match rewrites; override test                                         |
-| Description parsing for indexes                                 | T3        | `scripts/sync-lib.mjs` (`frontmatterDescription`, `summary`)                                                      | `scripts/sync-lib.test.mjs`                                                |
-| Nested plugin dirs in check-repo, release and installer         | T2        | `scripts/plugin-dirs.mjs`, `scripts/check-repo.mjs`, `scripts/release.mjs`, `installer/core.mjs` (`manifestPath`) | `scripts/plugin-dirs.test.mjs`, `installer/core.test.mjs`                  |
-| Installer "Languages" page                                      | T4        | `installer/core.mjs` `CATEGORIES` (`lsp`)                                                                         | `installer/core.test.mjs`                                                  |
-| Before/after test                                               | T8        | `plugins/languages/*/evals/`, `docs/features/language-skills/agreement.mjs`, `eval-results.md`                    | the eval run itself (0/12 questions qualified)                             |
-| Docs and excludes                                               | T7        | README, THIRD_PARTY, CLAUDE.md, `flake.nix`, `treefmt.toml`                                                       | `npm test`; prettier check                                                 |
+| spec goal                                                       | plan task | file:line                                                                                                               | test                                                                       |
+| --------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Two opt-in plugins under `plugins/languages/`                   | T5, T6    | `.claude-plugin/marketplace.json`, `plugins/languages/*/.claude-plugin/plugin.json`                                     | `tools/installer/core.test.mjs` opt-ins, check-repo                        |
+| Routers over an unscanned library; `paths` kept                 | T1, T6    | `scripts/sync-csharp.mjs` (`ROUTERS`, `renderRouter`), `plugins/languages/csharp-skills/skills/*/SKILL.md`              | `scripts/sync-csharp.test.mjs`; `claude -p` listing check (6 routers only) |
+| Weekly sync from main, fails loudly on drift                    | T5, T6    | `scripts/sync-rust.mjs`, `scripts/sync-csharp.mjs`, `.github/workflows/sync-{rust,csharp}.yml`                          | idempotence reruns; sync-csharp tests                                      |
+| New upstream skills and plugins picked up (unmapped go to core) | T6        | `scripts/sync-csharp.mjs` (`assignRouter`)                                                                              | `assignRouter` test                                                        |
+| Hidden skills out of the indexes                                | T6        | `scripts/sync-csharp.mjs` (`isHidden`)                                                                                  | `isHidden` test; 98 of 102 indexed                                         |
+| csharp-expert install advice rewritten                          | T6        | `scripts/sync-csharp.mjs` (`REWRITES`, `SUMMARY_OVERRIDES`)                                                             | must-match rewrites; override test                                         |
+| Description parsing for indexes                                 | T3        | `scripts/sync-lib.mjs` (`frontmatterDescription`, `summary`)                                                            | `scripts/sync-lib.test.mjs`                                                |
+| Nested plugin dirs in check-repo, release and installer         | T2        | `scripts/plugin-dirs.mjs`, `scripts/check-repo.mjs`, `scripts/release.mjs`, `tools/installer/core.mjs` (`manifestPath`) | `scripts/plugin-dirs.test.mjs`, `tools/installer/core.test.mjs`            |
+| Installer "Languages" page                                      | T4        | `tools/installer/core.mjs` `CATEGORIES` (`lsp`)                                                                         | `tools/installer/core.test.mjs`                                            |
+| Before/after test                                               | T8        | `plugins/languages/*/evals/`, `docs/features/language-skills/agreement.mjs`, `eval-results.md`                          | the eval run itself (0/12 questions qualified)                             |
+| Docs and excludes                                               | T7        | README, THIRD_PARTY, CLAUDE.md, `flake.nix`, `treefmt.toml`                                                             | `npm test`; prettier check                                                 |

@@ -335,7 +335,7 @@ Conflicts:
 
 Missing:
 
-- Hand-run mutation testing that is always available when no mutation tool is installed. Closest: csharp-skills:piece/test-gap-analysis (opt-in pack, installer/core/options.ts:67); superpowers writing-good-tests.md:15… Upstream: upstream:trailofbits/trailmark/genotoxic (needs trailmark and necessist)
+- Hand-run mutation testing that is always available when no mutation tool is installed. Closest: csharp-skills:piece/test-gap-analysis (opt-in pack, tools/installer/core/options.ts:67); superpowers writing-good-tests.md:15… Upstream: upstream:trailofbits/trailmark/genotoxic (needs trailmark and necessist)
 - A map from requirements to tests: which stated behaviours no test checks. Closest: tob-picks:workflow/spec-compliance finds enforcement lines in the code, not tests (spec-compliance-checker.md:14). csha… Upstream: None in the catalog.
 - Detecting flaky tests by repeated runs and order shuffles. The baseline promises 'flaky' (test-audit:15). Closest: superpowers find-polluter.sh (npm only); test-anti-patterns' static flakiness indicators (:142-143); the workflows doc'… Upstream: None in the catalog.
 - Coverage-guided fuzzing for parsers and codecs, which PBT excludes. Closest: tob-picks:property-based-testing, which says 'Not for coverage-guided binary fuzzing (libFuzzer, AFL)' (SKILL.md:4) Upstream: upstream:trailofbits/testing-handbook-skills/cargo-fuzz, harness-writing, atheris
@@ -404,7 +404,7 @@ Missing:
 - A 'check' home: turn a mechanical lesson into a test, lint or CI rule, proved against the past mistake. Closest: Nothing in /learn. superpowers test-driven-development writes the test once a build flow (/fix-flow or /implement) take… Upstream: mattpocock retro (skills/engineering/retro/SKILL.md:18-19 at 49dd158); pstack correct (skills/correct/SKILL.md:17-26) and principle-encode-…
 - A 'skill or conductor' home: a lesson about how a conductor or vendored skill behaved, routed to the conductor text or a sync transform and never to the vendored file. Example: the deviation rule tha… Closest: superpowers writing-skills (TDD for skill text) inside a build flow; diagnosing-superpowers' github-issues reference, w… Upstream: pstack reflect (skills/reflect/SKILL.md:47-62 at 4e5b1cf), which uses Cursor-specific paths
 - Rulings that survive until /learn runs. SDD and executing-plans delete their ledger at finish, so the decisions taken for the owner exist only in one final message. Closest: pstack-picks show-me-your-work: an append-only decision log kept out of git (SKILL.md:48, 54). Upstream: none
-- Stored lessons that stay fresh. The only docs/solutions note names installer/install.mjs and installer/core.mjs (agent-browser-install-never-retried.md:3,9). Both have been gone since c07ea4e on 2026… Closest: claude-md-improver's Currency criterion, which covers CLAUDE.md only (SKILL.md:47); /doctor prompt-audit, which covers … Upstream: none
+- Stored lessons that stay fresh. The only docs/solutions note names tools/installer/install.mjs and tools/installer/core.mjs (agent-browser-install-never-retried.md:3,9). Both have been gone since c07ea4e on 2026… Closest: claude-md-improver's Currency criterion, which covers CLAUDE.md only (SKILL.md:47); /doctor prompt-audit, which covers … Upstream: none
 
 Conflicts:
 

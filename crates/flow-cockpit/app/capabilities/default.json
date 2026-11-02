@@ -1,0 +1,31 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The main window: Tauri's core defaults, with the app's own commands.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-projects",
+    "allow-entries",
+    "allow-flow-run",
+    "allow-doc",
+    "allow-session",
+    "allow-tool-input",
+    "allow-tool-result",
+    "allow-views",
+    "allow-view-source",
+    "allow-extensions",
+    "allow-preview-command",
+    "allow-start-session",
+    "allow-resume-session",
+    "allow-send-input",
+    "allow-resize-session",
+    "allow-kill-session",
+    "allow-hosted-sessions",
+    "allow-subscribe-session",
+    "allow-scrollback",
+    "allow-confirm-close",
+    "allow-background-tasks",
+    "allow-background-output"
+  ]
+}

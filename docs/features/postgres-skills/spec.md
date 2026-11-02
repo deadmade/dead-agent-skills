@@ -58,7 +58,7 @@ More database plugins may follow, so this one starts a new `plugins/database/` g
   - Entries in THIRD_PARTY.md and the CLAUDE.md vendored list.
   - The `flake.nix` and `treefmt.toml` excludes.
 - **One version for everything:** the new `plugin.json` carries the repo version. `check-repo.mjs` enforces this.
-- **Installer:** changes go in `installer/core.mjs` with tests. No npm dependencies.
+- **Installer:** changes go in `tools/installer/core.mjs` with tests. No npm dependencies.
 - **Context cost:** plugin skills are listed in every project (ADR 0001). This plugin adds two descriptions, and only
   for users who opt in.
 - **Branch:** `feat/language-skills` is merged into `main` first. This work then goes on a fresh branch off `main`.

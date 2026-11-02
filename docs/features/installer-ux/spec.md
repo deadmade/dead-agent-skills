@@ -4,7 +4,7 @@ Approved 2026-10-11 (Gate 1).
 
 ## Context
 
-`installer/install.mjs` walks 6 category pages of `p.multiselect` in a fixed order (`install.mjs:408-462`).
+`tools/installer/install.mjs` walks 6 category pages of `p.multiselect` in a fixed order (`install.mjs:408-462`).
 The user can't go back a page, doesn't see where they are or what comes next, finds the dim (grey) hints hard to
 read, and is confused that space toggles while enter leaves the page. clack 1.8.1 has no back navigation or tab
 prompt ([clack#39](https://github.com/bombshell-dev/clack/issues/39), open). Goal: one tabbed screen to pick
@@ -12,8 +12,8 @@ everything, then the existing review.
 
 ## Grounding
 
-- `installer/install.mjs`: I/O + UI; `installer/core.mjs`: pure decisions (`CATEGORIES`, `categorize`, `HINTS`,
-  `TOGGLES`, `unavailable`), tested in `core.test.mjs` with `node:test`. Tests run via `node --test installer/*.test.mjs`
+- `tools/installer/install.mjs`: I/O + UI; `tools/installer/core.mjs`: pure decisions (`CATEGORIES`, `categorize`, `HINTS`,
+  `TOGGLES`, `unavailable`), tested in `core.test.mjs` with `node:test`. Tests run via `node --test tools/installer/*.test.mjs`
   (release.yml, flake.nix).
 - UI deps: `@clack/prompts` 1.8.1; `@clack/core` 1.5.1 already in `npm-shrinkwrap.json` (transitive).
 - `@clack/core` exports `Prompt` (events `cursor: (Action)`, `key: (char, info)`, `state`, `value`, `prompt()`),
@@ -74,7 +74,7 @@ everything, then the existing review.
 
 ### Code
 
-- New `installer/tabs.mjs`:
+- New `tools/installer/tabs.mjs`:
   - `move(state, action, pages)` pure: `{ tab, cursor, chosen }` → new state.
   - `render(state, pages, { width, describe })` pure → string.
   - `chooseTabs({ pages, chosen, tab, describe })`: a plain `@clack/core` `Prompt` wiring cursor/key events to
@@ -86,10 +86,10 @@ everything, then the existing review.
 
 ### Testing
 
-- `installer/tabs.test.mjs` (`node:test`): tab wrap, cursor clamp on tab switch, space toggle, `a` toggle-all and
+- `tools/installer/tabs.test.mjs` (`node:test`): tab wrap, cursor clamp on tab switch, space toggle, `a` toggle-all and
   its no-op on Danger, tab counts in render, narrow-width fallback, danger items red, footer without `a` on Danger.
 - Existing `core.test.mjs` keeps passing.
-- Manual: `node installer/install.mjs` in a terminal: switch tabs, toggle, enter → review → Back to choices keeps
+- Manual: `node tools/installer/install.mjs` in a terminal: switch tabs, toggle, enter → review → Back to choices keeps
   picks → Quit (no changes made).
 
 ### Out of scope

@@ -19,7 +19,7 @@ No fix before the cause is known and agreed, and no fix without a test that fail
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: `docs/features/<slug>/flow.md` from
 [build-template.md](../../references/build-template.md), `flow: fix`, phases `reproduce | ground | cause | fix |
-finish | done`. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack is its `pstack-picks` folder).
+finish | done`. Packs: `<flow-root>/packs` (pstack is its `pstack-picks` folder).
 
 ## Start or resume
 
@@ -46,7 +46,7 @@ In one message:
 
 Follow superpowers `systematic-debugging` with the reproduction and the grounding. It ends with a root cause backed
 by evidence (a log line, a value, a bisect), not a guess. **Gate:** present the cause, the fix options (each with
-what blast-radius says it touches and the files it changes) and your recommendation. The user approves one. Its
+what blast-radius says it touches and the files it changes) and your recommendation. The user approves one; record it as a gate line (`- Gate 1, <what>: <date>`). Its
 `<packs>/superpowers/skills/systematic-debugging/defense-in-depth.md` (validation at every layer) is one of those
 options only when you offer it and the user picks it; otherwise the cause is fixed once.
 <!-- overrides superpowers/skills/systematic-debugging/defense-in-depth.md: "Core principle: Validate at EVERY layer data passes through. Make the bug structurally impossible." -->

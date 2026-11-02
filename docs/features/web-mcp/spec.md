@@ -17,7 +17,7 @@ ranks and archives.
 ## Goals
 
 1. **One stdio MCP server in Rust** (`rmcp`, tokio, reqwest with rustls), shipped as the plugin `plugins/web-mcp`
-   with its binary built and downloaded like brv (`installer/core.mjs:304-321`, `build-brv.yml`, `release.yml`),
+   with its binary built and downloaded like brv (`tools/installer/core.mjs:304-321`, `build-brv.yml`, `release.yml`),
    for the same platforms as brv _(my call)_. Every tool result opens with a source line (URL, fetch time) that marks
    what follows as untrusted page content _(my call: word-for-word pages give prompt injection more room than
    summaries)_.
@@ -73,7 +73,7 @@ ranks and archives.
    - **SearXNG:** when Docker is present, the installer starts it: restart unless stopped, bound to 127.0.0.1 only,
      with a mounted `settings.yml` that turns on the JSON format (off in SearXNG's default config). Without Docker it
      prints the instructions (Q4).
-   - **agent-browser:** pinned like cswap. The version lives in `installer/agent-browser.json`; the installer
+   - **agent-browser:** pinned like cswap. The version lives in `tools/installer/agent-browser.json`; the installer
      installs it and its Chromium; a weekly sync workflow opens the bump PR (Q5).
 9. **Built-in tools off on request.** An installer option, on by default with web-mcp, denies `WebFetch` and
    `WebSearch` (a bare deny removes them from context, per the plan's verified facts). It applies only when SearXNG
