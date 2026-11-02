@@ -321,7 +321,10 @@ fn old_flow_md_files_load() {
 
 /// The part of a template inside its markdown code fence.
 fn template_body(path: &str) -> String {
-    let text = fs::read_to_string(repo_root().join(path)).unwrap();
+    // A Windows checkout has CRLF line endings.
+    let text = fs::read_to_string(repo_root().join(path))
+        .unwrap()
+        .replace("\r\n", "\n");
     let start = text.find("```markdown\n").unwrap() + "```markdown\n".len();
     let end = text.rfind("\n```").unwrap();
     text[start..end].to_string()
