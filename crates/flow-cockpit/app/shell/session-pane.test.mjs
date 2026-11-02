@@ -52,6 +52,10 @@ Object.defineProperty(globalThis, 'navigator', { value: window.navigator, config
 const { mountSessionPane } = await import('./session-pane.js');
 
 const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Waits until `ok()` holds, up to `ms`: xterm draws asynchronously, and a fixed pause is too short on a loaded runner. */
+const until = async (ok, ms = 2000) => {
+  for (const end = Date.now() + ms; !ok() && Date.now() < end; ) await settle(10);
+};
 const bytes = (text) => [...new TextEncoder().encode(text)];
 /** What the pane has drawn, from xterm's own DOM renderer. */
 const screen = (pane) => pane.element.querySelector('.xterm-rows')?.textContent ?? '';
@@ -143,6 +147,7 @@ test('priming_does_not_send_terminal_replies', async () => {
   const pane = mountSessionPane(freshId(), api);
   await settle();
   assert.deepEqual(sent, [], 'nothing the replay made xterm answer reaches the PTY');
+  await until(() => screen(pane).includes('hello'));
   assert.ok(screen(pane).includes('hello'));
 
   // Past the replay, the same query is live and its answer is wanted: claude asked.
