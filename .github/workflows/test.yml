@@ -67,13 +67,19 @@ jobs:
           echo "$out"
           [ "$code" = 1 ] && grep -q 'Run this in a terminal' <<< "$out"
 
+      # The Claude packages are generated from plugins/, which holds the sources and their tests, so each is tested with
+      # its tests copied in.
       - name: dead-skills mod tests
-        working-directory: plugins/default
-        run: claude plugin test .
+        run: |
+          cp plugins/default/hooks/*.test.* .claude-plugin/dead-skills/hooks/
+          cd .claude-plugin/dead-skills
+          claude plugin test .
 
       - name: md-pane mod tests
-        working-directory: plugins/opt-in/md-pane
-        run: claude plugin test .
+        run: |
+          cp plugins/opt-in/md-pane/hooks/*.test.* .claude-plugin/md-pane/hooks/
+          cd .claude-plugin/md-pane
+          claude plugin test .
 
       - name: headroom-trim server tests
         working-directory: plugins/opt-in/headroom-trim/server
