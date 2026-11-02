@@ -78,7 +78,7 @@
     },
     "resources": [],
     "dependencies": [],
-    "targets": ["claude-code", "codex"]
+    "targets": ["codex"]
   },
   {
     "name": "nix-lsp",

@@ -1,6 +1,6 @@
 ---
 name: feature-flow
-description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /feature-flow <what to build>; no argument resumes the active feature, a run's slug resumes that run."
+description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /feature-flow [what to build]; no argument resumes the active feature, a run's slug resumes that run."
 disable-model-invocation: true
 argument-hint: "What do you want to build (or a run's slug)?"
 ---

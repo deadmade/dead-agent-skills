@@ -1,6 +1,6 @@
 ---
 name: implement
-description: 'Build from a plan, spec or ticket that already exists, without the design phases of /feature-flow: turn a spec into tickets or a plan if needed, approve the plan, execute it test-first through superpowers, then /verify and /learn. One approval gate, resumable. Use for /implement <path to plan, spec or ticket>; no argument resumes.'
+description: 'Build from a plan, spec or ticket that already exists, without the design phases of /feature-flow: turn a spec into tickets or a plan if needed, approve the plan, execute it test-first through superpowers, then /verify and /learn. One approval gate, resumable. Use for /implement [path to plan, spec or ticket]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: 'Path to a plan, spec or ticket'
 ---

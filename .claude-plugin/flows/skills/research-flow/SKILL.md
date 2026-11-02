@@ -1,6 +1,6 @@
 ---
 name: research-flow
-description: "Build a feature on scientific evidence: ground it in the code and in papers, brainstorm options that cite an evidence table, state a falsifiable hypothesis with a metric, grill, plan, evaluate, execute, then measure the result against the hypothesis before finishing. Runs feature-flow's phases with research added. Two approval gates, no lock. Use for /research-flow <what to build>; no argument resumes the active research feature, a run's slug resumes that run."
+description: "Build a feature on scientific evidence: ground it in the code and in papers, brainstorm options that cite an evidence table, state a falsifiable hypothesis with a metric, grill, plan, evaluate, execute, then measure the result against the hypothesis before finishing. Runs feature-flow's phases with research added. Two approval gates, no lock. Use for /research-flow [what to build]; no argument resumes the active research feature, a run's slug resumes that run."
 disable-model-invocation: true
 argument-hint: "What do you want to build, and what should the research answer (or a run's slug)?"
 ---

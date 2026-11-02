@@ -1,6 +1,6 @@
 ---
 name: understand
-description: 'Learn a codebase, a subsystem or a concept by doing: map it (pstack how, graphify when a graph exists), learn why it is that way (pstack why), then a guided lesson through mattpocock teach where you write the key lines and Claude explains, and keep the terms you settled in GLOSSARY.md. Use for /understand <topic, path or concept>.'
+description: 'Learn a codebase, a subsystem or a concept by doing: map it (pstack how, graphify when a graph exists), learn why it is that way (pstack why), then a guided lesson through mattpocock teach where you write the key lines and Claude explains, and keep the terms you settled in GLOSSARY.md. Use for /understand [topic, path or concept].'
 disable-model-invocation: true
 argument-hint: 'What do you want to understand? (a path, a subsystem, a concept)'
 ---

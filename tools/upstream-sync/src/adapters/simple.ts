@@ -1,4 +1,4 @@
-import { addPaths, fail } from '../text.ts';
+import { addPaths, dropKeywords, fail } from '../text.ts';
 import type { SyncContext, AdapterResult } from '../types.ts';
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -94,7 +94,9 @@ export function run(ctx: SyncContext): AdapterResult {
         cpSync(join(up, f), join(dest, f));
       }
 
-      const out = addPaths(readFileSync(join(dest, 'SKILL.md'), 'utf8'), GLOBS);
+      // The marketplace rejects descriptions over 1024 characters; the keyword list is the part that goes first.
+      const trimmed = dropKeywords(readFileSync(join(dest, 'SKILL.md'), 'utf8'));
+      const out = addPaths(trimmed, GLOBS);
       if (out === null) fail(`${url}: unexpected SKILL.md frontmatter (no --- block, or paths: already present)`);
       writeFileSync(join(dest, 'SKILL.md'), out);
 

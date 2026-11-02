@@ -1,6 +1,6 @@
 ---
 name: writing
-description: "How to write and revise prose a person will read, by the method of Williams and Bizup's Style: Lessons in Clarity and Grace: a problem and a point up front, an order the reader needs, sentences about characters doing things, and nothing needless. Use when writing or revising specs, plans, reports, READMEs, PR descriptions, commit messages, or any answer longer than a few sentences, and for `copyedit <file.md>`: a fresh editor revises a document by this standard, and code checks that nothing it can see was lost."
+description: "How to write and revise prose a person will read, by the method of Williams and Bizup's Style: Lessons in Clarity and Grace: a problem and a point up front, an order the reader needs, sentences about characters doing things, and nothing needless. Use when writing or revising specs, plans, reports, READMEs, PR descriptions, commit messages, or any answer longer than a few sentences, and for `copyedit [file.md]`: a fresh editor revises a document by this standard, and code checks that nothing it can see was lost."
 argument-hint: '[copyedit <file.md>]'
 ---
 

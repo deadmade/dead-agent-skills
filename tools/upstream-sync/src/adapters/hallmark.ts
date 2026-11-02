@@ -66,7 +66,10 @@ function scopeDescription(text: string) {
     if (/^name:\s*hallmark\s*$/.test(line)) {
       named = true;
     } else if (/^description:\s*"/.test(line)) {
-      lines[i] = line.replace(/^description:\s*"/, () => `description: "${SCOPE} `);
+      // Angle brackets read as XML tags in the marketplace check, so `<path>` becomes `[path]`.
+      lines[i] = line
+        .replace(/^description:\s*"/, () => `description: "${SCOPE} `)
+        .replace(/<([^<>"]*)>/g, '[$1]');
       described = true;
     } else if (/^description:\s*[^"|>\s]/.test(line)) {
       const v = line.replace(/^description:\s*/, '').replaceAll('"', '\\"');

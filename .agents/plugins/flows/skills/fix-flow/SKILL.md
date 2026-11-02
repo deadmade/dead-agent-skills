@@ -1,6 +1,6 @@
 ---
 name: fix-flow
-description: 'Fix a bug from symptom to verified branch: reproduce it, map where it lives and what a fix could break, search upstream for the same issue, find the root cause with systematic debugging, approve it, write the failing regression test first, fix, then /verify and /learn. Resumable. Use for /fix-flow <symptom, error or issue>; no argument resumes.'
+description: 'Fix a bug from symptom to verified branch: reproduce it, map where it lives and what a fix could break, search upstream for the same issue, find the root cause with systematic debugging, approve it, write the failing regression test first, fix, then /verify and /learn. Resumable. Use for /fix-flow [symptom, error or issue]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: 'What is broken? (symptom, error text, issue link)'
 ---

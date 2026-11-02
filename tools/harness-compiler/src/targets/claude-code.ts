@@ -51,7 +51,6 @@ function manifest(context: EmitContext, mods: UiMod[]) {
     ...(m.license ? { license: m.license } : {}),
     ...(m.keywords ? { keywords: m.keywords } : {}),
     ...(dependencies.length ? { dependencies: [...new Set(dependencies)] } : {}),
-    ...(mods.find((mod) => mod.types) ? { types: `./${mods.find((mod) => mod.types)!.types}` } : {}),
     ...(Object.keys(m.config).length ? { userConfig: m.config } : {}),
     ...(existsSync(join(context.dest, 'skills')) ? { skills: './skills/' } : {}),
   };
