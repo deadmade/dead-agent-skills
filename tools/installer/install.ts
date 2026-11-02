@@ -55,7 +55,7 @@ import {
   tryJson,
 } from './context.ts';
 import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
-import { HEADROOM_TRIM, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
+import { HEADROOM_TRIM, installGraphify, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
 import { MCP_AZURE, FLOW_COCKPIT, TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
@@ -297,9 +297,11 @@ const webBuiltinsOff = webBuiltinsDecision({
   installed: has(WEB_MCP),
   healthy: browser.works,
 });
-if (selected.includes(HEADROOM_TRIM)) {
+const withGraphify = selected.some((id) => nameOf(id) === 'graphify');
+if (selected.includes(HEADROOM_TRIM) || withGraphify) {
   const uv = await installUv();
-  if (uv) await prepareTrimServer(uv);
+  if (uv && selected.includes(HEADROOM_TRIM)) await prepareTrimServer(uv);
+  if (uv && withGraphify) installGraphify(uv);
 }
 
 const toggles = {

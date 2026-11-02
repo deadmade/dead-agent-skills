@@ -4,7 +4,7 @@
 // at once. Asks before a download; every failure is a summary line.
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { type UpstreamPin, uvAsset, uvPlan } from '../core/binaries.ts';
+import { GRAPHIFY_EXTRAS, GRAPHIFY_SPEC, type UpstreamPin, graphifyToolArgs, uvAsset, uvPlan } from '../core/binaries.ts';
 import {
   pluginDataDir,
   pluginInstallPath,
@@ -20,7 +20,7 @@ import { log, progress } from '../ui/ui.ts';
 import { BIN_DIR } from './binaries.ts';
 
 export const HEADROOM_TRIM = `headroom-trim@${MARKETPLACE}`;
-const OFF = 'headroom-trim stays off until uv is installed';
+const OFF = 'headroom-trim and graphify stay as they are until uv is installed';
 
 // The uv path in use, or undefined (a summary line says why).
 export async function installUv(): Promise<string | undefined> {
@@ -46,7 +46,7 @@ export async function installUv(): Promise<string | undefined> {
   }
   if (plan.download === 'skip') return bin;
   const what = plan.download === 'install' ? 'Download' : 'Upgrade';
-  if (!(await ask(`${what} uv ${pinned} (Astral's release binary) to ${bin} for headroom-trim?`, true))) {
+  if (!(await ask(`${what} uv ${pinned} (Astral's release binary) to ${bin} for headroom-trim and graphify?`, true))) {
     failures.push(`uv: install skipped by you; ${OFF}`);
     return undefined;
   }
@@ -99,4 +99,18 @@ export async function prepareTrimServer(uv: string): Promise<void> {
     failures.push(
       `headroom-trim: token counts are estimated until the installer fetches tiktoken's vocabulary (${errCode(fetched.error) ?? `exit ${fetched.status}`})`,
     );
+}
+
+// graphify's CLI, with its optional parsers, as a uv tool run by the installer's uv. Always upgraded, so a rerun picks up
+// a new graphifyy; a failure is a summary line.
+export function installGraphify(uv: string): void {
+  log('info', 'Installing graphify (uv tool install)');
+  const r = startSync(uv, graphifyToolArgs(), { stdio: 'inherit' });
+  if (r.status !== 0) {
+    failures.push(
+      `graphify: uv tool install failed (${errCode(r.error) ?? `exit ${r.status}`}); run it yourself: uv tool install ${GRAPHIFY_SPEC}`,
+    );
+    return;
+  }
+  done.push(`graphify: installed with the ${GRAPHIFY_EXTRAS.join(', ')} extras`);
 }

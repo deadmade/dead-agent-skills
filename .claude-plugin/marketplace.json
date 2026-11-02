@@ -27,7 +27,7 @@
     },
     {
       "name": "graphify",
-      "description": "Graphify: turn a codebase, docs and papers into a queryable knowledge graph (/graphify), plus hooks that nudge Claude to query the graph before reading files. Needs the graphify CLI (uv tool install graphifyy). Vendored from Graphify-Labs/graphify, synced weekly.",
+      "description": "Graphify: turn a codebase, docs and papers into a queryable knowledge graph (/graphify), plus hooks that nudge Claude to query the graph before reading files. Needs the graphify CLI (the installer installs it with uv, with the sql, pdf, office, watch and leiden extras). Vendored from Graphify-Labs/graphify, synced weekly.",
       "source": "./.claude-plugin/graphify",
       "category": "development"
     },
