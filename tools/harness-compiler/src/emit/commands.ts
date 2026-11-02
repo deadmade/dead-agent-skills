@@ -1,7 +1,7 @@
 // build: replace the owned generated trees. check: prove they are current without touching the checkout.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import type { Diagnostic } from '../model.ts';
 import { buildTree } from './build.ts';
 
@@ -13,7 +13,13 @@ const files = (dir: string, within = dir): Map<string, string> => {
   if (!existsSync(dir)) return found;
   for (const e of readdirSync(dir, { recursive: true, withFileTypes: true }))
     if (e.isFile())
-      found.set(join(e.parentPath, e.name).slice(within.length + 1), readFileSync(join(e.parentPath, e.name), 'hex'));
+      found.set(
+        join(e.parentPath, e.name)
+          .slice(within.length + 1)
+          .split(sep)
+          .join('/'),
+        readFileSync(join(e.parentPath, e.name), 'hex'),
+      );
   return found;
 };
 export const formatDiagnostic = (d: Diagnostic) => `[${[d.target, d.plugin].filter(Boolean).join('/')}] ${d.message}`;
