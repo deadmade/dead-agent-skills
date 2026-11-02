@@ -22,10 +22,8 @@ export function portableText(text: string, file: string, root: string): string {
 }
 
 // Per-target rewriting of every shipped Markdown file.
-export function transformMarkdown(target: TargetId, source: string, file: string, root: string): string {
+export function transformMarkdown(target: TargetId, text: string, file: string, root: string): string {
   const relativePath = relative(root, file).split(sep).join('/');
-  // A Windows checkout has CRLF sources, and the line rules match whole lines.
-  const text = source.replaceAll('\r\n', '\n');
   const ruled = applyRules(target, relativePath, text);
   // The neutral root token becomes the agent's own variable, or a relative path where there is none.
   return target === 'codex'

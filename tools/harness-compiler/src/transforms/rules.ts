@@ -93,7 +93,8 @@ export function applyEdit(text: string, edit: Edit): string {
 
 // `relative` is the file's path inside the plugin, with `/` separators.
 export function applyRules(target: TargetId, relative: string, text: string): string {
-  let result = text;
+  // A Windows checkout has CRLF sources, and the edits match whole lines.
+  let result = text.replaceAll('\r\n', '\n');
   for (const rule of RULES) if (rule.drop === target && rule.file === relative) result = applyEdit(result, rule.edit);
   return result;
 }
