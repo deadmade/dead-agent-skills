@@ -32,7 +32,11 @@ test('localize replaces an upstream disable-model-invocation instead of adding a
 });
 
 test('localize and stamp reproduce the vendored SKILL.md', () => {
-  const vendored = readFileSync(`${ROOT}/plugins/shared/agent-review/skills/agent-review/SKILL.md`, 'utf8');
+  // The sync writes LF; a Windows checkout of the vendored file has CRLF.
+  const vendored = readFileSync(`${ROOT}/plugins/shared/agent-review/skills/agent-review/SKILL.md`, 'utf8').replaceAll(
+    '\r\n',
+    '\n',
+  );
   const url = vendored.match(/<!-- Vendored from (\S+) /)[1];
   const upstreamish = vendored
     .replace(/\n<!-- Vendored from .*-->\n/, '')
