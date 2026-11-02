@@ -7,8 +7,16 @@ import type { SyncContext } from '../types.ts';
 export type ProcessRunner = (program: string, args: string[], cwd: string) => string;
 // Git variables (GIT_INDEX_FILE inside a commit hook, GIT_DIR, ...) point at the caller's repository, not at cwd.
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+// Upstream files are vendored byte for byte: a host's core.autocrlf (Git for Windows sets it) must not turn them into CRLF.
+const gitArgs = (program: string, args: string[]) =>
+  program === 'git' ? ['-c', 'core.autocrlf=false', ...args] : args;
 export const execute: ProcessRunner = (program, args, cwd) =>
-  execFileSync(program, args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: cleanEnv() }).trim();
+  execFileSync(program, gitArgs(program, args), {
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    env: cleanEnv(),
+  }).trim();
 
 export function createContext(
   root: string,
