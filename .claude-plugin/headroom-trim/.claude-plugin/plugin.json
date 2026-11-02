@@ -1,6 +1,6 @@
 {
   "name": "headroom-trim",
-  "version": "0.6.0",
+  "version": "0.6.8",
   "description": "Shrinks every tool result with headroom's no-ML lossy compression before Claude reads it, through a local trim server that runs offline. Needs uv, which the installer downloads. Opt-in.",
   "author": {
     "name": "deadmade",

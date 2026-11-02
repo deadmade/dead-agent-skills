@@ -1,6 +1,6 @@
 {
   "name": "agent-review",
-  "version": "0.6.0",
+  "version": "0.6.8",
   "description": "Checks agent work through verified artifacts, independent extractions and cold reviews. Used by the default bundle and flows.",
   "author": {
     "name": "deadmade",
