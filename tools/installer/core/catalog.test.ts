@@ -24,7 +24,7 @@ test('neutral catalog preserves names, default and dependency closure without na
       'atlassian',
     ],
   );
-  assert.equal(selectTarget(all, 'claude-code').plugins.length, 17);
+  assert.equal(selectTarget(all, 'claude-code').plugins.length, 16);
   assert.deepEqual(portableSelection(all, []), ['dead-skills']);
   assert.deepEqual(portableSelection(all, ['flows']), ['dead-skills', 'flows', 'graphify', 'web-mcp']);
   assert.deepEqual(portableSelection(all, ['flows', 'flows']), ['dead-skills', 'flows', 'graphify', 'web-mcp']);

@@ -214,8 +214,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   upstreams and fake GitHub responses. Historical generated-file ownership stamps retain their original script names.
 - `scripts/`: repository validation, releases, flow dependency generation and mascot artwork; upstream syncing lives
   in `tools/upstream-sync/`.
-  Atlassian is the only url-sourced marketplace entry, deliberately unpinned. The installer would read a pinned url
-  entry's version from its `ref` (`shippedVersions`).
+  Atlassian is Codex-only (`targets: ["codex"]` in `plugins/catalog.json`): its upstream repo ships every skill twice
+  (`skills/` and `skills/v1/`), which the Claude marketplace rejects as duplicate names. Claude Code users connect Atlassian
+  through the official connector. It is the only url-sourced entry, deliberately unpinned; the installer would read a
+  pinned url entry's version from its `ref` (`shippedVersions`).
 
 ## Vendored content: don't edit
 

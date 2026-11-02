@@ -39,7 +39,6 @@ test('opt-ins from the real manifests', () => {
     optIns(marketplace, bundle).sort(),
     [
       ...[
-        'atlassian',
         'csharp-skills',
         'flow-cockpit',
         'flows',

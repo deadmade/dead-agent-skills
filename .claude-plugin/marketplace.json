@@ -74,15 +74,6 @@
       "category": "productivity"
     },
     {
-      "name": "atlassian",
-      "description": "Atlassian MCP integration for Jira and Confluence.",
-      "source": {
-        "source": "url",
-        "url": "https://github.com/atlassian/atlassian-mcp-server.git"
-      },
-      "category": "productivity"
-    },
-    {
       "name": "nix-lsp",
       "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
       "source": "./.claude-plugin/nix-lsp",

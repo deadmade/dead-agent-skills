@@ -61,6 +61,17 @@ export function description(skillMd: string) {
 
 // Insert a `paths:` list before the closing `---` of the first frontmatter block.
 // Returns null when there is no frontmatter or `paths:` is already present.
+// In a block-scalar description, removes the `**Keywords:** ...` paragraph when the description exceeds the marketplace
+// limit of 1024 characters. Text without that paragraph or within the limit is returned as it is.
+export function dropKeywords(text: string, max = 1024) {
+  const m = /^description: \|\n((?: {2}.*\n|\n)+)/m.exec(text);
+  if (!m) return text;
+  const value = m[1].replace(/^ {2}/gm, '');
+  if (value.length <= max) return text;
+  const cut = m[1].replace(/^ {2}\*\*Keywords:\*\*.*\n\n?/m, '');
+  return text.replace(m[1], cut);
+}
+
 export function addPaths(text: string, globs: string[]) {
   const lines = text.split('\n');
   if (lines[0] !== '---') return null;
