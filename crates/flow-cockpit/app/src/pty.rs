@@ -47,6 +47,7 @@ const DRAIN_WAIT: Duration = Duration::from_millis(250);
 /// How much of a session's output is kept for a pane that connects later.
 const SCROLLBACK_BYTES: usize = 256 * 1024;
 /// How long the login shell gets to print its `PATH`.
+#[cfg(unix)]
 const LOGIN_SHELL_WAIT: Duration = Duration::from_secs(10);
 
 /// Where the child finds `claude`: the inherited `PATH`, and the shell that knows the user's own.
