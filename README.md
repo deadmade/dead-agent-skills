@@ -94,7 +94,8 @@ The installer (Node standard library only, written in TypeScript and attached to
 update, then applies only the changes. It points the marketplace at the `release` branch, which follows the newest
 release, so Claude Code updates the plugins on its own (rerun the installer for new tui-review and web-mcp binaries and the flow cockpit's Windows app), and
 it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). It
-lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own). Optional toggles add ccstatusline
+lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own) and
+compacts the context at 350K tokens (`autoCompactWindow`, unless you set your own; it only matters on 1M-context models). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
 Everything ships as one version. Every merge to main releases a patch; a bigger step is `npm run release -- minor`
 and `git push --follow-tags origin main`. The tag builds the installer and the binaries and publishes the GitHub

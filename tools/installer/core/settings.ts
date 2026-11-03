@@ -17,6 +17,7 @@ export interface Settings {
   env?: Record<string, string>;
   theme?: string;
   cleanupPeriodDays?: number;
+  autoCompactWindow?: number;
   [key: string]: unknown;
 }
 interface HookEntry {
@@ -77,6 +78,9 @@ export const hasDcgHook = (s: Settings) =>
   );
 
 const KEEP_SESSIONS_DAYS = 36500;
+// How full the context gets before Claude Code compacts on its own. Claude Code caps it at the model's window, so on a
+// 200K model it does nothing; on a 1M model it compacts at 350K.
+const AUTO_COMPACT_WINDOW = 350000;
 
 // True when text is JSON equal to any shipped config text (whitespace-insensitive).
 export const isShipped = (text: string, shippedTexts: string[]) => {
@@ -139,6 +143,8 @@ export function mergeSettings(settings: Settings, { statusLine, webBuiltinsOff }
   };
   // Claude Code deletes session transcripts after 30 days by default; a value set by hand wins.
   out.cleanupPeriodDays ??= KEEP_SESSIONS_DAYS;
+  // A window set by hand wins, and /autocompact still overrides it per model; the env var would lock that command out.
+  out.autoCompactWindow ??= AUTO_COMPACT_WINDOW;
   if (statusLine && !isOurStatusLine(out.statusLine)) out.statusLine = STATUS_LINE;
   if (!statusLine && isOurStatusLine(out.statusLine)) delete out.statusLine;
   if (out.sandbox) {
