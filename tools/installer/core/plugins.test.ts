@@ -54,9 +54,7 @@ test('opt-ins from the real manifests', () => {
         'tui-review',
         'web-mcp',
       ].map((n) => `${n}@${M}`),
-      ...['csharp-lsp', 'hookify', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map(
-        (n) => `${n}@${O}`,
-      ),
+      ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),
     ].sort(),
   );
 });

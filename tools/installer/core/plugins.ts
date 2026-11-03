@@ -28,14 +28,7 @@ export interface PluginRow {
 export const BUNDLE = 'dead-skills';
 // Anthropic's own plugins come straight from their marketplace: ours may not reuse their names.
 export const OFFICIAL = 'claude-plugins-official';
-const OFFICIAL_OPT_INS = [
-  'skill-creator',
-  'hookify',
-  'rust-analyzer-lsp',
-  'csharp-lsp',
-  'typescript-lsp',
-  'pyright-lsp',
-];
+const OFFICIAL_OPT_INS = ['skill-creator', 'rust-analyzer-lsp', 'csharp-lsp', 'typescript-lsp', 'pyright-lsp'];
 
 export const nameOf = (id: string) => id.split('@')[0];
 

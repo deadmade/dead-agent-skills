@@ -35,7 +35,7 @@ export const CATEGORIES: Page[] = [
     id: 'workflow',
     title: 'Conductors & skills',
     blurb: 'flows runs the other skills in order and brings the ones it uses; plus standalone skills.',
-    keys: ['flows', 'hallmark', 'skill-creator', 'hookify'],
+    keys: ['flows', 'hallmark', 'skill-creator'],
   },
   {
     id: 'lsp',
@@ -97,7 +97,6 @@ export function categorize(keys: string[]) {
 // Short descriptions for what marketplace.json doesn't describe: the official opt-ins and the toggles.
 export const HINTS: Record<string, string> = {
   'skill-creator': "Anthropic's skill for writing and testing skills",
-  hookify: "Anthropic's rules-as-hooks from .claude/hookify.*.local.md",
   'rust-analyzer-lsp': 'Rust (rust-analyzer)',
   'csharp-lsp': 'C# (csharp-ls)',
   'typescript-lsp': 'TypeScript / JavaScript',
