@@ -164,19 +164,20 @@ option) at the version pinned in `tools/installer/assets/uv.json` (sha256-checke
 `crates/flow-cockpit/app/shell/vendor/` holds the libraries the views' building blocks and the boot script use, copied unchanged
 from their npm tarballs (each tarball checked against the registry's `dist.integrity`), each with its license next to it:
 
-- **marked** 18.1.2: MIT, https://github.com/markedjs/marked (`lib/marked.esm.js`, and `lib/marked.d.ts` as
-  `marked.esm.d.ts`; `LICENSE-marked`). Tarball `sha512-DfOnvLAQ6WYeWxWO1u4RyFOeqyHup6dks5PPqnoFiooU7ipRvidO/2j8plhAHIiZg574E9ZlzSjUiPMLAzFkgg==`.
+- **marked** 18.1.3: MIT, https://github.com/markedjs/marked (`lib/marked.esm.js`, and `lib/marked.d.ts` as
+  `marked.esm.d.ts`; `LICENSE-marked`). Tarball `sha512-9ChMH8EVVgjgID49nsL6IWxWk5c6GtAsq/xw7U1ggkjkU5AGuv68oLTVlFRtvcUYZtpbNyjyvGo3YDu0fGapiw==`.
 - **DOMPurify** 3.4.17: Apache-2.0 or MPL-2.0, https://github.com/cure53/DOMPurify (`dist/purify.es.mjs`,
   `dist/purify.es.d.mts`; `LICENSE-dompurify`, `LICENSE-dompurify-MPL`). Tarball
   `sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==`.
-- **mermaid** 12.2.0: MIT, https://github.com/mermaid-js/mermaid (`dist/mermaid.min.js`; `LICENSE-mermaid`). Tarball
-  `sha512-w7nr/SFrLO7BaVTs3dQTvYSV6nYSBj0Yy9DjBhsIJtAcHqRzXSq4Pg32ujHZ/AdWsAMNEvvhbm5dt9E2tOiHzw==`.
+- **mermaid** 12.3.0: MIT, https://github.com/mermaid-js/mermaid (`dist/mermaid.min.js`; `LICENSE-mermaid`). Tarball
+  `sha512-4113TdXeLAsMruJ79OpFL5O8+LTFXhQqZ260rF3tgUmiNAtRm4Uume04I+65PRN6yZ69J4f8rVYWW8zRk65UYw==`.
   `mermaid.min.js` is a bundle: it also carries mermaid's dependencies, each under its own license. Its license
-  banners name DOMPurify 3.4.12 (Apache-2.0 or MPL-2.0), lodash-es (MIT, through dagre-d3-es) and cytoscape (MIT).
-  The rest, from mermaid 12.2.0's `package.json` with the licenses the registry gives for the versions it allows:
-  elkjs (EPL-2.0), chevrotain (Apache-2.0), d3 (ISC), d3-sankey (BSD-3-Clause), and MIT for @braintree/sanitize-url,
-  @iconify/utils, @mermaid-js/parser, @upsetjs/venn.js, cytoscape-cose-bilkent, cytoscape-fcose, dagre-d3-es, dayjs,
-  es-toolkit, katex, khroma, marked, roughjs, stylis, ts-dedent and uuid.
+  banners name DOMPurify 3.4.17 (Apache-2.0 or MPL-2.0; its banner also names regenerator-runtime, MIT), lodash-es
+  (MIT, through dagre-d3-es) and cytoscape (MIT).
+  The rest, from mermaid 12.3.0's `package.json` with the licenses the registry gives for the versions it allows:
+  elkjs (EPL-2.0 OR GPL-3.0-or-later), chevrotain (Apache-2.0), d3 (ISC), d3-sankey (BSD-3-Clause), and MIT for
+  @braintree/sanitize-url, @iconify/utils, @mermaid-js/parser, @upsetjs/venn.js, cytoscape-cose-bilkent,
+  cytoscape-fcose, dagre-d3-es, dayjs, es-toolkit, katex, khroma, marked, roughjs, stylis and ts-dedent.
 - **@tauri-apps/api** 2.12.4 (npm `latest`): Apache-2.0 or MIT, https://github.com/tauri-apps/tauri (`core.js`, `core.d.ts`,
   `event.js`, `event.d.ts` and `external/tslib/tslib.es6.js`, which `core.js` imports; `LICENSE-tauri-apps-api` is its
   MIT text, `LICENSE-tauri-apps-api-Apache` its Apache-2.0 one). `boot.js` imports `invoke` and `listen` from it, so

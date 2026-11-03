@@ -8,14 +8,36 @@ updates:
     groups:
       actions:
         patterns: ['*']
+  # The root package.json and its workspaces (tools/*), one lockfile.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      npm:
+        patterns: ['*']
   - package-ecosystem: cargo
-    directories: ['/crates/tui-review', '/crates/web-mcp']
+    directories: ['/crates/tui-review', '/crates/web-mcp', '/crates/flow-cockpit']
     schedule:
       interval: weekly
       day: monday
     groups:
       cargo:
         patterns: ['*']
+  # ado-mcp's reqwest must stay the one azure_core uses (AGENTS.md: `cargo tree -d -i reqwest` shows one), and
+  # azure_devops_rust_api (archived upstream) pins azure_core, so neither moves on its own.
+  - package-ecosystem: cargo
+    directory: /crates/ado-mcp
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      cargo:
+        patterns: ['*']
+    ignore:
+      - dependency-name: reqwest
+      - dependency-name: azure_core
   - package-ecosystem: uv
     directory: /plugins/opt-in/headroom-trim/server
     schedule:
