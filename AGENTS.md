@@ -229,6 +229,10 @@ sync: `plugins/shared/agent-review/skills/`, `plugins/shared/agent-review/LICENS
 the npm tarballs THIRD_PARTY.md names, so a new version replaces the files rather than editing them.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
+## Dependency updates
+
+Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the `Cargo.lock` and pins of all four crates and the headroom-trim `uv.lock` current. ado-mcp's entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the JS vendored in `crates/flow-cockpit/app/shell/vendor/` (see above) and the `cisco-ai-skill-scanner` pin in the `scan-skills` script. The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
+
 ## Versions and releases
 
 Everything ships as one version: `package.json` and `package-lock.json`, the marketplace's `metadata.version`, every
