@@ -35,6 +35,12 @@ test('merge adds owned keys and keeps foreign ones', () => {
   assert.equal(mergeSettings({ cleanupPeriodDays: 7 }, {}).cleanupPeriodDays, 7);
 });
 
+test('auto-compact window defaults to 350k and keeps a number the user set', () => {
+  assert.equal(mergeSettings({}, {}).autoCompactWindow, 350000);
+  assert.equal(mergeSettings({ autoCompactWindow: 500000 }, {}).autoCompactWindow, 500000);
+  assert.equal(resetSettings({ autoCompactWindow: 500000 }, {}).autoCompactWindow, 350000);
+});
+
 test('merge is idempotent', () => {
   const once = mergeSettings({}, { statusLine: true });
   assert.deepEqual(mergeSettings(once, { statusLine: true }), once);
