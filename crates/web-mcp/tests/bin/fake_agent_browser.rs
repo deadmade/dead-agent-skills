@@ -2,12 +2,15 @@
 //! `$FAKE_AB_LOG` (unset: to `calls.jsonl` beside its `--config`, if any) and prints canned `--json` answers.
 //! An `open` of a URL containing "fail" fails; a batch's `wait` fails for a URL containing "wait-fail", and for
 //! one containing "wait-slow" only after its `--timeout` ms. A batch opening a search engine's host answers from
-//! `$FAKE_AB_PAGES` when that is set (see `engine_page`). `get cdp-url` answers a url ending in the contents of
+//! `$FAKE_AB_PAGES` when that is set (see `engine_page`). A batch with an `open` stores its URL in
+//! `<state>/<session>.url`: the session's tab keeps that page, so a batch without an `open` answers for the stored
+//! URL (its `engine_page`, its `get url`, the host lookups and `wait` failures keyed on the URL), and `tab new`
+//! removes it (a blank tab). `get cdp-url` answers a url ending in the contents of
 //! `<state>/chrome` (a changed one: Chrome relaunched); with `$FAKE_AB_OWNER_DELAY_MS`, an owner's (`*-window`)
 //! `open` sleeps that long first. `<state>` is `$FAKE_AB_STATE`, else `--config`'s folder. On a `--cdp` call,
 //! `<state>/dead-g<n>` makes a `-g<n>-` session answer agent-browser's dead-Chrome connect error, and
-//! `<state>/<session>.gone` makes a call other than `tab …` (in a batch: its `open`) answer `tab_gone`, until a
-//! `tab new` removes it.
+//! `<state>/<session>.gone` makes a call other than `tab …` (in a batch: its first command) answer `tab_gone`,
+//! until a `tab new` removes it.
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -62,9 +65,10 @@ fn main() {
         Some("get") if rest.get(1).is_some_and(|a| a == "cdp-url") => cdp_url(&state),
         Some("tab") if rest.get(1).is_some_and(|a| a == "new") => {
             let _ = std::fs::remove_file(&gone);
+            let _ = std::fs::remove_file(stored_url(&state, session));
             json!({"success": true, "data": {"tabId": "t9", "url": "about:blank"}})
         }
-        Some("batch") => batch(&stdin, session, tab_gone),
+        Some("batch") => batch(&stdin, &state, session, tab_gone),
         Some("open") if rest.get(1).is_some_and(|u| u.contains("fail")) => {
             println!(
                 "{}",
@@ -86,16 +90,29 @@ fn main() {
     println!("{out}");
 }
 
-/// A batch's answer to the commands in `stdin`; with `tab_gone`, its `open` answers `tab_gone`.
-fn batch(stdin: &str, session: &str, tab_gone: bool) -> Value {
+/// The file holding the URL `session`'s tab was last opened to.
+fn stored_url(state: &Path, session: &str) -> PathBuf {
+    state.join(format!("{session}.url"))
+}
+
+/// A batch's answer to the commands in `stdin`, for the page it `open`s, else the one its session's tab holds
+/// (`stored_url`; none: blank). With `tab_gone`, its first command answers `tab_gone` and opens nothing.
+fn batch(stdin: &str, state: &Path, session: &str, tab_gone: bool) -> Value {
     let cmds: Vec<Vec<String>> = serde_json::from_str(stdin).unwrap();
     if stdin.contains("/slow") {
         std::thread::sleep(std::time::Duration::from_secs(3)); // a page that hangs
     }
-    let url = cmds
-        .iter()
-        .find(|c| c[0] == "open")
-        .map_or("", |c| c[1].as_str());
+    let stored = stored_url(state, session);
+    let url = match cmds.iter().find(|c| c[0] == "open") {
+        Some(open) => {
+            if !tab_gone {
+                std::fs::write(&stored, &open[1]).unwrap();
+            }
+            open[1].clone()
+        }
+        None => std::fs::read_to_string(&stored).unwrap_or_default(),
+    };
+    let url = url.as_str();
     let page = engine_page(url);
     let html = match &page {
         Some(Ok(html)) => html.clone(),
@@ -109,8 +126,9 @@ fn batch(stdin: &str, session: &str, tab_gone: bool) -> Value {
     };
     let entries: Vec<Value> = cmds
         .iter()
-        .map(|c| {
-            if tab_gone && c[0] == "open" {
+        .enumerate()
+        .map(|(i, c)| {
+            if tab_gone && i == 0 {
                 let mut e = gone_json(session);
                 e["command"] = json!(c);
                 return e;

@@ -157,7 +157,7 @@ pub async fn run_engine(
     let url = e.url(query, since);
     let (html, landed) = match ctx
         .browser
-        .render(&url, &ctx.browser.engine_session(e), Some(run), left)
+        .render(Some(&url), &ctx.browser.engine_session(e), Some(run), left)
         .await
     {
         Ok(page) => page,
