@@ -37,12 +37,18 @@ Each lesson gets one home:
 
 | Home                         | When                                                                                 | Through                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| a check                      | a mistake a machine can catch: a test, a lint rule, a script `npm test` runs         | the repo's own test or lint setup, written test-first                                    |
 | AGENTS.md / CLAUDE.md        | an instruction a future session must follow in this repo (a command, a trap, a rule) | host instruction-file procedure (`claude-md-management:revise-claude-md` when available) |
 | `GLOSSARY.md`                | a domain term or relationship got settled                                            | mattpocock `domain-modeling`                                                             |
 | `docs/adr/`                  | a decision that is hard to reverse, surprising without context, and a real trade-off | mattpocock `domain-modeling`                                                             |
 | `docs/solutions/<slug>.md`   | a solved problem someone may hit again                                               | the format below                                                                         |
 | a skill or conductor         | a skill or conductor behaved wrong or left a step out                                | superpowers `writing-skills`                                                             |
 | host memory (when available) | about the user or how they like to work, not about the repo                          | the memory directory                                                                     |
+
+Prefer the home that makes the mistake impossible over the one that asks someone to remember it: a structural fix
+first, then a type, a check, a test, and a line of prose last. A proposed check names the past mistake it must fail
+on and how that was shown (run against the code as it was, it fails). A rule already in an AGENTS.md or CLAUDE.md
+that this run shows nobody followed is offered for removal, or for turning into a check.
 
 Present them as one numbered list: the lesson in one line, its home, and the exact text to write. Recommend dropping
 weak ones; three good entries beat ten. **Gate:** the user picks.
