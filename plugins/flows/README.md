@@ -79,6 +79,19 @@ research-flow
 ├ web-mcp: search
 └ paper-lookup: paper-lookup
 
+review-code
+├ claude-code: general-purpose, code-review, security-review
+├ claude-md-management@claude-plugins-official: claude-md-improver
+├ claude-security@claude-plugins-official: claude-security
+├ flows: writing
+├ web-mcp: fetch
+├ superpowers: verification-before-completion, systematic-debugging, test-driven-development, finishing-a-development-branch
+├ ponytail: ponytail-review, ponytail-audit
+├ pstack-picks: blast-radius, interrogate, principle-boundary-discipline
+├ tob-picks: spec-to-code-compliance, spec-compliance, spec-compliance-checker, mutation-testing, property-based-testing, sharp-edges
+├ security-audit: security-audit
+└ mattpocock-picks: improve-codebase-architecture, grilling
+
 self-review
 ├ claude-code: security-review
 ├ claude-md-management@claude-plugins-official: claude-md-improver
