@@ -37,8 +37,16 @@ release phase.
 ## Phase 2: PR
 
 Write the body inline, short: why, what changed, blast radius (pstack `blast-radius` over the diff against the base:
-what else it touches) and verification (the commands and results from Phase 1). Load `flows:writing` with the Skill tool
-and revise the title and body by it. Save the body to a file in the scratchpad.
+what else it touches) and verification (the commands and results from Phase 1). Three things shape it:
+
+- **What changed** opens with the smallest picture that shows the change: a call tree, a before/after line, or a
+  diagram of a few boxes in plain text. Prose follows only for what the picture can't say.
+- A **Door** line next to the blast radius: one-way (hard to undo: data, a wire format, a public interface) or
+  two-way (a revert undoes it), with the reason in a few words.
+- Where behaviour changed, the before/after evidence: the command and what it printed on the base and on the branch.
+
+Load `flows:writing` with the Skill tool and revise the title and body by it. Save the body to a file in the
+scratchpad.
 
 **Gate:** show the title and body; the user approves or edits them. Then hand over, to run in order:
 
