@@ -67,6 +67,10 @@ offered and the recommendation. -->
 
 <!-- Calls the build made on its own (not deviation-class), one line each, as they are made. -->
 
+## Parking lot
+
+<!-- Cleanups and ideas outside a task, one line each (`file`: what); not done. The user picks at Finish. -->
+
 ## Deviations
 
 <!-- Decisions that go to the user, one per `### <deviation>` heading, then `Status: open` or

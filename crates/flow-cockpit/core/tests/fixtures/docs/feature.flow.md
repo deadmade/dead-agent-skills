@@ -79,6 +79,10 @@ Task 1: base abc1234, untracked at start: none, files clean
 
 - 2026-10-27, Task 1: used the existing palette helper.
 
+## Parking lot
+
+- `crates/x/src/lib.rs`: the old parser could share the new tokenizer.
+
 ## Deviations
 
 <!-- Decisions that go to the user, one per `### <deviation>` heading, then `Status: open` or

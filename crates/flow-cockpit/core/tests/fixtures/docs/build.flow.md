@@ -58,6 +58,8 @@ Task 1: base abc1234, untracked at start: none, files clean
 
 - 2026-10-25, Task 1: an empty file and a missing file both give the default.
 
+## Parking lot
+
 ## Deviations
 
 <!-- Decisions that go to the user, one per `### <deviation>` heading, then `Status: open` or

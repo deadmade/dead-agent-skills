@@ -67,8 +67,10 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - Options always come with a recommendation and its reason.
 - **Deviations** while building: the approved plan is the contract, and each task's **Files** list is part of it. A
   deviation is anything the plan doesn't decide: a new or changed public interface, a new library or outside call, a
-  changed data flow or error handling, or a file the task didn't list. Private names and small cleanups inside the
-  task's files aren't deviations. This holds in every build flow (`/feature-flow`, `/research-flow`, `/implement`,
+  changed data flow or error handling, a file the task didn't list, or, for a task with an `**Adds:**` line, a new
+  type, exported function, flag, config key or dependency that line doesn't name. Private names aren't deviations. A
+  cleanup or idea outside the task is one line under **Parking lot** in flow.md (`file`: what), and not done; the user
+  picks from the Parking lot at Finish. This holds in every build flow (`/feature-flow`, `/research-flow`, `/implement`,
   `/fix-flow`, `/upgrade`) and in `/harden`'s fixes.
   - **The fifth stop.** A deviation is never ruled on, by the coordinating session or by a subagent. The coordinating
     session writes it under **Deviations** in flow.md as `### <deviation>` with `Status: open` (then what, why the plan
@@ -103,14 +105,18 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
     after pstack's `principle-laziness-protocol` (an earlier version; upstream has since dropped it): "If a task asks
     you to pass a new signal through types, schemas, pipelines, or similar layers, stop and look for a more direct
     path." A task that seems to need one value threaded through many modules is a deviation. The task reviewer reports
-    a deviation it finds as one, not as a quality note.
+    a deviation it finds as one, not as a quality note. The task reviewer's prompt also gets the task's `**Adds:**`
+    and `**Size:**` lines, when it has them: anything new in the diff that `Adds:` doesn't name is a deviation.
   - **The files check.** When a task starts, write its line under **Tasks** in flow.md:
     `Task <N>: base <sha>` (`git rev-parse HEAD`), with the untracked files then present
     (`git ls-files -o --exclude-standard`). When the implementer is done, before the task review, run
     `git diff --name-only <base>` (commits and working tree) and `git ls-files -o --exclude-standard` again, and compare
-    both with the task's **Files** list, leaving out the untracked files recorded at the start. A file not on the list
-    is a deviation. Add the result to the task's line: `files clean`, or `deviation` with the decision it went to
-    under **Deviations**, which holds only decisions that go to the user.
+    both with the task's **Files** list, leaving out the untracked files recorded at the start. Generated output the
+    repo's build writes (its documented generated folders and files) counts as on every list. A file not on the list
+    is a deviation. For a task with a `**Size:** ~N` line, also count its size: `git diff --numstat <base> -- <the
+task's Files paths>` (added plus removed) plus the lines of its new untracked files; more than twice N is a
+    deviation. Add the result to the task's line: `files clean`, or `deviation` (`deviation (size <n> of ~N)` for
+    size) with the decision it went to under **Deviations**, which holds only decisions that go to the user.
   - **Rulings.** Every other call the build makes on its own (a pre-flight conflict, a plan ambiguity, a parked
     finding, a private name) is one line under **Rulings** in flow.md, written as it is made:
     `<date>, Task <N>: <what was decided> — <why> — <what it costs if wrong>`. The skill's own ledger keeps its
