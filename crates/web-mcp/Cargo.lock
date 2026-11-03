@@ -4123,7 +4123,7 @@ dependencies = [
 
 [[package]]
 name = "web-mcp"
-version = "0.6.0"
+version = "0.6.13"
 dependencies = [
  "anyhow",
  "base64 0.23.1",

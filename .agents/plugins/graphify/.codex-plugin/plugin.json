@@ -1,6 +1,6 @@
 {
   "name": "graphify",
-  "version": "0.6.0",
+  "version": "0.6.13",
   "description": "Graphify skills for querying a codebase knowledge graph. Requires the graphify CLI.",
   "interface": {
     "displayName": "graphify",
