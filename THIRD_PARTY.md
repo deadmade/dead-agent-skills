@@ -164,8 +164,8 @@ option) at the version pinned in `tools/installer/assets/uv.json` (sha256-checke
 `crates/flow-cockpit/app/shell/vendor/` holds the libraries the views' building blocks and the boot script use, copied unchanged
 from their npm tarballs (each tarball checked against the registry's `dist.integrity`), each with its license next to it:
 
-- **marked** 18.1.2: MIT, https://github.com/markedjs/marked (`lib/marked.esm.js`, and `lib/marked.d.ts` as
-  `marked.esm.d.ts`; `LICENSE-marked`). Tarball `sha512-DfOnvLAQ6WYeWxWO1u4RyFOeqyHup6dks5PPqnoFiooU7ipRvidO/2j8plhAHIiZg574E9ZlzSjUiPMLAzFkgg==`.
+- **marked** 18.1.3: MIT, https://github.com/markedjs/marked (`lib/marked.esm.js`, and `lib/marked.d.ts` as
+  `marked.esm.d.ts`; `LICENSE-marked`). Tarball `sha512-9ChMH8EVVgjgID49nsL6IWxWk5c6GtAsq/xw7U1ggkjkU5AGuv68oLTVlFRtvcUYZtpbNyjyvGo3YDu0fGapiw==`.
 - **DOMPurify** 3.4.17: Apache-2.0 or MPL-2.0, https://github.com/cure53/DOMPurify (`dist/purify.es.mjs`,
   `dist/purify.es.d.mts`; `LICENSE-dompurify`, `LICENSE-dompurify-MPL`). Tarball
   `sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==`.
