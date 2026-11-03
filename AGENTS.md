@@ -290,6 +290,9 @@ plugins of ours that the manifest no longer lists.
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded). Enter it from the repo root only:
   started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or
   `plugins/flows/agents/` needs `nix develop` re-entered once to pick up their excludes.
+  A new worktree has no `.pre-commit-config.yaml` (it is generated and untracked), so its first commit fails until
+  `nix develop` runs in that worktree. treefmt's hook fails on any file it changes: run `treefmt` on the files you
+  changed (never a folder: it reformats files you didn't touch), then `npm run build:harnesses`, then stage.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 - `npm run scan-skills` (needs `pipx`): Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`;
   it fails on a high or critical finding. A finding judged benign gets a scoped suppression with its reason in

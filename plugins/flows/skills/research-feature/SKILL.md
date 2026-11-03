@@ -91,4 +91,4 @@ Write `docs/features/<slug>/research.md`:
 
 Copyedit it per flow-rules. **Gate 1:** the user approves the report; record it. Then offer `/build-feature` with
 research.md as its input (its Phase 1 takes the report as the prior-art report), with your recommendation. Ask for
-the **Run verdict** and set `phase: done`; on the user's yes, run `/learn` on this flow.
+the **Run verdict** and run `/learn` on this flow, then set `phase: done`.

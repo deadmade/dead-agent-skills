@@ -1,7 +1,7 @@
 ---
 flow: feature
-phase: finish
-now: Done: reviewed, fixed and committed; PR next through /integrate, then /learn.
+phase: done
+now: Done: PR #114 open, CI green; lessons kept.
 ---
 
 # flows-rework: flow
@@ -293,6 +293,21 @@ Report and picks in [docs/audits/2026-11-03-review-branch.md](../../audits/2026-
 picked 1-13, 16, 18, 20-27; all fixed and checked (6 and 13 on a second round), commit 80a0e34. Left as notes: 14
 (cockpit binary keeps old skill names until the installer reruns: goes in the PR's door line), 15, 17, 19. Rulings:
 all 13 confirmed by the user. Branch: commit, then a PR through `/integrate` (the user's pick).
+
+## After review
+
+The user's calls after the review, on the same PR: `/integrate` removed and its PR rules folded into
+`/review-code`'s finishing step (df12679); plans get agreed **Test seams**, the test-for-every-trivial-change rule is
+dropped and `/fix` may use a runnable check (bbcecf8, after mattpocock and pstack `tdd`); `/learn` writes the few
+lessons that matter without asking. CI green on bbcecf8; the earlier `cockpit (windows-latest)` failure
+(`session-pane.test.mjs:139`) passed on the rerun without a change, likely timing.
+
+## Learned
+
+- AGENTS.md (`nix develop` bullet): a new worktree has no pre-commit config until `nix develop` runs in it; treefmt on
+  changed files only, then `build:harnesses`, then stage.
+- Memory `no-jq-here`: jq is missing, so jq-based watch loops fail silently; use `gh --json -q` or `gh pr checks --watch`.
+- Memory `dcg-undo-via-patch`: undo edits with a saved patch and `git apply -R` where dcg blocks `git restore`.
 
 ## Run verdict
 

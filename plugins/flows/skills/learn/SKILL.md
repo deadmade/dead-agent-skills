@@ -1,6 +1,6 @@
 ---
 name: learn
-description: 'Keep what a piece of work taught, so the next session starts smarter: collect the surprises, decisions and root causes from a flow or the current session, sort each to its home (CLAUDE.md, GLOSSARY.md, an ADR, docs/solutions/, a skill, or memory), and write the ones you pick. The last step of every build flow. Use for /learn [flow.md or topic].'
+description: 'Keep what a piece of work taught, so the next session starts smarter: collect the surprises, decisions and root causes from a flow or the current session, sort each to its home (CLAUDE.md, GLOSSARY.md, an ADR, docs/solutions/, a skill, or memory), and write the few that matter without asking. The last step of every build flow. Use for /learn [flow.md or topic].'
 disable-model-invocation: true
 argument-hint: '[path to a flow.md, or what to look back on]'
 ---
@@ -10,11 +10,11 @@ argument-hint: '[path to a flow.md, or what to look back on]'
 Most of what a session learns dies with it. This flow keeps the few things the next session would otherwise pay for
 again, and drops the rest.
 
-| Phase    | Runs                                                                      | Output                     |
-| -------- | ------------------------------------------------------------------------- | -------------------------- |
-| 1 Gather | the caller's flow.md, else pstack `recall`                                | candidate lessons          |
-| 2 Sort   | each to one home                                                          | proposed entries. **Gate** |
-| 3 Write  | `revise-claude-md`, `domain-modeling`, `writing-skills`, a solutions note | entries written            |
+| Phase    | Runs                                                            | Output                  |
+| -------- | --------------------------------------------------------------- | ----------------------- |
+| 1 Gather | the caller's flow.md, else pstack `recall`                      | candidate lessons       |
+| 2 Sort   | each to one home, weak ones dropped                             | the entries to write    |
+| 3 Write  | `revise-claude-md`, `domain-modeling`, a solutions note, memory | entries written, listed |
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `<flow-root>/packs` (pstack
 and mattpocock are its `-picks` folders).
@@ -50,16 +50,19 @@ first, then a type, a check, a test, and a line of prose last. A proposed check 
 on and how that was shown (run against the code as it was, it fails). A rule already in an AGENTS.md or CLAUDE.md
 that this run shows nobody followed is offered for removal, or for turning into a check.
 
-Present them as one numbered list: the lesson in one line, its home, and the exact text to write. Recommend dropping
-weak ones; three good entries beat ten. **Gate:** the user picks.
+Don't ask the user; you decide. Keep a lesson only when the next session would otherwise pay for it again (a wrong
+turn, a broken tool, a rule found the hard way) and drop the rest. Usually that is zero to three entries, and zero is a
+fine result.
 
 ## Phase 3: Write
 
-Write the picked entries through the skill named for their home. The glossary is where
+Write the kept entries through the skill named for their home. A check, or a fix to a skill or conductor, is code: it
+becomes one line under **Parking lot** in the caller's flow.md (standalone: one line in the report) naming the past
+mistake it must fail on, and it is not written here. The glossary is where
 `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` says it lives (`GLOSSARY.md`, or the one
 `GLOSSARY-MAP.md` points at).
 
-A skill or conductor entry: `writing-skills` owns skill writing, its description rule included. skill-creator, when
+When a skill or conductor line is built later, `writing-skills` owns skill writing, its description rule included. skill-creator, when
 installed, is used only for its eval tooling (running evals and benchmarks), never to write or reword a skill. A
 vendored skill changes in its sync script's transform, never in the copied file.
 
@@ -74,4 +77,5 @@ A solutions note:
 - **Spot it next time:** <the check or signal that would have caught it sooner>
 ```
 
-Called from a build flow, list what was written under **Learned** in its flow.md.
+Called from a build flow, list what was written under **Learned** in its flow.md. Either way, end with one line per
+entry (its home and file) so the user can see it and revert it, or "nothing worth keeping".
