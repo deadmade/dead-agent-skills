@@ -1,6 +1,6 @@
 {
   "name": "flows",
-  "version": "0.6.0",
+  "version": "0.6.14",
   "description": "Conductor skills with approval gates and resumable state: build, audit, review, verify, integrate and learn. Includes the writing skill, copyedit pass and skill packs; Claude Code also runs the prose-check hook.",
   "author": {
     "name": "deadmade",
