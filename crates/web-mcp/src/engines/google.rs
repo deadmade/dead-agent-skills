@@ -1,6 +1,7 @@
-//! Google: a result is an `a` holding an `h3`, inside `#rso`/`#search`. No result page was captured (the line was
-//! rate-limited, findings.md), so the row selectors come from the markup maintained scrapers use today and are
-//! unverified; the block and consent markers are checked against fixtures.
+//! Google: a result is an `a` holding an `h3`, inside `#rso`/`#search`. The captured result page
+//! (`google.html`, web-mcp-google-block/findings.md) confirms the rows, but each row's link is an opaque
+//! `/goto?url=…` redirect with no target in the page, so the parser drops them all; the block and consent markers
+//! are checked against fixtures.
 
 use dom_query::Document;
 use url::Url;
@@ -90,7 +91,7 @@ mod tests {
         url("https://www.google.com/search?q=x")
     }
 
-    /// The pages of R8, read at run time because they aren't in the repository yet.
+    /// A captured page, read at run time: `google-none.html` isn't in the repository yet.
     fn fixture(name: &str) -> String {
         let path = format!(
             "{}/tests/fixtures/engines/{name}",
@@ -100,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs a result page captured off the VPN without a burst (R8)"]
+    #[ignore = "Google's rows link to opaque /goto redirects; resolving them is a follow-up (web-mcp-google-block/flow.md)"]
     fn google_parses_fixture() {
         assert_results(
             Engine::Google.parse(&fixture("google.html"), &page()),
@@ -109,7 +110,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs a result page captured off the VPN without a burst (R8)"]
+    #[ignore = "needs a no-results page: a nonsense query still got results (web-mcp-google-block/findings.md)"]
     fn google_no_results_is_empty() {
         assert_eq!(
             Engine::Google.parse(&fixture("google-none.html"), &page()),

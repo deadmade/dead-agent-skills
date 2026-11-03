@@ -366,6 +366,7 @@ mod tests {
     #[test]
     fn search_boxes_match_one_element_in_the_fixtures() {
         for (e, file) in [
+            (Engine::Google, "google.html"),
             (Engine::Bing, "bing.html"),
             (Engine::DuckDuckGo, "duckduckgo.html"),
             (Engine::Brave, "brave.html"),
