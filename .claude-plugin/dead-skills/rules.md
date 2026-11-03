@@ -4,3 +4,4 @@
 - Before stating a claim as a conclusion, classify it as measured, verified against source, inferred, or assumed; what code does at runtime, concluded from reading it, is inferred. Test the gaps the user would rely on when you can; otherwise label them as hypotheses.
 - A subagent's "done" or "tests pass" is a claim: check its artifact or rerun its check yourself before relying on it.
 - When a conclusion will drive a consequential decision or leave this session (a doc, a PR, a message), suggest `/agent-review` (Level 3) to the user.
+- Build only what the task needs: no file, abstraction, helper, option or fallback it doesn't call for, and one implementation gets no interface. Validate at trust boundaries, not between your own functions.

@@ -115,9 +115,23 @@ approve the spec. Record it.
 
 ## Phase 4: Plan
 
-Follow superpowers `writing-plans` on the approved spec. Copy each seam line from the spec verbatim into the plan's
-**Global Constraints**. Every task gets, right below its heading, `**Does:** <one plain sentence for a reader who
-doesn't know the code>` and `**Depends on:** Task <n>, … | none`. Let it run its own self-review. When it reaches its **Execution Handoff**, don't ask for an
+Follow superpowers `writing-plans` on the approved spec, with flow-rules **ponytail at chosen steps**' **Before you
+write** pasted into it. Copy each seam line from the spec verbatim into the plan's **Global Constraints**, and add one
+line to them: "One implementation gets no interface; one caller gets no helper; no option nobody sets." Every task
+gets, right below its heading:
+
+- `**Does:** <one plain sentence for a reader who doesn't know the code>`
+- `**Depends on:** Task <n>, … | none`
+- `**Adds:** <new files, types or classes, exported functions, config keys or flags, dependencies> | nothing new`:
+  every new piece of surface, so `Interfaces: Produces` lists only what a later task consumes.
+- `**Size:** ~<N>`: the lines the task adds plus removes in its own files, one number.
+
+Split a file only where a task's `Adds:` already names the second unit.
+<!-- overrides superpowers/skills/writing-plans/SKILL.md: "Prefer smaller, focused files over large ones that do too much." -->
+
+Let it run its own self-review. Then run `node <skill-dir>/scripts/glance.mjs <plan.md>`: it writes the plan's task
+graph and table at the top of plan.md, and it fails, naming the task, when a task lacks `Depends on:` or has a `Size:`
+that isn't `~N`. Run it again after every plan edit. When it reaches its **Execution Handoff**, don't ask for an
 execution method yet and don't invoke an execution skill: link the plan in flow.md and go to Phase 5.
 <!-- overrides superpowers/skills/writing-plans/SKILL.md: "Otherwise, ask them to review the plan and choose an execution method before implementation." -->
 
@@ -134,13 +148,14 @@ Optional, for a large or ambiguous design, offer before the review: pstack `arch
 first) or `arena` (several models draft the plan, best one wins). Only on the user's yes.
 
 **Gate 2:** ask the user to approve the plan **and** pick the execution method from `writing-plans`' handoff
-(subagent-driven, or native = `executing-plans`), with your recommendation. Record both.
+(subagent-driven, or native = `executing-plans`), with your recommendation. Record both. The gate message shows
+glance's block (re-run after the review's edits) and the findings, with plan.md linked rather than pasted.
 
 ## Phase 6: Execute
 
 Read the chosen skill by path and follow it: superpowers `subagent-driven-development` or `executing-plans`. They set
-up the worktree (`using-git-worktrees`), run TDD and reviews themselves. Stop when they would invoke
-`finishing-a-development-branch`.
+up the worktree (`using-git-worktrees`), run TDD and reviews themselves, with flow-rules **ponytail at chosen
+steps** pasted into every builder brief. Stop when they would invoke `finishing-a-development-branch`.
 
 Deviations stop the build: flow-rules **Deviations** (the fifth stop, the brief clause, the files check, Rulings).
 Before SDD deletes its workspace, copy its ledger's `Ruling:` lines into flow.md (flow-rules **Rulings**).

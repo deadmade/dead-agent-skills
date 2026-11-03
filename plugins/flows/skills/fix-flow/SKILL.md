@@ -54,8 +54,9 @@ options only when you offer it and the user picks it; otherwise the cause is fix
 
 ## Phase 4: Fix
 
-Follow superpowers `test-driven-development`: the regression test reproduces the bug and fails for the stated cause
-(show the output); then the smallest fix that makes it pass; then the full suite. Fix the cause once in the shared
+Follow superpowers `test-driven-development`, with flow-rules **ponytail at chosen steps** pasted into the fix
+brief: the regression test reproduces the bug and fails for the stated cause (show the output); then the smallest fix
+that makes it pass; then the full suite. Fix the cause once in the shared
 code, not at each caller. The approved option is the task, and the files it names are its **Files** list. A fix that
 needs more is a deviation and stops the build: flow-rules **Deviations** (the fifth stop, the brief clause, the files
 check, Rulings).

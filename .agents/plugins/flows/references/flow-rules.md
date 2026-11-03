@@ -195,6 +195,9 @@ verbatim at these steps, never the whole skill:
 
 In a build flow TDD wins over ponytail's no-test-for-trivial rule. Wherever **The smallest complete change** is pasted
 into a brief, this line goes with it: "TDD wins here: every change, trivial ones too, gets its failing test first."
+And this one, which keeps TDD from turning into a test per class: "Test behaviour at the seam the plan names, one test
+per behaviour the spec states; no tests of private helpers, of the framework or of the language. The plan's Review
+Focus tests count towards that, not on top of it."
 
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none." -->
 
