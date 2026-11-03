@@ -1,6 +1,6 @@
 {
   "name": "mcp-azure",
-  "version": "0.6.0",
+  "version": "0.6.9",
   "description": "Azure DevOps Server tools through the ado-mcp release binary: pull requests, work items, pipelines, search, wikis and repository files. Self-hosted, PAT authentication; opt-in.",
   "interface": {
     "displayName": "mcp-azure",
