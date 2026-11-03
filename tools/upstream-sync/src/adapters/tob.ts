@@ -40,7 +40,9 @@ const SKIPPED = [
   'modern-cpp',
   'modern-python',
   'open-sourcing',
+  'patching-bugs', // ideas in /fix
   'post-patch-validation',
+  'regression-hunt', // ideas in /review-code
   'review-walkthrough', // tui-review covers it
   'rust-review',
   'second-opinion',

@@ -30,9 +30,12 @@ const SKIPPED = [
   'engineering/code-review', // vendored by the self-review adapter as a reference of /self-review
   'engineering/diagnosing-bugs',
   'engineering/implement',
+  'engineering/implement-spec', // parallel implementers, no gates
+  'engineering/pr', // ideas in /integrate's PR body
   'engineering/prototype',
   'engineering/research',
   'engineering/resolving-merge-conflicts',
+  'engineering/retro', // ideas in /learn
   'engineering/tdd',
   'engineering/triage',
   'engineering/wayfinder',
