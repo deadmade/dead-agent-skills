@@ -1,6 +1,6 @@
 {
   "name": "atlassian",
-  "version": "0.6.0",
+  "version": "0.6.12",
   "description": "Atlassian MCP integration for Jira and Confluence.",
   "interface": {
     "displayName": "atlassian",

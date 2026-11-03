@@ -1,6 +1,6 @@
 {
   "name": "flows",
-  "version": "0.6.0",
+  "version": "0.6.12",
   "description": "Portable conductor skills with approval gates and resumable flow documents. Install the companion plugins listed in README.md from the same marketplace.",
   "interface": {
     "displayName": "flows",
