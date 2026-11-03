@@ -257,6 +257,6 @@ One ranked table, most severe first:
 | 1   | high/med/low | `file:line` | one sentence | the command, quote or test | what to do        |
 
 Every finding has evidence produced in this run: a command and its output, a quote with its line, a failing test.
-Nothing from memory. Then the user picks by number (`1,3`, `all high`, `none`). Fix only those, then re-run the check
+Nothing from memory. Then the user picks by number (`1,3`, `all fix` for every Fix before merge item, `all`, `none`). Fix only those, then re-run the check
 that found each one and show it passes. Record picks and results in the report file as `Picks: <finding numbers> |
 none`, then one line `Fixed <date>: <number>` per pick once its check passes.

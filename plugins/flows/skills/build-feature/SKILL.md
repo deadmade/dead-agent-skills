@@ -132,8 +132,8 @@ Split a file only where a task's `Adds:` already names the second unit.
 <!-- overrides superpowers/skills/writing-plans/SKILL.md: "Prefer smaller, focused files over large ones that do too much." -->
 
 Let it run its own self-review. Then run `node <skill-dir>/scripts/glance.mjs <plan.md>`: it writes the plan's task
-graph and table at the top of plan.md, and it fails, naming the task, when a task lacks `Depends on:` or has a `Size:`
-that isn't `~N`. Run it again after every plan edit. When it reaches its **Execution Handoff**, don't ask for an
+graph and table at the top of plan.md, and it fails with the reason when the plan has no `### Task <n>:` headings or
+a task lacks `Depends on:`, names no task in it, or has a `Size:` that isn't `~N`. Run it again after every plan edit. When it reaches its **Execution Handoff**, don't ask for an
 execution method yet and don't invoke an execution skill: link the plan in flow.md and go to Phase 5.
 <!-- overrides superpowers/skills/writing-plans/SKILL.md: "Otherwise, ask them to review the plan and choose an execution method before implementation." -->
 

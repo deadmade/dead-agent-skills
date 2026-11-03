@@ -24,8 +24,6 @@ what we build. -->
 ## Artifacts
 
 - Report:
-- ADRs:
-- Glossary:
 
 ## Gates
 

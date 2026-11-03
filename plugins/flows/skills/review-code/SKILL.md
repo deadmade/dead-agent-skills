@@ -45,9 +45,8 @@ standards are every applicable AGENTS.md and CLAUDE.md (root and changed folders
 
 ## Phase 2: Checks
 
-Follow [references/checks.md](references/checks.md) **Checks** (superpowers `systematic-debugging` for a red one, pstack
-`interrogate` offered when execution ran without per-task reviews). A red check stops the review: show the output and
-offer `/fix` on it, with your recommendation.
+Follow [references/checks.md](references/checks.md) **Checks** (it uses superpowers `systematic-debugging` and pstack
+`interrogate`).
 
 ## Phase 3: Lenses
 
@@ -73,7 +72,7 @@ findings keep their own severity.
 
 ## Phase 5: Report
 
-Follow [references/report.md](references/report.md). **Gate:** the user picks by number (`1,3`, `all fix`, `none`).
+Follow [references/report.md](references/report.md). **Gate:** the user picks by number (`1,3`, `all fix` for every **Fix before merge** item, `all`, `none`).
 
 ## Phase 6: Fix
 

@@ -61,10 +61,10 @@ code, not at each caller. The approved option is the task, and the files it name
 needs more is a deviation and stops the build: flow-rules **Deviations** (the fifth stop, the brief clause, the files
 check, Rulings).
 
-**Prove it three ways** before Finish (after trailofbits `patching-bugs`): the regression test fails on the code
-before the fix, passes with the fix, and fails again with only the fix reverted and the test kept. Then one fresh
-agent that saw none of the fixing reruns the three and reports each command and its output; a run that doesn't come
-out as stated goes back to Phase 3. A crash on the way to the fixed line doesn't count as the test failing: the
+**Prove it** before Finish (after trailofbits `patching-bugs`): the regression test fails on the code before the fix
+and passes with it. Then one fresh agent that saw none of the fixing reruns both, on the code before the fix (the
+fix reverted, the test kept) and with the fix, and reports each command and its output; a run that doesn't come out
+as stated goes back to Phase 3. A crash on the way to the fixed line doesn't count as the test failing: the
 failure has to be the bug.
 
 ## Phase 5: Finish

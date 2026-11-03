@@ -12,21 +12,22 @@ or agent that runs itself. Every brief ends with the shared tail below.
 | security    | the diff touches input parsing, auth, the network, files, processes, secrets or dependencies      | opus   |
 | risk        | migrations, a public interface, a wire format, config or a hot path                               | opus   |
 
-**Small diff** (at most 3 files and about 50 changed lines): agents cost more than they find. Run the lenses yourself,
-one after another, each with its brief, and say so; correctness still goes to one fresh agent, because an author
-re-reading its own diff isn't a review.
+**Small diff** (at most 3 files and about 50 changed lines): agents cost more than they find. One fresh agent runs
+every lens that applies, one brief after another, and says so; the session that wrote the code runs none of them,
+because an author re-reading its own diff isn't a review.
 
 ## Briefs
 
-**correctness.** On a host whose adapter names a built-in code review for this lens, run that (the adapter says
-how). Otherwise the agent follows `<packs>/ponytail/skills/ponytail-review/SKILL.md` sections 1 to 3 with only the
+**correctness.** On a host whose adapter names a built-in code review for this lens, run that when the adapter's
+conditions hold (the adapter says how). Otherwise the agent follows `<packs>/ponytail/skills/ponytail-review/SKILL.md` sections 1 to 3 with only the
 **Bug**, **Risk** and **Scale** items of section 2. Either way, add:
 
 - swallowed errors and fallbacks that hide a failure (a catch that logs and goes on, a default returned on error, a
   retry that never gives up);
 - a finding needs a caller the code supports that reaches it; a helper that fails on input nothing passes it isn't a
   bug;
-- nothing reproduced isn't a clean result: say which paths were not exercised.
+- nothing reproduced isn't a clean result: say which paths were not exercised;
+- a rule in the repo's AGENTS.md or CLAUDE.md that the diff breaks (quote the rule).
 
 **lean.** `ponytail-review`'s section 2 **Lean** item only (delete, reuse, stdlib, yagni, merge, split), plus:
 

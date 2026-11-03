@@ -94,6 +94,11 @@ are in [references/flow-rules.md](references/flow-rules.md).
 Calls between conductors (`/fix` → `/review-code`) aren't listed. Each conductor still has a fallback for a
 plugin that isn't there, for installs that skipped one.
 
+Renamed in 2026-11: `/feature-flow` is `/build-feature`, `/research-flow` is `/research-feature` (it now researches
+and builds nothing), `/fix-flow` is `/fix`, and `/review-code` replaces `/self-review`, `/verify`, `/test-audit`,
+`/doc-audit` and `/harden`. Runs started under the old names resume under the new ones; research runs started before
+the change don't.
+
 ## Writing
 
 flows holds one standard for prose a person will read: a skill that states it, a check on every Markdown write, and a
@@ -143,7 +148,7 @@ The same conductors and flow-state documents work in every supported coding agen
 resources; only conductor skills are discovered automatically. The host-specific tool mapping ships as
 `references/host.md` in each distribution, and cross-package lookups are described in `references/resource-index.md`.
 If a session cannot launch subagents, skip those steps and record them as not checked. Keep approval gates.
-Verification offers a diff walkthrough; tui-review is a separate optional tool.
+tui-review is a separate optional tool for reading a diff.
 
 Install instructions are generated with each distribution and listed in the repository README.
 

@@ -1,4 +1,7 @@
 //! plan.md: one `### Task <n>: <title>` block per task.
+//!
+//! `plugins/flows/skills/build-feature/scripts/glance.mjs` reads the same fields the same way to draw the plan's
+//! graph at Gate 2; a change to the field or Depends rules here belongs there too.
 
 use serde::Serialize;
 use ts_rs::TS;

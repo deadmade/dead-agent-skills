@@ -15,8 +15,6 @@ How should we split databases per customer?
 ## Artifacts
 
 - Report: docs/features/tenant-databases/research.md
-- ADRs:
-- Glossary:
 
 ## Gates
 

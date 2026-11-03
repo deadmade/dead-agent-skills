@@ -2,11 +2,15 @@
 // Draws a plan's task graph and task table as plain text between `<!-- glance -->` markers at the top of plan.md.
 // Fields are read the way flow-cockpit's plan parser reads them (crates/flow-cockpit/core/src/doc/plan.rs), so both
 // draw the same graph from the same plan.
-import { readFileSync, writeFileSync } from 'node:fs';
+// Keep the two in step: a change to plan.rs's field or Depends rules belongs here too.
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const OPEN = '<!-- glance -->';
 const CLOSE = '<!-- /glance -->';
+// The markers count only on lines of their own, so prose that names them is left alone.
+const OPEN_LINE = /^<!-- glance -->$/m;
+const CLOSE_LINE = /^<!-- \/glance -->$/m;
 const WIDTH = 110;
 const LABEL = 24;
 const DOES = 60;
@@ -62,32 +66,66 @@ function depends(value) {
   return out.length ? out : undefined;
 }
 
+const isFence = (line) => /^\s*(```|~~~)/.test(line);
+
+// plan.rs `strip_comments`: a `<!-- … -->` is removed only where it starts a line outside a fence; a `<!--` in prose,
+// inline code or a fence, or one never closed, is text.
+function stripComments(text) {
+  let out = '';
+  let fence = false;
+  let pos = 0;
+  while (pos < text.length) {
+    const nl = text.indexOf('\n', pos);
+    const end = nl < 0 ? text.length : nl + 1;
+    const line = text.slice(pos, end);
+    if (isFence(line)) fence = !fence;
+    const open = pos + line.length - line.trimStart().length;
+    const close = text.startsWith('<!--', open) ? text.indexOf('-->', open + 4) : -1;
+    if (!fence && close >= 0) {
+      out += text.slice(pos, open);
+      pos = close + 3;
+      continue;
+    }
+    out += line;
+    pos = end;
+  }
+  return out;
+}
+
 function parse(text) {
-  const lines = text.split('\n');
+  // Like plan.rs: comments are stripped and fenced lines are neither headings nor fields.
+  const lines = stripComments(text).split('\n');
   const title = (lines.find((l) => l.startsWith('# ')) ?? '# Plan')
     .slice(2)
     .replace(/ Implementation Plan$/, '')
     .trim();
   const tasks = [];
   let current;
+  let fence = false;
   for (const line of lines) {
+    if (isFence(line)) fence = !fence;
+    if (fence || isFence(line)) continue;
     const head = line.match(/^### Task (\d+[a-z]?)[:.–—-]?\s*(.*)$/);
     if (head) tasks.push((current = { id: head[1], title: head[2].trim(), lines: [] }));
     else if (/^#{2,3} /.test(line)) current = undefined;
     else current?.lines.push(line);
   }
+  if (!tasks.length) throw new Error('no `### Task <n>:` headings found');
   for (const t of tasks) {
     const d = field(t.lines, 'Depends on');
     if (d === undefined) throw new Error(`Task ${t.id}: no **Depends on:** line`);
-    t.depends = depends(d) ?? [];
+    t.depends = depends(d);
+    if (t.depends === undefined) throw new Error(`Task ${t.id}: **Depends on:** names no task ("${d}")`);
     t.does = field(t.lines, 'Does') ?? '';
     t.adds = field(t.lines, 'Adds');
     const size = field(t.lines, 'Size');
-    if (size !== undefined && !/^~\d+/.test(size)) throw new Error(`Task ${t.id}: **Size:** is not ~N ("${size}")`);
-    t.size = size === undefined ? undefined : Number(size.match(/^~(\d+)/)[1]);
+    const n = size?.match(/^~(\d+)(?:\s+lines?)?$/);
+    if (size !== undefined && !n) throw new Error(`Task ${t.id}: **Size:** is not ~N ("${size}")`);
+    t.size = n ? Number(n[1]) : undefined;
     const at = t.lines.findIndex((l) => /^\*\*Files:\*\*/.test(l.trim()));
-    t.files = 0;
-    // The bullets under **Files:**, blank lines around them allowed; the list ends at a bold line, a heading or a step.
+    // Paths written inline after **Files:**, then the bullets under it, blank lines around them allowed; the list
+    // ends at a bold line, a heading or a step.
+    t.files = ((field(t.lines, 'Files') ?? '').match(/`[^`]+`/g) ?? []).length;
     for (const l of at < 0 ? [] : t.lines.slice(at + 1)) {
       if (/^(\*\*|#|- \[)/.test(l.trim())) break;
       if (l.startsWith('- ')) t.files += 1;
@@ -162,30 +200,48 @@ function render({ title, tasks }) {
   return `${OPEN}\n\`\`\`\n${out.join('\n')}\n\`\`\`\n${CLOSE}`;
 }
 
-export function glance(text) {
+// The existing block's [start, end) in LF text, or undefined.
+function block(text) {
+  const open = text.match(OPEN_LINE);
+  const close = text.match(CLOSE_LINE);
+  if (!open || !close || close.index < open.index) return undefined;
+  return [open.index, close.index + CLOSE.length];
+}
+
+// A CRLF plan is read and written back as CRLF.
+export function glance(input) {
+  const crlf = input.includes('\r\n');
+  const text = input.replace(/\r\n?/g, '\n');
   const blockText = render(parse(text));
-  const start = text.indexOf(OPEN);
-  const end = text.indexOf(CLOSE);
-  if (start >= 0 && end > start) return text.slice(0, start) + blockText + text.slice(end + CLOSE.length);
-  const heading = text.search(/^# /m);
-  if (heading < 0) return `${blockText}\n\n${text}`;
-  const eol = text.indexOf('\n', heading);
-  const at = eol < 0 ? text.length : eol + 1;
-  return `${text.slice(0, at)}\n${blockText}\n${text.slice(at)}`;
+  const at = block(text);
+  let out;
+  if (at) out = text.slice(0, at[0]) + blockText + text.slice(at[1]);
+  else {
+    const heading = text.search(/^# /m);
+    if (heading < 0) out = `${blockText}\n\n${text}`;
+    else {
+      const eol = text.indexOf('\n', heading);
+      const cut = eol < 0 ? text.length : eol + 1;
+      out = `${text.slice(0, cut)}\n${blockText}\n${text.slice(cut)}`;
+    }
+  }
+  return crlf ? out.replace(/\n/g, '\r\n') : out;
 }
 
 export function run(path) {
   try {
-    const text = readFileSync(path, 'utf8');
-    const out = glance(text);
+    const out = glance(readFileSync(path, 'utf8'));
     writeFileSync(path, out);
-    return { code: 0, out: out.slice(out.indexOf(OPEN), out.indexOf(CLOSE) + CLOSE.length) };
+    const lf = out.replace(/\r\n/g, '\n');
+    const [start, end] = block(lf);
+    return { code: 0, out: lf.slice(start, end) };
   } catch (e) {
     return { code: 1, out: e.message };
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// realpath: run through a symlinked folder, argv[1] keeps the link while import.meta.url resolves it.
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { code, out } = run(process.argv[2]);
   console.log(out);
   process.exit(code);

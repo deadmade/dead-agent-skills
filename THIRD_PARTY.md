@@ -116,7 +116,7 @@ flows' `/review-code` (`plugins/flows/skills/review-code/`) vendors one agent fr
 `plugins/flows/agents/pr-test-analyzer.md` (Apache License 2.0, Copyright Anthropic, PBC; `LICENSE`), with its
 `description:` rewritten and a source comment added. It is synced by `tools/upstream-sync/src/adapters/self-review.ts`
 (weekly via GitHub Actions; the synced commit is in `plugins/flows/skills/review-code/UPSTREAM`, `NOTICE` sits next to
-it). Until flows-rework (2026-11) the same adapter also vendored the code-review command, four more toolkit agents and
+it). Until 2026-11 the same adapter also vendored the code-review command, four more toolkit agents and
 mattpocock/skills' engineering code-review skill for the former `/self-review`.
 
 ## writing (flows)

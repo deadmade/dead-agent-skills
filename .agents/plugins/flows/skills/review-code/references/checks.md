@@ -4,8 +4,9 @@
 
 Follow superpowers `verification-before-completion`. The checks are what the repo documents (AGENTS.md,
 CONTRIBUTING.md, the `test`/`lint` scripts, the CI workflows the diff would trigger), not a guess: run every one that
-applies to the changed files and read the output. A red check stops the flow: show the failing output, find the cause
-with superpowers `systematic-debugging`, and fix it on the user's yes (offer `/fix`) before going on.
+applies to the changed files and read the output. A red check stops the review: show the failing output, find the
+cause with superpowers `systematic-debugging`, and offer `/fix` on it with your recommendation. The review goes on
+only once the checks are green.
 
 **One run.** This run is the latest run: its output is the evidence for every later phase and for the verdict. Keep
 it, with the commit (`git rev-parse HEAD`) and `git status --short` it ran on. Nothing re-runs the suite while the
@@ -25,7 +26,6 @@ The verdict, one row each, with the evidence:
 | ----------- | ------------------------------------------------------------------------------------- |
 | Checks      | green: the commands of the last run, its commit, and that the tree since is unchanged |
 | Review      | findings fixed, findings the user left, and why                                       |
-| Read        | `git diff --stat <merge-base>` shown and the walkthrough offered, or skipped          |
 | Decisions   | every item below, confirmed or reopened by the user                                   |
 | Not checked | flow-rules **ponytail at chosen steps**, the footer line                              |
 

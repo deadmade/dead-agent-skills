@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { glance, run } from '../scripts/glance.mjs';
@@ -165,4 +166,98 @@ test('run writes the file and returns the block, or the error with code 1', () =
   writeFileSync(bad, plan(task(1, 'a')));
   assert.deepEqual(run(bad), { code: 1, out: 'Task 1: no **Depends on:** line' });
   assert.equal(readFileSync(bad, 'utf8'), plan(task(1, 'a')));
+});
+
+test('markers count only on lines of their own', () => {
+  const text = plan(task(1, 'a', 'none')).replace('Intro.', 'Intro mentions `<!-- glance -->…<!-- /glance -->` here.');
+  const out = glance(text);
+  assert.ok(out.includes('Intro mentions `<!-- glance -->…<!-- /glance -->` here.'));
+  assert.ok(out.startsWith('# Demo Implementation Plan\n\n<!-- glance -->\n```\n'));
+});
+
+test('a Depends line that names no task throws', () => {
+  for (const value of ['Tasks 1-2', 'the parser task', '`Task 1`'])
+    assert.throws(() => glance(plan(task(1, 'a', 'none'), task(2, 'b', value))), {
+      message: `Task 2: **Depends on:** names no task ("${value}")`,
+    });
+});
+
+test('CRLF plans parse like LF ones and keep their line endings', () => {
+  const lf = plan(task(1, 'a', 'none'), task(2, 'b', 'Task 1'));
+  assert.equal(glance(lf.replace(/\n/g, '\r\n')), glance(lf).replace(/\n/g, '\r\n'));
+});
+
+test('a plan with no task headings throws', () => {
+  assert.throws(() => glance('# Demo\n\n## Task 1: a\n\n**Depends on:** none\n'), /no `### Task <n>:` headings/);
+});
+
+test('headings and fields inside fences and comments are not read', () => {
+  const t = [
+    '### Task 1: a',
+    '',
+    '**Does:** x',
+    '**Depends on:** none',
+    '**Files:**',
+    '- Create: `a`',
+    '',
+    '```markdown',
+    '## Usage',
+    '### Task 7: fixture',
+    '```',
+    '<!-- ### Task 2: old -->',
+    '**Size:** ~10',
+    '',
+  ].join('\n');
+  const b = block(plan(t));
+  assert.match(b, /^Plan: Demo · 1 tasks · ~10 lines · 1 files$/m);
+  assert.doesNotMatch(b, /\[7 |\[2 /);
+});
+
+test('a `<!--` in prose or left open is text, as plan.rs reads it', () => {
+  const t1 = task(1, 'a', 'none', { does: 'mentions `<!--` and never closes it' });
+  const t3 = task(3, 'c', 'Task 2').replace('- [ ] a step', '<!-- a note -->\n- [ ] a step');
+  assert.match(block(plan(t1, task(2, 'b', 'Task 1'), t3)), /^Plan: Demo · 3 tasks/m);
+});
+
+test('a Files list wrapped over lines counts every path', () => {
+  const t = [
+    '### Task 1: a',
+    '',
+    '**Does:** x',
+    '**Depends on:** none',
+    '**Files:** Create `a.rs`, `b.rs`,',
+    'modify `c.rs` and `d.rs`',
+    '**Size:** ~1',
+    '',
+  ].join('\n');
+  assert.match(block(plan(t)), /^1 +x +4 +\? +~1$/m);
+});
+
+test('a Size like ~1.5k or ~1,200 throws', () => {
+  for (const size of ['~1.5k', '~1,200', '~40-60'])
+    assert.throws(() => glance(plan(task(1, 'a', 'none', { size }))), /Task 1: \*\*Size:\*\* is not ~N/);
+  assert.match(block(plan(task(1, 'a', 'none', { size: '~12 lines' }))), /~12 lines · /);
+});
+
+test('an inline Files list counts its paths', () => {
+  const t = [
+    '### Task 1: a',
+    '',
+    '**Does:** x',
+    '**Depends on:** none',
+    '**Files:** Create `a.rs`, `b.rs` and `c.rs`',
+    '**Size:** ~1',
+    '',
+  ].join('\n');
+  assert.match(block(plan(t)), /^1 +x +3 +\? +~1$/m);
+});
+
+test('the CLI runs through a symlinked folder', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'glance-cli-'));
+  symlinkSync(join(import.meta.dirname, '..', 'scripts'), join(dir, 'scripts'));
+  const file = join(dir, 'plan.md');
+  writeFileSync(file, plan(task(1, 'a', 'none')));
+  const res = spawnSync(process.execPath, [join(dir, 'scripts', 'glance.mjs'), file], { encoding: 'utf8' });
+  assert.equal(res.status, 0, res.stderr);
+  assert.match(res.stdout, /^<!-- glance -->/);
 });

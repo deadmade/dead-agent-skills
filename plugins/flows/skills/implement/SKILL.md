@@ -43,7 +43,8 @@ one at a time, with a recommendation each. More: the design isn't done; offer `/
   task without a **Files** list gets one written before the Gate. Every task also gets, right below its heading,
   `**Does:** <one plain sentence for a reader who doesn't know the code>` and `**Depends on:** Task <n>, … | none`,
   and the `**Adds:**` and `**Size:**` lines `/build-feature` Phase 4 describes.
-- **A spec or ticket:** follow superpowers `writing-plans` on it. For a spec too big for one branch, first offer
+- **A spec or ticket:** follow superpowers `writing-plans` on it, with flow-rules **ponytail at chosen steps**' **Before
+  you write** pasted into it. For a spec too big for one branch, first offer
   mattpocock `to-tickets` and plan only the first ticket.
 
 Either way, each seam answer from Phase 1 goes verbatim into the plan's **Global Constraints**, with the

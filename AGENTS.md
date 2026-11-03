@@ -82,7 +82,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   document by the skill, then `scripts/compare.mjs` replaces it only when nothing code can check was lost (the list is
   in `references/copyedit.md`). The conductors run it, per flow-rules, before a gate shows a spec, plan or audit report. `compare.mjs`
   imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
-  `scripts/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
+  `plugins/flows/skills/writing/tests/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
   our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
 - `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
   share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
@@ -242,7 +242,7 @@ plugin's `.claude-plugin/plugin.json`, every crate's `Cargo.toml`/`Cargo.lock` a
 `check-repo.mjs` fails on drift. Never bump by hand. Every merge to `main` that touches more than `docs/` or the root
 `*.md` files releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
 bump off `main` and tags it, so `main`'s `package.json` lags behind the tags and the next version counts from the
-highest `vX.Y.Z` tag (`scripts/next-version.mjs`; fetch tags before a local release). A release you choose:
+highest `vX.Y.Z` tag (`nextVersion` in `scripts/release.mjs`; fetch tags before a local release). A release you choose:
 
     npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main

@@ -43,3 +43,7 @@ suppressions:
     skills: [writing]
     paths: [tests/copyedit.test.mjs]
     reason: The test spawnSync's node on the skill's own scripts/compare.mjs with an argument array and no shell.
+  - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
+    skills: [build-feature]
+    paths: [tests/glance.test.mjs]
+    reason: The test spawnSync's node on the skill's own scripts/glance.mjs, through a temp symlink, with an argument array and no shell.
