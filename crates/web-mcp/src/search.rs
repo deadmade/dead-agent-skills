@@ -231,6 +231,8 @@ async fn typed_page(
     query: &str,
     deadline: Instant,
 ) -> Option<(String, Url, Parsed)> {
+    // `None` only on clock underflow, not "no time left": `run_engine`'s `timed_out()` ran before this, and
+    // `batch_once` times out at once on a past `until`.
     let until = deadline.checked_sub(READ_MARGIN)?;
     let typed = ctx
         .browser

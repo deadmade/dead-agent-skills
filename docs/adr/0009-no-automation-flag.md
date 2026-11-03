@@ -2,8 +2,8 @@
 
 agent-browser starts the window's Chrome with `--remote-debugging-port=0`, and Chrome answers a debugging port by
 setting `navigator.webdriver` to `true` in every tab. Bot checks read that flag first. A spike
-(`docs/features/web-mcp-google-block/findings.md`) found it the one signal every check named: sannysoft,
-deviceandbrowserinfo and browserscan all called the window a bot for it, and Google sent the first typed search to
+(`docs/features/web-mcp-google-block/findings.md`) found it the one signal every check named: sannysoft flagged
+WebDriver, deviceandbrowserinfo said "bot" and browserscan said "Robot", and Google sent the first typed search to
 `/sorry`. With the flag off, the same line, profile and typing got results, and sannysoft and browserscan found
 nothing. The owner config's `userAgent` never reached the tabs that do the work (they attach to the owner's Chrome),
 and in the one tab it reached it stripped the client hints.
@@ -30,9 +30,9 @@ overridden `navigator` properties, and hiding the CDP connection.
 ## Consequences
 
 - **The risk is named.** Google's terms forbid "bypassing our systems or protective measures", and turning the flag
-  off can be read that way. The line held here: the switch is Chromium's own and sets no value the browser would not
-  otherwise report, the window stays headed on the machine's real GPU and screen, and an engine that blocks anyway
-  rests for 30 minutes instead of being worked around further.
+  off can be read that way. The line held here: the switch is Chromium's own, only withholds the flag the debugging
+  port raises and supplies no value of its own, the window stays headed on the machine's real GPU and screen, and an
+  engine that blocks anyway rests for 30 minutes instead of being worked around further.
 - **What remains visible.** deviceandbrowserinfo still flags the CDP connection and two timing and worker
   inconsistencies (the latter may be Helium's fingerprint randomization). Google ignored them in the spike. Hiding
   them would be patching and stays out.

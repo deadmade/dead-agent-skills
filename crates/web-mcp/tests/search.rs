@@ -46,11 +46,16 @@ impl Batch {
         self.cmds.iter().any(|c| c == cmd)
     }
 
+    /// The value of `flag` in its `wait`.
+    fn wait_arg(&self, flag: &str) -> Option<&str> {
+        let wait = self.cmds.iter().find(|c| c[0] == "wait")?;
+        let at = wait.iter().position(|a| a == flag)?;
+        Some(&wait[at + 1])
+    }
+
     /// The `--timeout` of its `wait`.
     fn wait_timeout(&self) -> Option<&str> {
-        let wait = self.cmds.iter().find(|c| c[0] == "wait")?;
-        let at = wait.iter().position(|a| a == "--timeout")?;
-        Some(&wait[at + 1])
+        self.wait_arg("--timeout")
     }
 }
 
@@ -296,6 +301,9 @@ fn engine_tab_stays_between_searches() {
             "{e}"
         );
         assert!(!b[2].has("open") && !b[2].has("click"), "{e}");
+        // The typed read waits for a new document, so the old page never ends it.
+        let ready = b[2].wait_arg("--fn").unwrap_or_default();
+        assert!(ready.contains("performance.timeOrigin !=="), "{e}");
     }
 }
 
