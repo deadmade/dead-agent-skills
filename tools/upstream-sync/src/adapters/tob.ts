@@ -25,7 +25,7 @@ const SKIPPED = [
   'constant-time-analysis',
   'culture-index',
   'devcontainer-setup',
-  'differential-review', // pstack blast-radius, self-review's pr-test-analyzer and claude-security cover it
+  'differential-review', // pstack blast-radius, review-code's pr-test-analyzer and claude-security cover it
   'dimensional-analysis',
   'dwarf-expert',
   'entry-point-analyzer',

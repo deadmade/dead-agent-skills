@@ -32,7 +32,7 @@ export function run(ctx: SyncContext): AdapterResult {
 
   if (ctx.argument === 'security-audit') {
     // Vendor cloudflare/security-audit-skill's security-audit skill, unchanged, into plugins/flows/packs/security-audit/.
-    // /harden reads its domain files ("When to use this file") and its candidate-verifier prompt by path.
+    // /review-code's hardening pass reads its domain files ("When to use this file") and its candidate-verifier prompt by path.
     // Idempotent: re-running against the same upstream commit produces no diff.
 
     const UPSTREAM_URL = 'https://github.com/cloudflare/security-audit-skill.git';

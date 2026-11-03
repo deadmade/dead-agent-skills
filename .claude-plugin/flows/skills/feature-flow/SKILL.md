@@ -18,7 +18,7 @@ Claude proposes and recommends; the user decides.
 | 4 Plan       | superpowers `writing-plans`                                    | plan                                      |
 | 5 Evaluate   | reviewer subagents per plan-review.md                          | revised plan. **Gate 2**                  |
 | 6 Execute    | superpowers `subagent-driven-development` or `executing-plans` | code, tests                               |
-| 7 Finish     | `/verify`, then `/learn`                                       | walkthrough, branch handled, lessons kept |
+| 7 Finish     | `/review-code`, then `/learn`                                  | walkthrough, branch handled, lessons kept |
 
 - **Say how you know.** A claim the user decides on (in options, gate summaries, plan findings) is _measured_ (you
   ran it), _verified_ (a source or `file:line` says so; what code does, read but not run, is inferred), _inferred_ (your
@@ -164,6 +164,6 @@ Before SDD deletes its workspace, copy its ledger's `Ruling:` lines into flow.md
 
 1. Walkthrough table in flow.md: every spec goal → plan task → `file:line` → test. A goal with no code, or code with
    no goal, is a deviation: report it.
-2. Run `/verify` (read `<skill-dir>/../verify/SKILL.md`) on the branch, with the spec as its intent. If
+2. Run `/review-code branch` (read `<skill-dir>/../review-code/SKILL.md`) on the branch, with the spec as its intent. If
    execution ran natively (no per-task reviews), tell it so: it then also offers pstack `interrogate`.
 3. Run `/learn` (`<skill-dir>/../learn/SKILL.md`) on this flow. Set `phase: done`.

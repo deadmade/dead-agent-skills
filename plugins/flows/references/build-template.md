@@ -58,7 +58,7 @@ offered and the recommendation. -->
 
 ## Verify
 
-<!-- /verify's verdict and what it fixed. -->
+<!-- /review-code's verdict and what it fixed. -->
 
 ## Learned
 

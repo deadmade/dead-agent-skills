@@ -10,11 +10,11 @@ argument-hint: '[base branch]'
 Commit, PR, CI. Push and the `gh` commands that write are the owner's: this conductor writes the lines, the user runs
 them.
 
-| Phase    | Runs                                                                | Output                      |
-| -------- | ------------------------------------------------------------------- | --------------------------- |
-| 1 Commit | /verify's result, else superpowers `verification-before-completion` | commits shown, then made    |
-| 2 PR     | pstack `blast-radius`, `flows:writing`                              | title and body. **Gate**    |
-| 3 CI     | `Monitor` on `gh pr checks`                                         | green, or cause and options |
+| Phase    | Runs                                                                     | Output                      |
+| -------- | ------------------------------------------------------------------------ | --------------------------- |
+| 1 Commit | /review-code's result, else superpowers `verification-before-completion` | commits shown, then made    |
+| 2 PR     | pstack `blast-radius`, `flows:writing`                                   | title and body. **Gate**    |
+| 3 CI     | `Monitor` on `gh pr checks`                                              | green, or cause and options |
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: the caller's
 `docs/features/<slug>/flow.md` when there is one (standalone: none), with `phase:` `commit | pr | ci | done`
@@ -27,7 +27,7 @@ release phase.
 
 ## Phase 1: Commit
 
-- The checks: reuse `/verify`'s latest run when the caller's flow.md holds one for this commit with the tree unchanged
+- The checks: reuse `/review-code`'s latest run when the caller's flow.md holds one for this commit with the tree unchanged
   since; otherwise follow superpowers `verification-before-completion` and run them fresh. A red check stops here.
 - Group the changes into commits by purpose and **show them** (message and files each) before making any. A message is
   one sentence with no co-author lines. Stage with `git add -u` plus new paths by name, never `git add -A`; `git add`

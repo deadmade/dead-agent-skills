@@ -1,6 +1,6 @@
 ---
 name: fix-flow
-description: 'Fix a bug from symptom to verified branch: reproduce it, map where it lives and what a fix could break, search upstream for the same issue, find the root cause with systematic debugging, approve it, write the failing regression test first, fix, then /verify and /learn. Resumable. Use for /fix-flow [symptom, error or issue]; no argument resumes.'
+description: 'Fix a bug from symptom to verified branch: reproduce it, map where it lives and what a fix could break, search upstream for the same issue, find the root cause with systematic debugging, approve it, write the failing regression test first, fix, then /review-code and /learn. Resumable. Use for /fix-flow [symptom, error or issue]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: 'What is broken? (symptom, error text, issue link)'
 ---
@@ -15,7 +15,7 @@ No fix before the cause is known and agreed, and no fix without a test that fail
 | 2 Ground    | pstack `how` + `blast-radius`, upstream search | where it lives, known issues       |
 | 3 Cause     | superpowers `systematic-debugging`             | root cause with evidence. **Gate** |
 | 4 Fix       | superpowers `test-driven-development`          | failing test, then the fix         |
-| 5 Finish    | `/verify`, then `/learn`                       | branch handled, lesson kept        |
+| 5 Finish    | `/review-code`, then `/learn`                  | branch handled, lesson kept        |
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: `docs/features/<slug>/flow.md` from
 [build-template.md](../../references/build-template.md), `flow: fix`, phases `reproduce | ground | cause | fix |
@@ -69,5 +69,5 @@ failure has to be the bug.
 
 ## Phase 5: Finish
 
-Run `/verify` with the cause and fix as its intent, then `/learn` on this flow (a root cause is the classic
+Run `/review-code branch` with the cause and fix as its intent, then `/learn` on this flow (a root cause is the classic
 `docs/solutions/` note). Set `phase: done`.

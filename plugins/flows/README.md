@@ -3,21 +3,17 @@
 Conductor skills: each one runs the skills the rest of this marketplace ships, in order, stops at approval gates, and
 keeps a state file so the next session can resume. Claude proposes and recommends; you decide.
 
-| Conductor                   | Job                                               | Runs                                                                                                                                                     | Ends in              |
-| --------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `/understand <topic>`       | learn a codebase, subsystem or concept            | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                         | terms in GLOSSARY.md |
-| `/feature-flow <what>`      | a new feature with a design                       | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                        | `/verify`, `/learn`  |
-| `/research-flow <what>`     | a feature grounded in papers, hypothesis measured | feature-flow plus a literature agent (web-mcp papers, paper-lookup) and a measured result                                                                | `/verify`, `/learn`  |
-| `/implement <plan>`         | build from an existing plan, spec or ticket       | `to-tickets` or `writing-plans` if needed, superpowers execution                                                                                         | `/verify`, `/learn`  |
-| `/fix-flow <symptom>`       | fix a bug                                         | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                           | `/verify`, `/learn`  |
-| `/upgrade <pkg>[@v]`        | bump a dependency                                 | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                                                                                | `/verify`, `/learn`  |
-| `/test-audit [branch\|all]` | is the test suite appropriate?                    | run it, then mutation testing, property-based candidates, untested requirements, test smells                                                             | gaps you pick filled |
-| `/doc-audit [branch\|all]`  | do the docs tell the truth?                       | `spec-to-code-compliance` with the docs as spec, `claude-md-improver`, links/commands, prose                                                             | fixes you pick       |
-| `/harden [branch\|all]`     | security, footguns, bloat, architecture           | claude-security, cloudflare `security-audit` domain checklists, tob `sharp-edges`, ponytail audit/review, `improve-codebase-architecture`                | fixes you pick       |
-| `/self-review [base]`       | review your branch before a PR                    | bug pass, spec and standards pass, `security-review`, `claude-md-improver`, specialist agents (silent failures, tests, types, comments)                  | fixes you pick       |
-| `/verify [base]`            | is this branch ready for a PR?                    | checks once, `/self-review`, `/doc-audit branch`, optional `/test-audit branch`, diff walkthrough, a Decisions gate on the build's rulings and shortcuts | how to integrate     |
-| `/integrate [base]`         | commit, open the PR, watch CI                     | commits shown first, `blast-radius` + `writing` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                        | PR open, CI green    |
-| `/learn [flow]`             | keep what the work taught                         | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                        | done                 |
+| Conductor                    | Job                                               | Runs                                                                                                                                                                                                                                                     | Ends in                  |
+| ---------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `/understand <topic>`        | learn a codebase, subsystem or concept            | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                         | terms in GLOSSARY.md     |
+| `/feature-flow <what>`       | a new feature with a design                       | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                                                                                                                        | `/review-code`, `/learn` |
+| `/research-flow <what>`      | a feature grounded in papers, hypothesis measured | feature-flow plus a literature agent (web-mcp papers, paper-lookup) and a measured result                                                                                                                                                                | `/review-code`, `/learn` |
+| `/implement <plan>`          | build from an existing plan, spec or ticket       | `to-tickets` or `writing-plans` if needed, superpowers execution                                                                                                                                                                                         | `/review-code`, `/learn` |
+| `/fix-flow <symptom>`        | fix a bug                                         | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                                                                                                                           | `/review-code`, `/learn` |
+| `/upgrade <pkg>[@v]`         | bump a dependency                                 | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                                                                                                                                                                                | `/review-code`, `/learn` |
+| `/review-code [branch\|all]` | review a branch before merge, or the whole repo   | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes | how to integrate         |
+| `/integrate [base]`          | commit, open the PR, watch CI                     | commits shown first, `blast-radius` + `writing` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                                                                                                                        | PR open, CI green        |
+| `/learn [flow]`              | keep what the work taught                         | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                                                                                                                        | done                     |
 
 `branch` (the default) audits what changed against the base, plus the tests and docs that should have changed with
 it; `all` audits the whole repo, vendored content skipped.
@@ -30,12 +26,6 @@ Installing flows installs every plugin below; the packs ship inside flows itself
 <!-- uses:start -->
 
 ```text
-doc-audit
-├ tob-picks: spec-to-code-compliance, spec-compliance, spec-compliance-checker
-├ claude-md-management@claude-plugins-official: claude-md-improver
-├ web-mcp: fetch
-└ flows: writing
-
 feature-flow
 ├ pstack-picks: how, why, architect, arena, interrogate, blast-radius, principle-redesign-from-first-principles, principle-boundary-discipline
 ├ claude-code: general-purpose
@@ -47,15 +37,6 @@ fix-flow
 ├ pstack-picks: how, why, blast-radius
 ├ web-mcp: search, fetch
 └ superpowers: systematic-debugging, test-driven-development
-
-harden
-├ claude-security@claude-plugins-official: claude-security
-├ security-audit: security-audit
-├ tob-picks: sharp-edges
-├ ponytail: ponytail-audit, ponytail-review
-├ mattpocock-picks: improve-codebase-architecture, grilling
-├ pstack-picks: principle-boundary-discipline
-└ superpowers: test-driven-development
 
 implement
 ├ pstack-picks: how, principle-redesign-from-first-principles, principle-boundary-discipline
@@ -92,15 +73,6 @@ review-code
 ├ security-audit: security-audit
 └ mattpocock-picks: improve-codebase-architecture, grilling
 
-self-review
-├ claude-code: security-review
-├ claude-md-management@claude-plugins-official: claude-md-improver
-└ pstack-picks: blast-radius
-
-test-audit
-├ tob-picks: mutation-testing, property-based-testing, spec-to-code-compliance
-└ superpowers: verification-before-completion, test-driven-development
-
 understand
 ├ pstack-picks: how, why
 ├ graphify: graphify
@@ -111,10 +83,6 @@ upgrade
 ├ web-mcp: fetch
 ├ pstack-picks: blast-radius
 └ superpowers: writing-plans, test-driven-development
-
-verify
-├ superpowers: verification-before-completion, systematic-debugging, finishing-a-development-branch
-└ pstack-picks: interrogate
 ```
 
 <!-- uses:end -->
@@ -122,7 +90,7 @@ verify
 State lives in the repo: build flows in `docs/features/<slug>/flow.md`, audits in `docs/audits/`. The shared rules
 are in [references/flow-rules.md](references/flow-rules.md).
 
-Calls between conductors (`/fix-flow` → `/verify`) aren't listed. Each conductor still has a fallback for a
+Calls between conductors (`/fix-flow` → `/review-code`) aren't listed. Each conductor still has a fallback for a
 plugin that isn't there, for installs that skipped one.
 
 ## Writing
@@ -137,7 +105,7 @@ copyedit that revises a document by it before a gate.
   short section adds rules for technical documents that the book doesn't cover, such as no conversation shorthand.
   `references/` holds the full method of every lesson and both appendices, which Claude reads when a pass needs it.
   Unlike the conductors, Claude may load it on its own (`flows:writing`) whenever it writes a spec, a plan, a report,
-  a README, a PR description or a commit message. `/doc-audit` reads changed docs against it and `/integrate`
+  a README, a PR description or a commit message. `/review-code`'s docs lens reads changed docs against it and `/integrate`
   revises PR text by it.
 - **The prose check** (`hooks/prose-check.mjs`, a `PostToolUse` hook on every `Write` and `Edit` of a `*.md` file)
   reports conversation shorthand (`Q4`, `D2`, `round 2`, `my call`) in the new text only: an Edit's new string, or the
@@ -159,9 +127,8 @@ flows carries the skill packs its conductors run, in `packs/`: superpowers, pony
 tob-picks, paper-lookup and security-audit, each written there by its `tools/upstream-sync/src/adapters/*.ts`. The agent scans only a plugin's root
 `skills/`, `agents/` and `hooks/hooks.json`, so nothing under `packs/` loads on its own; the conductors read a pack's
 skills by path (`${PLUGIN_ROOT}/packs`). tob's spec checker is flows' own agent (`agents/spec-compliance-checker.md`),
-since a pack's agents don't load. `/self-review` vendors its passes too, from claude-plugins-official's code-review
-and pr-review-toolkit and from mattpocock's code-review (`skills/self-review/references/upstream/` and the other five
-`agents/`, written by `tools/upstream-sync/src/adapters/self-review.ts`). Where a conductor changes a pack's rule it quotes the sentence it overrides in an
+since a pack's agents don't load. `/review-code` vendors one agent too, pr-review-toolkit's `pr-test-analyzer`
+(`agents/`, written by `tools/upstream-sync/src/adapters/self-review.ts`). Where a conductor changes a pack's rule it quotes the sentence it overrides in an
 `overrides` comment marker, and `npm test` fails when that sentence is gone from the pack. To add
 a pack, follow [docs/vendor-a-pack.md](../../docs/vendor-a-pack.md).
 

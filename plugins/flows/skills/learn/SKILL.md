@@ -21,9 +21,9 @@ and mattpocock are its `-picks` folders).
 
 ## Phase 1: Gather
 
-From a build flow: its flow.md (**Rulings**, deviations, rejected options, plan-review findings, the verify verdict
+From a build flow: its flow.md (**Rulings**, deviations, rejected options, plan-review findings, the review verdict
 with the decisions the user reopened) and the branch's commits. Each ruling is a candidate: one that cost a wrong
-turn, or that the user reopened at /verify, usually is a lesson. Standalone: the flow.md named in the argument, else
+turn, or that the user reopened at /review-code, usually is a lesson. Standalone: the flow.md named in the argument, else
 pstack `recall` on the topic or the current session.
 
 A lesson is something that cost time or a wrong turn and isn't obvious from the code: a root cause, a constraint

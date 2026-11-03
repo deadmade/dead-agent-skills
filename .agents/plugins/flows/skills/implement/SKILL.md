@@ -1,6 +1,6 @@
 ---
 name: implement
-description: 'Build from a plan, spec or ticket that already exists, without the design phases of /feature-flow: turn a spec into tickets or a plan if needed, approve the plan, execute it test-first through superpowers, then /verify and /learn. One approval gate, resumable. Use for /implement [path to plan, spec or ticket]; no argument resumes.'
+description: 'Build from a plan, spec or ticket that already exists, without the design phases of /feature-flow: turn a spec into tickets or a plan if needed, approve the plan, execute it test-first through superpowers, then /review-code and /learn. One approval gate, resumable. Use for /implement [path to plan, spec or ticket]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: 'Path to a plan, spec or ticket'
 ---
@@ -15,7 +15,7 @@ and offer `/feature-flow` instead.
 | 1 Read    | the input, pstack `how` on the code it touches, the seam question | what's settled, what's not |
 | 2 Plan    | mattpocock `to-tickets` and/or superpowers `writing-plans`        | plan. **Gate**             |
 | 3 Execute | superpowers `subagent-driven-development` or `executing-plans`    | code, tests                |
-| 4 Finish  | `/verify`, then `/learn`                                          | branch handled             |
+| 4 Finish  | `/review-code`, then `/learn`                                     | branch handled             |
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: `docs/features/<slug>/flow.md` from
 [build-template.md](../../references/build-template.md), `flow: implement`, phases `read | plan | execute | finish |
@@ -64,5 +64,5 @@ flow.md (flow-rules **Rulings**).
 
 ## Phase 4: Finish
 
-Run `/verify` with the input as its intent (and that execution ran natively, if it did), then `/learn` on this flow.
+Run `/review-code branch` with the input as its intent (and that execution ran natively, if it did), then `/learn` on this flow.
 Set `phase: done`.

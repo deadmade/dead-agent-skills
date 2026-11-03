@@ -158,7 +158,7 @@ One conductor run, recorded in a `docs/features/<slug>/flow.md`, from its start 
 _Avoid_: run (alone; a web-mcp run is something else), flow (alone; that's the conductor), ticket
 
 **Audit**:
-One `docs/audits/<date>-<flow>-<scope>.md` report written by `/test-audit`, `/doc-audit` or `/harden`.
+One `docs/audits/<date>-review-<scope>.md` report written by `/review-code` (older ones by `/test-audit`, `/doc-audit` or `/harden`, which it replaced).
 _Avoid_: audit run, report (alone)
 
 **Claude session**:

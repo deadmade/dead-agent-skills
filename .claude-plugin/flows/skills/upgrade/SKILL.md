@@ -1,6 +1,6 @@
 ---
 name: upgrade
-description: 'Bump a dependency safely: read its changelog and migration guide, find every use in the code and what the breaking changes hit, approve a plan, bump, fix and test, then /verify. Resumable. Use for /upgrade [package@version]; no argument resumes.'
+description: 'Bump a dependency safely: read its changelog and migration guide, find every use in the code and what the breaking changes hit, approve a plan, bump, fix and test, then /review-code. Resumable. Use for /upgrade [package@version]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: '<package>[@version]'
 ---
@@ -12,7 +12,7 @@ argument-hint: '<package>[@version]'
 | 1 Research | context7, web-mcp `fetch` on the changelog and migration guide                                    | breaking changes, from → to           |
 | 2 Impact   | pstack `blast-radius`, grep for every use, superpowers `writing-plans`                            | what each change hits, plan. **Gate** |
 | 3 Bump     | the package manager, then superpowers `test-driven-development` per break, or implement's Execute | updated lockfile, code, tests         |
-| 4 Finish   | `/verify`, then `/learn`                                                                          | branch handled                        |
+| 4 Finish   | `/review-code`, then `/learn`                                                                     | branch handled                        |
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: `docs/features/<slug>/flow.md` from
 [build-template.md](../../references/build-template.md), `flow: upgrade`, slug `upgrade-<package>`, phases
@@ -51,4 +51,4 @@ clause, the files check, Rulings).
 
 ## Phase 4: Finish
 
-Run `/verify`, then `/learn` on this flow. Set `phase: done`.
+Run `/review-code`, then `/learn` on this flow. Set `phase: done`.

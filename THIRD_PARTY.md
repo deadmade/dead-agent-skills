@@ -27,7 +27,7 @@ The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
 `plugins/flows/packs/security-audit/skills/security-audit/` is vendored unchanged from
 [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT License, Copyright (c)
 2025-2026 Cloudflare, Inc.; full text in `plugins/flows/packs/security-audit/LICENSE`) by
-`tools/upstream-sync/src/adapters/simple.ts` (weekly via GitHub Actions). `/harden` reads its domain files and candidate-verifier
+`tools/upstream-sync/src/adapters/simple.ts` (weekly via GitHub Actions). `/review-code`'s hardening pass reads its domain files and candidate-verifier
 prompt by path. The synced upstream commit is in `plugins/flows/packs/security-audit/UPSTREAM`.
 
 ## MCP servers (dead-skills, mcp-github)
@@ -109,17 +109,15 @@ unmodified. `plugins/shared/graphify/hooks/hooks.json` reproduces the hooks upst
 separately installed `graphifyy` CLI. Synced by `tools/upstream-sync/src/adapters/graphify.ts` (weekly via GitHub Actions); the
 synced upstream commit is in `plugins/shared/graphify/UPSTREAM`.
 
-## self-review
+## review-code
 
-flows' `/self-review` (`plugins/flows/skills/self-review/`) vendors review passes from two upstreams, synced by
-`tools/upstream-sync/src/adapters/self-review.ts` (weekly via GitHub Actions; the synced commits are in
-`plugins/flows/skills/self-review/UPSTREAM`, the license files and `NOTICE` sit next to it):
-[anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)'s code-review command
-(`references/upstream/code-review.md`) and five pr-review-toolkit agents (`plugins/flows/agents/`: silent-failure-hunter,
-pr-test-analyzer, type-design-analyzer, comment-analyzer, code-simplifier; Apache License 2.0, Copyright Anthropic,
-PBC; `LICENSE`), with the agents'
-`description:` rewritten, and [mattpocock/skills](https://github.com/mattpocock/skills)'s engineering code-review
-skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from a source comment.
+flows' `/review-code` (`plugins/flows/skills/review-code/`) vendors one agent from
+[anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)'s pr-review-toolkit,
+`plugins/flows/agents/pr-test-analyzer.md` (Apache License 2.0, Copyright Anthropic, PBC; `LICENSE`), with its
+`description:` rewritten and a source comment added. It is synced by `tools/upstream-sync/src/adapters/self-review.ts`
+(weekly via GitHub Actions; the synced commit is in `plugins/flows/skills/review-code/UPSTREAM`, `NOTICE` sits next to
+it). Until flows-rework (2026-11) the same adapter also vendored the code-review command, four more toolkit agents and
+mattpocock/skills' engineering code-review skill for the former `/self-review`.
 
 ## writing (flows)
 
@@ -209,7 +207,7 @@ The only local changes are in `SKILL.md`'s frontmatter (`disable-model-invocatio
 sentence pointing at the dead-skills `rules.md` instead of the upstream README, `references/tool-notes.md` without its
 install section (it describes the unmodified skill) and `SKILL.md`'s link to it no longer naming install options, and a
 source comment in each Markdown file. The self-audit lines in `plugins/default/rules.md` and the review steps in
-self-review and feature-flow are adapted from its method.
+review-code and feature-flow are adapted from its method.
 
 ## Re-listed plugins
 

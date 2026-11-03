@@ -76,7 +76,7 @@ over your flow runs, audits and Claude sessions (on Linux the app comes from the
 prompts and agent starts and stops per session into a local capture folder, which only the window reads.
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
-`/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
+`/fix-flow`, `/review-code`, `/learn` and more) that run the other plugins' skills in order,
 with approval gates and a state file to resume from. They keep the number of agents small, ultracode included, and run
 each on a model suited to its job rather than the one you picked. Picking flows installs every plugin its conductors use.
 flows also sets the house standard for prose. A `writing` skill states Williams and Bizup's _Style_ in our own words.

@@ -61,17 +61,19 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   hand.
 - `plugins/opt-in/mcp/mcp-github/`: an MCP server config only.
 - `plugins/flows/`: the conductor skills (`/feature-flow`, `/research-flow`, `/implement`, `/fix-flow`, `/upgrade`,
-  `/test-audit`, `/doc-audit`, `/harden`, `/self-review`, `/verify`, `/integrate`, `/understand`, `/learn`). Each runs other plugins' skills in order;
+  `/review-code`, `/integrate`, `/understand`, `/learn`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
   plugin, audit scope and report format) live once in `references/flow-rules.md`, so a SKILL.md only says what it runs.
   Its short **Agents** section asks for few agents, combined where it makes sense, each on a model that fits its job
   (ADR 0005). The installer's only part is `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` (`mergeSettings`); it never
   writes `CLAUDE_CODE_SUBAGENT_MODEL`.
-  Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/verify` → `/doc-audit branch`). Each
+  Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/review-code`). Each
   conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
-  tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. `/self-review`
-  was a plugin of its own until 0.5.0; its skill and its five agents (`agents/`, next to tob's checker) now ship in
-  flows, so its agents are `flows:pr-test-analyzer` and so on, and the installer keeps flows on a machine that had it.
+  tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. `/review-code`
+  replaced `/test-audit`, `/doc-audit`, `/harden`, `/self-review` and `/verify` (their method text is in its
+  `references/`); on Claude Code its correctness lens is the built-in `code-review` (the host adapter template), and
+  the one agent it vendors is `flows:pr-test-analyzer`, next to tob's checker in `agents/`. `/self-review` was a plugin
+  of its own until 0.5.0, so the installer keeps flows on a machine that had it.
   flows also owns the prose standard: `skills/writing/` is the one skill in it Claude may load on its own
   (`flows:writing`). `flows-uses.mjs` treats only `disable-model-invocation: true` skills as conductors, so a
   `uses.json` may list `writing` under `flows`. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
@@ -224,7 +226,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 These are copied from upstream by `tools/upstream-sync/src/adapters/*.ts` (the weekly `sync.yml` opens the PRs) and overwritten on every
 sync: `plugins/shared/agent-review/skills/`, `plugins/shared/agent-review/LICENSE` and `UPSTREAM`, `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0; pstack-picks' `.claude-plugin/plugin.json` is hand-written), `plugins/flows/agents/`,
 `plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
-`plugins/flows/skills/self-review/references/upstream/` with its `LICENSE` and `LICENSE-MIT`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
+`plugins/flows/skills/review-code/LICENSE` and `UPSTREAM` (the self-review adapter's), and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
 `crates/flow-cockpit/app/shell/vendor/` (marked, DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync script: it is copied unchanged from
 the npm tarballs THIRD_PARTY.md names, so a new version replaces the files rather than editing them.
 When what's vendored or its license changes, update THIRD_PARTY.md.

@@ -27,7 +27,7 @@ const SKILLS = [
 // Anything upstream lists that is in neither array is reported as new (returned in result.newSkills).
 const SKIPPED = [
   'engineering/ask-matt',
-  'engineering/code-review', // vendored by the self-review adapter as a reference of /self-review
+  'engineering/code-review', // /review-code's correctness lens covers it
   'engineering/diagnosing-bugs',
   'engineering/implement',
   'engineering/implement-spec', // parallel implementers, no gates
