@@ -170,7 +170,8 @@ export function checkTemplates(root) {
       ['`now:` after `phase:` in the frontmatter', /\nphase: [^\n]*\nnow: /],
       [`the gate line shape \`${GATE_LINE}\``, GATE_LINE],
       ['`Picked:`', 'Picked:'],
-      ['`Status:`', 'Status: open'],
+      // A research run builds nothing, so its template has no Deviations.
+      ...(file.includes('research') ? [] : [['`Status:`', 'Status: open']]),
     ]);
   need(RULES_FILE, [
     ['the `Waiting for you` rule', 'Waiting for you'],

@@ -38,14 +38,10 @@ const FEATURE: List = &[
 ];
 /// research-flow/SKILL.md.
 const RESEARCH: List = &[
-    ("ground", None),
-    ("brainstorm", None),
-    ("grill", Some(1)),
-    ("plan", None),
-    ("evaluate", Some(2)),
-    ("execute", None),
-    ("validate", None),
-    ("finish", None),
+    ("frame", None),
+    ("search", None),
+    ("weigh", None),
+    ("report", Some(1)),
 ];
 /// implement/SKILL.md.
 const IMPLEMENT: List = &[

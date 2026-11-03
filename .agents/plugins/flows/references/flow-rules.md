@@ -24,8 +24,8 @@ Load [resource-index.md](resource-index.md) when resolving another package's ski
 
 ## State
 
-- **Build flows** (`/feature-flow`, `/research-flow`, `/implement`, `/fix-flow`, `/upgrade`) keep
-  `docs/features/<slug>/flow.md`. Its frontmatter names the flow (`flow: feature | research | implement | fix |
+- **Build flows** (`/feature-flow`, `/implement`, `/fix-flow`, `/upgrade`) and `/research-flow`, which researches
+  and builds nothing, keep `docs/features/<slug>/flow.md`. Its frontmatter names the flow (`flow: feature | research | implement | fix |
 upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it after every phase, with links to every
   artifact. It is how the next session resumes. feature-flow and research-flow have their own templates; the others
   use [build-template.md](build-template.md).
@@ -72,7 +72,7 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   changed data flow or error handling, a file the task didn't list, or, for a task with an `**Adds:**` line, a new
   type, exported function, flag, config key or dependency that line doesn't name. Private names aren't deviations. A
   cleanup or idea outside the task is one line under **Parking lot** in flow.md (`file`: what), and not done; the user
-  picks from the Parking lot at Finish. This holds in every build flow (`/feature-flow`, `/research-flow`, `/implement`,
+  picks from the Parking lot at Finish. This holds in every build flow (`/feature-flow`, `/implement`,
   `/fix-flow`, `/upgrade`) and in `/review-code`'s fixes.
   - **The fifth stop.** A deviation is never ruled on, by the coordinating session or by a subagent. The coordinating
     session writes it under **Deviations** in flow.md as `### <deviation>` with `Status: open` (then what, why the plan

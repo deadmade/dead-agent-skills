@@ -248,11 +248,13 @@ test('checkTemplates on the real repo returns []', () => {
 });
 
 for (const t of TEMPLATES) {
+  // A research run builds nothing, so its template has no Deviations and no `Status:`.
+  const research = t.includes('research');
   for (const [what, needle] of [
     ['now:', 'now: <'],
     ['the Gates line shape', '- Gate <n>, <what>:'],
     ['Picked:', 'Picked:'],
-    ['Status:', 'Status: open'],
+    ...(research ? [] : [['Status:', 'Status: open']]),
   ]) {
     test(`checkTemplates names ${t} without ${what}`, () => {
       const problems = without(t, needle);

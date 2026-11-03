@@ -63,6 +63,8 @@ Ask nothing yet. In one message, start both:
   `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists (the glossary and the ADRs).
 - **Prior art:** one background `general-purpose` agent with the prompt in
   [references/prior-art.md](references/prior-art.md), writing `docs/features/<slug>/prior-art.md`. Don't wait for it; Phase 2 starts with questions anyway. When it lands, run the source check in that reference and correct the report before presenting options.
+  When the request hands over an approved `research.md` from `/research-flow`, that report is the prior art: link it
+  and skip this agent.
 
 Write a short summary of each into flow.md under **Grounding** and **Prior art** as they land, including the source check’s counts.
 
