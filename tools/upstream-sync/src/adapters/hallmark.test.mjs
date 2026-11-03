@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { trim } from './hallmark.ts';
+import { run, trim } from './hallmark.ts';
 
 test('trim drops the comp step and the edit-time hook from flow.md', () => {
   const flow = `The stamp says \`shape: app screen\`, which sloplint and the edit-time hook read as the app scope.
@@ -61,4 +64,30 @@ See \`comp.md\`.
 test('trim reports a mention its edits no longer reach, and leaves "together" alone', () => {
   const { left } = trim('references/craft.md', 'Display and body together.\nNow load `comp.md` first.\n');
   assert.deepEqual(left, [2]);
+});
+
+test("run ships the skill's scripts but not upstream's own test files", () => {
+  // The skill scanner rates a test's child_process or eval use CRITICAL, and nothing here runs those tests.
+  const root = mkdtempSync(join(tmpdir(), 'hallmark-sync-'));
+  try {
+    const up = join(root, 'upstream');
+    const put = (rel, text) => {
+      mkdirSync(dirname(join(up, rel)), { recursive: true });
+      writeFileSync(join(up, rel), text);
+    };
+    put('LICENSE', 'license\n');
+    put('skills/hallmark/SKILL.md', '---\nname: hallmark\ndescription: "Design pages."\n---\nBody.\n');
+    put('skills/hallmark/references/flow.md', '# Flow\n');
+    put('skills/hallmark/scripts/photos.json', '[]\n');
+    for (const script of ['theme', 'capture', 'sloplint-render']) {
+      put(`skills/hallmark/scripts/${script}.mjs`, 'export {};\n');
+      put(`skills/hallmark/scripts/${script}.test.mjs`, "import test from 'node:test';\n");
+    }
+    const ctx = { ROOT: join(root, 'repo'), git: () => 'abc', finish: () => {}, sparseClone: () => up };
+    run(ctx);
+    const scripts = join(ctx.ROOT, 'plugins', 'opt-in', 'hallmark', 'skills', 'hallmark', 'scripts');
+    assert.deepEqual(readdirSync(scripts).sort(), ['capture.mjs', 'photos.json', 'sloplint-render.mjs', 'theme.mjs']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

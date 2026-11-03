@@ -121,10 +121,9 @@ export function run(ctx: SyncContext): AdapterResult {
   if (!checker.includes('{baseDir}/skills/'))
     fail('{baseDir}/skills/ not found in the checker agent (upstream changed?)');
   mkdirSync(dirname(FLOWS_CHECKER), { recursive: true });
-  writeFileSync(
-    FLOWS_CHECKER,
-    checker.replaceAll('{baseDir}/skills/', '${CLAUDE_PLUGIN_ROOT}/packs/tob-picks/skills/'),
-  );
+  // plugins/ is agent-neutral: the harness compiler turns ${PLUGIN_ROOT} into each target's root, and its lint rejects
+  // a native name such as CLAUDE_PLUGIN_ROOT here.
+  writeFileSync(FLOWS_CHECKER, checker.replaceAll('{baseDir}/skills/', '${PLUGIN_ROOT}/packs/tob-picks/skills/'));
 
   finish('tob-picks', git('-C', up, 'rev-parse', 'HEAD'), join(PLUGIN, 'UPSTREAM'), PLUGIN);
 
