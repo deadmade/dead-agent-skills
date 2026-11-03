@@ -99,5 +99,6 @@ fixes in the audit file (flow-rules **Reports**).
 ## Phase 7: Decide
 
 Follow [references/checks.md](references/checks.md) **Decide**: the verdict, the decisions the build made on its own
-(**Waiting on you** in the report), then `finishing-a-development-branch`. Called from a build flow, record the
+(**Waiting on you** in the report), then `finishing-a-development-branch`; its PR option ends with `Monitor` on the
+checks. Called from a build flow, record the
 result in its flow.md; standalone, offer `/learn` after this gate.

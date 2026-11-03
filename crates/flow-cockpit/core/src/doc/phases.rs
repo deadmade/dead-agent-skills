@@ -1,6 +1,6 @@
 //! The conductors' phase lists: which phases each flow.md-writing conductor has, in order, the `phase:` key each writes,
 //! and the gate that follows it. Taken from each conductor's SKILL.md phase table (`phase_lists_match_skill_tables`
-//! fails when one drifts). `/integrate` and the audits write no flow.md of their own and have no list.
+//! fails when one drifts). `/review-code` writes no flow.md of its own and has no list.
 
 use std::cmp::Ordering;
 

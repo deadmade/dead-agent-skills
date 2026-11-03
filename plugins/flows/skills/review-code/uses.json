@@ -1,5 +1,5 @@
 {
-  "claude-code": ["general-purpose", "code-review", "security-review"],
+  "claude-code": ["general-purpose", "code-review", "security-review", "Monitor"],
   "claude-md-management@claude-plugins-official": ["claude-md-improver"],
   "claude-security@claude-plugins-official": ["claude-security"],
   "flows": ["writing"],

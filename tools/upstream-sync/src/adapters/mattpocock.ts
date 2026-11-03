@@ -31,7 +31,7 @@ const SKIPPED = [
   'engineering/diagnosing-bugs',
   'engineering/implement',
   'engineering/implement-spec', // parallel implementers, no gates
-  'engineering/pr', // ideas in /integrate's PR body
+  'engineering/pr', // ideas in /review-code's PR step
   'engineering/prototype',
   'engineering/research',
   'engineering/resolving-merge-conflicts',

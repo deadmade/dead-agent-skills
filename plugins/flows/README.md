@@ -3,17 +3,16 @@
 Conductor skills: each one runs the skills the rest of this marketplace ships, in order, stops at approval gates, and
 keeps a state file so the next session can resume. Claude proposes and recommends; you decide.
 
-| Conductor                      | Job                                             | Runs                                                                                                                                                                                                                                                     | Ends in                                  |
-| ------------------------------ | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `/understand <topic>`          | learn a codebase, subsystem or concept          | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                         | terms in GLOSSARY.md                     |
-| `/build-feature <what>`        | a new feature with a design                     | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                                                                                                                        | `/review-code`, `/learn`                 |
-| `/research-feature <question>` | research a design question before building      | frame, papers and engineering sources (web-mcp, paper-lookup), source check, `grilling` on the options; no build, no benchmark                                                                                                                           | a decision report, then `/build-feature` |
-| `/implement <plan>`            | build from an existing plan, spec or ticket     | `to-tickets` or `writing-plans` if needed, superpowers execution                                                                                                                                                                                         | `/review-code`, `/learn`                 |
-| `/fix <symptom>`               | fix a bug                                       | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                                                                                                                           | `/review-code`, `/learn`                 |
-| `/upgrade <pkg>[@v]`           | bump a dependency                               | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                                                                                                                                                                                | `/review-code`, `/learn`                 |
-| `/review-code [branch\|all]`   | review a branch before merge, or the whole repo | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes | how to integrate                         |
-| `/integrate [base]`            | commit, open the PR, watch CI                   | commits shown first, `blast-radius` + `writing` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                                                                                                                        | PR open, CI green                        |
-| `/learn [flow]`                | keep what the work taught                       | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                                                                                                                        | done                                     |
+| Conductor                      | Job                                             | Runs                                                                                                                                                                                                                                                     | Ends in                                           |
+| ------------------------------ | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `/understand <topic>`          | learn a codebase, subsystem or concept          | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                         | terms in GLOSSARY.md                              |
+| `/build-feature <what>`        | a new feature with a design                     | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                                                                                                                        | `/review-code`, `/learn`                          |
+| `/research-feature <question>` | research a design question before building      | frame, papers and engineering sources (web-mcp, paper-lookup), source check, `grilling` on the options; no build, no benchmark                                                                                                                           | a decision report, then `/build-feature`          |
+| `/implement <plan>`            | build from an existing plan, spec or ticket     | `to-tickets` or `writing-plans` if needed, superpowers execution                                                                                                                                                                                         | `/review-code`, `/learn`                          |
+| `/fix <symptom>`               | fix a bug                                       | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                                                                                                                           | `/review-code`, `/learn`                          |
+| `/upgrade <pkg>[@v]`           | bump a dependency                               | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                                                                                                                                                                                | `/review-code`, `/learn`                          |
+| `/review-code [branch\|all]`   | review a branch before merge, or the whole repo | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes | merge, or a PR (`!` lines to push) and CI watched |
+| `/learn [flow]`                | keep what the work taught                       | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                                                                                                                        | done                                              |
 
 `branch` (the default) audits what changed against the base, plus the tests and docs that should have changed with
 it; `all` audits the whole repo, vendored content skipped.
@@ -43,12 +42,6 @@ implement
 ├ mattpocock-picks: codebase-design, to-tickets
 └ superpowers: writing-plans, subagent-driven-development, executing-plans
 
-integrate
-├ claude-code: Monitor
-├ flows: writing
-├ pstack-picks: blast-radius
-└ superpowers: verification-before-completion, systematic-debugging
-
 learn
 ├ claude-md-management@claude-plugins-official: revise-claude-md
 ├ mattpocock-picks: domain-modeling
@@ -62,7 +55,7 @@ research-feature
 └ mattpocock-picks: grilling
 
 review-code
-├ claude-code: general-purpose, code-review, security-review
+├ claude-code: general-purpose, code-review, security-review, Monitor
 ├ claude-md-management@claude-plugins-official: claude-md-improver
 ├ claude-security@claude-plugins-official: claude-security
 ├ flows: writing
@@ -111,8 +104,8 @@ copyedit that revises a document by it before a gate.
   short section adds rules for technical documents that the book doesn't cover, such as no conversation shorthand.
   `references/` holds the full method of every lesson and both appendices, which Claude reads when a pass needs it.
   Unlike the conductors, Claude may load it on its own (`flows:writing`) whenever it writes a spec, a plan, a report,
-  a README, a PR description or a commit message. `/review-code`'s docs lens reads changed docs against it and `/integrate`
-  revises PR text by it.
+  a README, a PR description or a commit message. `/review-code`'s docs lens reads changed docs against it, and its PR step
+  revises the PR body by it.
 - **The prose check** (`hooks/prose-check.mjs`, a `PostToolUse` hook on every `Write` and `Edit` of a `*.md` file)
   reports conversation shorthand (`Q4`, `D2`, `round 2`, `my call`) in the new text only: an Edit's new string, or the
   lines a Write added to the file, unless the file defines the label. It is Node code with no model call, so it costs no
