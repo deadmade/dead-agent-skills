@@ -24,7 +24,8 @@ that behaves like "a normal user", in "complete isolation" from their own.
   them. The `browser` tool and the fetch fallback keep throwaway sessions, so pages Claude opens can't change the
   search profile. (ADR 0007 replaces this: they are now tabs of the search window and share its profile.)
 - **No stealth.** Normal browser settings are allowed (a regular user agent, window size, `Accept-Language`).
-  Fingerprint patching is not. An engine that keeps blocking is dropped or switched to headed, not disguised.
+  Fingerprint patching is not. An engine that keeps blocking is dropped or switched to headed, not disguised. (ADR 0009
+  narrows this: turning the automation flag off and setting no user agent are normal settings.)
 - **Consent banners** are answered by the Consent-O-Matic extension. Normal Google Chrome ignores extensions loaded
   from a folder since version 137, so the search browser is Chrome for Testing, or Helium or Chromium where
   Chrome for Testing can't start (NixOS). (ADR 0007 replaces Consent-O-Matic with I still don't care about cookies,

@@ -112,6 +112,16 @@ _Avoid_: passage, summary
 The browser profile web-mcp's searches run in, with cookies and settings of its own and never the user's.
 _Avoid_: session (one browser), user profile
 
+**Automation flag**:
+`navigator.webdriver` reading `true`: what a browser started for automation tells every page. web-mcp's window turns
+it off (ADR 0009); bot checks, Google's among them, treat it as a bot.
+_Avoid_: stealth, webdriver mode
+
+**Typed search**:
+A search that types its query into the search box of the engine's result page already open in its tab and presses
+Enter, instead of loading a result URL.
+_Avoid_: reuse, follow-up URL
+
 **Writing skill**:
 The one standard for prose Claude writes for a person, based on Williams and Bizup's _Style_; flows' `writing` skill.
 _Avoid_: style guide, unslop
