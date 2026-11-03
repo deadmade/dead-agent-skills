@@ -119,8 +119,10 @@ approve the spec. Record it.
 
 Follow superpowers `writing-plans` on the approved spec, with flow-rules **ponytail at chosen steps**' **Before you
 write** pasted into it. Copy each seam line from the spec verbatim into the plan's **Global Constraints**, and add one
-line to them: "One implementation gets no interface; one caller gets no helper; no option nobody sets." Every task
-gets, right below its heading:
+line to them: "One implementation gets no interface; one caller gets no helper; no option nobody sets." They also get a
+**Test seams** list (after mattpocock `tdd`): each public boundary the tests go through (an exported function, a CLI,
+a route), one line each on what a test there catches and what it misses. Tests go only there, and the plan's test
+steps use only these. Every task gets, right below its heading:
 
 - `**Does:** <one plain sentence for a reader who doesn't know the code>`
 - `**Depends on:** Task <n>, … | none`
@@ -151,7 +153,8 @@ first) or `arena` (several models draft the plan, best one wins). Only on the us
 
 **Gate 2:** ask the user to approve the plan **and** pick the execution method from `writing-plans`' handoff
 (subagent-driven, or native = `executing-plans`), with your recommendation. Record both. The gate message shows
-glance's block (re-run after the review's edits) and the findings, with plan.md linked rather than pasted.
+glance's block (re-run after the review's edits), the **Test seams** list and the findings, with plan.md linked
+rather than pasted. Approving the plan approves the seams.
 
 ## Phase 6: Execute
 

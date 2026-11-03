@@ -70,7 +70,8 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - **Deviations** while building: the approved plan is the contract, and each task's **Files** list is part of it. A
   deviation is anything the plan doesn't decide: a new or changed public interface, a new library or outside call, a
   changed data flow or error handling, a file the task didn't list, or, for a task with an `**Adds:**` line, a new
-  type, exported function, flag, config key or dependency that line doesn't name. Private names aren't deviations. A
+  type, exported function, flag, config key or dependency that line doesn't name, or, for a plan with **Test seams**,
+  a test through a seam that list doesn't name. Private names aren't deviations. A
   cleanup or idea outside the task is one line under **Parking lot** in flow.md (`file`: what), and not done; the user
   picks from the Parking lot at Finish. This holds in every build flow (`/build-feature`, `/implement`,
   `/fix`, `/upgrade`) and in `/review-code`'s fixes.
@@ -201,11 +202,13 @@ verbatim at these steps, never the whole skill:
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "| lite | Build what was asked. Name the smaller option in one line and let the user pick. |" -->
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "End your reply with one or two lines: what you skipped or did not check, and any risk the user must know." -->
 
-In a build flow TDD wins over ponytail's no-test-for-trivial rule. Wherever **The smallest complete change** is pasted
-into a brief, this line goes with it: "TDD wins here: every change, trivial ones too, gets its failing test first."
-And this one, which keeps TDD from turning into a test per class: "Test behaviour at the seam the plan names, one test
-per behaviour the spec states; no tests of private helpers, of the framework or of the language. The plan's Review
-Focus tests count towards that, not on top of it."
+In a build flow every behaviour change gets its failing test first, and code that changes no behaviour gets none.
+Wherever **The smallest complete change** is pasted into a brief, this line goes with it: "A behaviour change gets its
+failing test first; a rename, a move, config, generated code and prose get none. Tests go only through the plan's
+**Test seams** (in `/fix`, the regression test's code path), one test per behaviour the spec states; no tests of
+private helpers, of the framework or of the language. The plan's Review Focus tests count towards that, not on top of
+it."
+<!-- overrides superpowers/skills/test-driven-development/SKILL.md: "NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST" -->
 
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none." -->
 

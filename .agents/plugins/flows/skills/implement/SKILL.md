@@ -48,7 +48,8 @@ one at a time, with a recommendation each. More: the design isn't done; offer `/
   mattpocock `to-tickets` and plan only the first ticket.
 
 Either way, each seam answer from Phase 1 goes verbatim into the plan's **Global Constraints**, with the
-no-interface line from `/build-feature` Phase 4, and `node <flow-root>/skills/build-feature/scripts/glance.mjs
+no-interface line and the **Test seams** list from `/build-feature` Phase 4 (for a plan that has none, write
+the list and show it at the Gate), and `node <flow-root>/skills/build-feature/scripts/glance.mjs
 <plan.md>` draws the plan's graph and table at its top; the Gate shows that block.
 
 **Gate:** read back the Global Constraints and each task's **Files** list (the deviation contract), then the user

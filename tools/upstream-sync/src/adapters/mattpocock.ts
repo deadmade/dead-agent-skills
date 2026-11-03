@@ -36,7 +36,7 @@ const SKIPPED = [
   'engineering/research',
   'engineering/resolving-merge-conflicts',
   'engineering/retro', // ideas in /learn
-  'engineering/tdd',
+  'engineering/tdd', // ideas in /build-feature's Test seams
   'engineering/triage',
   'engineering/wayfinder',
   'engineering/wizard',

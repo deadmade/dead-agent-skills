@@ -40,7 +40,7 @@ const SKIPPED = [
   'reflect',
   'setup-pstack',
   'swarm',
-  'tdd',
+  'tdd', // ideas in /fix's runnable-check fallback
   'teach',
   'typescript-best-practices',
   'principle-fix-root-causes',

@@ -37,7 +37,8 @@ conditions hold (the adapter says how). Otherwise the agent follows `<packs>/pon
 
 **tests.** Agent `flows:pr-test-analyzer` on the diff and its tests, plus flow-rules' tests rule (one test per
 behaviour, at the seam): missing tests for risky new logic, and excessive ones (tests of private helpers, of the
-framework, near-duplicates); a delete candidate is a finding too.
+framework, near-duplicates, tests through a seam the plan's **Test seams** doesn't list); a delete candidate is a
+finding too.
 
 **docs.** [docs.md](docs.md): the claims and mechanics checks on the docs in scope, plus the host adapter's
 instruction-file review, leading with statements the diff made untrue. Prose findings only for docs the diff changed.

@@ -56,7 +56,10 @@ options only when you offer it and the user picks it; otherwise the cause is fix
 
 Follow superpowers `test-driven-development`, with flow-rules **ponytail at chosen steps** pasted into the fix
 brief: the regression test reproduces the bug and fails for the stated cause (show the output); then the smallest fix
-that makes it pass; then the full suite. Fix the cause once in the shared
+that makes it pass; then the full suite. When that test would need a harness the repo doesn't have, production-only
+state or timing it can't control, say so and offer the nearest runnable check instead (a script or command whose
+output shows the bug); it replaces the test on the user's yes, and **Prove it** runs it the same way. A bad test is
+worse than none (after pstack `tdd`). Fix the cause once in the shared
 code, not at each caller. The approved option is the task, and the files it names are its **Files** list. A fix that
 needs more is a deviation and stops the build: flow-rules **Deviations** (the fifth stop, the brief clause, the files
 check, Rulings).
