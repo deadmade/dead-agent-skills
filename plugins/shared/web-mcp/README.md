@@ -39,8 +39,10 @@ you are researching. Shodan InternetDB is free for non-commercial use only.
 
 Each web-mcp server (one per Claude Code session) opens one visible browser window, on the first `search`, `browser`
 call or fetch fallback, and closes it when it exits. Everything runs as a tab of that window: one tab per engine, kept
-and reused by later searches, one per `browser` session, and one per fetch fallback, closed after it. Engines still run
-in parallel. If you close the window, the next call opens a new one; if the browser crashes, it is restarted. On
+and reused by later searches, one per `browser` session, and one per fetch fallback, closed after it. An engine's next
+search types its query into the result page already open in that tab (Google, Bing, DuckDuckGo, Brave, Scholar), as a
+person would; a tab's first search, any `since`, a repeated query or a failed typing loads the result URL. Engines
+still run in parallel. If you close the window, the next call opens a new one; if the browser crashes, it is restarted. On
 Windows the browser also goes when web-mcp is killed.
 
 The window's profile lives under `WEB_MCP_SEARCH_DIR` (default `$XDG_DATA_HOME/web-mcp`, `~/.local/share/web-mcp`, or

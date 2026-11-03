@@ -127,6 +127,20 @@ impl Engine {
         }
     }
 
+    /// The selector of the result page's search box, which a follow-up search types into; `None`: always load the
+    /// URL.
+    pub fn search_box(self) -> Option<&'static str> {
+        match self {
+            Self::Google => Some("textarea[name=q]"),
+            Self::Bing => Some("#sb_form_q"),
+            Self::DuckDuckGo => Some("#search_form_input"),
+            Self::Brave => Some("#searchbox"),
+            Self::Scholar => Some("#gs_hdr_tsi"),
+            // A single-page app with no captured result page.
+            Self::SemanticScholar => None,
+        }
+    }
+
     pub fn supports_since(self, s: Since) -> bool {
         match self {
             Self::Scholar => s == Since::Year,
@@ -338,6 +352,29 @@ mod tests {
         for e in Engine::ALL {
             assert!(e.ready_js().starts_with("!!(") && e.ready_js().ends_with(");"));
         }
+    }
+
+    /// A page captured in `tests/fixtures/engines/`.
+    fn fixture(name: &str) -> String {
+        let path = format!(
+            "{}/tests/fixtures/engines/{name}",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        std::fs::read_to_string(path).unwrap()
+    }
+
+    #[test]
+    fn search_boxes_match_one_element_in_the_fixtures() {
+        for (e, file) in [
+            (Engine::Bing, "bing.html"),
+            (Engine::DuckDuckGo, "duckduckgo.html"),
+            (Engine::Brave, "brave.html"),
+            (Engine::Scholar, "scholar.html"),
+        ] {
+            let doc = dom_query::Document::from(fixture(file).as_str());
+            assert_eq!(doc.select(e.search_box().unwrap()).length(), 1, "{file}");
+        }
+        assert_eq!(Engine::SemanticScholar.search_box(), None);
     }
 
     #[test]

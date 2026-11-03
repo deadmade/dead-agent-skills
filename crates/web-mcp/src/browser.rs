@@ -350,7 +350,7 @@ impl Browser {
             let answer = match op {
                 Op::Run(args) => self.run_with(&session, args, None, true, via).await,
                 Op::Batch(cmds, limits, may_fail) => self
-                    .batch_with(&session, cmds, limits, via, may_fail)
+                    .batch_with(&session, cmds, limits, via, may_fail, false)
                     .await
                     .map(Value::Array),
             };
@@ -511,7 +511,40 @@ impl Browser {
         answer.map(entries)
     }
 
-    /// `may_fail`: the index of a command whose failure doesn't fail the batch.
+    /// Runs `commands` as one `batch --json --bail` in `key`'s tab of the window as last seen, before `until`, and
+    /// returns each command's result. Unlike `batch`, it never binds a new tab or asks the owner again: the caller
+    /// has another way to its page.
+    ///
+    /// # Errors
+    /// `Timeout` once `until` passes (the call is killed), `TabGone` when the tab is gone, else as `batch`.
+    pub async fn batch_once(
+        &self,
+        key: &str,
+        commands: &[Vec<String>],
+        until: std::time::Instant,
+    ) -> Result<Vec<Value>, BrowserError> {
+        let live = self.live(false).await?;
+        let config = self.window.attach_config().map_err(BrowserError::Failed)?;
+        let session = self.track(key, live.r#gen);
+        let via = Via::Tab {
+            config: &config,
+            cdp: &live.url,
+        };
+        let cmds: Vec<Vec<&str>> = commands
+            .iter()
+            .map(|c| c.iter().map(String::as_str).collect())
+            .collect();
+        let left = until.saturating_duration_since(std::time::Instant::now());
+        tokio::time::timeout_at(
+            until.into(),
+            self.batch_with(&session, &cmds, false, via, None, true),
+        )
+        .await
+        .unwrap_or(Err(BrowserError::Timeout(left)))
+    }
+
+    /// `may_fail`: the index of a command whose failure doesn't fail the batch; `bail`: agent-browser stops at the
+    /// first failed command.
     async fn batch_with(
         &self,
         session: &str,
@@ -519,9 +552,13 @@ impl Browser {
         limits: bool,
         via: Via<'_>,
         may_fail: Option<usize>,
+        bail: bool,
     ) -> Result<Vec<Value>, BrowserError> {
         let input = json!(commands).to_string();
-        let args = ["batch".to_owned(), "--json".to_owned()];
+        let mut args = vec!["batch".to_owned(), "--json".to_owned()];
+        if bail {
+            args.push("--bail".to_owned());
+        }
         let answer = self
             .run_with(session, &args, Some(&input), limits, via)
             .await?;
@@ -1015,6 +1052,29 @@ mod tests {
             waited + Duration::from_millis(400) < capped,
             "{waited:?} vs {capped:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn batch_once_bails_and_never_rebinds() {
+        let (dir, b) = fake("once");
+        b.warm().await.unwrap();
+        let owner = dir.join("profiles/1");
+        let count =
+            |d: &Path, cmd: &[&str]| calls(d).iter().filter(|c| args(c).ends_with(cmd)).count();
+        let before = (calls(&dir).len(), count(&owner, &["get", "cdp-url"]));
+        std::fs::write(dir.join(format!("{}.gone", name("search-bing", 1))), "").unwrap();
+        let cmds = [vec!["eval".to_owned(), "1".to_owned()]];
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        let err = b.batch_once("search-bing", &cmds, until).await.unwrap_err();
+        assert!(matches!(err, BrowserError::TabGone(_)), "{err}");
+        let c = calls(&dir);
+        assert_eq!(c.len(), before.0 + 1, "{c:?}");
+        assert!(
+            args(c.last().unwrap()).ends_with(&["batch", "--json", "--bail"]),
+            "{c:?}"
+        );
+        assert_eq!(count(&dir, &["tab", "new"]), 0);
+        assert_eq!(count(&owner, &["get", "cdp-url"]), before.1);
     }
 
     #[tokio::test]

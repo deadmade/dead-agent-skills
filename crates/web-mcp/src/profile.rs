@@ -107,8 +107,9 @@ pub struct Profiles {
     http: reqwest::Client,
     /// `profiles/<n>` and its held lock, taken on the first `slot()` and kept until exit.
     slot: OnceLock<(PathBuf, File)>,
-    /// One turn per engine, indexed by its discriminant: an engine's tab serves one search at a time.
-    turns: [tokio::sync::Mutex<()>; Engine::ALL.len()],
+    /// One turn per engine, indexed by its discriminant: an engine's tab serves one search at a time. Each holds the
+    /// engine's last query that parsed as results, in this process.
+    turns: [tokio::sync::Mutex<Option<String>>; Engine::ALL.len()],
     /// The browser `ready()` uses in tests instead of looking for one.
     #[cfg(test)]
     chrome: Option<PathBuf>,
@@ -133,7 +134,7 @@ impl Profiles {
             dir,
             http,
             slot: OnceLock::new(),
-            turns: std::array::from_fn(|_| tokio::sync::Mutex::new(())),
+            turns: std::array::from_fn(|_| tokio::sync::Mutex::new(None)),
             #[cfg(test)]
             chrome: None,
         })
@@ -221,8 +222,13 @@ impl Profiles {
         )
     }
 
-    /// The engine's turn in this process, waited for until `until`; dropping it ends the turn.
-    pub async fn turn(&self, e: Engine, until: Instant) -> Option<tokio::sync::MutexGuard<'_, ()>> {
+    /// The engine's turn in this process, waited for until `until`; dropping it ends the turn. It holds the engine's
+    /// last query that parsed as results, in this process.
+    pub async fn turn(
+        &self,
+        e: Engine,
+        until: Instant,
+    ) -> Option<tokio::sync::MutexGuard<'_, Option<String>>> {
         tokio::time::timeout_at(until.into(), self.turns[e as usize].lock())
             .await
             .ok()
