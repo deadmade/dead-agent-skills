@@ -1,7 +1,7 @@
 // Vendor nutlope/hallmark's skill into its own plugin and scope it to web files via its description.
 // Only the skill itself ships: upstream's installers, the settings.json lint hook, Together AI image generation (the
-// comp step and generated stills), the theme-picture renderer, its dev checks and fixtures, and the Codex adapter are
-// deleted, along with the text that points at them.
+// comp step and generated stills), the theme-picture renderer, its dev checks, tests and fixtures, and the Codex adapter
+// are deleted, along with the text that points at them.
 // Idempotent: re-running against the same upstream commit produces no diff.
 import { cpSync, existsSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -26,6 +26,9 @@ export const DROPPED = [
   'scripts/picture.mjs',
   'scripts/refcheck.mjs',
 ];
+// Upstream's own tests, matched by name because it keeps adding them: the skill scanner rates a test's child_process
+// or eval use CRITICAL, and nothing here runs them.
+const TEST_FILE = /\.test\.[cm]?[jt]s$/;
 
 // Per file, the text that points at a dropped part. A pattern that stops matching upstream leaves a mention that
 // LEFTOVER catches, so the sync fails instead of shipping a dangling instruction.
@@ -67,9 +70,7 @@ function scopeDescription(text: string) {
       named = true;
     } else if (/^description:\s*"/.test(line)) {
       // Angle brackets read as XML tags in the marketplace check, so `<path>` becomes `[path]`.
-      lines[i] = line
-        .replace(/^description:\s*"/, () => `description: "${SCOPE} `)
-        .replace(/<([^<>"]*)>/g, '[$1]');
+      lines[i] = line.replace(/^description:\s*"/, () => `description: "${SCOPE} `).replace(/<([^<>"]*)>/g, '[$1]');
       described = true;
     } else if (/^description:\s*[^"|>\s]/.test(line)) {
       const v = line.replace(/^description:\s*/, '').replaceAll('"', '\\"');
@@ -100,7 +101,7 @@ export function run(ctx: SyncContext): AdapterResult {
   }
 
   rmSync(DEST, { recursive: true, force: true });
-  cpSync(SRC, DEST, { recursive: true });
+  cpSync(SRC, DEST, { recursive: true, filter: (src) => !TEST_FILE.test(src) });
   cpSync(join(up, 'LICENSE'), join(DEST, 'LICENSE'));
   for (const f of DROPPED) rmSync(join(DEST, f), { recursive: true, force: true });
 
