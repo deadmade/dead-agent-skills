@@ -215,5 +215,5 @@ self-review and feature-flow are adapted from its method.
 
 The marketplace entry for Atlassian only points at its upstream repository; no code is vendored here. Anthropic's
 plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
-claude-security, skill-creator, hookify and the LSPs) aren't listed here at all: they install from Anthropic's
+claude-security, skill-creator and the LSPs) aren't listed here at all: they install from Anthropic's
 `claude-plugins-official` marketplace. Each is covered by its own upstream license.
