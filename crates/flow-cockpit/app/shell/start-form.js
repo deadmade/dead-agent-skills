@@ -17,10 +17,10 @@
 
 /** A flow's `flow:` value (what `FlowRunSummary.conductor` holds) to the skill that conducts it. */
 const FLOW_SKILL = Object.freeze({
-  feature: 'feature-flow',
-  research: 'research-flow',
+  feature: 'build-feature',
+  research: 'research-feature',
   implement: 'implement',
-  fix: 'fix-flow',
+  fix: 'fix',
   upgrade: 'upgrade',
 });
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];

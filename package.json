@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "release": "node scripts/release.mjs",
-    "test": "node scripts/check-repo.mjs && node --test --experimental-test-coverage --test-coverage-include=\"tools/installer/**\" --test-coverage-exclude=\"tools/installer/**/*.test.ts\" --test-coverage-lines=79 \"tools/installer/**/*.test.ts\" && npm test --workspace=@dead-claude-skills/harness-compiler && node --test \"scripts/*.test.mjs\" \"plugins/flows/skills/writing/tests/*.test.mjs\" \"plugins/flows/skills/feature-flow/tests/*.test.mjs\" \"plugins/default/hooks/*.test.mjs\" \"plugins/flows/hooks/*.test.mjs\" \"plugins/opt-in/headroom-trim/hooks/*.test.mjs\" \"plugins/opt-in/flow-cockpit/hooks/*.test.mjs\" && npm test --workspace=@dead-claude-skills/upstream-sync",
+    "test": "node scripts/check-repo.mjs && node --test --experimental-test-coverage --test-coverage-include=\"tools/installer/**\" --test-coverage-exclude=\"tools/installer/**/*.test.ts\" --test-coverage-lines=79 \"tools/installer/**/*.test.ts\" && npm test --workspace=@dead-claude-skills/harness-compiler && node --test \"scripts/*.test.mjs\" \"plugins/flows/skills/writing/tests/*.test.mjs\" \"plugins/flows/skills/build-feature/tests/*.test.mjs\" \"plugins/default/hooks/*.test.mjs\" \"plugins/flows/hooks/*.test.mjs\" \"plugins/opt-in/headroom-trim/hooks/*.test.mjs\" \"plugins/opt-in/flow-cockpit/hooks/*.test.mjs\" && npm test --workspace=@dead-claude-skills/upstream-sync",
     "typecheck": "tsc --noEmit && npm run typecheck --workspace=@dead-claude-skills/harness-compiler && npm run typecheck --workspace=@dead-claude-skills/upstream-sync",
     "prepack": "node tools/harness-compiler/src/cli.ts check && tsc",
     "build:harnesses": "node tools/harness-compiler/src/cli.ts build",

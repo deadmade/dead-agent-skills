@@ -1,6 +1,6 @@
 # Build template
 
-For `/implement`, `/fix-flow` and `/upgrade`. Copy everything below the line into `docs/features/<slug>/flow.md`,
+For `/implement`, `/fix` and `/upgrade`. Copy everything below the line into `docs/features/<slug>/flow.md`,
 with the title and `flow:` filled in. Keep the frontmatter first. The conductor names its phases.
 
 ---

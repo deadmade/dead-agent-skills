@@ -1,6 +1,6 @@
 ---
 name: implement
-description: 'Build from a plan, spec or ticket that already exists, without the design phases of /feature-flow: turn a spec into tickets or a plan if needed, approve the plan, execute it test-first through superpowers, then /review-code and /learn. One approval gate, resumable. Use for /implement [path to plan, spec or ticket]; no argument resumes.'
+description: 'Build from a plan, spec or ticket that already exists, without the design phases of /build-feature: turn a spec into tickets or a plan if needed, approve the plan, execute it test-first through superpowers, then /review-code and /learn. One approval gate, resumable. Use for /implement [path to plan, spec or ticket]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: 'Path to a plan, spec or ticket'
 ---
@@ -8,7 +8,7 @@ argument-hint: 'Path to a plan, spec or ticket'
 # implement
 
 The design is done; build it. If the input turns out not to be a design (open questions, no clear behaviour), say so
-and offer `/feature-flow` instead.
+and offer `/build-feature` instead.
 
 | Phase     | Runs                                                              | Output                     |
 | --------- | ----------------------------------------------------------------- | -------------------------- |
@@ -33,21 +33,21 @@ Read the input and everything it links. Run pstack `how` (fallback: Explore agen
 the domain docs that `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists (the glossary and the
 ADRs). Under **Findings**: where it lands (`file:line`), and every point the input
 leaves open. A cross-cutting concern the input adds without saying where it is resolved and which modules never see
-it is an open point: ask feature-flow's seam question (mattpocock `codebase-design`, pstack
+it is an open point: ask build-feature's seam question (mattpocock `codebase-design`, pstack
 `principle-redesign-from-first-principles` and `principle-boundary-discipline`). Up to three open points: ask them,
-one at a time, with a recommendation each. More: the design isn't done; offer `/feature-flow`.
+one at a time, with a recommendation each. More: the design isn't done; offer `/build-feature`.
 
 ## Phase 2: Plan
 
 - **A plan** (tasks with steps): check it against the code from Phase 1; stale paths or names are fixed in place. A
   task without a **Files** list gets one written before the Gate. Every task also gets, right below its heading,
   `**Does:** <one plain sentence for a reader who doesn't know the code>` and `**Depends on:** Task <n>, … | none`,
-  and the `**Adds:**` and `**Size:**` lines `/feature-flow` Phase 4 describes.
+  and the `**Adds:**` and `**Size:**` lines `/build-feature` Phase 4 describes.
 - **A spec or ticket:** follow superpowers `writing-plans` on it. For a spec too big for one branch, first offer
   mattpocock `to-tickets` and plan only the first ticket.
 
 Either way, each seam answer from Phase 1 goes verbatim into the plan's **Global Constraints**, with the
-no-interface line from `/feature-flow` Phase 4, and `node <flow-root>/skills/feature-flow/scripts/glance.mjs
+no-interface line from `/build-feature` Phase 4, and `node <flow-root>/skills/build-feature/scripts/glance.mjs
 <plan.md>` draws the plan's graph and table at its top; the Gate shows that block.
 
 **Gate:** read back the Global Constraints and each task's **Files** list (the deviation contract), then the user

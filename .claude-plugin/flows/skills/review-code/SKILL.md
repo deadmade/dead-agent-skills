@@ -47,7 +47,7 @@ standards are every applicable AGENTS.md and CLAUDE.md (root and changed folders
 
 Follow [references/checks.md](references/checks.md) **Checks** (superpowers `systematic-debugging` for a red one, pstack
 `interrogate` offered when execution ran without per-task reviews). A red check stops the review: show the output and
-offer `/fix-flow` on it, with your recommendation.
+offer `/fix` on it, with your recommendation.
 
 ## Phase 3: Lenses
 
@@ -79,8 +79,8 @@ Follow [references/report.md](references/report.md). **Gate:** the user picks by
 
 Per pick: a fix that changes behaviour gets a failing test first (superpowers `test-driven-development`); a doc fix
 changes the doc to match the code, unless the user picks fixing the code. A finding that needs a cause before a fix
-(a failing test, a symptom whose root cause isn't known): offer `/fix-flow` on it; on the user's yes read
-`<skill-dir>/../fix-flow/SKILL.md` and run it inline (flow-rules **Calling another conductor**), up to its Finish. The
+(a failing test, a symptom whose root cause isn't known): offer `/fix` on it; on the user's yes read
+`<skill-dir>/../fix/SKILL.md` and run it inline (flow-rules **Calling another conductor**), up to its Finish. The
 picks are the contract: the files their findings name are the **Files** list, and a fix that needs more is a
 deviation (flow-rules **Deviations**). Picks from the `all` passes follow their own fix rules in
 [references/tests-all.md](references/tests-all.md) and [references/harden-all.md](references/harden-all.md).

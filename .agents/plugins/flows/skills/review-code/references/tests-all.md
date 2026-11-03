@@ -50,5 +50,5 @@ Superpowers `test-driven-development`:
 
 Fill changes tests only. A production edit goes to the user first. A test or property that fails on the real code
 stops that pick: classify it by `<packs>/tob-picks/skills/property-based-testing/references/interpreting-failures.md`
-(a bug, an ambiguous spec or a wrong test) and ask the user; a bug goes to `/fix-flow`. Then re-run the suite and the
+(a bug, an ambiguous spec or a wrong test) and ask the user; a bug goes to `/fix`. Then re-run the suite and the
 mutation probe on the touched area, and put the before and after survivor counts in the audit file.

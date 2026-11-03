@@ -3,17 +3,17 @@
 Conductor skills: each one runs the skills the rest of this marketplace ships, in order, stops at approval gates, and
 keeps a state file so the next session can resume. Claude proposes and recommends; you decide.
 
-| Conductor                    | Job                                             | Runs                                                                                                                                                                                                                                                     | Ends in                                 |
-| ---------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| `/understand <topic>`        | learn a codebase, subsystem or concept          | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                         | terms in GLOSSARY.md                    |
-| `/feature-flow <what>`       | a new feature with a design                     | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                                                                                                                        | `/review-code`, `/learn`                |
-| `/research-flow <question>`  | research a design question before building      | frame, papers and engineering sources (web-mcp, paper-lookup), source check, `grilling` on the options; no build, no benchmark                                                                                                                           | a decision report, then `/feature-flow` |
-| `/implement <plan>`          | build from an existing plan, spec or ticket     | `to-tickets` or `writing-plans` if needed, superpowers execution                                                                                                                                                                                         | `/review-code`, `/learn`                |
-| `/fix-flow <symptom>`        | fix a bug                                       | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                                                                                                                           | `/review-code`, `/learn`                |
-| `/upgrade <pkg>[@v]`         | bump a dependency                               | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                                                                                                                                                                                | `/review-code`, `/learn`                |
-| `/review-code [branch\|all]` | review a branch before merge, or the whole repo | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes | how to integrate                        |
-| `/integrate [base]`          | commit, open the PR, watch CI                   | commits shown first, `blast-radius` + `writing` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                                                                                                                        | PR open, CI green                       |
-| `/learn [flow]`              | keep what the work taught                       | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                                                                                                                        | done                                    |
+| Conductor                      | Job                                             | Runs                                                                                                                                                                                                                                                     | Ends in                                  |
+| ------------------------------ | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `/understand <topic>`          | learn a codebase, subsystem or concept          | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                         | terms in GLOSSARY.md                     |
+| `/build-feature <what>`        | a new feature with a design                     | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                                                                                                                        | `/review-code`, `/learn`                 |
+| `/research-feature <question>` | research a design question before building      | frame, papers and engineering sources (web-mcp, paper-lookup), source check, `grilling` on the options; no build, no benchmark                                                                                                                           | a decision report, then `/build-feature` |
+| `/implement <plan>`            | build from an existing plan, spec or ticket     | `to-tickets` or `writing-plans` if needed, superpowers execution                                                                                                                                                                                         | `/review-code`, `/learn`                 |
+| `/fix <symptom>`               | fix a bug                                       | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                                                                                                                           | `/review-code`, `/learn`                 |
+| `/upgrade <pkg>[@v]`           | bump a dependency                               | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                                                                                                                                                                                | `/review-code`, `/learn`                 |
+| `/review-code [branch\|all]`   | review a branch before merge, or the whole repo | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes | how to integrate                         |
+| `/integrate [base]`            | commit, open the PR, watch CI                   | commits shown first, `blast-radius` + `writing` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                                                                                                                        | PR open, CI green                        |
+| `/learn [flow]`                | keep what the work taught                       | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                                                                                                                        | done                                     |
 
 `branch` (the default) audits what changed against the base, plus the tests and docs that should have changed with
 it; `all` audits the whole repo, vendored content skipped.
@@ -26,14 +26,14 @@ Installing flows installs every plugin below; the packs ship inside flows itself
 <!-- uses:start -->
 
 ```text
-feature-flow
+build-feature
 ├ pstack-picks: how, why, architect, arena, interrogate, blast-radius, principle-redesign-from-first-principles, principle-boundary-discipline
 ├ claude-code: general-purpose
 ├ superpowers: brainstorming, writing-plans, using-git-worktrees, subagent-driven-development, executing-plans
 ├ mattpocock-picks: codebase-design, grilling, domain-modeling
 └ ponytail: ponytail-review
 
-fix-flow
+fix
 ├ pstack-picks: how, why, blast-radius
 ├ web-mcp: search, fetch
 └ superpowers: systematic-debugging, test-driven-development
@@ -55,7 +55,7 @@ learn
 ├ pstack-picks: recall
 └ superpowers: writing-skills
 
-research-flow
+research-feature
 ├ claude-code: general-purpose
 ├ web-mcp: search, fetch
 ├ paper-lookup: paper-lookup
@@ -91,7 +91,7 @@ upgrade
 State lives in the repo: build flows in `docs/features/<slug>/flow.md`, audits in `docs/audits/`. The shared rules
 are in [references/flow-rules.md](references/flow-rules.md).
 
-Calls between conductors (`/fix-flow` → `/review-code`) aren't listed. Each conductor still has a fallback for a
+Calls between conductors (`/fix` → `/review-code`) aren't listed. Each conductor still has a fallback for a
 plugin that isn't there, for installs that skipped one.
 
 ## Writing

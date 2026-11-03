@@ -36,7 +36,7 @@ to pick: list them under the table as **Needs validation**, each with its blocke
 
 A fix that changes behaviour gets a failing test first (superpowers `test-driven-development`); a deletion shows the
 suite still passes. An architecture pick runs `improve-codebase-architecture`'s grilling on it (mattpocock
-`grilling`, read by path), which may turn it into a `/feature-flow` or `/implement` instead: offer that. Re-run the
+`grilling`, read by path), which may turn it into a `/build-feature` or `/implement` instead: offer that. Re-run the
 pass that found each fixed finding.
 <!-- overrides mattpocock-picks/skills/improve-codebase-architecture/SKILL.md: "Once the user picks a candidate, call the Skill tool with "grilling" to walk the decision tree with them" -->
 

@@ -207,7 +207,7 @@ The only local changes are in `SKILL.md`'s frontmatter (`disable-model-invocatio
 sentence pointing at the dead-skills `rules.md` instead of the upstream README, `references/tool-notes.md` without its
 install section (it describes the unmodified skill) and `SKILL.md`'s link to it no longer naming install options, and a
 source comment in each Markdown file. The self-audit lines in `plugins/default/rules.md` and the review steps in
-review-code and feature-flow are adapted from its method.
+review-code and build-feature are adapted from its method.
 
 ## Re-listed plugins
 

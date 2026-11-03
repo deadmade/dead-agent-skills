@@ -24,10 +24,10 @@ Load [resource-index.md](resource-index.md) when resolving another package's ski
 
 ## State
 
-- **Build flows** (`/feature-flow`, `/implement`, `/fix-flow`, `/upgrade`) and `/research-flow`, which researches
+- **Build flows** (`/build-feature`, `/implement`, `/fix`, `/upgrade`) and `/research-feature`, which researches
   and builds nothing, keep `docs/features/<slug>/flow.md`. Its frontmatter names the flow (`flow: feature | research | implement | fix |
 upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it after every phase, with links to every
-  artifact. It is how the next session resumes. feature-flow and research-flow have their own templates; the others
+  artifact. It is how the next session resumes. build-feature and research-feature have their own templates; the others
   use [build-template.md](build-template.md).
 - **`now:`** (frontmatter, one plain sentence) says where the run stands and what comes next. Rewrite it after every
   phase and at every stop where you wait for the user; at such a stop it starts with `Waiting for you`, which is what
@@ -72,8 +72,8 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   changed data flow or error handling, a file the task didn't list, or, for a task with an `**Adds:**` line, a new
   type, exported function, flag, config key or dependency that line doesn't name. Private names aren't deviations. A
   cleanup or idea outside the task is one line under **Parking lot** in flow.md (`file`: what), and not done; the user
-  picks from the Parking lot at Finish. This holds in every build flow (`/feature-flow`, `/implement`,
-  `/fix-flow`, `/upgrade`) and in `/review-code`'s fixes.
+  picks from the Parking lot at Finish. This holds in every build flow (`/build-feature`, `/implement`,
+  `/fix`, `/upgrade`) and in `/review-code`'s fixes.
   - **The fifth stop.** A deviation is never ruled on, by the coordinating session or by a subagent. The coordinating
     session writes it under **Deviations** in flow.md as `### <deviation>` with `Status: open` (then what, why the plan
     doesn't hold, options with a recommendation), sets `now:` to `Waiting for you: …`, and asks the user with the host question tool; the build waits for the answer. A decision that changes
@@ -176,7 +176,7 @@ review).
 
 Flows' `flows:writing` skill may be invoked by the host skill tool; it supplies the copyedit pass.
 
-- **Calling another conductor** (`/fix-flow` → `/review-code`): read its SKILL.md and run it inline. Skip its start and
+- **Calling another conductor** (`/fix` → `/review-code`): read its SKILL.md and run it inline. Skip its start and
   resume step (the caller hands it the input), keep its gates, then return to the caller's next phase. Its `now:`
   goes into the caller's flow.md.
 
@@ -185,14 +185,14 @@ Flows' `flows:writing` skill may be invoked by the host skill tool; it supplies 
 ponytail never runs as a mode. A conductor pastes the named text from `<packs>/ponytail/skills/ponytail/SKILL.md`
 verbatim at these steps, never the whole skill:
 
-| Step                                                       | Text                                                                                    |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Plan, and every builder brief                              | the **Before you write** section                                                        |
-| Builder briefs and fixes (fix loop, fix-flow, review-code) | **The smallest complete change** with its Bug fix bullet, and the **Never cut** line    |
-| Brainstorm's approaches, report gates                      | the `lite` level: the smallest option is one of the options, named in one line          |
-| Plan review's Simpler angle, `/review-code`'s lean lens    | `<packs>/ponytail/skills/ponytail-review/SKILL.md`                                      |
-| Finish                                                     | `<packs>/ponytail/skills/ponytail-debt/SKILL.md` over the lines the branch adds         |
-| Every report                                               | the footer sentence, "End your reply with one or two lines…", as its "Not checked" line |
+| Step                                                    | Text                                                                                    |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Plan, and every builder brief                           | the **Before you write** section                                                        |
+| Builder briefs and fixes (fix loop, fix, review-code)   | **The smallest complete change** with its Bug fix bullet, and the **Never cut** line    |
+| Brainstorm's approaches, report gates                   | the `lite` level: the smallest option is one of the options, named in one line          |
+| Plan review's Simpler angle, `/review-code`'s lean lens | `<packs>/ponytail/skills/ponytail-review/SKILL.md`                                      |
+| Finish                                                  | `<packs>/ponytail/skills/ponytail-debt/SKILL.md` over the lines the branch adds         |
+| Every report                                            | the footer sentence, "End your reply with one or two lines…", as its "Not checked" line |
 
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "Before you write Read the task and the code it touches." -->
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "The smallest complete change Take the first option that fully works:" -->

@@ -351,13 +351,13 @@ const RESEARCH_PARTS: [&str; 5] = ["Request", "Gates", "Evidence", "Options", "R
 fn templates_parse_with_every_part() {
     for (path, flow, gates, parts) in [
         (
-            "plugins/flows/skills/feature-flow/references/flow-template.md",
+            "plugins/flows/skills/build-feature/references/flow-template.md",
             "feature",
             2,
             &BUILD_PARTS[..],
         ),
         (
-            "plugins/flows/skills/research-flow/references/research-template.md",
+            "plugins/flows/skills/research-feature/references/research-template.md",
             "research",
             1,
             &RESEARCH_PARTS[..],
@@ -398,12 +398,12 @@ fn filled_templates_parse_with_every_part() {
     for (name, template, gates) in [
         (
             "feature",
-            "plugins/flows/skills/feature-flow/references/flow-template.md",
+            "plugins/flows/skills/build-feature/references/flow-template.md",
             2,
         ),
         (
             "research",
-            "plugins/flows/skills/research-flow/references/research-template.md",
+            "plugins/flows/skills/research-feature/references/research-template.md",
             1,
         ),
         ("build", "plugins/flows/references/build-template.md", 2),

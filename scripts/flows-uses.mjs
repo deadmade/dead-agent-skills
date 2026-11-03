@@ -151,12 +151,12 @@ export function checkOverrides(root) {
 // The parts of flow.md, plans and audit reports the flow cockpit reads: each must stay in the templates and the
 // conductor text that make a run write them.
 const TEMPLATE_FILES = [
-  `${FLOWS}/skills/feature-flow/references/flow-template.md`,
-  `${FLOWS}/skills/research-flow/references/research-template.md`,
+  `${FLOWS}/skills/build-feature/references/flow-template.md`,
+  `${FLOWS}/skills/research-feature/references/research-template.md`,
   `${FLOWS}/references/build-template.md`,
 ];
 const RULES_FILE = `${FLOWS}/references/flow-rules.md`;
-const PLAN_FILES = ['feature-flow', 'implement', 'upgrade'].map((n) => `${FLOWS}/skills/${n}/SKILL.md`);
+const PLAN_FILES = ['build-feature', 'implement', 'upgrade'].map((n) => `${FLOWS}/skills/${n}/SKILL.md`);
 const GATE_LINE = '- Gate <n>, <what>:';
 export function checkTemplates(root) {
   const problems = [];

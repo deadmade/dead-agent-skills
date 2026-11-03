@@ -133,10 +133,10 @@ test('continue_prefills_the_flow_command_with_the_skill_name', async () => {
   assert.ok(!slugs.some((s) => s.includes('old-thing') || s.includes('hello') || s.includes('mystery')));
 
   const picks = {
-    'web-mcp-search': '/flows:feature-flow web-mcp-search',
-    'cockpit-study': '/flows:research-flow cockpit-study',
+    'web-mcp-search': '/flows:build-feature web-mcp-search',
+    'cockpit-study': '/flows:research-feature cockpit-study',
     'rename-all': '/flows:implement rename-all',
-    'flaky-test': '/flows:fix-flow flaky-test',
+    'flaky-test': '/flows:fix flaky-test',
     'bump-deps': '/flows:upgrade bump-deps',
   };
   for (const [slug, prompt] of Object.entries(picks)) {

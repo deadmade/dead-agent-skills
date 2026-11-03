@@ -223,12 +223,12 @@ test('checkPackPaths: a missing path fails, naming file and line', () => {
 
 // checkTemplates: the parts the flow cockpit reads must stay in the templates and the conductor text.
 const TEMPLATES = [
-  'plugins/flows/skills/feature-flow/references/flow-template.md',
-  'plugins/flows/skills/research-flow/references/research-template.md',
+  'plugins/flows/skills/build-feature/references/flow-template.md',
+  'plugins/flows/skills/research-feature/references/research-template.md',
   'plugins/flows/references/build-template.md',
 ];
 const RULES = 'plugins/flows/references/flow-rules.md';
-const PLANNERS = ['feature-flow', 'implement', 'upgrade'].map((n) => `plugins/flows/skills/${n}/SKILL.md`);
+const PLANNERS = ['build-feature', 'implement', 'upgrade'].map((n) => `plugins/flows/skills/${n}/SKILL.md`);
 
 // A copy of the real files with `needle` taken out of `file`.
 function without(file, needle) {

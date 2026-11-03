@@ -26,7 +26,7 @@ pub enum PhaseState {
 /// `(key, gate that follows)`, in order.
 type List = &'static [(&'static str, Option<u8>)];
 
-/// feature-flow/SKILL.md.
+/// build-feature/SKILL.md.
 const FEATURE: List = &[
     ("ground", None),
     ("brainstorm", None),
@@ -36,7 +36,7 @@ const FEATURE: List = &[
     ("execute", None),
     ("finish", None),
 ];
-/// research-flow/SKILL.md.
+/// research-feature/SKILL.md.
 const RESEARCH: List = &[
     ("frame", None),
     ("search", None),
@@ -50,7 +50,7 @@ const IMPLEMENT: List = &[
     ("execute", None),
     ("finish", None),
 ];
-/// fix-flow/SKILL.md.
+/// fix/SKILL.md.
 const FIX: List = &[
     ("reproduce", None),
     ("ground", None),
@@ -164,10 +164,10 @@ mod tests {
     #[test]
     fn phase_lists_match_skill_tables() {
         for (skill, flow) in [
-            ("feature-flow", "feature"),
-            ("research-flow", "research"),
+            ("build-feature", "feature"),
+            ("research-feature", "research"),
             ("implement", "implement"),
-            ("fix-flow", "fix"),
+            ("fix", "fix"),
             ("upgrade", "upgrade"),
         ] {
             let ours: Vec<(String, Option<u8>)> = list(flow)

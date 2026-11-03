@@ -64,4 +64,4 @@ the output. All green: say so and set `phase: done`.
 
 A red check: read its log and follow superpowers `systematic-debugging` to the cause, then **stop** with the failing
 check, the cause and the options (a fix to commit and push, a rerun, a flaky test) with a recommendation. A fix is a
-new `/fix-flow` or a commit here on the user's yes; the push is always the user's `!` line.
+new `/fix` or a commit here on the user's yes; the push is always the user's `!` line.

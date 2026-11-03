@@ -1,11 +1,11 @@
 ---
-name: feature-flow
-description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /feature-flow [what to build]; no argument resumes the active feature, a run's slug resumes that run."
+name: build-feature
+description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /build-feature [what to build]; no argument resumes the active feature, a run's slug resumes that run."
 disable-model-invocation: true
 argument-hint: "What do you want to build (or a run's slug)?"
 ---
 
-# feature-flow
+# build-feature
 
 One entry point that runs the skills this marketplace already ships, in order, and stops at two gates for the user.
 Claude proposes and recommends; the user decides.
@@ -63,7 +63,7 @@ Ask nothing yet. In one message, start both:
   `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists (the glossary and the ADRs).
 - **Prior art:** one background `general-purpose` agent with the prompt in
   [references/prior-art.md](references/prior-art.md), writing `docs/features/<slug>/prior-art.md`. Don't wait for it; Phase 2 starts with questions anyway. When it lands, run the source check in that reference and correct the report before presenting options.
-  When the request hands over an approved `research.md` from `/research-flow`, that report is the prior art: link it
+  When the request hands over an approved `research.md` from `/research-feature`, that report is the prior art: link it
   and skip this agent.
 
 Write a short summary of each into flow.md under **Grounding** and **Prior art** as they land, including the source check’s counts.
