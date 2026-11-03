@@ -1,6 +1,6 @@
 {
   "name": "graphify",
-  "version": "0.6.0",
+  "version": "0.6.17",
   "description": "Graphify: turn a codebase, docs and papers into a queryable knowledge graph (/graphify), plus hooks that nudge Claude to query the graph before reading files. Needs the graphify CLI (the installer installs it with uv, with the sql, pdf, office, watch and leiden extras). Vendored from Graphify-Labs/graphify, synced weekly.",
   "author": {
     "name": "deadmade",
