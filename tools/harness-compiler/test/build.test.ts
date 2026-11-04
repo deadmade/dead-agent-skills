@@ -120,7 +120,7 @@ function flows(conductor: string) {
   put(root, 'plugins/flows/plugin.json', { description: 'Flows.' });
   put(root, 'plugins/flows/skills/f/SKILL.md', conductor);
   put(root, 'plugins/flows/skills/w/SKILL.md', '---\nname: w\ndescription: d\n---\nWrite.\n');
-  put(root, 'plugins/flows/steps/a.md', 'Then {{ask-user}}.\n');
+  put(root, 'plugins/flows/steps/a.toml', "text = '''\nThen {{ask-user}}.\n'''\n");
   return root;
 }
 const CONDUCTOR = '---\nname: f\ndescription: d\ndisable-model-invocation: true\n---\n';

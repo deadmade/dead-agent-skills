@@ -24,6 +24,8 @@ const refuses = (files: Record<string, string>, file: string, line: number, what
     () => compose(files),
     (e) => e instanceof ComposeError && e.file === file && e.line === line && what.test(e.message),
   );
+// A step file: its `keys` lines, then `text` in a ''' literal string, so text line n is file line keys.length + 1 + n.
+const step = (text: string, ...keys: string[]) => [...keys, "text = '''", `${text}'''`, ''].join('\n');
 
 const FLOW = {
   'skills/f/SKILL.md': [
@@ -57,13 +59,13 @@ const FLOW = {
     '[step: gate]',
     '',
   ].join('\n'),
-  'steps/gate.md': '---\nrepeat: true\n---\nAsk at the gate.\n',
+  'steps/gate.toml': step('Ask at the gate.\n', 'repeat = true'),
 };
 
 test('composes a step in place', () => {
   const { files } = compose({
     'skills/f/SKILL.md': 'Before\n[step: a]\nAfter\n',
-    'steps/a.md': '---\nuses: p:x\n---\nStep one.\n\n### a\n\nStep two.\n',
+    'steps/a.toml': step('Step one.\n\n### a\n\nStep two.\n', 'uses = ["p:x"]'),
   });
   assert.equal(files.get('skills/f/SKILL.md'), 'Before\nStep one.\n\n### a\n\nStep two.\nAfter\n');
 });
@@ -82,13 +84,16 @@ test('strips override-marker lines', () => {
   const marker = '<!-- overrides superpowers/skills/x/SKILL.md: "Say it." -->';
   const { files } = compose({
     'skills/f/SKILL.md': `A\n${marker}\nB\n[step: a]\n`,
-    'steps/a.md': `C\n  ${marker}\nD\n`,
+    'steps/a.toml': step(`C\n  ${marker}\nD\n`),
   });
   assert.equal(files.get('skills/f/SKILL.md'), 'A\nB\nC\nD\n');
 });
 
 test('resolves tokens per target', () => {
-  const source = { 'skills/f/SKILL.md': 'Use {{ask-user}}.\n[step: a]\n', 'steps/a.md': 'Then {{ask-user}} again.\n' };
+  const source = {
+    'skills/f/SKILL.md': 'Use {{ask-user}}.\n[step: a]\n',
+    'steps/a.toml': step('Then {{ask-user}} again.\n'),
+  };
   const claude = compose(source, { 'ask-user': { text: 'the AskUserQuestion tool' } });
   const codex = compose(source, { 'ask-user': { text: 'the host user-question tool' } });
   assert.equal(
@@ -100,7 +105,12 @@ test('resolves tokens per target', () => {
     'Use the host user-question tool.\nThen the host user-question tool again.\n',
   );
   refuses({ 'skills/f/SKILL.md': 'A\nUse {{nope}}.\n' }, 'skills/f/SKILL.md', 2, /\{\{nope\}\}/);
-  refuses({ 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.md': 'A\nUse {{nope}}.\n' }, 'steps/a.md', 2, /\{\{nope\}\}/);
+  refuses(
+    { 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.toml': step('A\nUse {{nope}}.\n') },
+    'steps/a.toml',
+    3,
+    /\{\{nope\}\}/,
+  );
 });
 
 test('draws the phase table', () => {
@@ -154,28 +164,37 @@ test('refuses an unknown step', () => {
 });
 
 test('refuses a step without repeat: true used twice in one file', () => {
-  refuses({ 'skills/f/SKILL.md': '[step: a]\n\n[step: a]\n', 'steps/a.md': 'A.\n' }, 'skills/f/SKILL.md', 3, /\ba\b/);
+  refuses(
+    { 'skills/f/SKILL.md': '[step: a]\n\n[step: a]\n', 'steps/a.toml': step('A.\n') },
+    'skills/f/SKILL.md',
+    3,
+    /\ba\b/,
+  );
 });
 
 test('refuses a [step: line inside a step', () => {
   refuses(
-    { 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.md': '---\nuses: p:x\n---\nA.\n[step: b]\n', 'steps/b.md': 'B.\n' },
-    'steps/a.md',
-    5,
+    {
+      'skills/f/SKILL.md': '[step: a]\n',
+      'steps/a.toml': step('A.\n[step: b]\n', 'uses = ["p:x"]'),
+      'steps/b.toml': step('B.\n'),
+    },
+    'steps/a.toml',
+    4,
     /\ba\b/,
   );
 });
 
 test('refuses a # or ## heading inside a step', () => {
-  refuses({ 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.md': 'A.\n## Heading\n' }, 'steps/a.md', 2, /\ba\b/);
-  refuses({ 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.md': '# Title\n' }, 'steps/a.md', 1, /\ba\b/);
+  refuses({ 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.toml': step('A.\n## Heading\n') }, 'steps/a.toml', 3, /\ba\b/);
+  refuses({ 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.toml': step('# Title\n') }, 'steps/a.toml', 2, /\ba\b/);
 });
 
 test('refuses <skill-dir> inside a step', () => {
   refuses(
-    { 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.md': 'Run node "<skill-dir>/x.mjs".\n' },
-    'steps/a.md',
-    1,
+    { 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.toml': step('Run node "<skill-dir>/x.mjs".\n') },
+    'steps/a.toml',
+    2,
     /\ba\b/,
   );
 });
@@ -183,14 +202,78 @@ test('refuses <skill-dir> inside a step', () => {
 test('checks only the steps a file uses', () => {
   const { files } = compose({
     'skills/f/SKILL.md': 'A\n',
-    'steps/unused.md': '## Heading\n\nRun node "<skill-dir>/x.mjs".\n',
+    'steps/unused.toml': step('## Heading\n\nRun node "<skill-dir>/x.mjs".\n', 'needs = "subagents"'),
   });
   assert.equal(files.get('skills/f/SKILL.md'), 'A\n');
 });
 
+// A step no file uses, refused at `line` of steps/a.toml: keys, types and the text opener are checked on every step.
+const refusesStep = (content: string, line: number, what: RegExp) =>
+  refuses({ 'skills/f/SKILL.md': 'A\n', 'steps/a.toml': content }, 'steps/a.toml', line, what);
+
+test('refuses a step that is not TOML, at its line with the caret', () => {
+  refusesStep(step('A.\n', 'needs = subagents'), 1, /needs = subagents\n.*\^/s);
+});
+
+test("refuses a ''' inside a step's text, with the hint that it ends the text", () => {
+  refusesStep(step("Quote ''' here.\n"), 2, /''' inside the text ends it/);
+  refusesStep(step("Quote '''\nmore\n"), 3, /''' inside the text ends it/);
+});
+
+test('refuses an unknown step key, listing the valid keys', () => {
+  refusesStep(step('A.\n', 'require = ["b"]'), 1, /unknown key require\b.*\buses, requires, writes\b.*\btext\b/);
+});
+
+test('refuses a step key of the wrong type, and a uses entry that is not plugin:name', () => {
+  refusesStep(step('A.\n', 'repeat = "true"'), 1, /\brepeat\b/);
+  refusesStep(step('A.\n', 'uses = "a:b"'), 1, /\buses\b/);
+  refusesStep(step('A.\n', 'requires = ["b"]', 'uses = ["p:x", "how"]'), 2, /"how" is not plugin:name/);
+});
+
+test('refuses a needs or in value outside its one allowed value', () => {
+  refusesStep(step('A.\n', 'needs = "subagent"'), 1, /\bneeds\b.*"subagents"/);
+  refusesStep(step('A.\n', 'in = "every-flow"'), 1, /\bin\b.*"every-conductor"/);
+});
+
+test("refuses a step without text, or whose text opener isn't alone on its line", () => {
+  refusesStep('uses = ["p:x"]\n', 1, /\btext\b/);
+  refusesStep("uses = [\"p:x\"]\ntext = '''A.\n'''\n", 2, /text = '''/);
+  refusesStep('text = """\nA.\n"""\n', 1, /text = '''/);
+});
+
+test('does not load a dotfile in steps/', () => {
+  assert.doesNotThrow(() => compose({ 'skills/f/SKILL.md': 'A\n', 'steps/.draft.toml': 'not = toml =\n' }));
+  refuses(
+    { 'skills/f/SKILL.md': '[step: .draft]\n', 'steps/.draft.toml': step('A.\n') },
+    'skills/f/SKILL.md',
+    1,
+    /draft/,
+  );
+});
+
+test('refuses a converted conductor missing a step that says in = "every-conductor"', () => {
+  const steps = { 'steps/rules.toml': step('R.\n', 'in = "every-conductor"'), 'steps/a.toml': step('A.\n') };
+  refuses({ ...steps, 'skills/f/SKILL.md': '[step: phases]\n\n[step: a]\n' }, 'skills/f/SKILL.md', 1, /\brules\b/);
+  assert.doesNotThrow(() => compose({ ...steps, 'skills/f/SKILL.md': '[step: phases]\n\n[step: rules]\n' }));
+  assert.doesNotThrow(() => compose({ ...steps, 'skills/g/SKILL.md': '[step: a]\n' }));
+});
+
+test('refuses a near-miss step line in a file with [step: phases], and leaves it alone elsewhere', () => {
+  for (const line of ['[step:a]', '[Step: a]', '[step: a] ']) {
+    const files = { 'steps/a.toml': step('A.\n') };
+    refuses({ ...files, 'skills/f/SKILL.md': `[step: phases]\n\n${line}\n` }, 'skills/f/SKILL.md', 3, /step line/);
+    const unconverted = { ...files, 'skills/g/SKILL.md': `${line}\n` };
+    assert.equal(compose(unconverted).files.get('skills/g/SKILL.md'), `${line}\n`);
+  }
+});
+
 test('refuses an unmet requires:', () => {
   refuses(
-    { 'skills/f/SKILL.md': 'A\n[step: a]\n', 'steps/a.md': '---\nrequires: b\n---\nA.\n', 'steps/b.md': 'B.\n' },
+    {
+      'skills/f/SKILL.md': 'A\n[step: a]\n',
+      'steps/a.toml': step('A.\n', 'requires = ["b"]'),
+      'steps/b.toml': step('B.\n'),
+    },
     'skills/f/SKILL.md',
     2,
     /\ba\b.*\bb\b/,
@@ -200,7 +283,7 @@ test('refuses an unmet requires:', () => {
 test("refuses a writes: section missing from any of the flow's templates", () => {
   const flow = {
     'skills/f/SKILL.md': '---\nname: f\ntemplate: references/t1.md, references/t2.md\n---\n[step: a]\n',
-    'steps/a.md': '---\nwrites: Rulings, Parking lot\n---\nA.\n',
+    'steps/a.toml': step('A.\n', 'writes = ["Rulings", "Parking lot"]'),
     'references/t1.md': '# T1\n\n## Rulings\n\n## Parking lot\n',
   };
   refuses(
@@ -214,7 +297,7 @@ test("refuses a writes: section missing from any of the flow's templates", () =>
 
 test('refuses a flow with no template: using a step that writes:', () => {
   refuses(
-    { 'skills/f/SKILL.md': '---\nname: f\n---\n[step: a]\n', 'steps/a.md': '---\nwrites: Rulings\n---\nA.\n' },
+    { 'skills/f/SKILL.md': '---\nname: f\n---\n[step: a]\n', 'steps/a.toml': step('A.\n', 'writes = ["Rulings"]') },
     'skills/f/SKILL.md',
     4,
     /\ba\b.*template/,
@@ -223,11 +306,11 @@ test('refuses a flow with no template: using a step that writes:', () => {
 
 test('refuses a needs: subagents step without a Without subagents: line', () => {
   const flow = { 'skills/f/SKILL.md': '[step: a]\n' };
-  refuses({ ...flow, 'steps/a.md': '---\nneeds: subagents\n---\nDispatch agents.\n' }, 'steps/a.md', 2, /\ba\b/);
+  refuses({ ...flow, 'steps/a.toml': step('Dispatch agents.\n', 'needs = "subagents"') }, 'steps/a.toml', 1, /\ba\b/);
   assert.doesNotThrow(() =>
     compose({
       ...flow,
-      'steps/a.md': '---\nneeds: subagents\n---\nDispatch agents.\nWithout subagents: do it yourself.\n',
+      'steps/a.toml': step('Dispatch agents.\nWithout subagents: do it yourself.\n', 'needs = "subagents"'),
     }),
   );
 });
@@ -248,8 +331,10 @@ test('computes uses', () => {
     {
       'skills/f/SKILL.md':
         '---\nname: f\ndisable-model-invocation: true\nuses: superpowers:writing-plans, pstack-picks:how\n---\n[step: a]\n{{watch}}\n',
-      'steps/a.md':
-        '---\nuses: pstack-picks:why, pstack-picks:how, claude-md-management@claude-plugins-official:claude-md-improver\n---\nA.\n',
+      'steps/a.toml': step(
+        'A.\n',
+        'uses = ["pstack-picks:why", "pstack-picks:how", "claude-md-management@claude-plugins-official:claude-md-improver"]',
+      ),
       'skills/writing/SKILL.md': '---\nname: writing\nuses: p:x\n---\nWrite.\n',
     },
     { watch: { text: 'Watch.', uses: { 'claude-code': ['Monitor'] } } },

@@ -1,6 +1,7 @@
 // Builds each flows conductor from its `[step: name]` lines and host tokens, and refuses a broken one (spec §1–§4).
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { TomlError, parse } from 'smol-toml';
 import type { TargetId } from '../model.ts';
 
 export type Uses = Record<string, string[]>;
@@ -38,6 +39,8 @@ export const CLAUDE_ONLY: RegExp[] = [
 export const SHORT_NAMES: string[] = ['how', 'why', 'fetch', 'teach'];
 
 const STEP = /^\[step: ([^\]]+)\]$/;
+// `[step:x]`, `[Step: x]`, `[step: x] ` (trailing space): meant as a step line, read as prose.
+const NEAR_STEP = /^\s*\[\s*steps?\s*:/i;
 const OVERRIDE = /^\s*<!--\s*overrides\s.*-->\s*$/;
 const PHASE = /^## Phase (\d+): (.+)$/;
 const ROW = /^<!--\s*runs:\s*(.*?)\s*·\s*output:\s*(.*?)\s*-->$/;
@@ -63,31 +66,92 @@ function frontmatter(lines: string[]): { keys: Keys; end: number } {
   return { keys, end: close + 1 };
 }
 
+// A step is steps/<name>.toml (spec §1); its keys, their types and values come from step.schema.json.
+interface StepKeys {
+  in?: string;
+  uses?: string[];
+  requires?: string[];
+  writes?: string[];
+  needs?: string;
+  repeat?: boolean;
+  text: string;
+}
 interface Step {
   file: string;
-  keys: Keys;
+  keys: StepKeys;
+  line: (key: string) => number;
   body: string[];
   start: number;
 }
+type Prop = { type?: string; enum?: string[]; items?: { type?: string; pattern?: string; description?: string } };
+const schema: { required: string[]; properties: Record<string, Prop> } = JSON.parse(
+  readFileSync(join(import.meta.dirname, '../../../../plugins/flows/steps/step.schema.json'), 'utf8'),
+);
+const PROPS = schema.properties;
+
+// Parses a step and checks its keys, types and text opener; every step is loaded, used or not.
+function loadStep(pluginDir: string, name: string): Step {
+  const file = `steps/${name}.toml`;
+  const raw = read(join(pluginDir, file));
+  const rows = raw.split('\n');
+  // smol-toml gives values without positions, so a key's line is the first line that assigns it (0: none).
+  const at = (key: string) => rows.findIndex((r) => new RegExp(`^${key}\\s*=`).test(r)) + 1;
+  const line = (key: string) => at(key) || 1;
+  const fail = (key: string, what: string): never => {
+    throw new ComposeError(file, line(key), `step ${name} ${what}`);
+  };
+  let data: Record<string, unknown>;
+  try {
+    data = parse(raw);
+  } catch (e) {
+    if (!(e instanceof TomlError)) throw e;
+    const open = at('text');
+    const ended = open && e.line > open && rows.slice(open, e.line).some((r) => r.includes("'''"));
+    const what = e.message.split('\n')[0].replace('Invalid TOML document: ', '');
+    throw new ComposeError(
+      file,
+      e.line,
+      `step ${name} is not TOML: ${what}${ended ? " (a ''' inside the text ends it; reword it)" : ''}\n${e.codeblock}`,
+    );
+  }
+  for (const [key, value] of Object.entries(data)) {
+    const prop = PROPS[key] ?? fail(key, `has unknown key ${key} (keys: ${Object.keys(PROPS).join(', ')})`);
+    const not = `, not ${JSON.stringify(value)}`;
+    if (prop.enum && !prop.enum.includes(value as string))
+      fail(key, `${key} must be ${prop.enum.map((v) => JSON.stringify(v)).join(' or ')}${not}`);
+    if (prop.type === 'boolean' && typeof value !== 'boolean') fail(key, `${key} must be true or false${not}`);
+    if (prop.type === 'string' && typeof value !== 'string') fail(key, `${key} must be a string${not}`);
+    if (prop.type === 'array') {
+      if (!Array.isArray(value) || value.some((v) => typeof v !== 'string'))
+        fail(key, `${key} must be a list of strings${not}`);
+      const pattern = prop.items?.pattern && new RegExp(prop.items.pattern);
+      const bad = pattern && (value as string[]).find((v) => !pattern.test(v));
+      if (bad) fail(key, `${key} entry "${bad}" is not ${prop.items!.description}`);
+    }
+  }
+  for (const key of schema.required) if (!(key in data)) fail(key, `has no ${key}`);
+  const start = line('text');
+  if (rows[start - 1] !== "text = '''") fail('text', "text must open alone on its line: text = '''");
+  const keys = data as unknown as StepKeys;
+  return { file, keys, line, body: keys.text.replace(/\n$/, '').split('\n'), start };
+}
+
 // Checks 1 and 4 on a step's own text, run only when a file uses the step.
-function loadStep(pluginDir: string, name: string): Step | undefined {
-  const file = `steps/${name}.md`;
-  if (!existsSync(join(pluginDir, file))) return undefined;
-  const lines = read(join(pluginDir, file)).replace(/\n$/, '').split('\n');
-  const { keys, end } = frontmatter(lines);
-  const body = lines.slice(end);
-  body.forEach((line, i) => {
+function checkText(name: string, step: Step) {
+  step.body.forEach((line, i) => {
     const fail = (what: string) => {
-      throw new ComposeError(file, end + i + 1, `step ${name} ${what}`);
+      throw new ComposeError(step.file, step.start + i + 1, `step ${name} ${what}`);
     };
     if (line.startsWith('[step:')) fail('holds a [step:] line; steps do not nest');
     if (/^#{1,2} /.test(line)) fail("has a # or ## heading; it sits under the flow's own heading");
     if (line.includes('<skill-dir>')) fail('names <skill-dir>; steps write paths through <flow-root>');
   });
-  const needs = keys.get('needs');
-  if (needs?.value === 'subagents' && !body.some((line) => line.startsWith('Without subagents:')))
-    throw new ComposeError(file, needs.line, `step ${name} needs subagents but has no "Without subagents:" line`);
-  return { file, keys, body, start: end };
+  if (step.keys.needs === 'subagents' && !step.body.some((line) => line.startsWith('Without subagents:')))
+    throw new ComposeError(
+      step.file,
+      step.line('needs'),
+      `step ${name} needs subagents but has no "Without subagents:" line`,
+    );
 }
 
 const markdown = (pluginDir: string, top: string) =>
@@ -98,7 +162,14 @@ const markdown = (pluginDir: string, top: string) =>
     : [];
 
 export function composeFlows(pluginDir: string, tokens: HostTokens): Composed {
-  const steps = new Map<string, Step | undefined>();
+  // Only steps/<name>.toml with a step name loads, so dotfiles and step.schema.json are not steps.
+  const stepDir = join(pluginDir, 'steps');
+  const steps = new Map(
+    (existsSync(stepDir) ? readdirSync(stepDir) : []).flatMap((f) => {
+      const name = /^([a-z][a-z-]*)\.toml$/.exec(f)?.[1];
+      return name ? [[name, loadStep(pluginDir, name)] as const] : [];
+    }),
+  );
   const files = new Map<string, string>();
   const found: Record<string, Record<string, Set<string>>> = {};
   for (const rel of [...markdown(pluginDir, 'skills'), ...markdown(pluginDir, 'references')].sort()) {
@@ -154,13 +225,15 @@ export function composeFlows(pluginDir: string, tokens: HostTokens): Composed {
     lines.forEach((line, i) => {
       if (dropped.has(i) || OVERRIDE.test(line)) return;
       const name = i >= end ? STEP.exec(line)?.[1] : undefined;
+      if (!name && usesPhases && i >= end && NEAR_STEP.test(line))
+        throw new ComposeError(rel, i + 1, `"${line}" looks like a step line; write it alone as [step: <name>]`);
       if (!name) return out.push(resolve(line, rel, i + 1));
       const builtIn = name === 'phases' || name === 'host';
-      const step = builtIn ? undefined : (steps.get(name) ?? loadStep(pluginDir, name));
+      const step = builtIn ? undefined : steps.get(name);
       if (!builtIn && !step) throw new ComposeError(rel, i + 1, `unknown step ${name}`);
-      if (step) steps.set(name, step);
-      if (used.has(name) && step?.keys.get('repeat')?.value !== 'true')
-        throw new ComposeError(rel, i + 1, `step ${name} is used twice; only a step with repeat: true may be`);
+      if (step) checkText(name, step);
+      if (used.has(name) && step?.keys.repeat !== true)
+        throw new ComposeError(rel, i + 1, `step ${name} is used twice; only a step with repeat = true may be`);
       used.set(name, i + 1);
       if (name === 'phases') out.push(...table);
       // The host step is the adapter token's text.
@@ -170,15 +243,24 @@ export function composeFlows(pluginDir: string, tokens: HostTokens): Composed {
           if (!OVERRIDE.test(text)) out.push(resolve(text, step!.file, step!.start + k + 1));
         });
     });
+    // A converted conductor (a SKILL.md holding [step: phases]) uses every step that says in = "every-conductor".
+    if (usesPhases && /^skills\/[^/]+\/SKILL\.md$/.test(rel))
+      for (const [name, step] of steps)
+        if (step.keys.in && !used.has(name))
+          throw new ComposeError(
+            rel,
+            lines.indexOf('[step: phases]', end) + 1,
+            `${rel} lacks [step: ${name}]; ${step.file} says in = "${step.keys.in}"`,
+          );
 
     const templates = list(flowKeys.get('template')?.value);
     for (const [name, at] of used) {
       const step = steps.get(name);
       if (!step) continue;
-      for (const needed of list(step.keys.get('requires')?.value))
+      for (const needed of step.keys.requires ?? [])
         if (!used.has(needed))
           throw new ComposeError(rel, at, `step ${name} requires step ${needed}, which ${rel} lacks`);
-      const writes = list(step.keys.get('writes')?.value);
+      const writes = step.keys.writes ?? [];
       if (writes.length && !templates.length)
         throw new ComposeError(
           rel,
@@ -196,9 +278,9 @@ export function composeFlows(pluginDir: string, tokens: HostTokens): Composed {
           if (!sections.includes(section))
             throw new ComposeError(rel, at, `step ${name} writes ## ${section}, which ${template} lacks`);
       }
-      fileUses.push(parseUses(step.keys, step.file));
+      fileUses.push(parseUses(step.keys.uses ?? [], step.file, step.line('uses')));
     }
-    fileUses.push(parseUses(keys, rel));
+    fileUses.push(parseUses(list(keys.get('uses')?.value), rel, keys.get('uses')?.line ?? 1));
 
     files.set(rel, out.join('\n'));
     if (!conductor) continue;
@@ -219,13 +301,12 @@ export function composeFlows(pluginDir: string, tokens: HostTokens): Composed {
   return { files, uses };
 }
 
-// `uses: plugin:name, …`, split at the first colon (a plugin may carry `@marketplace`).
-function parseUses(keys: Keys, file: string): Uses {
+// `plugin:name` entries, split at the first colon (a plugin may carry `@marketplace`).
+function parseUses(items: string[], file: string, line: number): Uses {
   const uses: Uses = {};
-  const entry = keys.get('uses');
-  for (const item of list(entry?.value)) {
+  for (const item of items) {
     const at = item.indexOf(':');
-    if (at < 1) throw new ComposeError(file, entry!.line, `uses entry "${item}" is not plugin:name`);
+    if (at < 1) throw new ComposeError(file, line, `uses entry "${item}" is not plugin:name`);
     (uses[item.slice(0, at)] ??= []).push(item.slice(at + 1));
   }
   return uses;

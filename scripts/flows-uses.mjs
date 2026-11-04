@@ -102,12 +102,12 @@ export function checkUseNames(root, uses) {
 // Bold marks and line wraps in the pack don't matter; the vendored packs/ and agents/ are not scanned.
 const MARKER = /<!--\s*overrides\s+(\S+?):\s*"(.*)"\s*-->/;
 const flat = (t) => t.replace(/[*_]/g, '').replace(/\s+/g, ' ');
-// flows' own .md files, the vendored packs/ and agents/ left out.
+// flows' own .md files and steps/*.toml, the vendored packs/ and agents/ left out.
 const conductorDocs = (root, dir = FLOWS) =>
   readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) => {
     const rel = `${dir}/${e.name}`;
     if (e.isDirectory()) return rel === PACKS || rel === `${FLOWS}/agents` ? [] : conductorDocs(root, rel);
-    return e.name.endsWith('.md') ? [rel] : [];
+    return e.name.endsWith('.md') || (dir === `${FLOWS}/steps` && e.name.endsWith('.toml')) ? [rel] : [];
   });
 export function checkOverrides(root) {
   const problems = [];

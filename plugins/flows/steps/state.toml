@@ -1,3 +1,4 @@
+text = '''
 - The run keeps `docs/features/<slug>/flow.md`, copied from the template this conductor names, with every
   placeholder the template names filled in; none stays literal (a `phase: <first phase>` left as written gives the
   flow cockpit an unknown phase). Its frontmatter names the flow (`flow:`, this conductor's value) and the `phase:`;
@@ -12,3 +13,4 @@
   them added when it is resumed; none is required of it.
 - The user reads specs, plans and flow.md in the flow cockpit, which draws Mermaid: use a diagram where it explains
   something better than prose; never required.
+'''

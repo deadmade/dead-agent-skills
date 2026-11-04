@@ -1,3 +1,6 @@
+in = "every-conductor"
+
+text = '''
 The coding agent proposes and recommends; the user decides.
 
 - The user may skip a phase by saying so ("skip grilling"); record it. Never skip one on your own, and never skip a
@@ -64,3 +67,4 @@ what you skipped or did not check, and any risk the user must know."
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "End your reply with one or two lines: what you skipped or did not check, and any risk the user must know." -->
 
 After a compaction, or on resume, re-read this file from the `## Phase` heading of the phase you are in (flow.md's `phase:`, where the run keeps one), before acting.
+'''

@@ -54,6 +54,9 @@ jobs:
         with:
           node-version: 26
 
+      # The sync rebuilds the harnesses and the repo checks run the compiler, which needs its packages.
+      - run: npm ci
+
       - name: Sync
         id: run
         run: node tools/upstream-sync/src/cli.ts apply --github-output ${{ matrix.source }}

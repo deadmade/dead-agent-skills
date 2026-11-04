@@ -155,12 +155,12 @@ test('the real conductors pass, and flows depends on exactly what they use on Cl
   assert.deepEqual(checkPackPaths(ROOT), []);
 });
 
-// A repo whose conductor quotes `quote` from a pack file that reads `pack`.
-function overrides(quote, pack = 'Always **write the\nplan** first.\n') {
+// A repo whose conductor (or `file`) quotes `quote` from a pack file that reads `pack`.
+function overrides(quote, pack = 'Always **write the\nplan** first.\n', file = 'plugins/flows/skills/fix/SKILL.md') {
   const fx = mkdtempSync(join(tmpdir(), 'ov-'));
   const put = (f, s) => (mkdirSync(dirname(join(fx, f)), { recursive: true }), writeFileSync(join(fx, f), s));
   put('plugins/flows/packs/p/skills/s/SKILL.md', pack);
-  put('plugins/flows/skills/fix/SKILL.md', `intro\n<!-- overrides p/skills/s/SKILL.md: "${quote}" -->\n`);
+  put(file, `intro\n<!-- overrides p/skills/s/SKILL.md: "${quote}" -->\n`);
   return checkOverrides(fx);
 }
 
@@ -171,6 +171,12 @@ test('checkOverrides: a found sentence passes, also across a wrap and bold in th
 test('checkOverrides: a changed sentence fails, naming file and line', () => {
   assert.deepEqual(overrides('Never write the plan.'), [
     'plugins/flows/skills/fix/SKILL.md:2: p/skills/s/SKILL.md no longer contains "Never write the plan."',
+  ]);
+});
+
+test('checkOverrides: a changed sentence in a steps/*.toml fails', () => {
+  assert.deepEqual(overrides('Never write the plan.', undefined, 'plugins/flows/steps/x.toml'), [
+    'plugins/flows/steps/x.toml:2: p/skills/s/SKILL.md no longer contains "Never write the plan."',
   ]);
 });
 
@@ -193,13 +199,14 @@ test('checkOverrides: a missing pack file fails', () => {
   assert.equal(checkOverrides(fx).length, 1);
 });
 
-// A repo whose conductor reads `text`, with one pack file p/skills/s/SKILL.md; packs/ and agents/ name a missing path.
-function packPaths(text) {
+// A repo whose conductor (or `file`) reads `text`, with one pack file p/skills/s/SKILL.md; packs/ and agents/ name a
+// missing path.
+function packPaths(text, file = 'plugins/flows/skills/fix/SKILL.md') {
   const fx = mkdtempSync(join(tmpdir(), 'pp-'));
   const put = (f, s) => (mkdirSync(dirname(join(fx, f)), { recursive: true }), writeFileSync(join(fx, f), s));
   put('plugins/flows/packs/p/skills/s/SKILL.md', '`<packs>/p/gone.md`');
   put('plugins/flows/agents/a.md', '`${CLAUDE_PLUGIN_ROOT}/packs/p/gone.md`');
-  put('plugins/flows/skills/fix/SKILL.md', text);
+  put(file, text);
   return checkPackPaths(fx);
 }
 
@@ -214,6 +221,12 @@ test('checkPackPaths: a missing path fails, naming file and line', () => {
   assert.deepEqual(packPaths('intro\nby `<packs>/p/skills/gone.md` and ${CLAUDE_PLUGIN_ROOT}/packs/q/x.md.'), [
     'plugins/flows/skills/fix/SKILL.md:2: <packs>/p/skills/gone.md does not exist',
     'plugins/flows/skills/fix/SKILL.md:2: <packs>/q/x.md does not exist',
+  ]);
+});
+
+test('checkPackPaths: a missing path in a steps/*.toml fails', () => {
+  assert.deepEqual(packPaths("text = '''\nRead `<packs>/p/gone.md`.\n'''\n", 'plugins/flows/steps/x.toml'), [
+    'plugins/flows/steps/x.toml:2: <packs>/p/gone.md does not exist',
   ]);
 });
 

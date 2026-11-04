@@ -1,6 +1,6 @@
----
-uses: pstack-picks:how, pstack-picks:why, graphify:graphify, mattpocock-picks:setup-matt-pocock-skills
----
+uses = ["pstack-picks:how", "pstack-picks:why", "graphify:graphify", "mattpocock-picks:setup-matt-pocock-skills"]
+
+text = '''
 
 - **Codebase.** When the request hands over an approved research run (`docs/features/<slug>/research.md`), its
   flow.md's **Grounding** is this grounding: link it and run only what it doesn't cover.
@@ -11,3 +11,4 @@ uses: pstack-picks:how, pstack-picks:why, graphify:graphify, mattpocock-picks:se
     question: one `why` run is pstack's full investigation, not a quick lookup.
   - Read the domain docs that `<flow-root>/packs/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists
     (the glossary and the ADRs).
+'''

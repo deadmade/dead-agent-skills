@@ -1,3 +1,4 @@
+text = '''
 Say which plugin provides it, then use the fallback. Only the rows for plugins this flow uses matter.
 
 | Plugin                 | Missing                                  | Fallback                                                                                            |
@@ -10,3 +11,4 @@ Say which plugin provides it, then use the fallback. Only the rows for plugins t
 | host security skill    | security review                          | review the diff for exploitable vulnerabilities using the host adapter                              |
 | claude-md-management   | `claude-md-improver`, `revise-claude-md` | read applicable AGENTS.md and CLAUDE.md against the code yourself                                   |
 | its plugin             | a stack pack                             | go on without it                                                                                    |
+'''

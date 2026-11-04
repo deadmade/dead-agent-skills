@@ -1,0 +1,7 @@
+# For editors only (taplo's language server, Even Better TOML): completion and checks for the flow steps' keys.
+# Nothing formats the steps; compose.ts reads the same schema (spec §1).
+[[rule]]
+include = ["plugins/flows/steps/*.toml"]
+
+[rule.schema]
+path = "./plugins/flows/steps/step.schema.json"

@@ -31,6 +31,25 @@
 
     preCommit = system: let
       pkgs = nixpkgs.legacyPackages.${system};
+      inherit (pkgs) lib;
+
+      # What package-lock.json pins (the compiler's smol-toml among it), for the sandboxed check, which has no `npm ci`:
+      # check-repo and the compiler tests import it. Built from the manifests alone, so only they rebuild it.
+      workspaces = (lib.importJSON ./package.json).workspaces;
+      npmRoot = lib.fileset.toSource {
+        root = ./.;
+        fileset = lib.fileset.unions ([./package.json ./package-lock.json] ++ map (ws: ./. + "/${ws}/package.json") workspaces);
+      };
+      nodeModules = pkgs.importNpmLock.buildNodeModules {
+        inherit npmRoot;
+        inherit (pkgs) nodejs;
+        derivationArgs = {
+          # npm ci installs a workspace's dependencies only when its package.json is there.
+          postPatch = lib.concatMapStrings (ws: "mkdir -p ${ws} && cp ${npmRoot}/${ws}/package.json ${ws}/\n") workspaces;
+          # The links to the workspaces would dangle here; the checked tree has the workspaces themselves.
+          postInstall = "rm -r $out/node_modules/@dead-claude-skills";
+        };
+      };
 
       check-repo = pkgs.writeShellApplication {
         name = "check-repo";
@@ -52,6 +71,12 @@
     in
       git-hooks.lib.${system}.run {
         src = ./.;
+        # The checked tree, with node_modules beside package.json as `npm ci` would leave it (git ignores the link).
+        rootSrc = lib.mkForce (pkgs.runCommand "source-with-node-modules" {} ''
+          cp -r ${./.} $out
+          chmod u+w $out
+          ln -s ${nodeModules}/node_modules $out/node_modules
+        '');
         hooks = {
           treefmt = {
             enable = true;
