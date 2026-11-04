@@ -1,0 +1,11 @@
+repeat = true
+
+text = '''
+- **Gates:** a gate passes only on the user's explicit approval of the artifact it names, recorded with the date in
+  the state file as a line `- Gate <n>, <what>: <date>[, <extra>]`, the date empty while the gate is open; a
+  reopening is appended as `Reopened <date>: <why>`. "Sounds good" to an idea isn't approval of a document. Nothing
+  past a gate starts before it passes.
+- A plan gate adds `, execution: subagent-driven | native`: ask the user to approve the plan **and** pick the
+  execution method from `writing-plans`' handoff (subagent-driven, or native = `executing-plans`), with your
+  recommendation. Record both.
+'''

@@ -1,0 +1,10 @@
+text = '''
+**Before you write.** Read the task and the code it touches. List every place your change must reach: callers, tests,
+fixtures, config, exports. Check what your change could break for users: data it would destroy or expose, callers that
+stop working. That is scope. Extra features are not.
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "Before you write Read the task and the code it touches." -->
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "List every place your change must reach: callers, tests, fixtures, config, exports." -->
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "Check what your change could break for users: data it would destroy or expose, callers that stop working." -->
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "That is scope." -->
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "Extra features are not." -->
+'''

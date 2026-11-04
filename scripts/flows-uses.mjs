@@ -137,7 +137,8 @@ const TEMPLATE_FILES = [
 ];
 const RULES_FILE = `${FLOWS}/references/flow-rules.md`;
 const AUDIT_FILE = `${FLOWS}/skills/review-code/references/audit-template.md`;
-const PLAN_FILES = ['build-feature', 'implement', 'upgrade'].map((n) => `${FLOWS}/skills/${n}/SKILL.md`);
+const GATE_STEP = `${FLOWS}/steps/gate.toml`;
+const PLAN_STEP = `${FLOWS}/steps/plan-shape.toml`;
 const GATE_LINE = '- Gate <n>, <what>:';
 export function checkTemplates(root) {
   const problems = [];
@@ -156,18 +157,17 @@ export function checkTemplates(root) {
     ]);
   need(RULES_FILE, [
     ['the `Waiting for you` rule', 'Waiting for you'],
-    [`the gate line shape \`${GATE_LINE}\``, GATE_LINE],
     ['`Status: decided`', 'Status: decided'],
+  ]);
+  need(GATE_STEP, [[`the gate line shape \`${GATE_LINE}\``, GATE_LINE]]);
+  need(PLAN_STEP, [
+    ['`**Does:**`', '**Does:**'],
+    ['`**Depends on:**`', '**Depends on:**'],
   ]);
   need(AUDIT_FILE, [
     ['`Picks:`', 'Picks:'],
     ['`Fixed <date>`', 'Fixed <date>'],
   ]);
-  for (const file of PLAN_FILES)
-    need(file, [
-      ['`**Does:**`', '**Does:**'],
-      ['`**Depends on:**`', '**Depends on:**'],
-    ]);
   return problems;
 }
 

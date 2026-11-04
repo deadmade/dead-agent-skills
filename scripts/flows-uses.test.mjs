@@ -238,14 +238,14 @@ const TEMPLATES = [
 ];
 const RULES = 'plugins/flows/references/flow-rules.md';
 const AUDIT = 'plugins/flows/skills/review-code/references/audit-template.md';
-const PLANNERS = ['build-feature', 'implement', 'upgrade'].map((n) => `plugins/flows/skills/${n}/SKILL.md`);
+const STEPS = 'plugins/flows/steps';
 
 // A copy of the real files with `needle` taken out of `file`.
 function without(file, needle) {
   const fx = mkdtempSync(join(tmpdir(), 'ct-'));
-  for (const f of [...TEMPLATES, RULES, AUDIT, ...PLANNERS]) {
+  for (const f of [...TEMPLATES, RULES, AUDIT, STEPS]) {
     mkdirSync(dirname(join(fx, f)), { recursive: true });
-    cpSync(join(ROOT, f), join(fx, f));
+    cpSync(join(ROOT, f), join(fx, f), { recursive: true });
   }
   const text = readFileSync(join(fx, file), 'utf8');
   assert.ok(text.includes(needle), `${file} has ${needle}`);
@@ -276,6 +276,9 @@ for (const t of TEMPLATES) {
 
 for (const [file, what, needle] of [
   [RULES, 'the Waiting for you rule', 'Waiting for you'],
+  [`${STEPS}/gate.toml`, 'the gate line shape', '- Gate <n>, <what>:'],
+  [`${STEPS}/plan-shape.toml`, '**Does:**', '**Does:**'],
+  [`${STEPS}/plan-shape.toml`, '**Depends on:**', '**Depends on:**'],
   [AUDIT, 'Picks:', 'Picks:'],
   [AUDIT, 'Fixed', 'Fixed <date>'],
 ]) {
@@ -283,14 +286,4 @@ for (const [file, what, needle] of [
     const problems = without(file, needle);
     assert.ok(problems.length >= 1 && problems.every((p) => p.startsWith(file)), problems.join('\n'));
   });
-}
-
-for (const f of PLANNERS) {
-  for (const needle of ['**Does:**', '**Depends on:**']) {
-    test(`checkTemplates names ${f} without ${needle}`, () => {
-      const problems = without(f, needle);
-      assert.equal(problems.length, 1, problems.join('\n'));
-      assert.ok(problems[0].startsWith(f) && problems[0].includes(needle), problems[0]);
-    });
-  }
 }
