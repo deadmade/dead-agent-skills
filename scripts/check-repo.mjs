@@ -85,21 +85,26 @@ for (const dir of pluginDirs)
   if (!plugins.some((p) => p.source === dir)) problems.push(`${dir} is not listed in plugins/catalog.json`);
 
 // --- flows: each conductor's composed uses per harness, and what is generated from them (scripts/flows-uses.mjs) ---
-const uses = { 'claude-code': composeFlows(FLOWS, CLAUDE_CODE).uses, codex: composeFlows(FLOWS, CODEX).uses };
+let uses;
+try {
+  uses = { 'claude-code': composeFlows(FLOWS, CLAUDE_CODE).uses, codex: composeFlows(FLOWS, CODEX).uses };
+} catch (error) {
+  problems.push(`flows compose: ${error.message}`);
+}
 problems.push(
-  ...new Set(Object.values(uses).flatMap((all) => checkUseNames('.', all))),
+  ...new Set(Object.values(uses ?? {}).flatMap((all) => checkUseNames('.', all))),
   ...checkOverrides('.'),
   ...checkPackPaths('.'),
   ...checkTemplates('.'),
 );
 const regen = 'run node scripts/flows-uses.mjs';
-if (JSON.stringify(currentDeps('.')) !== JSON.stringify(expectedDeps(uses['claude-code'], packs('.'))))
+if (uses && JSON.stringify(currentDeps('.')) !== JSON.stringify(expectedDeps(uses['claude-code'], packs('.'))))
   problems.push(
     `${FLOWS}/plugin.json and plugins/catalog.json: flows dependencies differ from the conductors' uses: ${regen}`,
   );
 // A Windows checkout has CRLF; the generated tree is LF.
 const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8').replace(/\r\n/g, '\n');
-if (withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
+if (uses && withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
   problems.push(`${FLOWS}/README.md: uses tree is stale: ${regen}`);
 
 // --- one version: package.json and its lock, the marketplace metadata.version and each Rust crate

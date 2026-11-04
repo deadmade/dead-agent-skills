@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { TomlError, parse } from 'smol-toml';
+import { shippable } from '../emit/fs.ts';
 import type { TargetId } from '../model.ts';
 
 export type Uses = Record<string, string[]>;
@@ -43,7 +44,8 @@ const NEAR_STEP = /^\s*\[\s*steps?\s*:/i;
 export const OVERRIDE = /^\s*<!--\s*overrides\s.*-->\s*$/;
 const PHASE = /^## Phase (\d+): (.+)$/;
 const ROW = /^<!--\s*runs:\s*(.*?)\s*·\s*output:\s*(.*?)\s*-->$/;
-const TOKEN = /\{\{([\w:-]+)\}\}/g;
+// Any `{{…}}`, so a near miss such as `{{ ask-user }}` is refused as unknown rather than shipped literally.
+const TOKEN = /\{\{([^}]*)\}\}/g;
 
 const read = (file: string) => readFileSync(file, 'utf8').replaceAll('\r\n', '\n');
 const list = (value = '') =>
@@ -158,6 +160,7 @@ const markdown = (pluginDir: string, top: string) =>
     ? readdirSync(join(pluginDir, top), { recursive: true, withFileTypes: true })
         .filter((e) => e.isFile() && e.name.endsWith('.md'))
         .map((e) => relative(pluginDir, join(e.parentPath, e.name)).split(sep).join('/'))
+        .filter(shippable)
     : [];
 
 export function composeFlows(pluginDir: string, tokens: HostTokens): Composed {

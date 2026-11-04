@@ -80,6 +80,15 @@ test('leaves a file with no step line, no token and no override marker byte-iden
   assert.deepEqual(Object.fromEntries(files), sources);
 });
 
+test('leaves out .md files in folders that never ship (tests/, evals/)', () => {
+  const { files } = compose({
+    'skills/f/SKILL.md': 'A\n',
+    'skills/f/tests/fixtures/plan.md': '[step: missing]\n{{nope}}\n',
+    'references/evals/case.md': '{{nope}}\n',
+  });
+  assert.deepEqual([...files.keys()], ['skills/f/SKILL.md']);
+});
+
 test('strips override-marker lines', () => {
   const marker = '<!-- overrides superpowers/skills/x/SKILL.md: "Say it." -->';
   const { files } = compose({
@@ -105,6 +114,8 @@ test('resolves tokens per target', () => {
     'Use the host user-question tool.\nThen the host user-question tool again.\n',
   );
   refuses({ 'skills/f/SKILL.md': 'A\nUse {{nope}}.\n' }, 'skills/f/SKILL.md', 2, /\{\{nope\}\}/);
+  for (const near of ['{{ ask-user }}', '{{ask-user }}', '{{model: fast}}'])
+    refuses({ 'skills/f/SKILL.md': `A\nUse ${near}.\n` }, 'skills/f/SKILL.md', 2, /unknown token/);
   refuses(
     { 'skills/f/SKILL.md': '[step: a]\n', 'steps/a.toml': step('A\nUse {{nope}}.\n') },
     'steps/a.toml',
