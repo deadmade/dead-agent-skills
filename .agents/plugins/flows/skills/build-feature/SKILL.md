@@ -318,11 +318,6 @@ Let it run its own self-review. When it reaches its **Execution Handoff**, don't
 invoke an execution skill: link the plan in flow.md and come back to this flow. The method is asked once, at the plan's
 gate.
 
-- **Added tasks.** A task added after the plan's gate, by the user's decision during the build, takes the next free
-  number, never a letter: the pack's `task-brief 8` would also pick up `8b`. It goes at the end of plan.md with its own
-  `**Depends on:**` line; below that line, write
-  `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
-
 Run `node "<flow-root>/skills/build-feature/scripts/glance.mjs" "<plan.md>"` after every edit to the plan and again
 after its copyedit, so the block a gate shows matches the plan below it. It writes the plan's task graph and table at
 the top of plan.md, and it fails with the reason when the plan has no `### Task <n>:` headings or a task lacks
@@ -464,6 +459,11 @@ before work continues. Only the main session can ask: a subagent that meets a de
 recorded as `Status: decided <date>: <what>`. This is a fifth stop next to the four that `subagent-driven-development`
 and `executing-plans` name. For deviations it overrides their continuous execution and their rulings, and a plan
 correction that is a deviation goes to the user too.
+
+- **Added tasks.** A task added after the plan's gate, by the user's decision during the build, takes the next free
+  number, never a letter: the pack's `task-brief 8` would also pick up `8b`. It goes at the end of plan.md, when the
+  run has one, with its own `**Depends on:**` line; below that line, write
+  `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
 
 **Review findings and reports.** Where `subagent-driven-development` rules on what review or a subagent turns up, a
 deviation still goes to the user. In the fix loop (a plan-mandated finding), at the breaker and in the final review's

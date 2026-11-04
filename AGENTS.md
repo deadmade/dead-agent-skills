@@ -84,7 +84,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   check on `*.md` writes for conversation shorthand, off with `FLOWS_PROSE_CHECK=off`. The writing skill also holds the copyedit
   (`references/copyedit.md`, run as `/flows:writing copyedit <file>`): a fresh agent on the strongest model edits a
   document by the skill, then `scripts/compare.mjs` replaces it only when nothing code can check was lost (the list is
-  in `references/copyedit.md`). The conductors run it, by `steps/copyedit.toml`, before a gate shows a spec, plan or audit report. `compare.mjs`
+  in `references/copyedit.md`). The conductors run it, by `steps/copyedit.toml`, before a gate shows a spec, plan, research report or audit report. `compare.mjs`
   imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
   `plugins/flows/skills/writing/tests/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
   our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
@@ -345,8 +345,10 @@ are reported and omitted. Never edit `.claude-plugin/` or `.agents/plugins/` by 
 `tools/installer/core/agents.ts` holds host metadata for the installer; `tools/installer/steps/codex.ts` uses Codex's
 native plugin and MCP commands, respecting CODEX_HOME.
 Keep Claude marketplace IDs and the legacy executable alias stable. The GitHub repository still has its old name.
-Flow behavior is shared; the host mapping reference is generated per target from `tools/harness-compiler/src/templates/hosts/`.
-Unavailable subagents mean skipped steps, never sequential replacements or successful check claims.
+Flow behavior is shared; each built conductor carries its host's wording through the `{{adapter}}` and other tokens in
+`tools/harness-compiler/src/templates/hosts/`.
+Without subagents the main session does delegated work (searching, exploring) itself; independent checks are skipped and
+recorded as not checked, never replaced by a review in the main session or claimed as passed.
 
 Both native marketplaces must work directly from a fresh clone, without the installer or a build.
 `.agents/plugins/` and `.claude-plugin/` contain generated, checked-in packages; change sources and regenerate it rather than editing

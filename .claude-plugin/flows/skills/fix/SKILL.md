@@ -331,6 +331,11 @@ recorded as `Status: decided <date>: <what>`. This is a fifth stop next to the f
 and `executing-plans` name. For deviations it overrides their continuous execution and their rulings, and a plan
 correction that is a deviation goes to the user too.
 
+- **Added tasks.** A task added after the plan's gate, by the user's decision during the build, takes the next free
+  number, never a letter: the pack's `task-brief 8` would also pick up `8b`. It goes at the end of plan.md, when the
+  run has one, with its own `**Depends on:**` line; below that line, write
+  `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
+
 **Review findings and reports.** Where `subagent-driven-development` rules on what review or a subagent turns up, a
 deviation still goes to the user. In the fix loop (a plan-mandated finding), at the breaker and in the final review's
 fix wave, a finding whose fix is deviation-class goes to the user, not a ruling. A `NEEDS_CONTEXT` that carries a

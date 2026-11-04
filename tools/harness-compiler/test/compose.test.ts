@@ -375,12 +375,12 @@ test("checkBuilt: a conductor's rules plus Start over 4,500 estimated tokens is 
   assert.match(over.problems[0], /skills\/c\/SKILL\.md:\d+: .*4501.*4500/);
   assert.deepEqual(over.estimates, { c: 4501 });
   const under = checked({ 'skills/c/SKILL.md': `${start(4500 * 4)}## Phase 1: Read\n\n${'y'.repeat(40000)}\n` });
-  assert.deepEqual(under, { problems: [], warnings: [], estimates: { c: 4500 } });
+  assert.deepEqual(under, { problems: [], estimates: { c: 4500 } });
 });
 
 test('checkBuilt: a 20,000-byte non-conductor skill with no ## Phase heading is clean', () => {
   const big = checked({ 'skills/w/SKILL.md': `---\nname: w\n---\n${'x'.repeat(20000)}\n` });
-  assert.deepEqual(big, { problems: [], warnings: [], estimates: {} });
+  assert.deepEqual(big, { problems: [], estimates: {} });
 });
 
 test("checkBuilt: a node command or references link that doesn't resolve is a problem", () => {
@@ -429,7 +429,7 @@ test("checkBuilt: a uses name absent from the conductor's SKILL.md and linked re
     ...ref,
     'skills/c/SKILL.md': usesFlow(uses, 'Run writing-plans. See [r](references/r.md).'),
   });
-  assert.deepEqual(linked, { problems: [], warnings: [], estimates: { c: linked.estimates.c } });
+  assert.deepEqual(linked, { problems: [], estimates: { c: linked.estimates.c } });
   const unlinked = checked({ ...ref, 'skills/c/SKILL.md': usesFlow(uses, 'Run writing-plans.') });
   assert.equal(unlinked.problems.length, 1);
   assert.match(unlinked.problems[0], /^\[claude-code\] skills\/c\/SKILL\.md:\d+: .*ponytail:ponytail-review/);

@@ -14,7 +14,6 @@ try {
     for (const d of built.diagnostics) console.log(formatDiagnostic(d));
     for (const [conductor, tokens] of Object.entries(built.estimates))
       console.log(`${conductor}: ~${tokens} tokens of rules plus Start`);
-    for (const w of built.warnings) console.log(`warning: ${w}`);
     for (const p of built.problems) console.error(`problem: ${p}`);
     console.log('Updated both native distributions and repository marketplaces.');
   } else if (command === 'check') {

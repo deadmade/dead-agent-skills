@@ -162,6 +162,10 @@ test('an unresolved node path makes check() return a problem', () => {
     ['[claude-code] skills/f/SKILL.md:6', '[codex] skills/f/SKILL.md:6'],
     problems.join('\n'),
   );
+  assert.ok(
+    problems.every((p) => /missing\.mjs/.test(p)),
+    problems.join('\n'),
+  );
 });
 test('Codex text naming a Claude-only phrase makes check() return a problem', () => {
   const problems = checked(`${CONDUCTOR}Search with WebSearch.\n`);

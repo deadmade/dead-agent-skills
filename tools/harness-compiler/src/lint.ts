@@ -1,7 +1,7 @@
 // plugins/ is the neutral source: no file or phrase in it may belong to one agent, except vendored upstream text.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { CLAUDE_ONLY } from './flows/compose.ts';
+import { CLAUDE_ONLY, OVERRIDE } from './flows/compose.ts';
 
 export interface Allowed {
   // Path prefix or exact path, relative to the repository root, `/`-separated.
@@ -28,7 +28,6 @@ const PHRASES: [RegExp, string][] = [
 ];
 // The files flows' compose reads, whose Claude-only phrases would reach Codex; README.md's uses tree names them.
 const FLOWS_TEXT = /^plugins\/flows\/(steps\/|(skills|references)\/.*\.md$)/;
-const OVERRIDE = /<!--\s*overrides\s/;
 const NATIVE_FILE = /(^|\/)(\.mcp\.json|\.lsp\.json)$|(^|\/)(claude-[^/]*|codex)\.[^/]+$|\.claude\.[^/]+$/;
 const NATIVE_EVENTS =
   /"(SessionStart|SessionEnd|UserPromptSubmit|PreToolUse|PostToolUse|PostToolUseFailure|Stop|SubagentStart|SubagentStop|Notification|PermissionRequest)"/;

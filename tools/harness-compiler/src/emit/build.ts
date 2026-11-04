@@ -21,7 +21,6 @@ export interface Build {
   diagnostics: Diagnostic[];
   // What checkBuilt finds in the built flows, as `[target] file:line: what`.
   problems: string[];
-  warnings: string[];
   // Each flows conductor's rules-plus-Start tokens, keyed `<target>/<conductor>`.
   estimates: Record<string, number>;
 }
@@ -29,7 +28,7 @@ export interface Build {
 export function buildTree(root: string, output: string): Build {
   const plugins = loadPlugins(root);
   const version: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
-  const built: Build = { diagnostics: [], problems: [], warnings: [], estimates: {} };
+  const built: Build = { diagnostics: [], problems: [], estimates: {} };
   const { diagnostics } = built;
   const palettes = new Map<string, Palette>();
   for (const plugin of plugins)
@@ -103,7 +102,6 @@ export function buildTree(root: string, output: string): Build {
       if (composed) {
         const found = checkBuilt(dest, target.id, composed);
         built.problems.push(...found.problems);
-        built.warnings.push(...found.warnings);
         for (const [conductor, tokens] of Object.entries(found.estimates))
           built.estimates[`${target.id}/${conductor}`] = tokens;
       }

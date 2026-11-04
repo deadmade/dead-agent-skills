@@ -30,6 +30,10 @@ it follows:
   code, state machines. Name the property, don't write it yet.
 - **Requirements:** tob `spec-to-code-compliance` with the spec (a `docs/features/*/` spec, CLAUDE.md, README) and the
   tests as the implementation: which stated behaviours no test checks.
+  - tob's spec-compliance checker ships as flows' own agent: `tob-picks:spec-compliance-checker` means
+    `flows:spec-compliance-checker`.
+  - For tob's spec-compliance workflow, follow [spec-compliance.md](../../../references/spec-compliance.md) with
+    the target path, optional spec and limit. It uses native subagents, without a host-specific Workflow runtime.
 
 `kind` in each finding: missing test, surviving mutant (with the mutant as a diff), property candidate (with the
 property), untested requirement. Rank by what a real bug there would cost, not by count:

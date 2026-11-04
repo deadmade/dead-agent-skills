@@ -12,7 +12,6 @@ export interface Composed {
 }
 export interface Checked {
   problems: string[];
-  warnings: string[];
   estimates: Record<string, number>;
 }
 export class ComposeError extends Error {
@@ -41,7 +40,7 @@ export const SHORT_NAMES: string[] = ['how', 'why', 'fetch', 'teach'];
 const STEP = /^\[step: ([^\]]+)\]$/;
 // `[step:x]`, `[Step: x]`, `[step: x] ` (trailing space): meant as a step line, read as prose.
 const NEAR_STEP = /^\s*\[\s*steps?\s*:/i;
-const OVERRIDE = /^\s*<!--\s*overrides\s.*-->\s*$/;
+export const OVERRIDE = /^\s*<!--\s*overrides\s.*-->\s*$/;
 const PHASE = /^## Phase (\d+): (.+)$/;
 const ROW = /^<!--\s*runs:\s*(.*?)\s*·\s*output:\s*(.*?)\s*-->$/;
 const TOKEN = /\{\{([\w:-]+)\}\}/g;
@@ -319,7 +318,7 @@ const PACK = /(?:<packs>|<flow-root>\/packs)\/([^\s/`'"()[\]]+)\/skills\/([^\s/`
 
 // Checks 5 to 8 and the Codex phrase check on the composed files as built; every finding is a problem.
 export function checkBuilt(dest: string, target: TargetId, composed: Composed): Checked {
-  const checked: Checked = { problems: [], warnings: [], estimates: {} };
+  const checked: Checked = { problems: [], estimates: {} };
   for (const rel of composed.files.keys()) {
     const text = read(join(dest, rel));
     const lines = text.split('\n');
@@ -333,7 +332,7 @@ export function checkBuilt(dest: string, target: TargetId, composed: Composed): 
           : undefined;
     lines.forEach((line, i) => {
       const problem = (what: string) => checked.problems.push(`[${target}] ${rel}:${i + 1}: ${what}`);
-      if (line.includes('flow-rules')) problem('names flow-rules, which no longer exists');
+      if (/\bflow-rules\b/.test(line)) problem('names flow-rules, which no longer exists');
       for (const [, script] of line.matchAll(NODE)) {
         const path = placed(script);
         if (!path) problem(`node ${script} is not a <flow-root> or <skill-dir> path`);
