@@ -101,9 +101,15 @@ understand
 └ web-mcp: fetch
 
 upgrade
+├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
+├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
+├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ dead-skills: context7
-├ pstack-picks: blast-radius
-├ superpowers: test-driven-development, writing-plans
+├ flows: writing
+├ graphify: graphify
+├ mattpocock-picks: setup-matt-pocock-skills
+├ pstack-picks: blast-radius, how, interrogate, why
+├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, writing-plans
 └ web-mcp: fetch
 ```
 
