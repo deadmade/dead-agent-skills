@@ -245,7 +245,9 @@ nothing to pick: the gate approves the report, with `Picks: none`, and Phase 6 d
 
 Fix only the picks. Each pick is a task labelled `Fix <finding number>`, never `Task <n>`, which in a caller's flow.md
 names a plan task: its line under **Tasks** is `Fix <n>: base <sha>`, its Rulings name `Fix <n>`, the builder brief and
-the files check below use that label, and the files its finding names are its **Files** list. A fix that changes
+the files check below use that label, and the files its finding names are its **Files** list. A pick run through
+`/fix` (below) takes its **Files** list and its task line from /fix's gate: /fix writes its `Fix <n>` line, and none
+is written here for it. A fix that changes
 behaviour gets a failing test first (superpowers `test-driven-development`); a doc fix changes the doc to match the
 code, unless the user picks fixing the code. Picks from the `all` passes follow their own fix rules in tests-all.md and
 harden-all.md. Every fix follows the builder brief:

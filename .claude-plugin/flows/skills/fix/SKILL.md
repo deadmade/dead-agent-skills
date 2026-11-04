@@ -136,10 +136,11 @@ instructions.
 
 **Called inline** (by /review-code's Fix phase, or another conductor), this start doesn't run: the caller hands over
 the symptom and the label of its task. Under /review-code that label is `Fix <n>`, and it replaces `Task 1` in the
-task line, the Rulings and the files check below; its **Files** list is still the one its gate picks. The gate
-continues the caller's numbering (`- Gate 3, fix: cause approved`), and Phase 4 works in the caller's tree. In an
-audit file, which has no **Options**, the options and the `Picked:` line go under **Findings** with the reproduction.
-The run stops after Phase 5 and returns to the caller: its Finish and Decide are the caller's.
+task line, the Rulings and the files check below: one-task's line is the caller's `Fix <n>: base <sha>` line, written
+once, here, and its **Files** list is the one this run's gate picks. The gate continues the caller's numbering
+(`- Gate 3, fix: cause approved`), and Phase 4 works in the caller's tree. In an audit file, which has no **Options**
+or **Grounding**, the grounding, the options and the `Picked:` line go under **Findings** with the reproduction. The
+run stops after Phase 5 and returns to the caller: its Finish and Decide are the caller's.
 
 - The run keeps `docs/features/<slug>/flow.md`, copied from the template this conductor names, with every
   placeholder the template names filled in; none stays literal (a `phase: <first phase>` left as written gives the
@@ -389,16 +390,19 @@ command and its output. It never touches the user's tree:
 2. With the fix: the test, or the agreed check.
 3. Before the fix: every file on the **Files** list but the test, restored to the gate commit's version
    (`git checkout <base sha> -- <files>`, the base on the task's line under **Tasks**; a file the fix added is
-   deleted), then the same run.
+   deleted), then the same run. Where the test lives in a file the fix also changes (a Rust `#[cfg(test)]` module),
+   revert only the fix's hunks in that file. The failure has to be the bug, as in Phase 4: a test that no longer
+   compiles or crashes on the way doesn't count.
 4. `git worktree remove --force <scratch>`.
 
 A bug that shows only sometimes is proven by 20 runs each way: before the fix it fails at least once, with the fix
-never. A proof that doesn't come out as stated sends the run back to Phase 3, its gate reopened. The second failed
-proof stops instead and goes to the user with both attempts, their commands and output.
+never. A proof that doesn't come out as stated sends the run back to Phase 3: the failed fix is reverted (the test
+kept) before its gate reopens. The second failed proof stops instead and goes to the user with both attempts, their
+commands and output.
 
 Without subagents: the fresh agent's rerun is an independent check, so it is skipped and recorded under **Skipped**
-(`fresh proof: no subagents`), never run by the session that wrote the fix. Phase 4's runs stand as the proof, marked
-as the author's.
+(`fresh proof: no subagents`), never run by the session that wrote the fix. Phase 4's runs are the only evidence,
+marked as the author's; the proof is not checked.
 
 ## Phase 6: Finish
 
