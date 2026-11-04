@@ -350,7 +350,7 @@ impl Browser {
             let answer = match op {
                 Op::Run(args) => self.run_with(&session, args, None, true, via).await,
                 Op::Batch(cmds, limits, may_fail) => self
-                    .batch_with(&session, cmds, limits, via, may_fail)
+                    .batch_with(&session, cmds, limits, via, may_fail, false)
                     .await
                     .map(Value::Array),
             };
@@ -511,7 +511,40 @@ impl Browser {
         answer.map(entries)
     }
 
-    /// `may_fail`: the index of a command whose failure doesn't fail the batch.
+    /// Runs `commands` as one `batch --json --bail` in `key`'s tab of the window as last seen, before `until`, and
+    /// returns each command's result. Unlike `batch`, it never binds a new tab or asks the owner again: the caller
+    /// has another way to its page.
+    ///
+    /// # Errors
+    /// `Timeout` once `until` passes (the call is killed), `TabGone` when the tab is gone, else as `batch`.
+    pub async fn batch_once(
+        &self,
+        key: &str,
+        commands: &[Vec<String>],
+        until: std::time::Instant,
+    ) -> Result<Vec<Value>, BrowserError> {
+        let live = self.live(false).await?;
+        let config = self.window.attach_config().map_err(BrowserError::Failed)?;
+        let session = self.track(key, live.r#gen);
+        let via = Via::Tab {
+            config: &config,
+            cdp: &live.url,
+        };
+        let cmds: Vec<Vec<&str>> = commands
+            .iter()
+            .map(|c| c.iter().map(String::as_str).collect())
+            .collect();
+        let left = until.saturating_duration_since(std::time::Instant::now());
+        tokio::time::timeout_at(
+            until.into(),
+            self.batch_with(&session, &cmds, false, via, None, true),
+        )
+        .await
+        .unwrap_or(Err(BrowserError::Timeout(left)))
+    }
+
+    /// `may_fail`: the index of a command whose failure doesn't fail the batch; `bail`: agent-browser stops at the
+    /// first failed command.
     async fn batch_with(
         &self,
         session: &str,
@@ -519,9 +552,13 @@ impl Browser {
         limits: bool,
         via: Via<'_>,
         may_fail: Option<usize>,
+        bail: bool,
     ) -> Result<Vec<Value>, BrowserError> {
         let input = json!(commands).to_string();
-        let args = ["batch".to_owned(), "--json".to_owned()];
+        let mut args = vec!["batch".to_owned(), "--json".to_owned()];
+        if bail {
+            args.push("--bail".to_owned());
+        }
         let answer = self
             .run_with(session, &args, Some(&input), limits, via)
             .await?;
@@ -551,7 +588,7 @@ impl Browser {
     }
 
     /// The rendered `<body>` of `url` and the URL the browser ended on (redirects included), from one batch in
-    /// `key`'s tab within `deadline`.
+    /// `key`'s tab within `deadline`. Without a `url` the batch opens nothing: it reads the tab as it is.
     ///
     /// Without `search`: the tab is closed again. With it: the batch waits on `ready_js` first, with `--timeout`
     /// `deadline` less `READ_MARGIN`, so a page that never gets ready (a consent wall, changed markup) times the
@@ -562,7 +599,7 @@ impl Browser {
     /// As `batch`, when the deadline passes, or when it answers no HTML or no URL.
     pub async fn render(
         &self,
-        url: &Url,
+        url: Option<&Url>,
         key: &str,
         search: Option<SearchRun<'_>>,
         deadline: Duration,
@@ -573,13 +610,15 @@ impl Browser {
             .max(Duration::from_millis(100))
             .as_millis()
             .to_string();
-        let mut cmds = vec![vec!["open", url.as_str()]];
+        let mut cmds: Vec<Vec<&str>> = url.map(|u| vec!["open", u.as_str()]).into_iter().collect();
+        let wait_at = cmds.len();
         if let Some(s) = &search {
             cmds.push(vec!["wait", "--fn", s.ready_js, "--timeout", &wait]);
         }
         cmds.extend([vec!["get", "html", "body"], vec!["get", "url"]]);
         // The HTML is data for the extractor: no output cap, no boundary markers.
-        let batch = self.attached(key, Op::Batch(&cmds, false, search.as_ref().map(|_| 1)));
+        let may_fail = search.as_ref().map(|_| wait_at);
+        let batch = self.attached(key, Op::Batch(&cmds, false, may_fail));
         let answer = tokio::time::timeout(deadline, batch)
             .await
             .unwrap_or(Err(BrowserError::Timeout(deadline)))
@@ -631,7 +670,8 @@ impl Browser {
         static N: AtomicU64 = AtomicU64::new(0);
         self.warm().await?;
         let key = format!("{FETCH_PREFIX}{}", N.fetch_add(1, Ordering::Relaxed));
-        self.render(url, &key, None, self.fallback_deadline).await
+        self.render(Some(url), &key, None, self.fallback_deadline)
+            .await
     }
 }
 
@@ -851,7 +891,12 @@ mod tests {
         let url = Url::parse("http://example.com/wait-fail?q=x").unwrap();
         let run = SearchRun { ready_js: READY_JS };
         let (html, landed) = b
-            .render(&url, "search-brave", Some(run), Duration::from_secs(5))
+            .render(
+                Some(&url),
+                "search-brave",
+                Some(run),
+                Duration::from_secs(5),
+            )
             .await
             .unwrap();
         assert!(html.contains("Rendered page for"), "{html}");
@@ -893,13 +938,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn render_search_without_open_reads_the_tab() {
+        let (dir, b) = fake("tab");
+        let url = Url::parse("http://example.com/q?x=1").unwrap();
+        let run = || SearchRun { ready_js: READY_JS };
+        let deadline = Duration::from_secs(5);
+        let loaded = b
+            .render(Some(&url), "search-bing", Some(run()), deadline)
+            .await
+            .unwrap();
+        let read = b
+            .render(None, "search-bing", Some(run()), deadline)
+            .await
+            .unwrap();
+        assert_eq!(read, loaded);
+        assert_eq!(read.1, url);
+        let c = calls(&dir);
+        assert_eq!(c.len(), 2, "no close: {c:?}");
+        let batch: Value = serde_json::from_str(c[1]["stdin"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            batch,
+            json!([
+                ["wait", "--fn", READY_JS, "--timeout", "3000"],
+                ["get", "html", "body"],
+                ["get", "url"]
+            ])
+        );
+    }
+
+    #[tokio::test]
     async fn render_closes_on_deadline() {
         let (dir, b) = fake("deadline");
         b.warm().await.unwrap();
         let url = Url::parse("http://example.com/slow").unwrap();
         let run = SearchRun { ready_js: READY_JS };
         let err = b
-            .render(&url, "search-bing", Some(run), Duration::from_millis(500))
+            .render(
+                Some(&url),
+                "search-bing",
+                Some(run),
+                Duration::from_millis(500),
+            )
             .await
             .unwrap_err();
         assert!(err.to_string().contains("did not finish"), "{err}");
@@ -947,7 +1026,7 @@ mod tests {
         }
         // Files that never go: the wait gives up after 1 s (plus the deadline and the two closing calls).
         let t = std::time::Instant::now();
-        b.render(&url, key, Some(run()), deadline)
+        b.render(Some(&url), key, Some(run()), deadline)
             .await
             .unwrap_err();
         let capped = t.elapsed();
@@ -963,7 +1042,7 @@ mod tests {
             }
         });
         let t = std::time::Instant::now();
-        b.render(&url, key, Some(run()), deadline)
+        b.render(Some(&url), key, Some(run()), deadline)
             .await
             .unwrap_err();
         let waited = t.elapsed();
@@ -976,6 +1055,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn batch_once_bails_and_never_rebinds() {
+        let (dir, b) = fake("once");
+        b.warm().await.unwrap();
+        let owner = dir.join("profiles/1");
+        let count =
+            |d: &Path, cmd: &[&str]| calls(d).iter().filter(|c| args(c).ends_with(cmd)).count();
+        let before = (calls(&dir).len(), count(&owner, &["get", "cdp-url"]));
+        std::fs::write(dir.join(format!("{}.gone", name("search-bing", 1))), "").unwrap();
+        let cmds = [vec!["eval".to_owned(), "1".to_owned()]];
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        let err = b.batch_once("search-bing", &cmds, until).await.unwrap_err();
+        assert!(matches!(err, BrowserError::TabGone(_)), "{err}");
+        let c = calls(&dir);
+        assert_eq!(c.len(), before.0 + 1, "{c:?}");
+        assert!(
+            args(c.last().unwrap()).ends_with(&["batch", "--json", "--bail"]),
+            "{c:?}"
+        );
+        assert_eq!(count(&dir, &["tab", "new"]), 0);
+        assert_eq!(count(&owner, &["get", "cdp-url"]), before.1);
+    }
+
+    #[tokio::test]
     async fn render_reads_a_page_that_never_gets_ready() {
         let (dir, b) = fake("never");
         b.warm().await.unwrap();
@@ -984,7 +1086,7 @@ mod tests {
         let deadline = READ_MARGIN + Duration::from_millis(700);
         let t = std::time::Instant::now();
         let (html, landed) = b
-            .render(&url, "search-google", Some(run), deadline)
+            .render(Some(&url), "search-google", Some(run), deadline)
             .await
             .unwrap();
         assert!(t.elapsed() < deadline, "{:?}", t.elapsed());

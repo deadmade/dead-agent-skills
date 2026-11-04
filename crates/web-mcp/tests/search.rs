@@ -22,11 +22,75 @@ fn engine_session(mcp: &Mcp, g: u32, e: &str) -> String {
 fn batches(pages: &Path) -> Vec<String> {
     let mut s: Vec<String> = log(pages)
         .iter()
-        .filter(|c| command_of(c) == "batch --json")
+        .filter(|c| command_of(c).starts_with("batch --json"))
         .map(|c| session_of(c).to_owned())
         .collect();
     s.sort();
     s
+}
+
+/// One logged batch of a session: its commands, and whether it ran with `--bail`.
+struct Batch {
+    cmds: Vec<Vec<String>>,
+    bail: bool,
+}
+
+impl Batch {
+    /// Whether a command of it starts with `word`.
+    fn has(&self, word: &str) -> bool {
+        self.cmds.iter().any(|c| c[0] == word)
+    }
+
+    /// Whether it holds the command `cmd`.
+    fn holds(&self, cmd: &[&str]) -> bool {
+        self.cmds.iter().any(|c| c == cmd)
+    }
+
+    /// The value of `flag` in its `wait`.
+    fn wait_arg(&self, flag: &str) -> Option<&str> {
+        let wait = self.cmds.iter().find(|c| c[0] == "wait")?;
+        let at = wait.iter().position(|a| a == flag)?;
+        Some(&wait[at + 1])
+    }
+
+    /// The `--timeout` of its `wait`.
+    fn wait_timeout(&self) -> Option<&str> {
+        self.wait_arg("--timeout")
+    }
+}
+
+/// `session`'s logged batches, in order.
+fn session_batches(pages: &Path, session: &str) -> Vec<Batch> {
+    log(pages)
+        .iter()
+        .filter(|c| session_of(c) == session && command_of(c).starts_with("batch --json"))
+        .map(|c| Batch {
+            cmds: serde_json::from_str(c["stdin"].as_str().unwrap()).unwrap(),
+            bail: command_of(c) == "batch --json --bail",
+        })
+        .collect()
+}
+
+/// Whether any logged batch typed (holds a `click`).
+fn any_click(pages: &Path) -> bool {
+    log(pages).iter().any(|c| {
+        command_of(c).starts_with("batch --json")
+            && serde_json::from_str::<Vec<Vec<String>>>(c["stdin"].as_str().unwrap())
+                .unwrap()
+                .iter()
+                .any(|c| c[0] == "click")
+    })
+}
+
+/// Searches `query` and checks every web engine answered.
+fn all_answer(mcp: &mut Mcp, args: Value) {
+    let r = search(mcp, args);
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        first_line(t).starts_with("Source: google, bing, duckduckgo, brave (searched "),
+        "{t}"
+    );
 }
 
 /// `mcp`'s engine sessions of generation `g`, sorted, each `n` times.
@@ -221,14 +285,211 @@ fn search_fuses_all_four_engines() {
 fn engine_tab_stays_between_searches() {
     let (_fx, pages) = setup();
     let mut mcp = start(&pages, &[]);
-    for _ in 0..2 {
-        let r = search(&mut mcp, json!({"query": "zebra"}));
-        assert!(!is_error(&r), "{r}");
+    for q in ["zebra", "zebra stripes", "zebra mane"] {
+        all_answer(&mut mcp, json!({"query": q}));
     }
-    assert_eq!(batches(&pages), engine_sessions(&mcp, 1, 2));
+    // Each tab: the first search's load, then each later search's typing and its read.
+    assert_eq!(batches(&pages), engine_sessions(&mcp, 1, 5));
     for cmd in ["tab new", "tab close", "close"] {
         assert_eq!(ran(&pages, cmd), [], "{cmd}");
     }
+    for e in ENGINES {
+        let session = engine_session(&mcp, 1, e);
+        let b = session_batches(&pages, &session);
+        assert!(b[0].has("open") && !b[0].bail, "{e}");
+        // A typed search's results are remembered too, so the next one types again.
+        for at in [1, 3] {
+            assert!(
+                b[at].bail && b[at].holds(&["press", "Space"]) && !b[at].has("open"),
+                "{e} {at}"
+            );
+            assert!(
+                !b[at + 1].has("open") && !b[at + 1].has("click"),
+                "{e} {at}"
+            );
+            // The typed read waits for a new document, so the old page never ends it.
+            let ready = b[at + 1].wait_arg("--fn").unwrap_or_default();
+            assert!(ready.contains("performance.timeOrigin !=="), "{e} {at}");
+        }
+        let typed = std::fs::read_to_string(mcp.state.join(format!("{session}.typed"))).unwrap();
+        assert_eq!(typed, "zebra mane", "{e}");
+    }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn same_query_loads_the_url() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    for _ in 0..2 {
+        all_answer(&mut mcp, json!({"query": "zebra"}));
+    }
+    assert!(!any_click(&pages));
+    for e in ENGINES {
+        let b = session_batches(&pages, &engine_session(&mcp, 1, e));
+        assert_eq!(b.iter().filter(|b| b.has("open")).count(), 2, "{e}");
+    }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn since_search_loads_the_url() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    all_answer(&mut mcp, json!({"query": "zebra stripes", "since": "week"}));
+    // A filtered search leaves nothing to type on.
+    all_answer(&mut mcp, json!({"query": "zebra mane"}));
+    assert!(!any_click(&pages));
+    for e in ENGINES {
+        let b = session_batches(&pages, &engine_session(&mcp, 1, e));
+        assert_eq!(b.len(), 3, "{e}");
+        assert!(b.iter().all(|b| b.has("open")), "{e}");
+    }
+    let google = session_batches(&pages, &engine_session(&mcp, 1, "google"));
+    let open = google[1].cmds.iter().find(|c| c[0] == "open").unwrap();
+    let tbs = url::Url::parse(&open[1])
+        .unwrap()
+        .query_pairs()
+        .find(|(k, _)| k == "tbs")
+        .map(|(_, v)| v.into_owned());
+    assert_eq!(tbs.as_deref(), Some("qdr:w"), "{open:?}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn odd_query_loads_the_url() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    all_answer(&mut mcp, json!({"query": "zebra  stripes"}));
+    assert!(!any_click(&pages));
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn missing_box_falls_back_to_the_url() {
+    let (_fx, pages) = setup();
+    mark(&pages, "bing.nobox");
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    all_answer(&mut mcp, json!({"query": "zebra stripes"}));
+    let bing = engine_session(&mcp, 1, "bing");
+    let b = session_batches(&pages, &bing);
+    assert_eq!(b.len(), 3);
+    assert!(b[1].bail && b[1].has("click"));
+    assert!(b[2].has("open"));
+    assert!(!mcp.state.join(format!("{bing}.typed")).exists());
+    assert!(!any_rest(&mcp));
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn no_navigation_falls_back_to_the_url() {
+    let (_fx, pages) = setup();
+    mark(&pages, "bing.nonav");
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    all_answer(&mut mcp, json!({"query": "zebra stripes"}));
+    let bing = engine_session(&mcp, 1, "bing");
+    let typed = std::fs::read_to_string(mcp.state.join(format!("{bing}.typed"))).unwrap();
+    assert_eq!(typed, "zebra stripes");
+    let b = session_batches(&pages, &bing);
+    assert_eq!(b.len(), 4);
+    assert!(b[1].has("click"));
+    // The typed read waits the read margin + 4 s, less render's own read margin.
+    assert!(!b[2].has("open"));
+    assert_eq!(b[2].wait_timeout(), Some("4000"));
+    assert!(b[3].has("open"));
+    assert!(!any_rest(&mcp));
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn slow_typing_times_out_without_a_second_load() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    mark(&pages, "bing.slowtype");
+    let t0 = Instant::now();
+    let r = search(&mut mcp, json!({"query": "zebra stripes"}));
+    // The fake types for 60 s; the 10 s deadline ends the call (slack for slow runners).
+    assert!(t0.elapsed() < Duration::from_secs(25), "{:?}", t0.elapsed());
+    let t = text(&r);
+    assert!(first_line(t).contains("(skipped: bing: timed out)"), "{t}");
+    // The typing ran out the time a fallback load would need, so none is tried.
+    let b = session_batches(&pages, &engine_session(&mcp, 1, "bing"));
+    assert_eq!(b.len(), 2);
+    assert!(b[1].bail && b[1].has("click"));
+    assert!(!any_rest(&mcp));
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn typed_block_rests_without_a_second_load() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    mark(&pages, "google.blocked");
+    let t = text(&search(&mut mcp, json!({"query": "zebra stripes"}))).to_owned();
+    assert!(
+        first_line(&t)
+            .starts_with("Source: bing, duckduckgo, brave (skipped: google: captcha (.web/"),
+        "{t}"
+    );
+    let b = session_batches(&pages, &engine_session(&mcp, 1, "google"));
+    assert_eq!(b.len(), 3);
+    assert!(b[1].has("click"));
+    assert!(!b[2].has("open"));
+    assert!(mcp.search.join("google/rest").exists());
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn gone_tab_falls_back_to_the_url() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    let bing = engine_session(&mcp, 1, "bing");
+    std::fs::write(mcp.state.join(format!("{bing}.gone")), "").unwrap();
+    all_answer(&mut mcp, json!({"query": "zebra stripes"}));
+    // The typing batch never rebinds: the fallback's render does, once.
+    assert_eq!(ran(&pages, "tab new"), [(bing.clone(), true)]);
+    let b = session_batches(&pages, &bing);
+    assert_eq!(b.len(), 4);
+    assert!(b[1].bail && b[1].has("click"));
+    assert!(b[2].has("open") && b[3].has("open"));
+    assert!(!any_rest(&mcp));
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn typing_survives_a_chrome_restart() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    std::fs::write(mcp.state.join("chrome"), "2").unwrap();
+    std::fs::write(mcp.state.join("dead-g1"), "").unwrap();
+    all_answer(&mut mcp, json!({"query": "zebra stripes"}));
+    for e in ENGINES {
+        let b = session_batches(&pages, &engine_session(&mcp, 2, e));
+        assert!(b.last().is_some_and(|b| b.has("open")), "{e}");
+    }
+    assert!(!any_rest(&mcp));
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn consent_page_is_not_typed_into() {
+    let (_fx, pages) = setup();
+    mark(&pages, "google.consent-once");
+    let mut mcp = start(&pages, &[]);
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(t.contains("google: consent (clearing)"), "{t}");
+    all_answer(&mut mcp, json!({"query": "zebra stripes"}));
+    let b = session_batches(&pages, &engine_session(&mcp, 1, "google"));
+    assert_eq!(b.len(), 2);
+    assert!(b.iter().all(|b| b.has("open") && !b.has("click")));
 }
 
 #[cfg(debug_assertions)]

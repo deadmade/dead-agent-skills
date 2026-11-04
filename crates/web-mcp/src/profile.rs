@@ -1,4 +1,4 @@
-//! The search folder: the browser, cookie extension and user agent the window runs with, the profile slots (one
+//! The search folder: the browser and cookie extension the window runs with, the profile slots (one
 //! persistent browser profile per web-mcp process, held under a lock, with its own consent marks), the config files,
 //! the engines' turns, and their rests, shared by every web-mcp process on the machine.
 
@@ -30,10 +30,6 @@ pub const ENGINE_DEADLINE: Duration = Duration::from_secs(10);
 const DOWNLOAD: Duration = Duration::from_secs(20);
 /// The zip is under 2 MiB.
 const DOWNLOAD_MAX: usize = 2 << 20;
-
-/// The Chrome major the user agent names when the browser's version can't be read.
-// shortcut: Helium's Chromium at the spike (2026-10-23); raise it when engines start refusing user agents this old.
-const FALLBACK_MAJOR: u32 = 154;
 
 /// Unpacks the extension `zip` into `dir/idcac-<first 8 hex of its sha256>` and returns that folder.
 /// It goes through a temp folder and a rename, so the folder is whole or absent; one that exists is kept, unless it
@@ -100,8 +96,6 @@ pub struct Ready {
     pub chrome: PathBuf,
     /// The unpacked cookie extension.
     pub extension: PathBuf,
-    /// A regular Chrome user agent for the browser's own major version.
-    pub ua: String,
 }
 
 /// The search folder: per engine `<engine>/rest`, plus the shared `extensions/` and, for Helium,
@@ -113,8 +107,9 @@ pub struct Profiles {
     http: reqwest::Client,
     /// `profiles/<n>` and its held lock, taken on the first `slot()` and kept until exit.
     slot: OnceLock<(PathBuf, File)>,
-    /// One turn per engine, indexed by its discriminant: an engine's tab serves one search at a time.
-    turns: [tokio::sync::Mutex<()>; Engine::ALL.len()],
+    /// One turn per engine, indexed by its discriminant: an engine's tab serves one search at a time. Each holds the
+    /// engine's last query without `since` that parsed as results, in this process.
+    turns: [tokio::sync::Mutex<Option<String>>; Engine::ALL.len()],
     /// The browser `ready()` uses in tests instead of looking for one.
     #[cfg(test)]
     chrome: Option<PathBuf>,
@@ -139,7 +134,7 @@ impl Profiles {
             dir,
             http,
             slot: OnceLock::new(),
-            turns: std::array::from_fn(|_| tokio::sync::Mutex::new(())),
+            turns: std::array::from_fn(|_| tokio::sync::Mutex::new(None)),
             #[cfg(test)]
             chrome: None,
         })
@@ -208,10 +203,10 @@ impl Profiles {
             "profile": utf8(&slot.join("profile"))?,
             "extensions": [utf8(&r.extension)?],
             "executablePath": utf8(&r.chrome)?,
-            "userAgent": r.ua,
             "headed": true,
-            // Newline-separated, no commas: agent-browser splits `args` on both.
-            "args": "--lang=en-US\n--disable-background-timer-throttling\n--disable-renderer-backgrounding",
+            // Newline-separated, no commas: agent-browser splits `args` on both. The last switch keeps
+            // `--remote-debugging-port=0` (agent-browser's) from setting `navigator.webdriver` (ADR 0009).
+            "args": "--lang=en-US\n--disable-background-timer-throttling\n--disable-renderer-backgrounding\n--disable-blink-features=AutomationControlled",
         });
         write_json(&slot.join("agent-browser.json"), &json)
     }
@@ -227,8 +222,13 @@ impl Profiles {
         )
     }
 
-    /// The engine's turn in this process, waited for until `until`; dropping it ends the turn.
-    pub async fn turn(&self, e: Engine, until: Instant) -> Option<tokio::sync::MutexGuard<'_, ()>> {
+    /// The engine's turn in this process, waited for until `until`; dropping it ends the turn. It holds the engine's
+    /// last query without `since` that parsed as results, in this process.
+    pub async fn turn(
+        &self,
+        e: Engine,
+        until: Instant,
+    ) -> Option<tokio::sync::MutexGuard<'_, Option<String>>> {
         tokio::time::timeout_at(until.into(), self.turns[e as usize].lock())
             .await
             .ok()
@@ -272,7 +272,7 @@ impl Profiles {
         path: &OsStr,
     ) -> Result<Ready, String> {
         self.check_owner()?;
-        let (chrome, major) = pick(chrome_env, home, path).await?;
+        let chrome = pick(chrome_env, home, path).await?;
         let chrome = std::path::absolute(&chrome).unwrap_or(chrome);
         let chrome = if !cfg!(windows) && chrome.file_name() == Some(OsStr::new("helium")) {
             self.helium_wrapper(&chrome)?
@@ -282,7 +282,6 @@ impl Profiles {
         Ok(Ready {
             chrome,
             extension: self.extension().await?,
-            ua: user_agent(major),
         })
     }
 
@@ -395,21 +394,14 @@ fn utf8(p: &Path) -> Result<&str, String> {
         .ok_or_else(|| format!("{} is not valid UTF-8", p.display()))
 }
 
-/// The browser for search and its Chrome major (web-mcp-search/findings.md, "Order and version"): `WEB_MCP_CHROME`, the
-/// newest Chrome for Testing if it starts (on Windows: if it exists), `helium` or `chromium` on `path`. Never the
-/// user's branded Chrome: it ignores extensions loaded from a folder.
+/// The browser for search (web-mcp-search/findings.md, "Order and version"): `WEB_MCP_CHROME`, the newest Chrome for
+/// Testing if it starts (on Windows: if it exists), `helium` or `chromium` on `path`. Never the user's branded Chrome:
+/// it ignores extensions loaded from a folder.
 async fn pick(
     chrome_env: Option<PathBuf>,
     home: Option<&Path>,
     path: &OsStr,
-) -> Result<(PathBuf, u32), String> {
-    let major_of = async |bin: &Path| {
-        version(bin)
-            .await
-            .as_deref()
-            .and_then(major)
-            .unwrap_or(FALLBACK_MAJOR)
-    };
+) -> Result<PathBuf, String> {
     if let Some(p) = chrome_env {
         if !p.is_file() {
             return Err(format!(
@@ -417,26 +409,24 @@ async fn pick(
                 p.display()
             ));
         }
-        let m = major_of(&p).await;
-        return Ok((p, m));
+        return Ok(p);
     }
-    // On Windows its binary existing is enough: `version` never runs there.
-    if let Some((bin, m)) = home.and_then(newest_cft)
-        && (cfg!(windows) || version(&bin).await.is_some())
+    // On Windows its binary existing is enough: `starts` never runs it there.
+    if let Some(bin) = home.and_then(newest_cft)
+        && (cfg!(windows) || starts(&bin).await)
     {
-        return Ok((bin, m));
+        return Ok(bin);
     }
     for name in ["helium", "chromium"] {
         if let Some(bin) = Browser::resolve_on(name, path) {
-            let m = major_of(&bin).await;
-            return Ok((bin, m));
+            return Ok(bin);
         }
     }
     Err("no browser for search: set WEB_MCP_CHROME, run `agent-browser install`, or install Helium or Chromium".into())
 }
 
-/// The newest `agent-browser install` Chrome for Testing under `home` and its major, compared by number.
-fn newest_cft(home: &Path) -> Option<(PathBuf, u32)> {
+/// The newest `agent-browser install` Chrome for Testing under `home`, compared by number.
+fn newest_cft(home: &Path) -> Option<PathBuf> {
     let exes = if cfg!(windows) {
         ["chrome.exe", "chrome-win64/chrome.exe"]
     } else {
@@ -454,66 +444,38 @@ fn newest_cft(home: &Path) -> Option<(PathBuf, u32)> {
             Some((v, bin))
         })
         .max_by_key(|(v, _)| *v)
-        .map(|(v, bin)| (bin, v[0]))
+        .map(|(_, bin)| bin)
 }
 
-/// Each binary `version` ran and its answer.
-static VERSIONS: Mutex<BTreeMap<PathBuf, Option<String>>> = Mutex::new(BTreeMap::new());
+/// Each binary `starts` ran and whether it started.
+static STARTS: Mutex<BTreeMap<PathBuf, bool>> = Mutex::new(BTreeMap::new());
 
-/// `<bin> --version`'s output, `None` when it doesn't start or fails; one spawn per binary per process.
-/// Always `None` on Windows, where Chrome opens a window for `--version` instead of printing it.
-async fn version(bin: &Path) -> Option<String> {
+/// Whether `<bin> --version` runs and succeeds; one spawn per binary per process.
+/// Always `false` on Windows, where Chrome opens a window for `--version` instead of printing it.
+async fn starts(bin: &Path) -> bool {
     if cfg!(windows) {
-        return None;
+        return false;
     }
-    if let Some(v) = VERSIONS.lock().expect("versions").get(bin) {
-        return v.clone();
+    if let Some(&ok) = STARTS.lock().expect("starts").get(bin) {
+        return ok;
     }
     let run = Command::new(bin)
         .arg("--version")
         .stdin(Stdio::null())
         .kill_on_drop(true)
         .output();
-    let v = match tokio::time::timeout(Duration::from_secs(5), run).await {
-        Ok(Ok(out)) if out.status.success() => {
-            Some(String::from_utf8_lossy(&out.stdout).into_owned())
-        }
-        _ => None,
-    };
-    VERSIONS
-        .lock()
-        .expect("versions")
-        .insert(bin.to_owned(), v.clone());
-    v
-}
-
-/// The major of the first `a.b.c.d` in `--version` output; for Helium, of its Chromium.
-fn major(version: &str) -> Option<u32> {
-    let chromium = version
-        .find("Chromium ")
-        .map_or(version, |i| &version[i + "Chromium ".len()..]);
-    chromium
-        .split(|c: char| c.is_whitespace() || c == '(' || c == ')')
-        .find_map(four_part)
-        .map(|v| v[0])
+    let ok = matches!(
+        tokio::time::timeout(Duration::from_secs(5), run).await,
+        Ok(Ok(out)) if out.status.success()
+    );
+    STARTS.lock().expect("starts").insert(bin.to_owned(), ok);
+    ok
 }
 
 fn four_part(s: &str) -> Option<[u32; 4]> {
     let mut n = s.split('.').map(|p| p.parse().ok());
     let v = [n.next()??, n.next()??, n.next()??, n.next()??];
     n.next().is_none().then_some(v)
-}
-
-/// Chrome's own user agent, reduced as Chrome reduces it, without `Headless`.
-fn user_agent(major: u32) -> String {
-    let platform = if cfg!(windows) {
-        "Windows NT 10.0; Win64; x64"
-    } else {
-        "X11; Linux x86_64"
-    };
-    format!(
-        "Mozilla/5.0 ({platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
-    )
 }
 
 /// Replaces `path` with `content` through a temp file and a rename (another web-mcp may be reading or running it),
@@ -670,7 +632,6 @@ mod tests {
         Ready {
             chrome: dir.join("chrome"),
             extension: dir.join("extensions/idcac-8f70ab94"),
-            ua: "Mozilla/5.0 Chrome/154.0.0.0".into(),
         }
     }
 
@@ -842,9 +803,8 @@ mod tests {
                 "profile": s(&slot.join("profile")),
                 "extensions": [s(&r.extension)],
                 "executablePath": s(&r.chrome),
-                "userAgent": r.ua,
                 "headed": true,
-                "args": "--lang=en-US\n--disable-background-timer-throttling\n--disable-renderer-backgrounding",
+                "args": "--lang=en-US\n--disable-background-timer-throttling\n--disable-renderer-backgrounding\n--disable-blink-features=AutomationControlled",
             })
         );
     }
@@ -868,16 +828,6 @@ mod tests {
         let r = p.ready().await.unwrap();
         assert_eq!(r.chrome, chrome);
         assert_eq!(p.dir(), dir);
-    }
-
-    #[test]
-    fn version_majors_are_read() {
-        assert_eq!(major("Helium 0.18.1.1 (Chromium 154.0.8037.57)"), Some(154));
-        assert_eq!(major("Chromium 153.0.7000.1 built on NixOS"), Some(153));
-        assert_eq!(major("Google Chrome for Testing 156.0.1.2"), Some(156));
-        assert_eq!(major("nothing here 1.2"), None);
-        assert!(user_agent(154).contains("Chrome/154.0.0.0 Safari/537.36"));
-        assert!(!user_agent(154).contains("Headless"));
     }
 
     /// A dummy executable printing `out` for `--version`, exiting with `code`.
@@ -911,7 +861,6 @@ mod tests {
 
         let r = p.ready_with(None, Some(&home), &path).await.unwrap();
         assert_eq!(r.chrome, bin.join("chromium"));
-        assert!(r.ua.contains("Chrome/153.0.0.0"), "{}", r.ua);
 
         exe(
             &bin.join("helium"),
@@ -920,7 +869,6 @@ mod tests {
         );
         let r = p.ready_with(None, Some(&home), &path).await.unwrap();
         assert_eq!(r.chrome, dir.join("helium-wrap.sh"));
-        assert!(r.ua.contains("Chrome/154.0.0.0"), "{}", r.ua);
 
         // Newest by number, not by string; a folder without its binary doesn't count.
         exe(
@@ -936,7 +884,6 @@ mod tests {
         std::fs::create_dir_all(cft.join("chrome-200.0.0.0")).unwrap();
         let r = p.ready_with(None, Some(&home), &path).await.unwrap();
         assert_eq!(r.chrome, cft.join("chrome-156.0.1.2/chrome-linux64/chrome"));
-        assert!(r.ua.contains("Chrome/156.0.0.0"), "{}", r.ua);
 
         // A Chrome for Testing that doesn't start is passed over.
         let dead = home.join("dead");
@@ -955,11 +902,6 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(r.chrome, mine);
-        assert!(
-            r.ua.contains(&format!("Chrome/{FALLBACK_MAJOR}.0.0.0")),
-            "{}",
-            r.ua
-        );
 
         let none = p.ready_with(None, None, OsStr::new("")).await.unwrap_err();
         assert!(none.contains("WEB_MCP_CHROME"), "{none}");
@@ -968,7 +910,7 @@ mod tests {
     /// On Windows `chrome.exe --version` opens a window: Chrome for Testing is taken on its folder, never started.
     #[cfg(windows)]
     #[tokio::test]
-    async fn windows_never_runs_a_browser_for_its_version() {
+    async fn windows_never_runs_a_browser_to_see_if_it_starts() {
         let dir = seeded("win-cft");
         let p = profiles(&dir);
         let home = dir.join("home");
@@ -981,7 +923,6 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(r.chrome, cft);
-        assert!(r.ua.contains("Chrome/156.0.0.0"), "{}", r.ua);
 
         let mine = dir.join("mine.exe");
         std::fs::write(&mine, "").unwrap();
@@ -990,13 +931,8 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(r.chrome, mine);
-        assert!(
-            r.ua.contains(&format!("Chrome/{FALLBACK_MAJOR}.0.0.0")),
-            "{}",
-            r.ua
-        );
-        // `version` records every binary it ran.
-        let ran = VERSIONS.lock().unwrap();
+        // `starts` records every binary it ran.
+        let ran = STARTS.lock().unwrap();
         assert!(
             !ran.contains_key(&cft) && !ran.contains_key(&mine),
             "{ran:?}"

@@ -28,6 +28,9 @@ const TOP: usize = 5;
 const PAGE_WAIT: Duration = Duration::from_secs(3);
 /// The page's own download deadline: it carries on in the background after `PAGE_WAIT`.
 const PAGE_DEADLINE: Duration = Duration::from_secs(30);
+/// The most a typed search's wait takes beyond the read margin: web-mcp-google-block/findings.md's slowest typed wait
+/// was 2.9 s, and a fallback load needs the rest of the deadline.
+const TYPED_WAIT: Duration = Duration::from_secs(4);
 /// Passages BM25 hands to the final order.
 const RANKED: usize = 50;
 const WEB: [Engine; 4] = [
@@ -118,6 +121,9 @@ impl Filter {
 /// One engine's result page for `query`, read in its tab of the window before `deadline`; the caller warmed the
 /// window first.
 ///
+/// A follow-up search (see `types`) types its query into the result page the tab already holds, as a person would;
+/// when typing fails or lands on another query, the same search loads the result URL instead, and nothing rests.
+///
 /// A consent page waits a search out first (R16): a wall never satisfies `ready_js`, so it takes the whole
 /// deadline, and the cookie extension's click in the tab, which stays open, lands for the next search. Only a
 /// consent page met twice in a row rests the engine.
@@ -141,32 +147,55 @@ pub async fn run_engine(
     if let Some(why) = resting() {
         return Err(why);
     }
-    let _turn = profiles.turn(e, deadline).await.ok_or("busy")?;
+    let mut last = profiles.turn(e, deadline).await.ok_or("busy")?;
+    // Put back only on results without `since`.
+    let prev = last.take();
     // Another process may have rested it while we waited.
     if let Some(why) = resting() {
         return Err(why);
     }
-    let left = deadline.saturating_duration_since(Instant::now());
     // Too little left to read a page that never gets ready (a turn won late).
-    if left < READ_MARGIN {
+    let timed_out = || deadline.saturating_duration_since(Instant::now()) < READ_MARGIN;
+    if timed_out() {
         return Err("timed out".into());
     }
-    let run = SearchRun {
-        ready_js: e.ready_js(),
-    };
+    let session = ctx.browser.engine_session(e);
     let url = e.url(query, since);
-    let (html, landed) = match ctx
-        .browser
-        .render(&url, &ctx.browser.engine_session(e), Some(run), left)
-        .await
-    {
-        Ok(page) => page,
-        Err(BrowserError::Timeout(_)) => return Err("timed out".into()),
-        Err(err) => return Err(err.to_string()),
+    let typed = match e.search_box() {
+        Some(sel) if types(e, prev.as_deref(), query, since) => {
+            typed_page(ctx, e, &session, sel, query, deadline).await
+        }
+        _ => None,
     };
-    let what = match e.parse(&html, &landed) {
+    let (html, landed, parsed) = if let Some(page) = typed {
+        page
+    } else {
+        // The tab's first search, or typing that can't be trusted: load the result URL.
+        if timed_out() {
+            return Err("timed out".into());
+        }
+        let run = SearchRun {
+            ready_js: e.ready_js(),
+        };
+        let left = deadline.saturating_duration_since(Instant::now());
+        let (html, landed) = match ctx
+            .browser
+            .render(Some(&url), &session, Some(run), left)
+            .await
+        {
+            Ok(page) => page,
+            Err(BrowserError::Timeout(_)) => return Err("timed out".into()),
+            Err(err) => return Err(err.to_string()),
+        };
+        let parsed = e.parse(&html, &landed);
+        (html, landed, parsed)
+    };
+    let what = match parsed {
         Parsed::Results(found) => {
             profiles.set_consent_seen(e, false);
+            if since.is_none() {
+                *last = Some(query.to_owned());
+            }
             return Ok(found);
         }
         Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e) => {
@@ -189,6 +218,100 @@ pub async fn run_engine(
         "{what} ({})",
         keep_page(ctx, url, landed, html).await
     ))
+}
+
+/// The page that typing `query` into the engine's result page already open in `session` lands on, parsed; `None`
+/// when the result URL must be loaded instead: the typing or the read failed, or the page holds no block and is for
+/// another query (the read may have landed on a blank tab).
+async fn typed_page(
+    ctx: &Ctx,
+    e: Engine,
+    session: &str,
+    search_box: &str,
+    query: &str,
+    deadline: Instant,
+) -> Option<(String, Url, Parsed)> {
+    // `None` only on clock underflow, not "no time left": `run_engine`'s `timed_out()` ran before this, and
+    // `batch_once` times out at once on a past `until`.
+    let until = deadline.checked_sub(READ_MARGIN)?;
+    let typed = ctx
+        .browser
+        .batch_once(session, &typing(search_box, query), until)
+        .await
+        .ok()?;
+    let origin = typed.first()?["result"].as_f64()?;
+    let left = deadline.saturating_duration_since(Instant::now());
+    if left < READ_MARGIN {
+        return None;
+    }
+    let ready_js = typed_ready(e.ready_js(), origin);
+    let run = SearchRun {
+        ready_js: &ready_js,
+    };
+    let (html, landed) = ctx
+        .browser
+        .render(None, session, Some(run), left.min(READ_MARGIN + TYPED_WAIT))
+        .await
+        .ok()?;
+    let parsed = e.parse(&html, &landed);
+    let ours = landed.query_pairs().any(|(k, v)| k == "q" && v == query);
+    (ours || matches!(parsed, Parsed::Blocked(_))).then_some((html, landed, parsed))
+}
+
+/// Whether this search types its query into the result page the engine's tab holds: the engine's last search here
+/// without `since` parsed as results for another query (`prev`), there is no `since`, the engine has a search box, and the query has
+/// no control characters and no leading, trailing or doubled whitespace.
+fn types(e: Engine, prev: Option<&str>, query: &str, since: Option<Since>) -> bool {
+    prev.is_some_and(|p| p != query)
+        && since.is_none()
+        && e.search_box().is_some()
+        && !query.chars().any(char::is_control)
+        && query.split_whitespace().collect::<Vec<_>>().join(" ") == query
+}
+
+/// The typing batch: read the page's `performance.timeOrigin`, click the search box `sel`, select its text, then one
+/// `press` per ASCII letter, digit or space, each run of other characters inserted as text (`press` would read `+`
+/// or a leading `-` as a modifier or a flag), and Enter.
+fn typing(sel: &str, query: &str) -> Vec<Vec<String>> {
+    let cmd = |c: &[&str]| c.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+    let mut out = vec![
+        cmd(&["eval", "performance.timeOrigin"]),
+        cmd(&["click", sel]),
+        cmd(&["press", "Control+a"]),
+    ];
+    let mut other = String::new();
+    let insert = |out: &mut Vec<Vec<String>>, other: &mut String| {
+        if !other.is_empty() {
+            out.push(vec![
+                "keyboard".to_owned(),
+                "inserttext".to_owned(),
+                std::mem::take(other),
+            ]);
+        }
+    };
+    for c in query.chars() {
+        let key = match c {
+            ' ' => "Space".to_owned(),
+            c if c.is_ascii_alphanumeric() => c.to_string(),
+            c => {
+                other.push(c);
+                continue;
+            }
+        };
+        insert(&mut out, &mut other);
+        out.push(vec!["press".to_owned(), key]);
+    }
+    insert(&mut out, &mut other);
+    out.push(cmd(&["press", "Enter"]));
+    out
+}
+
+/// The wait after typing: the engine's `ready_js`, on a new document (not the one whose `performance.timeOrigin`
+/// was `origin`), so a block page ends it at once and the old page never does.
+fn typed_ready(ready_js: &str, origin: f64) -> String {
+    let js = ready_js.trim();
+    let js = js.strip_suffix(';').unwrap_or(js);
+    format!("({js}) && performance.timeOrigin !== {origin}")
 }
 
 /// Archives an engine page that held no results, for whoever fixes the parser; returns its `.web/` path.
@@ -451,6 +574,64 @@ mod tests {
         assert_eq!(
             filter(Some("bing"), None, true).unwrap_err(),
             "bing is a web engine; leave papers off"
+        );
+    }
+
+    #[test]
+    fn types_only_a_new_plain_query_without_since() {
+        assert!(types(Engine::Google, Some("old"), "new query", None));
+        assert!(!types(Engine::Google, None, "new", None));
+        assert!(!types(Engine::Google, Some("new"), "new", None));
+        assert!(!types(
+            Engine::Google,
+            Some("old"),
+            "new",
+            Some(Since::Week)
+        ));
+        assert!(!types(Engine::SemanticScholar, Some("old"), "new", None));
+        for odd in ["a\nb", "a\tb", " a", "a ", "a  b"] {
+            assert!(!types(Engine::Bing, Some("old"), odd, None), "{odd:?}");
+        }
+    }
+
+    #[test]
+    fn typing_presses_letters_digits_and_spaces_and_inserts_the_rest() {
+        let v = |c: &[&str]| c.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+        assert_eq!(
+            typing("#b", "Ab 1+ü-x"),
+            vec![
+                v(&["eval", "performance.timeOrigin"]),
+                v(&["click", "#b"]),
+                v(&["press", "Control+a"]),
+                v(&["press", "A"]),
+                v(&["press", "b"]),
+                v(&["press", "Space"]),
+                v(&["press", "1"]),
+                v(&["keyboard", "inserttext", "+ü-"]),
+                v(&["press", "x"]),
+                v(&["press", "Enter"]),
+            ]
+        );
+        // A trailing run is inserted before Enter.
+        assert_eq!(
+            typing("#b", "x é+"),
+            vec![
+                v(&["eval", "performance.timeOrigin"]),
+                v(&["click", "#b"]),
+                v(&["press", "Control+a"]),
+                v(&["press", "x"]),
+                v(&["press", "Space"]),
+                v(&["keyboard", "inserttext", "é+"]),
+                v(&["press", "Enter"]),
+            ]
+        );
+    }
+
+    #[test]
+    fn typed_ready_needs_a_new_document() {
+        assert_eq!(
+            typed_ready("!!(x);\n", 1234.5),
+            "(!!(x)) && performance.timeOrigin !== 1234.5"
         );
     }
 

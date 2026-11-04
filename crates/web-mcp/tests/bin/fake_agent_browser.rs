@@ -2,12 +2,23 @@
 //! `$FAKE_AB_LOG` (unset: to `calls.jsonl` beside its `--config`, if any) and prints canned `--json` answers.
 //! An `open` of a URL containing "fail" fails; a batch's `wait` fails for a URL containing "wait-fail", and for
 //! one containing "wait-slow" only after its `--timeout` ms. A batch opening a search engine's host answers from
-//! `$FAKE_AB_PAGES` when that is set (see `engine_page`). `get cdp-url` answers a url ending in the contents of
+//! `$FAKE_AB_PAGES` when that is set (see `engine_page`). A batch with an `open` stores its URL in
+//! `<state>/<session>.url`: the session's tab keeps that page, so a batch without an `open` answers for the stored
+//! URL (its `engine_page`, its `get url`, the host lookups and `wait` failures keyed on the URL), and `tab new`
+//! removes it (a blank tab). `get cdp-url` answers a url ending in the contents of
 //! `<state>/chrome` (a changed one: Chrome relaunched); with `$FAKE_AB_OWNER_DELAY_MS`, an owner's (`*-window`)
 //! `open` sleeps that long first. `<state>` is `$FAKE_AB_STATE`, else `--config`'s folder. On a `--cdp` call,
 //! `<state>/dead-g<n>` makes a `-g<n>-` session answer agent-browser's dead-Chrome connect error, and
-//! `<state>/<session>.gone` makes a call other than `tab …` (in a batch: its `open`) answer `tab_gone`, until a
-//! `tab new` removes it.
+//! `<state>/<session>.gone` makes a call other than `tab …` (in a batch: its first command) answer `tab_gone`,
+//! until a `tab new` removes it. With `--bail`, a batch's entries stop after its first failed one.
+//!
+//! A typing batch (no `open`, a `click`) reads no page. Its `eval` answers `{"result": 1}`; its `click` fails when
+//! the session has no stored URL or `$FAKE_AB_PAGES/<engine>.nobox` exists (the engine of the stored URL's host, as
+//! in `engine_page`). It collects the text of its `press <one char>` (`Space`: a space) and `keyboard inserttext`
+//! commands, and at `press Enter` writes it to `<state>/<session>.typed` and sets the stored URL's `q` to it, other
+//! parameters kept; with `<engine>.nonav` the URL stays, `<state>/<session>.stuck` marks it, and the session's next
+//! read (a batch with no `open` and no `click`, on a tab not gone) runs out its `wait`s' `--timeout`, fails them and
+//! removes the mark; `tab new` leaves it. With `<engine>.slowtype` the typing batch sleeps 60 s first.
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -62,9 +73,13 @@ fn main() {
         Some("get") if rest.get(1).is_some_and(|a| a == "cdp-url") => cdp_url(&state),
         Some("tab") if rest.get(1).is_some_and(|a| a == "new") => {
             let _ = std::fs::remove_file(&gone);
+            let _ = std::fs::remove_file(stored_url(&state, session));
             json!({"success": true, "data": {"tabId": "t9", "url": "about:blank"}})
         }
-        Some("batch") => batch(&stdin, session, tab_gone),
+        Some("batch") => {
+            let bail = rest.iter().any(|a| a == "--bail");
+            batch(&stdin, &state, session, tab_gone, bail)
+        }
         Some("open") if rest.get(1).is_some_and(|u| u.contains("fail")) => {
             println!(
                 "{}",
@@ -86,16 +101,36 @@ fn main() {
     println!("{out}");
 }
 
-/// A batch's answer to the commands in `stdin`; with `tab_gone`, its `open` answers `tab_gone`.
-fn batch(stdin: &str, session: &str, tab_gone: bool) -> Value {
+/// The file holding the URL `session`'s tab was last opened to.
+fn stored_url(state: &Path, session: &str) -> PathBuf {
+    state.join(format!("{session}.url"))
+}
+
+/// A batch's answer to the commands in `stdin`, for the page it `open`s, else the one its session's tab holds
+/// (`stored_url`; none: blank). With `tab_gone`, its first command answers `tab_gone` and opens nothing; with
+/// `bail`, the entries stop after the first failed one.
+fn batch(stdin: &str, state: &Path, session: &str, tab_gone: bool, bail: bool) -> Value {
     let cmds: Vec<Vec<String>> = serde_json::from_str(stdin).unwrap();
+    let opens = cmds.iter().any(|c| c[0] == "open");
+    if !opens && cmds.iter().any(|c| c[0] == "click") {
+        return Value::Array(typing(&cmds, state, session, tab_gone, bail));
+    }
     if stdin.contains("/slow") {
         std::thread::sleep(std::time::Duration::from_secs(3)); // a page that hangs
     }
-    let url = cmds
-        .iter()
-        .find(|c| c[0] == "open")
-        .map_or("", |c| c[1].as_str());
+    let stored = stored_url(state, session);
+    let url = match cmds.iter().find(|c| c[0] == "open") {
+        Some(open) => {
+            if !tab_gone {
+                std::fs::write(&stored, &open[1]).unwrap();
+            }
+            open[1].clone()
+        }
+        None => std::fs::read_to_string(&stored).unwrap_or_default(),
+    };
+    // A typed search that never navigated: this read's wait runs out.
+    let stuck = !opens && !tab_gone && std::fs::remove_file(stuck_mark(state, session)).is_ok();
+    let url = url.as_str();
     let page = engine_page(url);
     let html = match &page {
         Some(Ok(html)) => html.clone(),
@@ -107,29 +142,129 @@ fn batch(stdin: &str, session: &str, tab_gone: bool) -> Value {
     } else {
         url
     };
-    let entries: Vec<Value> = cmds
-        .iter()
-        .map(|c| {
-            if tab_gone && c[0] == "open" {
-                let mut e = gone_json(session);
-                e["command"] = json!(c);
-                return e;
-            }
-            if let (Some(Err(e)), "open") = (&page, c[0].as_str()) {
-                return json!({"command": c, "success": false, "result": null, "error": e});
-            }
-            if c[0] == "wait" && wait_fails(url, c) {
-                return json!({"command": c, "success": false, "result": null, "error": "timed out"});
-            }
+    let mut entries = Vec::new();
+    for (i, c) in cmds.iter().enumerate() {
+        let entry = if tab_gone && i == 0 {
+            gone_entry(session, c)
+        } else if let (Some(Err(e)), "open") = (&page, c[0].as_str()) {
+            json!({"command": c, "success": false, "result": null, "error": e})
+        } else if c[0] == "wait" && wait_fails(url, c, stuck) {
+            json!({"command": c, "success": false, "result": null, "error": "timed out"})
+        } else {
             let result = match c.get(1).map(String::as_str) {
                 Some("html") => json!({"html": html}),
                 Some("url") => json!(landed),
                 _ => json!({"url": url}),
             };
             json!({"command": c, "success": true, "result": result})
+        };
+        if push_bailed(&mut entries, entry, bail) {
+            break;
+        }
+    }
+    Value::Array(entries)
+}
+
+/// A batch entry answering `tab_gone` for command `c`.
+fn gone_entry(session: &str, c: &[String]) -> Value {
+    let mut e = gone_json(session);
+    e["command"] = json!(c);
+    e
+}
+
+/// Pushes `entry`; whether the batch stops after it (`bail`, and it failed).
+fn push_bailed(entries: &mut Vec<Value>, entry: Value, bail: bool) -> bool {
+    let failed = entry["success"] == false;
+    entries.push(entry);
+    bail && failed
+}
+
+/// The file marking that `session`'s last typed search never navigated.
+fn stuck_mark(state: &Path, session: &str) -> PathBuf {
+    state.join(format!("{session}.stuck"))
+}
+
+/// A typing batch's entries, on the page `session`'s tab holds (see the module doc).
+fn typing(
+    cmds: &[Vec<String>],
+    state: &Path,
+    session: &str,
+    tab_gone: bool,
+    bail: bool,
+) -> Vec<Value> {
+    let stored = stored_url(state, session);
+    let url = std::fs::read_to_string(&stored).ok();
+    let engine = url.as_deref().and_then(engine_of);
+    let marked = |m: &str| {
+        pages_dir()
+            .zip(engine)
+            .is_some_and(|(d, e)| d.join(format!("{e}.{m}")).exists())
+    };
+    if marked("slowtype") {
+        std::thread::sleep(Duration::from_mins(1)); // past any deadline; the server kills the call
+    }
+    let mut typed = String::new();
+    let mut entries = Vec::new();
+    for (i, c) in cmds.iter().enumerate() {
+        let ok = json!({"command": c, "success": true, "result": null});
+        let entry = if tab_gone && i == 0 {
+            gone_entry(session, c)
+        } else {
+            match (c[0].as_str(), c.get(1).map(String::as_str)) {
+                ("eval", _) => json!({"command": c, "success": true, "result": {"result": 1}}),
+                ("click", _) if url.is_none() || marked("nobox") => json!({
+                    "command": c, "success": false, "result": null,
+                    "error": format!("Element not found: {}", c[1]),
+                }),
+                ("press", Some("Space")) => {
+                    typed.push(' ');
+                    ok
+                }
+                ("press", Some("Enter")) => {
+                    std::fs::write(state.join(format!("{session}.typed")), &typed).unwrap();
+                    match &url {
+                        Some(_) if marked("nonav") => {
+                            std::fs::write(stuck_mark(state, session), "").unwrap();
+                        }
+                        Some(u) => std::fs::write(&stored, with_q(u, &typed)).unwrap(),
+                        None => {}
+                    }
+                    ok
+                }
+                ("press", Some(k)) if k.chars().count() == 1 => {
+                    typed.push_str(k);
+                    ok
+                }
+                ("keyboard", Some("inserttext")) => {
+                    typed.push_str(&c[2]);
+                    ok
+                }
+                _ => ok,
+            }
+        };
+        if push_bailed(&mut entries, entry, bail) {
+            break;
+        }
+    }
+    entries
+}
+
+/// `url` with its `q` set to `q`, its other parameters kept.
+fn with_q(url: &str, q: &str) -> String {
+    let mut u = url::Url::parse(url).unwrap();
+    let pairs: Vec<(String, String)> = u
+        .query_pairs()
+        .map(|(k, v)| {
+            let v = if k == "q" {
+                q.to_owned()
+            } else {
+                v.into_owned()
+            };
+            (k.into_owned(), v)
         })
         .collect();
-    Value::Array(entries)
+    u.query_pairs_mut().clear().extend_pairs(pairs);
+    u.to_string()
 }
 
 /// The command after the global flags: --session <s>, --config <path>, --cdp <url>, --json, --max-output <n>,
@@ -213,10 +348,10 @@ fn rendered(url: &str, session: &str) -> String {
     )
 }
 
-/// Whether a batch's `wait` command `c` on `url` fails; a page that never gets ready first runs out the wait's
-/// `--timeout`, as the daemon does.
-fn wait_fails(url: &str, c: &[String]) -> bool {
-    if url.contains("wait-slow") {
+/// Whether a batch's `wait` command `c` on `url` fails; a page that never gets ready (or a `stuck` typed search)
+/// first runs out the wait's `--timeout`, as the daemon does.
+fn wait_fails(url: &str, c: &[String], stuck: bool) -> bool {
+    if url.contains("wait-slow") || stuck {
         let ms = c
             .iter()
             .position(|a| a == "--timeout")
@@ -227,13 +362,11 @@ fn wait_fails(url: &str, c: &[String]) -> bool {
     url.contains("wait-fail")
 }
 
-/// The result page of the engine whose host `url` is on, from `$FAKE_AB_PAGES` (unset: `None`), after
-/// `$FAKE_AB_DELAY_MS`. A marker file `<engine>.<marker>` there picks it: `none`, `blocked`, `consent-once` (the
-/// consent page, once), `slow` (60 s first) or `offline` (`Err`: the failure `open` reports); else `<engine>.html`.
-fn engine_page(url: &str) -> Option<Result<String, &'static str>> {
+/// The engine whose host `url` is on.
+fn engine_of(url: &str) -> Option<&'static str> {
     let host = url::Url::parse(url).ok()?.host_str()?.to_owned();
     // scholar.google.com before google.com.
-    let (_, engine) = [
+    [
         ("scholar.google.com", "scholar"),
         ("google.com", "google"),
         ("bing.com", "bing"),
@@ -242,8 +375,21 @@ fn engine_page(url: &str) -> Option<Result<String, &'static str>> {
         ("semanticscholar.org", "semanticscholar"),
     ]
     .into_iter()
-    .find(|(d, _)| host == *d || host.ends_with(&format!(".{d}")))?;
-    let dir = PathBuf::from(std::env::var_os("FAKE_AB_PAGES")?);
+    .find(|(d, _)| host == *d || host.ends_with(&format!(".{d}")))
+    .map(|(_, e)| e)
+}
+
+/// `$FAKE_AB_PAGES`.
+fn pages_dir() -> Option<PathBuf> {
+    std::env::var_os("FAKE_AB_PAGES").map(PathBuf::from)
+}
+
+/// The result page of the engine whose host `url` is on, from `$FAKE_AB_PAGES` (unset: `None`), after
+/// `$FAKE_AB_DELAY_MS`. A marker file `<engine>.<marker>` there picks it: `none`, `blocked`, `consent-once` (the
+/// consent page, once), `slow` (60 s first) or `offline` (`Err`: the failure `open` reports); else `<engine>.html`.
+fn engine_page(url: &str) -> Option<Result<String, &'static str>> {
+    let engine = engine_of(url)?;
+    let dir = pages_dir()?;
     if let Some(ms) = std::env::var("FAKE_AB_DELAY_MS")
         .ok()
         .and_then(|v| v.parse().ok())
