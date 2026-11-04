@@ -29,7 +29,8 @@ ask in chat and wait for the answer at approval gates. Never interpret a tool ti
 Use native subagent tools only when exposed by the current session. Read reviewer briefs from
 `<flow-root>/agents/<name>.md` and pass their text plus the scoped task to the native agent tool.
 Do not require named Claude agent registrations or change the user's model or feature settings.
-If subagents are unavailable, skip subagent steps, record them as not checked, and preserve user gates.
+If subagents are unavailable, do delegated work such as searching and exploring in the main session, skip
+independent checks and record them as not checked, and preserve user gates.
 
 Load discovered skills by their supplied file path. Read pack skills directly, resolving paths relative to
 the file being read. Claude tool names in vendored instructions mean the corresponding native capability, not a
