@@ -28,9 +28,10 @@ ask before a run grows large. Give every agent the model that fits its job: {{mo
 {{model:standard}} for searching and most review, {{model:strongest}} or {{model:other}} where the judgment is hard (a
 subtle review, the final review).
 
-If subagents are unavailable, skip every subagent-only step, including reviewer dispatch; do not replace it with a
-sequential review in the main session. Record the skipped steps in flow.md and the final report. A skipped check never
-counts as passed. Preserve all approval gates and wait for real user answers.
+If subagents are unavailable, the main session does delegated work itself: searching, exploring, gathering
+sources. A step whose point is an independent check (a reviewer, the prior-art source check, the final review, the
+copyedit) is skipped, not replaced by a review in the main session. Record the skipped steps in flow.md and the final
+report. A skipped check never counts as passed. Preserve all approval gates and wait for real user answers.
 
 **Homes and commits.**
 

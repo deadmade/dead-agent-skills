@@ -76,9 +76,10 @@ ask before a run grows large. Give every agent the model that fits its job: haik
 sonnet for searching and most review, opus or fable where the judgment is hard (a
 subtle review, the final review).
 
-If subagents are unavailable, skip every subagent-only step, including reviewer dispatch; do not replace it with a
-sequential review in the main session. Record the skipped steps in flow.md and the final report. A skipped check never
-counts as passed. Preserve all approval gates and wait for real user answers.
+If subagents are unavailable, the main session does delegated work itself: searching, exploring, gathering
+sources. A step whose point is an independent check (a reviewer, the prior-art source check, the final review, the
+copyedit) is skipped, not replaced by a review in the main session. Record the skipped steps in flow.md and the final
+report. A skipped check never counts as passed. Preserve all approval gates and wait for real user answers.
 
 **Homes and commits.**
 
@@ -200,8 +201,8 @@ Ask nothing yet. In one message, start both:
   When the request hands over an approved research report (`docs/features/<slug>/research.md`), that report is the
   prior art: link it and skip this agent.
 
-Without subagents: skip the prior-art agent and its source check, and record both as skipped in flow.md; a skipped
-check never counts as passed.
+Without subagents: run the prior-art prompt yourself and write the same report to the same path; its source check is
+skipped and recorded under **Skipped**, and a skipped check never counts as passed.
 
 Phase 2 starts with questions, so the report has time to land. Write a short summary of each into flow.md under
 **Grounding** and **Prior art** as they land, including the source check's counts.

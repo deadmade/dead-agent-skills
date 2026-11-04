@@ -15,7 +15,7 @@ other systems shard. It ends in a report the user approves, not in code.
 | 1 Frame | pstack `how`, then the questions the code doesn't answer | grounding, question, constraints |
 | 2 Search | a literature agent and a prior-art agent, then one source check | evidence table, approaches |
 | 3 Weigh | mattpocock `grilling` on the options against the evidence | 2–4 options, a recommendation |
-| 4 Report | `research.md`, copyedited, then `/learn` | the report, lessons. **Gate 1** |
+| 4 Report | `research.md`, copyedited, then `/learn` and one commit | the report, lessons, the commit. **Gate 1** |
 
 phases: frame | search | weigh | report | done
 
@@ -74,9 +74,10 @@ ask before a run grows large. Give every agent the model that fits its job: haik
 sonnet for searching and most review, opus or fable where the judgment is hard (a
 subtle review, the final review).
 
-If subagents are unavailable, skip every subagent-only step, including reviewer dispatch; do not replace it with a
-sequential review in the main session. Record the skipped steps in flow.md and the final report. A skipped check never
-counts as passed. Preserve all approval gates and wait for real user answers.
+If subagents are unavailable, the main session does delegated work itself: searching, exploring, gathering
+sources. A step whose point is an independent check (a reviewer, the prior-art source check, the final review, the
+copyedit) is skipped, not replaced by a review in the main session. Record the skipped steps in flow.md and the final
+report. A skipped check never counts as passed. Preserve all approval gates and wait for real user answers.
 
 **Homes and commits.**
 
@@ -210,11 +211,16 @@ prior-art agent, whose prompt takes the question in place of the feature:
   When the request hands over an approved research report (`docs/features/<slug>/research.md`), that report is the
   prior art: link it and skip this agent.
 
-Without subagents: skip the prior-art agent and its source check, and record both as skipped in flow.md; a skipped
-check never counts as passed.
+Without subagents: run the prior-art prompt yourself and write the same report to the same path; its source check is
+skipped and recorded under **Skipped**, and a skipped check never counts as passed.
+
+Without subagents: run the literature prompt yourself too, writing the same file to the same path. The source check
+is skipped and recorded under **Skipped**, and every evidence row's source-check result reads `not checked`.
 
 Link both reports under **Artifacts**. Here one source check covers both: when both have landed, give the source
-check in prior-art.md both report files, and correct both.
+check in prior-art.md both files and say which is which: `prior-art.md` is the report its prompt names, and
+`literature.md` is an evidence table, checked the same way row by row. Its codebase facts are those of both prompts.
+Then correct both.
 
 Write the evidence table under **Evidence**, rows from both reports, each with its strength on literature.md's scale
 (High / Med / Low) and its source-check result, and the approaches under **Prior art**. Thin or conflicting evidence
@@ -276,5 +282,11 @@ Then, in this order:
 2. **Parking lot.** Show every line under **Parking lot**, /learn's included, and ask for each: do now, a follow-up,
    or drop. Record the answer on its line.
 3. **Run verdict.** Ask for it and record it under **Run verdict**.
-4. Set `phase: done`. Then offer `/build-feature docs/features/<slug>/research.md`, with your recommendation: it
-   starts a run of its own that links the report as its prior art and reuses this run's **Grounding**.
+4. **Do now.** A "do now" line goes into the `/build-feature` request offered below. A doc edit (an ADR, a glossary
+   line) is done in this session instead, on the user's yes.
+5. **Commit.** Set `phase: done` and `now:` first, since nothing rewrites flow.md after this commit. Then show one
+   commit, its message and files: the run folder plus /learn's files and any doc edit from 4. Make it on the user's
+   yes, as the run rules say, so the report is in HEAD when a build's worktree is cut.
+6. Offer `/build-feature docs/features/<slug>/research.md`, with the "do now" lines in its request and your
+   recommendation: it starts a run of its own that links the report as its prior art and reuses this run's
+   **Grounding**.

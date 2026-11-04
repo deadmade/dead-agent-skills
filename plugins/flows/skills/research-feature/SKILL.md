@@ -65,8 +65,13 @@ In one message, start both: the literature agent, one fresh agent in the backgro
 prior-art agent, whose prompt takes the question in place of the feature:
 [step: prior-art]
 
+Without subagents: run the literature prompt yourself too, writing the same file to the same path. The source check
+is skipped and recorded under **Skipped**, and every evidence row's source-check result reads `not checked`.
+
 Link both reports under **Artifacts**. Here one source check covers both: when both have landed, give the source
-check in prior-art.md both report files, and correct both.
+check in prior-art.md both files and say which is which: `prior-art.md` is the report its prompt names, and
+`literature.md` is an evidence table, checked the same way row by row. Its codebase facts are those of both prompts.
+Then correct both.
 
 Write the evidence table under **Evidence**, rows from both reports, each with its strength on literature.md's scale
 (High / Med / Low) and its source-check result, and the approaches under **Prior art**. Thin or conflicting evidence
@@ -84,7 +89,7 @@ always the smallest that would work, named in one line (ponytail's `lite` level)
 
 ## Phase 4: Report
 
-<!-- runs: `research.md`, copyedited, then `/learn` · output: the report, lessons -->
+<!-- runs: `research.md`, copyedited, then `/learn` and one commit · output: the report, lessons, the commit -->
 
 Write `docs/features/<slug>/research.md` and link it under **Artifacts** as the Report:
 
@@ -110,5 +115,11 @@ Then, in this order:
 2. **Parking lot.** Show every line under **Parking lot**, /learn's included, and ask for each: do now, a follow-up,
    or drop. Record the answer on its line.
 3. **Run verdict.** Ask for it and record it under **Run verdict**.
-4. Set `phase: done`. Then offer `/build-feature docs/features/<slug>/research.md`, with your recommendation: it
-   starts a run of its own that links the report as its prior art and reuses this run's **Grounding**.
+4. **Do now.** A "do now" line goes into the `/build-feature` request offered below. A doc edit (an ADR, a glossary
+   line) is done in this session instead, on the user's yes.
+5. **Commit.** Set `phase: done` and `now:` first, since nothing rewrites flow.md after this commit. Then show one
+   commit, its message and files: the run folder plus /learn's files and any doc edit from 4. Make it on the user's
+   yes, as the run rules say, so the report is in HEAD when a build's worktree is cut.
+6. Offer `/build-feature docs/features/<slug>/research.md`, with the "do now" lines in its request and your
+   recommendation: it starts a run of its own that links the report as its prior art and reuses this run's
+   **Grounding**.
