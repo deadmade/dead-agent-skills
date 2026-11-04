@@ -38,6 +38,16 @@ mattpocock are its `-picks` folders; cloudflare is `security-audit`).
 The argument is `branch` (default) or `all`, then an optional base; flow-rules **Scope** picks the base. Say the scope
 in one line (`feature-x ← main, 12 files, +340 −95, 4 commits + uncommitted`). An empty diff: say so and stop.
 
+The argument is `branch` (default) or `all`.
+
+- **branch:** the base is a named base, else `origin/HEAD`, else `origin/main` or `origin/master`. The scope is the working tree against
+  `git merge-base <base> HEAD`, untracked files included, plus what the change should have touched and didn't: the
+  tests of changed code, the docs that describe it.
+- **all:** every tracked file.
+- Either way, skip content the repo marks as vendored or generated (AGENTS.md, a `THIRD_PARTY.md`, a sync script):
+  a finding there names the upstream or the sync transform, never the copied file.
+- Say the scope in one line (`branch: feat-x ← main, 12 files` or `all: 340 files, vendored skipped`) and continue.
+
 The intent is the spec a calling build flow hands over; otherwise, first match: a `docs/features/*/flow.md` whose
 `phase:` isn't `done` with the spec and plan it links, issue refs in the commit messages, a path the user names. None:
 ask once in one line and start the lenses meanwhile; "none" skips the spec check, and the report says so. The

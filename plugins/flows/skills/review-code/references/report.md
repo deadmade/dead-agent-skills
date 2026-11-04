@@ -9,6 +9,23 @@ line, every verified finding in flow-rules **Reports**' table with the template'
 `confirmed` or `plausible` in the evidence), the dropped count, and later the `Picks:` and `Fixed <date>:` lines
 flow-rules **Reports** names.
 
+- **Audits:** `/review-code` writes `docs/audits/<YYYY-MM-DD>-review-<scope>.md`: the scope line, the findings
+  table, the user's pick per finding, and what was fixed. Older reports there carry the names of the conductors it
+  replaced (`test-audit`, `doc-audit`, `harden`).
+
+## Reports (audits)
+
+One ranked table, most severe first:
+
+| #   | severity     | where       | finding      | evidence                   | fix (recommended) |
+| --- | ------------ | ----------- | ------------ | -------------------------- | ----------------- |
+| 1   | high/med/low | `file:line` | one sentence | the command, quote or test | what to do        |
+
+Every finding has evidence produced in this run: a command and its output, a quote with its line, a failing test.
+Nothing from memory. Then the user picks by number (`1,3`, `all fix` for every Fix before merge item, `all`, `none`). Fix only those, then re-run the check
+that found each one and show it passes. Record picks and results in the report file as `Picks: <finding numbers> |
+none`, then one line `Fixed <date>: <number>` per pick once its check passes.
+
 ## The screen
 
 ```

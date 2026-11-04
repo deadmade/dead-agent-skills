@@ -15,6 +15,13 @@ help text and skill descriptions that document behaviour.
 
 ## Claims
 
+- tob's spec-compliance checker ships as flows' own agent: `tob-picks:spec-compliance-checker` means
+  `flows:spec-compliance-checker`.
+  <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "For a single requirement, dispatch the `tob-picks:spec-compliance-checker` agent at it." -->
+- For tob's spec-compliance workflow, follow [spec-compliance.md](../../../references/spec-compliance.md) with
+  the target path, optional spec and limit. It uses native subagents, without a host-specific Workflow runtime.
+  <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Run `/tob-picks:spec-compliance <path>`." -->
+
 Follow tob `spec-to-code-compliance` with the docs as the specification and the scope's code as the implementation.
 A handful of claims (a usual `branch`): check each yourself against the code, or one `flows:spec-compliance-checker`
 per claim when there are more than the lens can hold. Many (`all`, or a long doc): the **every claim** pass, the tob
