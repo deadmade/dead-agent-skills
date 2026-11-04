@@ -60,13 +60,13 @@ list from the grounding under **Grounding**, where the gate and one-task's files
 big for one task: stop, name it, and offer `/build-feature`.
 
 **A plan** goes ahead when glance accepts it and every task has **Does**, **Depends on**, **Adds**, **Size** and a
-**Files** list. It is a plan the run was given, so glance runs on it only with `--check` (the `--check` paragraph
-below), never in its writing mode:
+**Files** list of plain paths (the files check compares paths, so a `path:123-145` entry is a gap). It is a plan the
+run was given, so glance runs on it only with `--check` (the `--check` paragraph below), never in its writing mode:
 
 [step: plan-check]
 
-A missing field, or a path or name the grounding shows is stale: stop and name each one, so the user can fix the plan
-and run /implement again.
+A missing field, a `path:lines` **Files** entry, or a path or name the grounding shows is stale: stop and name each
+one, so the user can fix the plan and run /implement again.
 
 Anything else (a spec, open questions): say it isn't a ticket or a plan and offer `/build-feature`.
 

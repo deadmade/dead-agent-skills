@@ -203,8 +203,8 @@ list from the grounding under **Grounding**, where the gate and one-task's files
 big for one task: stop, name it, and offer `/build-feature`.
 
 **A plan** goes ahead when glance accepts it and every task has **Does**, **Depends on**, **Adds**, **Size** and a
-**Files** list. It is a plan the run was given, so glance runs on it only with `--check` (the `--check` paragraph
-below), never in its writing mode:
+**Files** list of plain paths (the files check compares paths, so a `path:123-145` entry is a gap). It is a plan the
+run was given, so glance runs on it only with `--check` (the `--check` paragraph below), never in its writing mode:
 
 Run `node "<flow-root>/skills/build-feature/scripts/glance.mjs" "<plan.md>"` after every edit to the plan and again
 after its copyedit, so the block a gate shows matches the plan below it. It writes the plan's task graph and table at
@@ -217,8 +217,8 @@ A plan the run was given, or one outside `docs/features/<slug>/`, is linked from
 Check it with `node "<flow-root>/skills/build-feature/scripts/glance.mjs" --check "<plan>"`, which prints the same
 block and the same errors and writes nothing, and name each failure or missing line instead of fixing it.
 
-A missing field, or a path or name the grounding shows is stale: stop and name each one, so the user can fix the plan
-and run /implement again.
+A missing field, a `path:lines` **Files** entry, or a path or name the grounding shows is stale: stop and name each
+one, so the user can fix the plan and run /implement again.
 
 Anything else (a spec, open questions): say it isn't a ticket or a plan and offer `/build-feature`.
 

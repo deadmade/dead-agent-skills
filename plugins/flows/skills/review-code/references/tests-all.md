@@ -29,7 +29,8 @@ it follows:
   encode/decode and serialize/deserialize pairs, parsers, normalizers, validators, comparators and sorting, numeric
   code, state machines. Name the property, don't write it yet.
 - **Requirements:** tob `spec-to-code-compliance` with the spec (a `docs/features/*/` spec, CLAUDE.md, README) and the
-  tests as the implementation: which stated behaviours no test checks.
+  tests as the implementation: which stated behaviours no test checks. Give it the requirement limit the user agreed
+  when the main session offered this pass, or ask the user for one before starting it.
   - tob's spec-compliance checker ships as flows' own agent: `tob-picks:spec-compliance-checker` means
     `flows:spec-compliance-checker`.
     <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "For a single requirement, dispatch the `tob-picks:spec-compliance-checker` agent at it." -->

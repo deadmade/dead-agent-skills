@@ -236,10 +236,10 @@ These keep a technical document from being read two ways, or from reading as not
 ## Copyedit a finished document
 
 You can't see your own draft as a reader who wasn't there would. When asked to copyedit a file, or when a flow reaches a
-gate with a spec, a plan or an audit report, follow [references/copyedit.md](references/copyedit.md): a fresh agent on
-opus revises the document by this standard, and `scripts/compare.mjs` writes the edit over the document
-only when nothing code can check was lost. It commits nothing. `<flow-root>` is the flows plugin folder: two levels
-above this SKILL.md.
+gate with a spec, a plan, a research report or an audit report, follow [references/copyedit.md](references/copyedit.md):
+a fresh agent on opus revises the document by this standard, and `scripts/compare.mjs` writes the edit
+over the document only when nothing code can check was lost. It commits nothing. `<flow-root>` is the flows plugin
+folder: two levels above this SKILL.md.
 
 ## Length, correctness and punctuation
 

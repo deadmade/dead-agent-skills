@@ -102,7 +102,7 @@ review-code
 ├ pstack-picks: blast-radius, interrogate, principle-boundary-discipline
 ├ security-audit: security-audit
 ├ superpowers: finishing-a-development-branch, systematic-debugging, test-driven-development, verification-before-completion
-├ tob-picks: mutation-testing, property-based-testing, sharp-edges, spec-compliance, spec-compliance-checker, spec-to-code-compliance
+├ tob-picks: mutation-testing, property-based-testing, sharp-edges, spec-to-code-compliance
 └ web-mcp: fetch
 
 understand
