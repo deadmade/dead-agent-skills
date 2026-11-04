@@ -168,6 +168,23 @@ test('run writes the file and returns the block, or the error with code 1', () =
   assert.equal(readFileSync(bad, 'utf8'), plan(task(1, 'a')));
 });
 
+test('--check prints the block and writes nothing, with the same exit codes', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'glance-check-'));
+  const cli = join(import.meta.dirname, '..', 'scripts', 'glance.mjs');
+  const good = join(dir, 'plan.md');
+  writeFileSync(good, plan(task(1, 'a', 'none')));
+  const before = readFileSync(good);
+  const ok = spawnSync(process.execPath, [cli, '--check', good], { encoding: 'utf8' });
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(ok.stdout, /^<!-- glance -->\n```\nPlan: Demo · 1 tasks/);
+  assert.deepEqual(readFileSync(good), before);
+  const bad = join(dir, 'bad.md');
+  writeFileSync(bad, plan(task(1, 'a', 'none'), task(2, 'b')));
+  const no = spawnSync(process.execPath, [cli, '--check', bad], { encoding: 'utf8' });
+  assert.equal(no.status, 1);
+  assert.equal(no.stdout, 'Task 2: no **Depends on:** line\n');
+});
+
 test('markers count only on lines of their own', () => {
   const text = plan(task(1, 'a', 'none')).replace('Intro.', 'Intro mentions `<!-- glance -->…<!-- /glance -->` here.');
   const out = glance(text);

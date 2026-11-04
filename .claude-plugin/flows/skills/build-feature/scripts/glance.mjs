@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Draws a plan's task graph and task table as plain text between `<!-- glance -->` markers at the top of plan.md.
+// With `--check` it prints the block and writes nothing, for a plan the run was given and must not change.
 // Fields are read the way flow-cockpit's plan parser reads them (crates/flow-cockpit/core/src/doc/plan.rs), so both
 // draw the same graph from the same plan.
 // Keep the two in step: a change to plan.rs's field or Depends rules belongs here too.
@@ -228,10 +229,10 @@ export function glance(input) {
   return crlf ? out.replace(/\n/g, '\r\n') : out;
 }
 
-export function run(path) {
+export function run(path, check = false) {
   try {
     const out = glance(readFileSync(path, 'utf8'));
-    writeFileSync(path, out);
+    if (!check) writeFileSync(path, out);
     const lf = out.replace(/\r\n/g, '\n');
     const [start, end] = block(lf);
     return { code: 0, out: lf.slice(start, end) };
@@ -242,7 +243,12 @@ export function run(path) {
 
 // realpath: run through a symlinked folder, argv[1] keeps the link while import.meta.url resolves it.
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const { code, out } = run(process.argv[2]);
+  const args = process.argv.slice(2);
+  const check = args.includes('--check');
+  const { code, out } = run(
+    args.find((a) => a !== '--check'),
+    check,
+  );
   console.log(out);
   process.exit(code);
 }

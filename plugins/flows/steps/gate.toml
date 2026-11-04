@@ -1,11 +1,17 @@
 repeat = true
 
 text = '''
-- **Gates:** a gate passes only on the user's explicit approval of the artifact it names, recorded with the date in
-  the state file as a line `- Gate <n>, <what>: <date>[, <extra>]`, the date empty while the gate is open; a
-  reopening is appended as `Reopened <date>: <why>`. "Sounds good" to an idea isn't approval of a document. Nothing
-  past a gate starts before it passes.
-- A plan gate adds `, execution: subagent-driven | native`: ask the user to approve the plan **and** pick the
-  execution method from `writing-plans`' handoff (subagent-driven, or native = `executing-plans`), with your
-  recommendation. Record both.
+- **Gate.** Ask with {{ask-user}}, then wait for the answer. A gate passes only on the user's explicit approval of
+  the artifact it names: "Sounds good" to an idea isn't approval of a document. Nothing past a gate starts before it
+  passes.
+- Record it as one line under **Gates** in flow.md: `- Gate <n>, <what>: <date>[, execution: subagent-driven | native]`,
+  the date empty while the gate is open; a reopening is appended to that line as `Reopened <date>: <why>`, then the
+  date it is approved again. Gates are numbered in the order the run reaches them. A conductor run inline continues
+  its caller's numbering and names itself (`- Gate 3, fix: cause approved`). A run without flow.md records the line
+  in its audit file.
+- Only a plan gate offers an execution method, and on that gate's own line: subagent-driven (offered only when
+  subagents are available) or native = `executing-plans`, with your recommendation. The user approves the plan **and**
+  picks the method in the same answer. Every other gate asks for approval alone.
+- The gate message says whether the document it shows was copyedited: `copyedited`, `copyedit refused` with the lines
+  `compare.mjs` printed, `not copyedited: no subagents`, or `not copyedited: a given plan is not changed`.
 '''

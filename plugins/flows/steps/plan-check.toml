@@ -1,5 +1,12 @@
 text = '''
-Then run `node <flow-root>/skills/build-feature/scripts/glance.mjs <plan.md>`: it writes the plan's task
-graph and table at the top of plan.md, and it fails with the reason when the plan has no `### Task <n>:` headings or
-a task lacks `Depends on:`, names no task in it, or has a `Size:` that isn't `~N`. Run it again after every plan edit.
+Run `node "<flow-root>/skills/build-feature/scripts/glance.mjs" "<plan.md>"` after every edit to the plan and again
+after its copyedit, so the block a gate shows matches the plan below it. It writes the plan's task graph and table at
+the top of plan.md, and it fails with the reason when the plan has no `### Task <n>:` headings or a task lacks
+`Depends on:`, names no task in it, or has a `Size:` that isn't `~N`. A missing **Does:**, **Adds:** or **Size:**
+line doesn't fail it, so read its table as well: every task has all four lines, and an empty `does` or a `?` under
+`adds` or `size` is a line to add.
+
+A plan the run was given, or one outside `docs/features/<slug>/`, is linked from flow.md and never edited in place.
+Check it with `node "<flow-root>/skills/build-feature/scripts/glance.mjs" --check "<plan>"`, which prints the same
+block and the same errors and writes nothing, and name each failure or missing line instead of fixing it.
 '''

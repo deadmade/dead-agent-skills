@@ -2,11 +2,13 @@ uses = ["superpowers:writing-plans"]
 requires = ["plan-check", "before-you-write"]
 
 text = '''
-Follow superpowers `writing-plans` on the approved spec, with flow-rules **ponytail at chosen steps**' **Before you
-write** pasted into it. Copy each seam line from the spec verbatim into the plan's **Global Constraints**, and add one
-line to them: "One implementation gets no interface; one caller gets no helper; no option nobody sets." They also get a
-**Test seams** list (after mattpocock `tdd`): each public boundary the tests go through (an exported function, a CLI,
-a route), one line each on what a test there catches and what it misses. Tests go only there, and the plan's test
+Follow superpowers `writing-plans`, with **Before you write** pasted into it. Copy each seam line the run settled
+(`<concern>: resolved in <module>; never seen by <modules>`) verbatim into the plan's **Global Constraints**, and add
+one line to them: "One implementation gets no interface; one caller gets no helper; no option nobody sets." Detect the
+stack from the files the plan touches and the repository root, look it up in `<flow-root>/references/stack-packs.md`,
+and name only the matching skill in **Global Constraints**, for the builder and review briefs to load; never a whole
+library. The plan also gets a **Test seams** list: each public boundary the tests go through (an exported function, a
+CLI, a route), one line each on what a test there catches and what it misses. Tests go only there, and the plan's test
 steps use only these. Every task gets, right below its heading:
 
 - `**Does:** <one plain sentence for a reader who doesn't know the code>`
@@ -15,16 +17,23 @@ steps use only these. Every task gets, right below its heading:
   every new piece of surface, so `Interfaces: Produces` lists only what a later task consumes.
 - `**Size:** ~<N>`: the lines the task adds plus removes in its own files, one number.
 
+A task's **Files** entries are plain paths (`` - Modify: `src/x.ts` ``), never `path:123-145`: the files check compares
+them with `git diff --name-only` and counts them with `git diff --numstat`, and a line range matches nothing. Name the
+lines in the task's steps instead.
+<!-- overrides superpowers/skills/writing-plans/SKILL.md: "- Modify: `exact/path/to/existing.py:123-145`" -->
+
 Split a file only where a task's `Adds:` already names the second unit.
 <!-- overrides superpowers/skills/writing-plans/SKILL.md: "Prefer smaller, focused files over large ones that do too much." -->
 
-Let it run its own self-review. When it reaches its **Execution Handoff**, don't ask for an
-execution method yet and don't invoke an execution skill: link the plan in flow.md and go to Phase 5.
+Let it run its own self-review. When it reaches its **Execution Handoff**, don't ask for an execution method and don't
+invoke an execution skill: link the plan in flow.md and come back to this flow. The method is asked once, at the plan's
+gate.
 <!-- overrides superpowers/skills/writing-plans/SKILL.md: "Otherwise, ask them to review the plan and choose an execution method before implementation." -->
 <!-- overrides superpowers/skills/writing-plans/SKILL.md: "REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development" -->
 <!-- overrides superpowers/skills/writing-plans/SKILL.md: "REQUIRED SUB-SKILL: Use superpowers:executing-plans" -->
 
-- **Added tasks.** A task a decision adds during the build takes the number of the task it follows plus a letter
-  (`8b`, then `8c`). It goes into plan.md right after that task. Below its `**Depends on:**` line, which may name
-  lettered tasks, write `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
+- **Added tasks.** A task added after the plan's gate, by the user's decision during the build, takes the next free
+  number, never a letter: the pack's `task-brief 8` would also pick up `8b`. It goes at the end of plan.md with its own
+  `**Depends on:**` line; below that line, write
+  `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
 '''
