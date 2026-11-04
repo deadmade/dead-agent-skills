@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import type { HostTokens } from '../../flows/compose.ts';
 
 const adapter = readFileSync(new URL('./codex.md', import.meta.url), 'utf8')
+  .replaceAll('\r\n', '\n')
   .replace(/^# .*\n+/, '')
   .trimEnd();
 const model = { text: "the session's model" };
