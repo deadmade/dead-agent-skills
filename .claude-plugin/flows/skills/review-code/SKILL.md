@@ -12,7 +12,7 @@ Is this change ready, and what should be fixed first? One review, as few agents 
 | Phase | Runs | Output |
 | --- | --- | --- |
 | 1 Scope | the target, the intent question | base, diff, intent |
-| 2 Checks | the repo's documented checks, superpowers `verification-before-completion` | every check green or pre-existing, or a stop; one run |
+| 2 Checks | the repo's documented checks, superpowers `verification-before-completion` | every check green, pre-existing or unknown and accepted, or a stop; one run |
 | 3 Lenses | the lenses lenses.md picks | candidate findings |
 | 4 Verify | one fresh agent | confirmed or plausible, each with a case |
 | 5 Report | report.md, the copyedit | one screen, `docs/audits/…`. **Gate 1** |
@@ -148,8 +148,8 @@ Say which plugin provides it, then use the fallback. Only the rows for plugins t
 ## Start
 
 /review-code keeps no flow.md: its record is the audit file (Phase 5), and without a flow.md the audit file stands in
-for it wherever a step below says flow.md. It has no `now:` either: the audit template keeps none. Gate lines go into
-the audit file: Gate 1 under **Findings**, after the `Picks:` line; Gate 2 under **Run verdict**.
+for it wherever a step below says flow.md. Standalone, it has no `now:` either (the audit template keeps none); called
+inline, it writes `now:` into the caller's flow.md, as the call rule says. Gate lines go into the audit file: Gate 1 under **Findings**, after the `Picks:` line; Gate 2 under **Run verdict**.
 
 - **Standalone,** the argument is the target, `branch` (the default), `all` or `pr <number>`, then an optional base.
 - **Called inline** (a build flow's Finish, or /fix), the caller hands over the target, the intent, whether execution
@@ -395,7 +395,8 @@ Called inline, the run stops here and returns to its caller.
 Standalone only. Offer `/learn` first and run it inline: its Parking-lot lines go under the audit file's **Parking
 lot** and are decided below, and what it writes is in the commits Decide offers. The decisions include each new
 `shortcut:` line (what ponytail `ponytail-debt` lists), each decided under **Waiting on you**. The Checks row says what
-Phase 2 found: green, a pre-existing red check, no documented checks, or under `pr` the output of `gh pr checks`.
+Phase 2 found: green, a pre-existing red check, an unknown one the user accepted, no documented checks, or under `pr`
+the output of `gh pr checks`.
 
 - **Gate.** Ask with the AskUserQuestion tool, then wait for the answer. A gate passes only on the user's explicit approval of
   the artifact it names: "Sounds good" to an idea isn't approval of a document. Nothing past a gate starts before it

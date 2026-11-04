@@ -21,7 +21,7 @@ filled in.
 
 ## Tasks
 
-<!-- One line per task: `Task <N>: base <sha>`, untracked at start: <files or none>, then `files clean` or
+<!-- One line per task: `Fix <n>: base <sha>`, untracked at start: <files or none>, then `files clean` or
 `deviation` (see Deviations). -->
 
 ## Rulings

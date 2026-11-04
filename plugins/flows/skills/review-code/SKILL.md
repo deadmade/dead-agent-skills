@@ -43,8 +43,8 @@ subagents)`. The main session never reviews its own diff.
 ## Start
 
 /review-code keeps no flow.md: its record is the audit file (Phase 5), and without a flow.md the audit file stands in
-for it wherever a step below says flow.md. It has no `now:` either: the audit template keeps none. Gate lines go into
-the audit file: Gate 1 under **Findings**, after the `Picks:` line; Gate 2 under **Run verdict**.
+for it wherever a step below says flow.md. Standalone, it has no `now:` either (the audit template keeps none); called
+inline, it writes `now:` into the caller's flow.md, as the call rule says. Gate lines go into the audit file: Gate 1 under **Findings**, after the `Picks:` line; Gate 2 under **Run verdict**.
 
 - **Standalone,** the argument is the target, `branch` (the default), `all` or `pr <number>`, then an optional base.
 - **Called inline** (a build flow's Finish, or /fix), the caller hands over the target, the intent, whether execution
@@ -80,7 +80,7 @@ The standards are every applicable AGENTS.md and CLAUDE.md (root and changed fol
 
 ## Phase 2: Checks
 
-<!-- runs: the repo's documented checks, superpowers `verification-before-completion` · output: every check green or pre-existing, or a stop; one run -->
+<!-- runs: the repo's documented checks, superpowers `verification-before-completion` · output: every check green, pre-existing or unknown and accepted, or a stop; one run -->
 
 Follow [references/checks.md](references/checks.md). Under `pr`, nothing runs: the Checks row is the output of
 `gh pr checks <number>`, as it stands.
@@ -166,7 +166,8 @@ Called inline, the run stops here and returns to its caller.
 Standalone only. Offer `/learn` first and run it inline: its Parking-lot lines go under the audit file's **Parking
 lot** and are decided below, and what it writes is in the commits Decide offers. The decisions include each new
 `shortcut:` line (what ponytail `ponytail-debt` lists), each decided under **Waiting on you**. The Checks row says what
-Phase 2 found: green, a pre-existing red check, no documented checks, or under `pr` the output of `gh pr checks`.
+Phase 2 found: green, a pre-existing red check, an unknown one the user accepted, no documented checks, or under `pr`
+the output of `gh pr checks`.
 
 [step: gate]
 
