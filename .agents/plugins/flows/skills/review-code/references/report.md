@@ -17,7 +17,8 @@ wrong) or `worth doing`, so `all fix` resolves from the file alone:
 
 Every finding has evidence produced in this run: a command and its output, a quote with its line, a failing test.
 Nothing from memory. The evidence says `confirmed` or `plausible`, and the dropped count follows the table. After
-Gate 1 come `Picks: <finding numbers> | none`, then one line `Fixed <date>: <number>` per pick once its check passes.
+Gate 1 come `Picks: <finding numbers> | none`; fix only those, then re-run the check that found each fixed finding
+and show it passes, and add one line `Fixed <date>: <number>` per pick once it does.
 
 ## The screen
 

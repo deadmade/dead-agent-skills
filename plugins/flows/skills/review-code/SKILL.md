@@ -24,10 +24,12 @@ This flow adds:
 - **Never post.** Nothing goes to GitHub or anywhere else; the report stays in chat and in `docs/audits/`.
 - **The diff** is the working tree against the merge-base, untracked files included: `git diff <merge-base>` plus
   `git ls-files --others --exclude-standard`. Under `pr`, it is `gh pr diff <number>`.
-- **Lenses are independent.** A lens gets only the diff command, the file list, the intent, the repo's standards and
-  its brief, and never sees another lens's findings; the small diff's combined agent is the one exception
-  ([references/lenses.md](references/lenses.md)). Where the adapter says a built-in review "runs forked", that is the
-  host's own fresh reviewer, which counts as fresh; a fork of this conversation never does.
+- **Under `pr`, the local tree is not the PR.** Every agent gets the PR's head sha and reads code only with
+  `git show <head sha>:<path>`; when the head couldn't be fetched (Phase 1), it has the diff alone.
+- **Lenses are independent.** A lens gets only the diff command (under `pr`, with the head sha), the file list, the
+  intent, the repo's standards and its brief, and never sees another lens's findings; the small diff's combined agent is
+  the one exception ([references/lenses.md](references/lenses.md)). Where the adapter says a built-in review "runs
+  forked", that is the host's own fresh reviewer, which counts as fresh; a fork of this conversation never does.
 - No code changes before Gate 1 passes.
 
 Without subagents: the lenses, the verifier and the fix check are skipped and recorded under **Skipped** in the audit
@@ -41,13 +43,13 @@ subagents)`. The main session never reviews its own diff.
 ## Start
 
 /review-code keeps no flow.md: its record is the audit file (Phase 5), and without a flow.md the audit file stands in
-for it wherever a step below says flow.md. Gate lines go into the audit file: Gate 1 under **Findings**, after the
-`Picks:` line; Gate 2 under **Run verdict**.
+for it wherever a step below says flow.md. It has no `now:` either: the audit template keeps none. Gate lines go into
+the audit file: Gate 1 under **Findings**, after the `Picks:` line; Gate 2 under **Run verdict**.
 
 - **Standalone,** the argument is the target, `branch` (the default), `all` or `pr <number>`, then an optional base.
-- **Called inline** (a build flow's Finish, or /fix), the caller hands over the target, the intent and whether
-  execution ran natively. The run goes through Phase 6 and stops there: the caller's Decide and Close cover Phase 7.
-  Its gates continue the caller's numbering in the caller's flow.md.
+- **Called inline** (a build flow's Finish, or /fix), the caller hands over the target, the intent, whether execution
+  ran natively, and its latest run (commands, commit, `git status --short`). The run goes through Phase 6 and stops
+  there: the caller's Decide and Close cover Phase 7. Its gates continue the caller's numbering in the caller's flow.md.
 
 ## Phase 1: Scope
 
@@ -57,19 +59,22 @@ for it wherever a step below says flow.md. Gate lines go into the audit file: Ga
   working tree against `git merge-base <base> HEAD`, untracked files included, plus what the change should have
   touched and didn't: the tests of changed code, the docs that describe it.
 - **all:** every tracked file.
-- **pr `<number>`:** someone else's pull request, read-only. The diff is `gh pr diff <number>`, the base and head
-  come from `gh pr view <number>`, and the code around the diff is read with `git show <head sha>:<path>` after
-  `git fetch origin pull/<number>/head`. The PR is never checked out, built or run.
+- **pr `<number>`:** someone else's pull request, read-only. The diff is `gh pr diff <number>`; `gh pr view <number>`
+  gives the base, the head sha and the body. Fetch the head's objects from the base repository as `gh` knows it, not
+  from an assumed `origin`: `git fetch <url from gh repo view --json url> pull/<number>/head`, with no checkout. If
+  the fetch fails, the review runs from the diff alone and the report says so. The PR is never checked out, built or
+  run.
 - Either way, skip content the repo marks as vendored or generated (CLAUDE.md, a `THIRD_PARTY.md`, a sync script):
   a finding there names the upstream or the sync transform, never the copied file.
 - Say the scope in one line (`branch: feat-x ← main, 12 files, +340 −95, 4 commits + uncommitted`,
   `all: 340 files, vendored skipped` or `pr 42: feat-x → main, 5 files`). An empty diff: say so and stop.
 
-The intent is what a calling flow hands over: the spec and the plan of a build flow, a ticket, or the cause /fix
-fixed. Otherwise, first match: a `docs/features/*/flow.md` whose `phase:` isn't `done`, with the spec and plan it
-links (several: ask which one); issue refs in the commit messages (under `pr`, in the PR's body); a path the user
-names. None: ask once in one line. "none" skips the spec check, and the report says so. Ask now, while Phase 2 runs;
-no lens starts before the intent is settled.
+The intent is what a calling flow hands over: the spec and the plan of a build flow, a ticket, or the cause /fix fixed.
+Under `pr`, it is the PR's body and the issues it links; no local flow.md is looked up, since that would be the user's
+own work. Otherwise, first match: a `docs/features/*/flow.md` whose `phase:` isn't `done`, with the spec and plan it
+links (several: ask which one); issue refs in the commit messages; a path the user names. None: ask once in one line.
+"none" skips the spec check, and the report says so. Ask now, while Phase 2 runs; no lens starts before the intent is
+settled.
 
 The standards are every applicable AGENTS.md and CLAUDE.md (root and changed folders), CONTRIBUTING.md and similar.
 
@@ -98,11 +103,11 @@ those the user says yes to; their findings join the candidates.
 
 <!-- runs: one fresh agent · output: confirmed or plausible, each with a case -->
 
-One fresh agent that ran no lens gets every candidate (merged: the same issue from two lenses is one, citing both),
-the diff command and the cited files. Per candidate it reads the lines and marks it **confirmed** (it read the line,
-and the failure follows for the stated case) or **plausible** (likely, not shown). A candidate without a concrete
-case (this input or situation leads to this wrong result) is dropped and counted. Security and security-domain
-findings keep their own severity.
+One fresh agent that ran no lens gets every candidate (merged: the same issue from two lenses is one, citing both), the
+diff command and the cited files (under `pr`, the head sha, read with `git show`). Per candidate it reads the lines and
+marks it **confirmed** (it read the line, and the failure follows for the stated case) or **plausible** (likely, not
+shown). A candidate without a concrete case (this input or situation leads to this wrong result) is dropped and counted.
+Security and security-domain findings keep their own severity.
 
 ## Phase 5: Report
 
@@ -122,11 +127,12 @@ nothing to pick: the gate approves the report, with `Picks: none`, and Phase 6 d
 
 <!-- runs: the picks, test-first where behaviour changes; one fresh fix-check agent · output: fixes, re-checked -->
 
-Fix only the picks. Each pick is a task, `Task <finding number>` under **Tasks**, and the files its finding names are
-its **Files** list. A fix that changes behaviour gets a failing test first (superpowers
-`test-driven-development`); a doc fix changes the doc to match the code, unless the user picks fixing the code. Picks
-from the `all` passes follow their own fix rules in tests-all.md and harden-all.md. Every fix follows the builder
-brief:
+Fix only the picks. Each pick is a task labelled `Fix <finding number>`, never `Task <n>`, which in a caller's flow.md
+names a plan task: its line under **Tasks** is `Fix <n>: base <sha>`, its Rulings name `Fix <n>`, the builder brief and
+the files check below use that label, and the files its finding names are its **Files** list. A fix that changes
+behaviour gets a failing test first (superpowers `test-driven-development`); a doc fix changes the doc to match the
+code, unless the user picks fixing the code. Picks from the `all` passes follow their own fix rules in tests-all.md and
+harden-all.md. Every fix follows the builder brief:
 
 [step: before-you-write]
 
@@ -157,12 +163,16 @@ Called inline, the run stops here and returns to its caller.
 
 <!-- runs: the decisions gate, superpowers `finishing-a-development-branch` · output: decisions, commits, how the branch ends -->
 
-Standalone only. Offer `/learn` first; the Parking-lot lines it adds are decided below. The decisions include each new
+Standalone only. Offer `/learn` first and run it inline: its Parking-lot lines go under the audit file's **Parking
+lot** and are decided below, and what it writes is in the commits Decide offers. The decisions include each new
 `shortcut:` line (what ponytail `ponytail-debt` lists), each decided under **Waiting on you**. The Checks row says what
 Phase 2 found: green, a pre-existing red check, no documented checks, or under `pr` the output of `gh pr checks`.
-Under `pr`, the only commit Decide offers is the audit file's.
 
 [step: gate]
+
+Under `pr`, Decide stays off the local tree: the new `shortcut:` lines come from `gh pr diff`, a fresh `gh pr checks`
+stands in for re-running the checks, `now:` isn't set to Close's waiting line, and the one commit offered is the audit
+file plus what /learn wrote, on the branch checked out now, named in the offer.
 
 [step: decide]
 

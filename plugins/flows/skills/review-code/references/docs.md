@@ -55,6 +55,10 @@ In the scoped docs, check what can be checked by running something:
 - **Versions and names:** versions, plugin and package names, env vars and config keys match their source.
 - **Plugin manifests:** the host's plugin validator on the plugin folder, when the host provides one.
 
+Under `pr`, the local tree is not the PR's: paths, links, scripts and manifests are checked at the head sha
+(`git show <head sha>:<path>`, `git ls-tree <head sha>`), no command from the PR runs, and without a fetched head the
+checks that need its files are recorded as not checked.
+
 ## Prose
 
 Docs the diff changed, read against `flows:writing`, loaded with the host's skill tool. Findings only, severity low

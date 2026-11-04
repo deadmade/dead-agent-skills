@@ -1,6 +1,6 @@
 # Lenses
 
-One agent per lens that runs, each a fresh `general-purpose` agent on the model named, unless the brief names a skill
+One agent per lens that runs, each a fresh agent on the model named, unless the brief names a skill
 or agent that runs itself. Every brief ends with the shared tail below.
 
 | Lens        | Runs when                                                                                         | Model               |
