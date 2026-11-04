@@ -8,9 +8,10 @@ keeps a state file so the next session can resume. Claude proposes and recommend
 | `/understand <topic>`               | learn a codebase, subsystem or concept          | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                         | terms in GLOSSARY.md                              |
 | `/build-feature <what>`             | a new feature with a design                     | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                                                                                                                        | `/review-code`, `/learn`                          |
 | `/research-feature <question>`      | research a design question before building      | frame, papers and engineering sources (web-mcp, paper-lookup), source check, `grilling` on the options; no build, no benchmark                                                                                                                           | a decision report, then `/build-feature`          |
-| `/implement <plan>`                 | build from an existing plan, spec or ticket     | `to-tickets` or `writing-plans` if needed, superpowers execution                                                                                                                                                                                         | `/review-code`, `/learn`                          |
+| `/implement <ticket or plan>`       | build a ticket or a given plan                  | reads and checks the input, one gate to confirm it; a ticket in this session, a plan through superpowers execution; never plans, never changes a plan                                                                                                    | `/review-code`, `/learn`                          |
 | `/fix <symptom>`                    | fix a bug                                       | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                                                                                                                           | `/review-code`, `/learn`                          |
-| `/upgrade <pkg>[@v]`                | bump a dependency                               | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                                                                                                                                                                                | `/review-code`, `/learn`                          |
+| `/upgrade <pkg>[@v] …`              | bump one dependency, a list, or all outdated    | changelogs via web-mcp and context7, `blast-radius`; patch and minor bumps as one task, majors through a plan; bump, fix test-first in batches                                                                                                           | `/review-code`, `/learn`                          |
+| `/refactor <what>`                  | restructure code without changing behaviour     | `how` and the suite, shape and size the target, a plan, characterization tests where coverage is thin, the moves on a branch                                                                                                                             | `/review-code`, `/learn`                          |
 | `/review-code [branch\|all]`        | review a branch before merge, or the whole repo | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes | merge, or a PR (`!` lines to push) and CI watched |
 | `/learn [flow]`                     | keep what the work taught                       | no questions: the few lessons that matter, via `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note or memory; checks and skill fixes to the Parking lot                                                                                      | done                                              |
 | `/flows:writing copyedit <file.md>` | revise a finished document for a new reader     | a fresh agent revises it by the `writing` skill; `compare.mjs` refuses an edit that lost what code can check                                                                                                                                             | the edited document, uncommitted                  |
@@ -20,7 +21,8 @@ it; `all` audits the whole repo, vendored content skipped.
 
 ## What each conductor uses
 
-Generated from each conductor's `uses.json` by `node scripts/flows-uses.mjs`; `npm test` fails when it is stale.
+Generated from each conductor's `uses:` line, its steps' and its host wording's by `node scripts/flows-uses.mjs`;
+`npm test` fails when it is stale.
 Installing flows installs every plugin below; the packs ship inside flows itself.
 
 <!-- uses:start -->
@@ -128,7 +130,8 @@ upgrade
 <!-- uses:end -->
 
 State lives in the repo: build flows in `docs/features/<slug>/flow.md`, audits in `docs/audits/`. The shared rules
-are in [references/flow-rules.md](references/flow-rules.md).
+are steps (`steps/*.toml`), which the build composes into each conductor that names them
+([compose.ts](../../tools/harness-compiler/src/flows/compose.ts)), so every built SKILL.md carries all its rules.
 
 Calls between conductors (`/fix` → `/review-code`) aren't listed. Each conductor still has a fallback for a
 plugin that isn't there, for installs that skipped one.
@@ -157,8 +160,8 @@ copyedit that revises a document by it before a gate.
   lines a Write added to the file, unless the file defines the label. It is Node code with no model call, so it costs no
   tokens. Claude sees its findings and may leave a sentence that a finding gets wrong. In `flow.md` files it is off,
   since flow.md is the log where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
-- **The copyedit** (`skills/writing/references/copyedit.md`, `/flows:writing copyedit <file.md>`) has a fresh Opus
-  agent revise a document by the skill for a reader who wasn't in the conversation, then lets the edit through only when
+- **The copyedit** (`skills/writing/references/copyedit.md`, `/flows:writing copyedit <file.md>`): a fresh agent
+  revises a document by the skill for a reader who wasn't in the conversation, and the edit goes through only when
   code finds nothing lost that it can check. It refuses the edit when a heading or its order, a code block, a code span,
   a link target or link definition, a URL, an HTML comment, a number, a checkbox step, a table's shape or a quote is
   lost, when the edit has under 60% as many prose words as the original, when the editor wrote nothing, or when the
@@ -173,9 +176,11 @@ tob-picks, paper-lookup and security-audit, each written there by its `tools/ups
 `skills/`, `agents/` and `hooks/hooks.json`, so nothing under `packs/` loads on its own; the conductors read a pack's
 skills by path (`${PLUGIN_ROOT}/packs`). tob's spec checker is flows' own agent (`agents/spec-compliance-checker.md`),
 since a pack's agents don't load. `/review-code` vendors one agent too, pr-review-toolkit's `pr-test-analyzer`
-(`agents/`, written by `tools/upstream-sync/src/adapters/self-review.ts`). Where a conductor changes a pack's rule it quotes the sentence it overrides in an
-`overrides` comment marker, and `npm test` fails when that sentence is gone from the pack. To add
-a pack, follow [docs/vendor-a-pack.md](../../docs/vendor-a-pack.md).
+(`agents/`, written by `tools/upstream-sync/src/adapters/self-review.ts`). Where a conductor or a step overrides a
+sentence of a pack, or pastes a section of one, a marker next to it quotes each sentence:
+`<!-- overrides <pack>/<path inside the pack>: "<sentence>" -->`. The build strips the markers, and `npm test` fails
+when the pack no longer holds the sentence, so an upstream change to an overridden or pasted rule is noticed at its
+sync. To add a pack, follow [docs/vendor-a-pack.md](../../docs/vendor-a-pack.md).
 
 ## Install
 
@@ -184,8 +189,9 @@ Pick it in the installer (see the [main README](../../README.md)), which also in
 ## Supported agents
 
 The same conductors and flow-state documents work in every supported coding agent. Each distribution carries all pack
-resources; only conductor skills are discovered automatically. The host-specific tool mapping ships as
-`references/host.md` in each distribution, and cross-package lookups are described in `references/resource-index.md`.
+resources; only conductor skills are discovered automatically. The host-specific tool mapping is written into each
+built conductor (`tools/harness-compiler/src/templates/hosts/`), and cross-package lookups are described in
+`references/resource-index.md`.
 If a session cannot launch subagents, skip those steps and record them as not checked. Keep approval gates.
 tui-review is a separate optional tool for reading a diff.
 

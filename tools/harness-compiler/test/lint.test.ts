@@ -76,6 +76,21 @@ test('allowlisted paths are skipped and a catalog source without plugin.json is 
   }
 });
 
+test("a Claude-only phrase in a flows step is a problem, but not on an override-marker line or in flows' README", () => {
+  const ask = 'Ask with AskUserQuestion.\n';
+  const root = fixture({
+    'plugins/flows/plugin.json': '{}',
+    'plugins/flows/steps/x.toml': `text = '''\n${ask}'''\n`,
+    'plugins/flows/steps/y.toml': `text = '''\n<!-- overrides p/SKILL.md: "${ask.trim()}" -->\n'''\n`,
+    'plugins/flows/README.md': ask,
+  });
+  try {
+    assert.deepEqual(messages(root, [], ['plugins/flows']), ['plugins/flows/steps/x.toml:2 mentions AskUserQuestion']);
+  } finally {
+    rmSync(root, { recursive: true });
+  }
+});
+
 test('allowlist entries need a reason', () => {
   const root = fixture({ 'allow.json': '[{"path":"plugins/x","reason":""}]' });
   try {

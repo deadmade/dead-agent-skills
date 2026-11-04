@@ -317,8 +317,7 @@ const NODE = /\bnode\s+["`]?([^\s"`]+\.[cm]?js)\b/g;
 const LINK = /\]\(([^)\s#]*references\/[^)\s#]+)/g;
 const PACK = /(?:<packs>|<flow-root>\/packs)\/([^\s/`'"()[\]]+)\/skills\/([^\s/`'"()[\]]+)/g;
 
-// Checks 6, 7 and 8 and the Codex phrase check on the composed files as built; check 6, check 7's short-name and
-// pack-path rules and the phrases warn until Task 18.
+// Checks 5 to 8 and the Codex phrase check on the composed files as built; every finding is a problem.
 export function checkBuilt(dest: string, target: TargetId, composed: Composed): Checked {
   const checked: Checked = { problems: [], warnings: [], estimates: {} };
   for (const rel of composed.files.keys()) {
@@ -333,17 +332,18 @@ export function checkBuilt(dest: string, target: TargetId, composed: Composed): 
           ? join(dest, 'skills', flow, path.slice('<skill-dir>/'.length))
           : undefined;
     lines.forEach((line, i) => {
-      const warn = (what: string) => checked.warnings.push(`[${target}] ${rel}:${i + 1}: ${what}`);
+      const problem = (what: string) => checked.problems.push(`[${target}] ${rel}:${i + 1}: ${what}`);
+      if (line.includes('flow-rules')) problem('names flow-rules, which no longer exists');
       for (const [, script] of line.matchAll(NODE)) {
         const path = placed(script);
-        if (!path) warn(`node ${script} is not a <flow-root> or <skill-dir> path`);
-        else if (!existsSync(path)) warn(`node ${script} does not resolve in the built tree`);
+        if (!path) problem(`node ${script} is not a <flow-root> or <skill-dir> path`);
+        else if (!existsSync(path)) problem(`node ${script} does not resolve in the built tree`);
       }
       for (const [, link] of line.matchAll(LINK))
         if (!/^\w+:/.test(link) && !existsSync(placed(link) ?? join(dest, rel, '..', link)))
-          warn(`link ${link} does not resolve in the built tree`);
+          problem(`link ${link} does not resolve in the built tree`);
       const phrases = target === 'codex' ? CLAUDE_ONLY.flatMap((p) => p.exec(line)?.[0] ?? []) : [];
-      if (phrases.length) warn(`names Claude-only ${phrases.join(', ')}`);
+      if (phrases.length) problem(`names Claude-only ${phrases.join(', ')}`);
     });
     if (
       !/^skills\/[^/]+\/SKILL\.md$/.test(rel) ||
@@ -379,7 +379,7 @@ export function checkBuilt(dest: string, target: TargetId, composed: Composed): 
           if (/[<>…*]/.test(pack + name)) continue;
           paths.add(`${pack}:${name}`);
           if (!uses[pack]?.includes(name))
-            checked.warnings.push(
+            checked.problems.push(
               `[${target}] ${file}:${i + 1}: names <packs>/${pack}/skills/${name}, but ${pack}:${name} is not in ${flow}'s uses`,
             );
         }
@@ -397,7 +397,7 @@ export function checkBuilt(dest: string, target: TargetId, composed: Composed): 
             )
           : [];
         if (bare.length)
-          checked.warnings.push(
+          checked.problems.push(
             `[${target}] ${bare[0]}: uses ${id} but names it only as the bare word "${name}"; write ${id} or its pack path`,
           );
         else checked.problems.push(`[${target}] ${rel}:1: uses ${id}, which neither it nor a reference it links names`);

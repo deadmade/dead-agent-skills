@@ -140,19 +140,31 @@ test('flows compose per harness, and Codex conductors get an implicit-invocation
   assert.equal(existsSync(join(out, '.claude-plugin/flows/skills/f/agents')), false);
   assert.throws(() => buildTree(flows('[step: nope]\n'), join(root, 'again')), /unknown step nope/);
 });
-test("check fails on a conductor over budget but not on a node path that doesn't resolve", () => {
-  const checked = (conductor: string) => {
-    const root = flows(conductor);
-    buildTree(root, join(root, 'built'));
-    cpSync(join(root, 'built/.agents'), join(root, '.agents'), { recursive: true });
-    cpSync(join(root, 'built/.claude-plugin'), join(root, '.claude-plugin'), { recursive: true });
-    return check(root);
-  };
+const checked = (conductor: string) => {
+  const root = flows(conductor);
+  buildTree(root, join(root, 'built'));
+  cpSync(join(root, 'built/.agents'), join(root, '.agents'), { recursive: true });
+  cpSync(join(root, 'built/.claude-plugin'), join(root, '.claude-plugin'), { recursive: true });
+  return check(root);
+};
+test('check fails on a conductor over budget', () => {
   const over = checked(`${CONDUCTOR}${'x'.repeat(20000)}\n## Phase 1: Read\n`);
   assert.equal(over.length, 2);
   assert.ok(
     over.every((p) => /^flows: .*skills\/f\/SKILL\.md:\d+: /.test(p)),
     over.join('\n'),
   );
-  assert.deepEqual(checked(`${CONDUCTOR}Run node "<flow-root>/missing.mjs".\n`), []);
+});
+test('an unresolved node path makes check() return a problem', () => {
+  const problems = checked(`${CONDUCTOR}Run node "<flow-root>/missing.mjs".\n`);
+  assert.deepEqual(
+    problems.map((p) => p.split(': ')[1]),
+    ['[claude-code] skills/f/SKILL.md:6', '[codex] skills/f/SKILL.md:6'],
+    problems.join('\n'),
+  );
+});
+test('Codex text naming a Claude-only phrase makes check() return a problem', () => {
+  const problems = checked(`${CONDUCTOR}Search with WebSearch.\n`);
+  assert.equal(problems.length, 1, problems.join('\n'));
+  assert.match(problems[0], /^flows: \[codex\] skills\/f\/SKILL\.md:6: .*WebSearch/);
 });

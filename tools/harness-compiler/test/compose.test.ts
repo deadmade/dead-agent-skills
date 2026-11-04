@@ -383,7 +383,7 @@ test('checkBuilt: a 20,000-byte non-conductor skill with no ## Phase heading is 
   assert.deepEqual(big, { problems: [], warnings: [], estimates: {} });
 });
 
-test("checkBuilt: a node command or references link that doesn't resolve is a warning", () => {
+test("checkBuilt: a node command or references link that doesn't resolve is a problem", () => {
   const files = { 'skills/c/x.mjs': '', 'skills/c/references/r.md': 'Run node "<skill-dir>/x.mjs".\n' };
   for (const line of [
     'node "./x.mjs"',
@@ -391,25 +391,31 @@ test("checkBuilt: a node command or references link that doesn't resolve is a wa
     'node "<skill-dir>/missing.mjs"',
     'See [r](references/missing.md).',
   ]) {
-    const { problems, warnings } = checked({ ...files, 'skills/c/SKILL.md': `A\n${line}\n` });
-    assert.deepEqual(problems, [], line);
-    assert.equal(warnings.length, 1, line);
-    assert.match(warnings[0], /skills\/c\/SKILL\.md:2: /, line);
+    const { problems } = checked({ ...files, 'skills/c/SKILL.md': `A\n${line}\n` });
+    assert.equal(problems.length, 1, line);
+    assert.match(problems[0], /skills\/c\/SKILL\.md:2: /, line);
   }
-  assert.deepEqual(checked({ ...files, 'skills/c/SKILL.md': 'See [r](references/r.md).\n' }).warnings, []);
+  assert.deepEqual(checked({ ...files, 'skills/c/SKILL.md': 'See [r](references/r.md).\n' }).problems, []);
 });
 
-test('checkBuilt: Codex text naming a Claude-only phrase outside packs/ and resources/ is a warning', () => {
+test('checkBuilt: built text naming flow-rules is a problem', () => {
+  for (const file of ['skills/c/SKILL.md', 'references/r.md']) {
+    const { problems } = checked({ [file]: 'A\nAs the flow-rules say.\n' });
+    assert.equal(problems.length, 1, file);
+    assert.ok(problems[0].startsWith(`[claude-code] ${file}:2: `) && problems[0].includes('flow-rules'), problems[0]);
+  }
+});
+
+test('checkBuilt: Codex text naming a Claude-only phrase outside packs/ and resources/ is a problem', () => {
   const files = {
     'skills/c/SKILL.md': 'A\nUse AskUserQuestion.\n',
     'packs/p/skills/s/SKILL.md': 'Use WebFetch.\n',
     'resources/g/skills/g/SKILL.md': 'Use Monitor.\n',
   };
   const codex = checked(files, 'codex');
-  assert.deepEqual(codex.problems, []);
-  assert.equal(codex.warnings.length, 1);
-  assert.match(codex.warnings[0], /skills\/c\/SKILL\.md:2: .*AskUserQuestion/);
-  assert.deepEqual(checked(files, 'claude-code').warnings, []);
+  assert.equal(codex.problems.length, 1);
+  assert.match(codex.problems[0], /skills\/c\/SKILL\.md:2: .*AskUserQuestion/);
+  assert.deepEqual(checked(files, 'claude-code').problems, []);
 });
 
 // A conductor whose frontmatter uses `uses` and whose body reads `body`.
@@ -439,26 +445,23 @@ test('checkBuilt: a short-name use counts only as plugin:name or a pack path, an
   const plain = checked({
     'skills/c/SKILL.md': usesFlow('superpowers:writing-plans', 'Run writing-plans: how and why.'),
   });
-  assert.deepEqual([plain.problems, plain.warnings], [[], []]);
+  assert.deepEqual(plain.problems, []);
   for (const mention of ['pstack-picks:how', '<packs>/pstack-picks/skills/how/SKILL.md'])
-    assert.deepEqual(checked({ 'skills/c/SKILL.md': usesFlow('pstack-picks:how', `Read ${mention}.`) }).warnings, []);
-  // Short names warn until the conductors are converted.
+    assert.deepEqual(checked({ 'skills/c/SKILL.md': usesFlow('pstack-picks:how', `Read ${mention}.`) }).problems, []);
   const bare = checked({ 'skills/c/SKILL.md': usesFlow('pstack-picks:how', 'Ask how it works.') });
-  assert.deepEqual(bare.problems, []);
-  assert.equal(bare.warnings.length, 1);
-  assert.match(bare.warnings[0], /^\[claude-code\] skills\/c\/SKILL\.md:\d+: .*pstack-picks:how/);
+  assert.equal(bare.problems.length, 1);
+  assert.match(bare.problems[0], /^\[claude-code\] skills\/c\/SKILL\.md:\d+: .*pstack-picks:how/);
 });
 
-test("checkBuilt: a pack path in a conductor's text that isn't in its uses is a warning", () => {
+test("checkBuilt: a pack path in a conductor's text that isn't in its uses is a problem", () => {
   const body = [
     'Read <packs>/superpowers/skills/writing-plans/SKILL.md and <packs>/<pack>/skills/<name>/SKILL.md.',
     'Then <packs>/ponytail/skills/ponytail/SKILL.md and `<flow-root>/packs/tob-picks/skills/sharp-edges/SKILL.md`.',
   ].join('\n');
-  const { problems, warnings } = checked({ 'skills/c/SKILL.md': usesFlow('superpowers:writing-plans', body) });
-  assert.deepEqual(problems, []);
-  assert.equal(warnings.length, 2, warnings.join('\n'));
-  assert.match(warnings[0], /skills\/c\/SKILL\.md:6: .*ponytail:ponytail/);
-  assert.match(warnings[1], /skills\/c\/SKILL\.md:6: .*tob-picks:sharp-edges/);
+  const { problems } = checked({ 'skills/c/SKILL.md': usesFlow('superpowers:writing-plans', body) });
+  assert.equal(problems.length, 2, problems.join('\n'));
+  assert.match(problems[0], /skills\/c\/SKILL\.md:6: .*ponytail:ponytail/);
+  assert.match(problems[1], /skills\/c\/SKILL\.md:6: .*tob-picks:sharp-edges/);
 });
 
 test('the host maps agree', () => {

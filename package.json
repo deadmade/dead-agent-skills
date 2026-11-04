@@ -11,7 +11,7 @@
     "prepack": "node tools/harness-compiler/src/cli.ts check && tsc",
     "build:harnesses": "node tools/harness-compiler/src/cli.ts build",
     "check:harnesses": "node tools/harness-compiler/src/cli.ts check",
-    "scan-skills": "pipx run --spec cisco-ai-skill-scanner==2.3.2 skill-scanner scan-all plugins --recursive --policy .github/skill-scanner.yaml --fail-on-severity high",
+    "scan-skills": "pipx run --spec cisco-ai-skill-scanner==2.3.2 skill-scanner scan-all plugins --recursive --policy .github/skill-scanner.yaml --fail-on-severity high && pipx run --spec cisco-ai-skill-scanner==2.3.2 skill-scanner scan-all .claude-plugin/flows/skills --recursive --policy .github/skill-scanner.yaml --fail-on-severity high",
     "sync": "node tools/upstream-sync/src/cli.ts"
   },
   "bin": {

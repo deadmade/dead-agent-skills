@@ -4,7 +4,6 @@ import { copy, json, text } from '../emit/fs.ts';
 import { renderCodexTheme } from '../transforms/themes.ts';
 import { INTEGRATIONS, READMES, packageReadme, setupSkill } from '../templates/codex.ts';
 import { codexThemeSetup, projectRulesSkill } from '../templates/skills.ts';
-import { hostReference } from '../templates/hosts.ts';
 import { nativeHooks } from './hooks.ts';
 import type { Target } from './target.ts';
 
@@ -66,7 +65,6 @@ export const codex: Target = {
       text(join(dest, 'skills', `setup-${plugin.name}`, 'SKILL.md'), setupSkill(plugin.name));
     if (READMES.includes(plugin.name)) text(join(dest, 'README.md'), packageReadme(plugin.name));
     if (plugin.name === 'flows') {
-      text(join(dest, 'references/host.md'), hostReference('codex'));
       // A conductor runs only when the user calls it, the form the packs' own openai.yaml files ship.
       for (const skill of readdirSync(join(plugin.dir!, 'skills'))) {
         const file = join(plugin.dir!, 'skills', skill, 'SKILL.md');

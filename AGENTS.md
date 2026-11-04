@@ -61,26 +61,30 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   hand.
 - `plugins/opt-in/mcp/mcp-github/`: an MCP server config only.
 - `plugins/flows/`: the conductor skills (`/build-feature`, `/research-feature`, `/implement`, `/fix`, `/upgrade`,
-  `/review-code`, `/understand`, `/learn`). Each runs other plugins' skills in order;
+  `/refactor`, `/review-code`, `/understand`, `/learn`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
-  plugin, audit scope and report format) live once in `references/flow-rules.md`, so a SKILL.md only says what it runs.
-  Its short **Agents** section asks for few agents, combined where it makes sense, each on a model that fits its job
-  (ADR 0005). The installer's only part is `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` (`mergeSettings`); it never
-  writes `CLAUDE_CODE_SUBAGENT_MODEL`.
+  plugin) live once in `plugins/flows/steps/*.toml`, composed into each conductor at build time (ADR 0009), so a
+  SKILL.md says what it runs and names its steps (`[step: <name>]`). Compose (`tools/harness-compiler/src/flows/compose.ts`)
+  stops the build on a broken step and fails `check:harnesses` on built text that doesn't hold; host wording comes from
+  `src/templates/hosts/<target>.ts`, and `harness-compiler lint`'s flows phrase list (`CLAUDE_ONLY`) keeps Claude-only
+  names out of steps, skills and references. run-rules' **Agents** paragraph asks for few agents, combined where it
+  makes sense, each on a model that fits its job (ADR 0005). The installer's only part is
+  `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` (`mergeSettings`); it never writes `CLAUDE_CODE_SUBAGENT_MODEL`.
   Conductors call each other by reading the callee's SKILL.md (`/fix` → `/review-code`). Each
-  conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
-  tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. `/review-code`
+  conductor's `uses:` frontmatter, plus its steps' and host wording's `uses`, lists what it runs;
+  `scripts/flows-uses.mjs` generates flows' `dependencies` and the README tree from them, and check-repo fails when a
+  listed skill is gone or the generated parts are stale. `/review-code`
   replaced `/test-audit`, `/doc-audit`, `/harden`, `/self-review` and `/verify` (their method text is in its
   `references/`); on Claude Code its correctness lens is the built-in `code-review` (the host adapter template), and
   the one agent it vendors is `flows:pr-test-analyzer`, next to tob's checker in `agents/`. `/self-review` was a plugin
   of its own until 0.5.0, so the installer keeps flows on a machine that had it.
   flows also owns the prose standard: `skills/writing/` is the one skill in it Claude may load on its own
   (`flows:writing`). `flows-uses.mjs` treats only `disable-model-invocation: true` skills as conductors, so a
-  `uses.json` may list `writing` under `flows`. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
+  `uses:` line may list `flows:writing`. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
   check on `*.md` writes for conversation shorthand, off with `FLOWS_PROSE_CHECK=off`. The writing skill also holds the copyedit
-  (`references/copyedit.md`, run as `/flows:writing copyedit <file>`): a fresh Opus `general-purpose` agent edits a
+  (`references/copyedit.md`, run as `/flows:writing copyedit <file>`): a fresh agent on the strongest model edits a
   document by the skill, then `scripts/compare.mjs` replaces it only when nothing code can check was lost (the list is
-  in `references/copyedit.md`). The conductors run it, per flow-rules, before a gate shows a spec, plan or audit report. `compare.mjs`
+  in `references/copyedit.md`). The conductors run it, by `steps/copyedit.toml`, before a gate shows a spec, plan or audit report. `compare.mjs`
   imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
   `plugins/flows/skills/writing/tests/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
   our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
@@ -109,8 +113,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   stays at `519d36a` on purpose: upstream's newer commits fail the sync's `GUARD`, so its weekly `sync.yml` job
   (no `--ref`) fails until a PR adapts the rewrites; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
   `plugins/flows/agents/spec-compliance-checker.md` (vendored by the `tob` sync adapter), because a pack's agents don't load.
-  Where a conductor changes a pack's rule it quotes the sentence in an `<!-- overrides <pack>/<path>: "..." -->`
-  marker in flows' own `.md` files; `checkOverrides` (`scripts/flows-uses.mjs`, run by check-repo and by every pack
+  Where a conductor or step changes a pack's rule, or pastes a section of one, it quotes each sentence in an
+  `<!-- overrides <pack>/<path>: "..." -->` marker in flows' own `.md` and `steps/*.toml` files (the build strips
+  them); `checkOverrides` (`scripts/flows-uses.mjs`, run by check-repo and by every pack
   sync before its PR) fails when the quoted sentence is gone. `docs/vendor-a-pack.md` is the checklist for a new pack.
 - `plugins/flows/packs/ponytail/`, `plugins/flows/packs/superpowers/`: vendored unchanged from upstream's newest stable release
   (`npm run sync -- apply <name>`, ADR 0002): ponytail's skills and its
