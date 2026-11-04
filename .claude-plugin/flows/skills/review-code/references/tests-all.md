@@ -43,7 +43,6 @@ Superpowers `test-driven-development`:
 1. Write the test. For a surviving mutant, show it fails with the mutant applied (in the scratch worktree) and passes
    on the real code. For a requirement, show it fails when the behaviour is removed. A test that can't fail isn't
    done. That is RED here: a test of existing code passes on it by design.
-   <!-- overrides superpowers/skills/test-driven-development/SKILL.md: "Test passes? You're testing existing behavior. Fix test." -->
 2. Property candidates: tob `property-based-testing` writes the property with the repo's existing PBT library, or
    proposes one (a new dependency: the user's yes).
 3. Delete candidates: delete, and show the mutants the deleted test killed are still killed.

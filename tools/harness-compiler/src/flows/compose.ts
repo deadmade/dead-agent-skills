@@ -231,7 +231,50 @@ function parseUses(keys: Keys, file: string): Uses {
   return uses;
 }
 
-// Checks 5–8 on the built tree; Task 2 fills them in.
+const BUDGET = 4500;
+const NODE = /\bnode\s+["`]?([^\s"`]+\.[cm]?js)\b/g;
+const LINK = /\]\(([^)\s#]*references\/[^)\s#]+)/g;
+
+// Checks 6 and 8 and the Codex phrase check on the composed files as built; check 6 and the phrases warn until Task 18.
 export function checkBuilt(dest: string, target: TargetId, composed: Composed): Checked {
-  return { problems: [], warnings: [], estimates: {} };
+  const checked: Checked = { problems: [], warnings: [], estimates: {} };
+  for (const rel of composed.files.keys()) {
+    const text = read(join(dest, rel));
+    const lines = text.split('\n');
+    const flow = rel.startsWith('skills/') ? rel.split('/')[1] : undefined;
+    // <flow-root> is the built plugin folder and <skill-dir> the file's own skill folder; undefined for neither.
+    const placed = (path: string) =>
+      path.startsWith('<flow-root>/')
+        ? join(dest, path.slice('<flow-root>/'.length))
+        : path.startsWith('<skill-dir>/') && flow
+          ? join(dest, 'skills', flow, path.slice('<skill-dir>/'.length))
+          : undefined;
+    lines.forEach((line, i) => {
+      const warn = (what: string) => checked.warnings.push(`[${target}] ${rel}:${i + 1}: ${what}`);
+      for (const [, script] of line.matchAll(NODE)) {
+        const path = placed(script);
+        if (!path) warn(`node ${script} is not a <flow-root> or <skill-dir> path`);
+        else if (!existsSync(path)) warn(`node ${script} does not resolve in the built tree`);
+      }
+      for (const [, link] of line.matchAll(LINK))
+        if (!/^\w+:/.test(link) && !existsSync(placed(link) ?? join(dest, rel, '..', link)))
+          warn(`link ${link} does not resolve in the built tree`);
+      const phrases = target === 'codex' ? CLAUDE_ONLY.flatMap((p) => p.exec(line)?.[0] ?? []) : [];
+      if (phrases.length) warn(`names Claude-only ${phrases.join(', ')}`);
+    });
+    if (
+      !/^skills\/[^/]+\/SKILL\.md$/.test(rel) ||
+      frontmatter(lines).keys.get('disable-model-invocation')?.value !== 'true'
+    )
+      continue;
+    const phase = text.search(/^## Phase/m);
+    const start = phase < 0 ? text : text.slice(0, phase);
+    const tokens = Math.ceil(Buffer.byteLength(start) / 4);
+    checked.estimates[flow!] = tokens;
+    if (tokens > BUDGET)
+      checked.problems.push(
+        `[${target}] ${rel}:${start.split('\n').length}: rules plus Start are ~${tokens} tokens, over the ${BUDGET} budget`,
+      );
+  }
+  return checked;
 }

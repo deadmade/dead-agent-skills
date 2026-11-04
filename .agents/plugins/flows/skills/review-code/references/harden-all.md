@@ -18,8 +18,6 @@ One message, in parallel, each given the scope:
   - Each candidate then goes to a fresh `general-purpose` verifier that did not hunt it, given the
     **Candidate-verifier prompt** from `VALIDATION-AND-REPORTING.md` and the `confirmed`, `needs_validation` and
     `rejected` branches of `report-schema.json`. Rejected candidates are dropped.
-    <!-- overrides security-audit/skills/security-audit/SKILL.md: "Guidance mode: For security questions, focused reviews, methodology, triage, or investigation of specific findings, use only the relevant parts of this skill." -->
-    <!-- overrides security-audit/skills/security-audit/VALIDATION-AND-REPORTING.md: "You did not write this candidate. Try to refute it from repository source and bounded local evidence." -->
 - **Sharp edges:** tob `sharp-edges` on the scope's public APIs, config schemas and defaults: what is easy to misuse.
 - **Bloat:** ponytail `ponytail-audit`: dead code, needless abstraction, what to delete.
 - **Architecture:** mattpocock `improve-codebase-architecture`, report part only (its grilling runs later, on a
@@ -38,7 +36,6 @@ A fix that changes behaviour gets a failing test first (superpowers `test-driven
 suite still passes. An architecture pick runs `improve-codebase-architecture`'s grilling on it (mattpocock
 `grilling`, read by path), which may turn it into a `/build-feature` or `/implement` instead: offer that. Re-run the
 pass that found each fixed finding.
-<!-- overrides mattpocock-picks/skills/improve-codebase-architecture/SKILL.md: "Once the user picks a candidate, call the Skill tool with "grilling" to walk the decision tree with them" -->
 
 The pick is the contract: the files its finding names are its **Files** list. A fix that needs more stops: flow-rules
 **Deviations** (the fifth stop, the brief clause, the files check, Rulings), with **Deviations**, **Tasks** and

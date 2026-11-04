@@ -103,3 +103,56 @@ test('a plugin without plugin.json or with a missing resource is rejected before
   assert.throws(() => buildTree(root, join(root, 'out')), /Missing package resource a\/nope/);
   assert.equal(existsSync(join(root, 'out')), false);
 });
+
+// A flows plugin with one conductor, one other skill and one step.
+function flows(conductor: string) {
+  const root = mkdtempSync(join(tmpdir(), 'compiler-'));
+  put(root, 'package.json', { version: '1.2.3' });
+  put(root, 'plugins/catalog.json', [
+    {
+      name: 'flows',
+      source: 'plugins/flows',
+      resources: ['skills'],
+      dependencies: [],
+      targets: ['claude-code', 'codex'],
+    },
+  ]);
+  put(root, 'plugins/flows/plugin.json', { description: 'Flows.' });
+  put(root, 'plugins/flows/skills/f/SKILL.md', conductor);
+  put(root, 'plugins/flows/skills/w/SKILL.md', '---\nname: w\ndescription: d\n---\nWrite.\n');
+  put(root, 'plugins/flows/steps/a.md', 'Then {{ask-user}}.\n');
+  return root;
+}
+const CONDUCTOR = '---\nname: f\ndescription: d\ndisable-model-invocation: true\n---\n';
+test('flows compose per harness, and Codex conductors get an implicit-invocation policy', () => {
+  const root = flows(`${CONDUCTOR}# f\n\n[step: a]\n`);
+  const out = join(root, 'out');
+  buildTree(root, out);
+  const read = (path: string) => readFileSync(join(out, path), 'utf8');
+  assert.equal(read('.claude-plugin/flows/skills/f/SKILL.md'), `${CONDUCTOR}# f\n\nThen the AskUserQuestion tool.\n`);
+  assert.match(read('.agents/plugins/flows/skills/f/SKILL.md'), /^# f\n\nThen the host user-question tool/m);
+  assert.doesNotMatch(read('.agents/plugins/flows/skills/f/SKILL.md'), /AskUserQuestion|\{\{|\[step:/);
+  assert.equal(
+    read('.agents/plugins/flows/skills/f/agents/openai.yaml'),
+    'policy:\n  allow_implicit_invocation: false\n',
+  );
+  assert.equal(existsSync(join(out, '.agents/plugins/flows/skills/w/agents')), false);
+  assert.equal(existsSync(join(out, '.claude-plugin/flows/skills/f/agents')), false);
+  assert.throws(() => buildTree(flows('[step: nope]\n'), join(root, 'again')), /unknown step nope/);
+});
+test("check fails on a conductor over budget but not on a node path that doesn't resolve", () => {
+  const checked = (conductor: string) => {
+    const root = flows(conductor);
+    buildTree(root, join(root, 'built'));
+    cpSync(join(root, 'built/.agents'), join(root, '.agents'), { recursive: true });
+    cpSync(join(root, 'built/.claude-plugin'), join(root, '.claude-plugin'), { recursive: true });
+    return check(root);
+  };
+  const over = checked(`${CONDUCTOR}${'x'.repeat(20000)}\n## Phase 1: Read\n`);
+  assert.equal(over.length, 2);
+  assert.ok(
+    over.every((p) => /^flows: .*skills\/f\/SKILL\.md:\d+: /.test(p)),
+    over.join('\n'),
+  );
+  assert.deepEqual(checked(`${CONDUCTOR}Run node "<flow-root>/missing.mjs".\n`), []);
+});

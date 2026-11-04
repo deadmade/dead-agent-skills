@@ -38,7 +38,7 @@ try {
 }
 // --- generated distributions and marketplaces are current ---
 try {
-  problems.push(...check('.').map((p) => `${p} (run npm run build:harnesses)`));
+  problems.push(...check('.').map((p) => (p.startsWith('flows: ') ? p : `${p} (run npm run build:harnesses)`)));
 } catch (error) {
   problems.push(`harness-compiler check: ${error.message}`);
 }

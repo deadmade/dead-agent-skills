@@ -3,7 +3,10 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { ComposeError, composeFlows, type HostTokens } from '../src/flows/compose.ts';
+import { ComposeError, checkBuilt, composeFlows, type HostTokens } from '../src/flows/compose.ts';
+import type { TargetId } from '../src/model.ts';
+import { TOKENS as CLAUDE_CODE } from '../src/templates/hosts/claude-code.ts';
+import { TOKENS as CODEX } from '../src/templates/hosts/codex.ts';
 
 const put = (root: string, path: string, value: string) => {
   mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -269,4 +272,58 @@ test('computes uses', () => {
 test('reads CRLF as LF', () => {
   const crlf = Object.fromEntries(Object.entries(FLOW).map(([path, text]) => [path, text.replaceAll('\n', '\r\n')]));
   assert.deepEqual(compose(crlf), compose(FLOW));
+});
+
+const checked = (files: Record<string, string>, target: TargetId = 'claude-code') => {
+  const dir = plugin(files);
+  return checkBuilt(dir, target, composeFlows(dir, TOKENS));
+};
+const CONDUCTOR = '---\nname: c\ndisable-model-invocation: true\n---\n';
+
+test("checkBuilt: a conductor's rules plus Start over 4,500 estimated tokens is a problem", () => {
+  const start = (bytes: number) => `${CONDUCTOR}${'x'.repeat(bytes - CONDUCTOR.length - 1)}\n`;
+  const over = checked({ 'skills/c/SKILL.md': `${start(4501 * 4)}## Phase 1: Read\n\n${'y'.repeat(40000)}\n` });
+  assert.equal(over.problems.length, 1);
+  assert.match(over.problems[0], /skills\/c\/SKILL\.md:\d+: .*4501.*4500/);
+  assert.deepEqual(over.estimates, { c: 4501 });
+  const under = checked({ 'skills/c/SKILL.md': `${start(4500 * 4)}## Phase 1: Read\n\n${'y'.repeat(40000)}\n` });
+  assert.deepEqual(under, { problems: [], warnings: [], estimates: { c: 4500 } });
+});
+
+test('checkBuilt: a 20,000-byte non-conductor skill with no ## Phase heading is clean', () => {
+  const big = checked({ 'skills/w/SKILL.md': `---\nname: w\n---\n${'x'.repeat(20000)}\n` });
+  assert.deepEqual(big, { problems: [], warnings: [], estimates: {} });
+});
+
+test("checkBuilt: a node command or references link that doesn't resolve is a warning", () => {
+  const files = { 'skills/c/x.mjs': '', 'skills/c/references/r.md': 'Run node "<skill-dir>/x.mjs".\n' };
+  for (const line of [
+    'node "./x.mjs"',
+    'node "<flow-root>/missing.mjs"',
+    'node "<skill-dir>/missing.mjs"',
+    'See [r](references/missing.md).',
+  ]) {
+    const { problems, warnings } = checked({ ...files, 'skills/c/SKILL.md': `A\n${line}\n` });
+    assert.deepEqual(problems, [], line);
+    assert.equal(warnings.length, 1, line);
+    assert.match(warnings[0], /skills\/c\/SKILL\.md:2: /, line);
+  }
+  assert.deepEqual(checked({ ...files, 'skills/c/SKILL.md': 'See [r](references/r.md).\n' }).warnings, []);
+});
+
+test('checkBuilt: Codex text naming a Claude-only phrase outside packs/ and resources/ is a warning', () => {
+  const files = {
+    'skills/c/SKILL.md': 'A\nUse AskUserQuestion.\n',
+    'packs/p/skills/s/SKILL.md': 'Use WebFetch.\n',
+    'resources/g/skills/g/SKILL.md': 'Use Monitor.\n',
+  };
+  const codex = checked(files, 'codex');
+  assert.deepEqual(codex.problems, []);
+  assert.equal(codex.warnings.length, 1);
+  assert.match(codex.warnings[0], /skills\/c\/SKILL\.md:2: .*AskUserQuestion/);
+  assert.deepEqual(checked(files, 'claude-code').warnings, []);
+});
+
+test('the host maps agree', () => {
+  assert.deepEqual(Object.keys(CLAUDE_CODE).sort(), Object.keys(CODEX).sort());
 });

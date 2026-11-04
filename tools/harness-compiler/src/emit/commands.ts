@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSy
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import type { Diagnostic } from '../model.ts';
-import { buildTree } from './build.ts';
+import { type Build, buildTree } from './build.ts';
 
 // What the compiler owns in the repository: whole directories, and single files.
 const OWNED_DIRS = ['.claude-plugin', '.agents/plugins'];
@@ -24,28 +24,28 @@ const files = (dir: string, within = dir): Map<string, string> => {
 };
 export const formatDiagnostic = (d: Diagnostic) => `[${[d.target, d.plugin].filter(Boolean).join('/')}] ${d.message}`;
 
-export function build(repo: string): Diagnostic[] {
+export function build(repo: string): Build {
   const root = resolve(repo);
   const staging = mkdtempSync(join(root, '.native-build-'));
   try {
-    const { diagnostics } = buildTree(root, staging);
+    const built = buildTree(root, staging);
     for (const dir of OWNED_DIRS) {
       rmSync(join(root, dir), { recursive: true, force: true });
       mkdirSync(dirname(join(root, dir)), { recursive: true });
       renameSync(join(staging, dir), join(root, dir));
     }
-    return diagnostics;
+    return built;
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }
 }
 
-// Returns the problems; empty means every generated file is current.
+// Returns the problems: file drift, then what the built-text checks find (`flows: …`); empty means all is current.
 export function check(repo: string): string[] {
   const root = resolve(repo);
   const temp = mkdtempSync(join(tmpdir(), 'harness-check-'));
   try {
-    buildTree(root, temp);
+    const built = buildTree(root, temp);
     const expected = new Map<string, string>(),
       actual = new Map<string, string>();
     for (const dir of OWNED_DIRS) {
@@ -58,7 +58,7 @@ export function check(repo: string): string[] {
       else if (actual.get(path) !== content) problems.push(`stale: ${path}`);
     }
     for (const path of actual.keys()) if (!expected.has(path)) problems.push(`extra: ${path}`);
-    return problems;
+    return [...problems, ...built.problems.map((p) => `flows: ${p}`)];
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }

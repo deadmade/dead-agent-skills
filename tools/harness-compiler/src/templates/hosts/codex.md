@@ -9,8 +9,8 @@ Do not require named Claude agent registrations or change the user's model or fe
 If subagents are unavailable, skip subagent steps, record them as not checked, and preserve user gates.
 
 Load discovered skills by their supplied file path. Read pack skills directly, resolving paths relative to
-the file being read. Vendored instructions mentioning Skill, Task, Read, AskUserQuestion or other Claude tools
-mean the corresponding native capability, not literal tool names. Ignore a pack's feature-flag or model setup
+the file being read. Claude tool names in vendored instructions mean the corresponding native capability, not a
+literal tool. Ignore a pack's feature-flag or model setup
 instructions when the current session already supplies its capabilities. Session tool schemas take precedence.
 
 Graphify is also bundled as an unregistered resource at

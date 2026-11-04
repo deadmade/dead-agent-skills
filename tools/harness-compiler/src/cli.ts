@@ -10,12 +10,19 @@ const root = join(import.meta.dirname, '../../..');
 const [command = 'build'] = process.argv.slice(2);
 try {
   if (command === 'build') {
-    for (const d of build(root)) console.log(formatDiagnostic(d));
+    const built = build(root);
+    for (const d of built.diagnostics) console.log(formatDiagnostic(d));
+    for (const [conductor, tokens] of Object.entries(built.estimates))
+      console.log(`${conductor}: ~${tokens} tokens of rules plus Start`);
+    for (const w of built.warnings) console.log(`warning: ${w}`);
+    for (const p of built.problems) console.error(`problem: ${p}`);
     console.log('Updated both native distributions and repository marketplaces.');
   } else if (command === 'check') {
     const problems = check(root);
     if (problems.length) {
-      console.error(problems.join('\n') + '\nRun npm run build:harnesses.');
+      console.error(
+        problems.map((p) => (p.startsWith('flows: ') ? p : `${p} (run npm run build:harnesses)`)).join('\n'),
+      );
       process.exitCode = 1;
     } else console.log('Native distributions and marketplaces are current.');
   } else if (command === 'validate') {

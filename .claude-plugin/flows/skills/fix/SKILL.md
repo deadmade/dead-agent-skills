@@ -49,8 +49,6 @@ by evidence (a log line, a value, a bisect), not a guess. **Gate:** present the 
 what blast-radius says it touches and the files it changes) and your recommendation. The user approves one; record it as a gate line (`- Gate 1, <what>: <date>`). Its
 `<packs>/superpowers/skills/systematic-debugging/defense-in-depth.md` (validation at every layer) is one of those
 options only when you offer it and the user picks it; otherwise the cause is fixed once.
-<!-- overrides superpowers/skills/systematic-debugging/defense-in-depth.md: "Core principle: Validate at EVERY layer data passes through. Make the bug structurally impossible." -->
-<!-- overrides superpowers/skills/systematic-debugging/root-cause-tracing.md: "BETTER: Also add defense-in-depth" -->
 
 ## Phase 4: Fix
 

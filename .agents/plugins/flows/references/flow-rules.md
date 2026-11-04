@@ -49,12 +49,6 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - **A conductor overrides the handoffs of the skills it runs.** When a sub-skill says to invoke the next skill
   (`brainstorming` → `writing-plans`, `writing-plans` → execution, execution → `finishing-a-development-branch`),
   don't: come back to the conductor and run its next phase.
-  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "4. Invoke the superpowers:writing-plans skill." -->
-  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "After the design doc is approved, the next step is the plan: invoke superpowers:writing-plans and no other skill." -->
-  <!-- overrides superpowers/skills/writing-plans/SKILL.md: "REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development" -->
-  <!-- overrides superpowers/skills/writing-plans/SKILL.md: "REQUIRED SUB-SKILL: Use superpowers:executing-plans" -->
-  <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Use superpowers:finishing-a-development-branch." -->
-  <!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Use superpowers:finishing-a-development-branch." -->
 - **Gates:** a gate passes only on the user's explicit approval of the artifact it names, recorded with the date in
   the state file as a line `- Gate <n>, <what>: <date>[, <extra>]`, the date empty while the gate is open; a
   reopening is appended as `Reopened <date>: <why>`. "Sounds good" to an idea isn't approval of a document. Nothing
@@ -83,13 +77,6 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
     recommendation, and the coordinating session asks. The answer is recorded as `Status: decided <date>: <what>`. This is a fifth stop next to the four that
     `subagent-driven-development` and `executing-plans` name. For deviations it overrides their continuous execution
     and their rulings, and a plan correction that is a deviation goes to the user too.
-    <!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Rulings, not stalls. A running plan does not wait on a human." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
-    <!-- overrides superpowers/skills/subagent-driven-development/references/handling-reports.md: "If the plan itself is wrong, rule on the correction, ledger it, and re-dispatch with the ruling carried in the dispatch" -->
-    <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
-    <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Rulings, not stalls. Conflicts, ambiguities, plan defects — decide them." -->
-    <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
   - **Added tasks.** A task a decision adds during the build takes the number of the task it follows plus a letter
     (`8b`, then `8c`). It goes into plan.md right after that task. Below its `**Depends on:**` line, which may name
     lettered tasks, write `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
@@ -98,10 +85,6 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
     review's fix wave, a finding whose fix is deviation-class goes to the user, not a ruling. A `NEEDS_CONTEXT` that
     carries a deviation goes to the user too; the session doesn't supply the missing decision itself. The final
     review's single fix subagent gets the brief clause, with the union of the plan's **Files** lists as its list.
-    <!-- overrides superpowers/skills/subagent-driven-development/references/fix-loop.md: "A finding labeled plan-mandated — or any finding that conflicts with what the plan's text requires — is yours to rule on: weigh the finding against the plan text, decide with the spec as the binding authority, and ledger the ruling before you act on it." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/references/fix-loop.md: "Real and load-bearing — a later task builds on it, or it reveals a plan defect: rule on the smallest change that unblocks the dependent work, ledger it as `Task <N>: Ruling: <finding> — <what you decided and why>`, and carry it into the next task's dispatch." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Adjudicate any residual findings as in the fix loop's breaker (references/fix-loop.md): park with rulings, or rule on the load-bearing ones and ledger what you decided. Only the four things that stop a running plan (top of SKILL.md) stop you here." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/references/handling-reports.md: "NEEDS_CONTEXT: The implementer needs information that wasn't provided. Provide the missing context and re-dispatch." -->
   - **The brief clause.** Paste into every implementer and task-review prompt, verbatim: the deviation classes above,
     that a deviation is reported as `NEEDS_CONTEXT` and not decided, the task's **Files** list, the plan's **Global
     Constraints** (the seam lines included), and this line, ours,
@@ -142,13 +125,10 @@ review).
 
 - Specs and plans live only in `docs/features/<slug>/` (`spec.md`, `plan.md`), next to flow.md, not where
   `brainstorming` and `writing-plans` save them.
-  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "Where it goes: in a software repo, `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, committed." -->
-  <!-- overrides superpowers/skills/writing-plans/SKILL.md: "Save plans to: `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`" -->
 - Commit or push only when the user asks, unless a sub-skill's own step does it with the user's agreement (an approved
   plan's commit steps count). The spec and plan aren't committed when written.
 - A commit message is one sentence, with no co-author lines. Stage with `git add -u` plus the new paths by name, never
   `git add -A`. A plan's commit steps follow this, not `writing-plans`' example.
-  <!-- overrides superpowers/skills/writing-plans/SKILL.md: "git commit -m "feat: add specific feature"" -->
 
 ## Loading skills
 
@@ -166,10 +146,8 @@ review).
     followed by the task.
   - tob's spec-compliance checker ships as flows' own agent: `tob-picks:spec-compliance-checker` means
     `flows:spec-compliance-checker`.
-    <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "For a single requirement, dispatch the `tob-picks:spec-compliance-checker` agent at it." -->
   - For tob's spec-compliance workflow, follow [spec-compliance.md](spec-compliance.md) with
     the target path, optional spec and limit. It uses native subagents, without a host-specific Workflow runtime.
-    <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Run `/tob-picks:spec-compliance <path>`." -->
 - **Installed skills:** load them with the host's skill tool when available, otherwise read their SKILL.md.
   Skills restricted to explicit invocation are read directly when a conductor calls them. Use the host adapter
   and resource index for cross-package lookup; never guess plugin-cache paths. Other conductors are at
@@ -195,12 +173,6 @@ verbatim at these steps, never the whole skill:
 | `/review-code`'s Decide                                 | new `shortcut:` lines (what `ponytail-debt` lists), each decided under Waiting on you   |
 | Every report                                            | the footer sentence, "End your reply with one or two lines…", as its "Not checked" line |
 
-<!-- overrides ponytail/skills/ponytail/SKILL.md: "Before you write Read the task and the code it touches." -->
-<!-- overrides ponytail/skills/ponytail/SKILL.md: "The smallest complete change Take the first option that fully works:" -->
-<!-- overrides ponytail/skills/ponytail/SKILL.md: "Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared code." -->
-<!-- overrides ponytail/skills/ponytail/SKILL.md: "Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for." -->
-<!-- overrides ponytail/skills/ponytail/SKILL.md: "| lite | Build what was asked. Name the smaller option in one line and let the user pick. |" -->
-<!-- overrides ponytail/skills/ponytail/SKILL.md: "End your reply with one or two lines: what you skipped or did not check, and any risk the user must know." -->
 
 In a build flow every behaviour change gets its failing test first, and code that changes no behaviour gets none.
 Wherever **The smallest complete change** is pasted into a brief, this line goes with it: "A behaviour change gets its
@@ -208,9 +180,7 @@ failing test first; a rename, a move, config, generated code and prose get none.
 **Test seams** (in `/fix`, the regression test's code path), one test per behaviour the spec states; no tests of
 private helpers, of the framework or of the language. The plan's Review Focus tests count towards that, not on top of
 it."
-<!-- overrides superpowers/skills/test-driven-development/SKILL.md: "NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST" -->
 
-<!-- overrides ponytail/skills/ponytail/SKILL.md: "Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none." -->
 
 ## Stack packs
 

@@ -11,8 +11,9 @@ cache depth or select an arbitrary version. The resource index lists package nam
 
 For security review use `security-review` or `claude-security` when available; otherwise ask the reviewer to
 check the scoped diff for exploitable vulnerabilities, grounding each finding in a concrete input and code path.
-For instruction-file review use claude-md-management when available; otherwise compare applicable AGENTS.md,
-CLAUDE.md and their referenced rules with the scoped changes and propose corrections without applying them.
+For instruction-file review use claude-md-management's `claude-md-improver` when available; otherwise compare
+applicable AGENTS.md, CLAUDE.md and their referenced rules with the scoped changes and propose corrections without
+applying them.
 
 For `/review-code`'s correctness lens, use the built-in `code-review` skill when it is available and its scope is
 the review's scope: `branch`, against the default branch, with nothing uncommitted or untracked. Run it through Skill

@@ -17,7 +17,6 @@ sections of flow.md, the ADRs, its angle below, and the rubric. Spread the angle
 | **Simpler**     | `<packs>/ponytail/skills/ponytail-review/SKILL.md`, with the plan in place of a diff: tasks the spec doesn't need, a library or built-in that replaces custom code. Also a smaller first slice that delivers the core, and divergence from every prior-art approach with no stated reason. |
 
 Reviewer prompt tail (the Simpler reviewer reports in it, not in ponytail-review's Output format):
-<!-- overrides ponytail/skills/ponytail-review/SKILL.md: "Then the findings in three groups, skip empty groups:" -->
 
 ```
 Review only from your angle. Each finding: what is wrong, why (source: file:line, a doc section you fetched, or

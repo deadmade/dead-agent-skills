@@ -43,8 +43,6 @@ target. Cite the commit, PR, ADR or doc for each; "unknown" is an answer.
 Follow mattpocock `teach` with the map, the why and the user's goal, for this one lesson. Its workspace is the chat
 and one scratch file outside the repo: no `MISSION.md`, `lessons/`, `learning-records/` or other workspace files in
 the repo. If the user wants a course over many sessions, offer `teach` in a folder of its own instead.
-<!-- overrides mattpocock-picks/skills/teach/SKILL.md: "This is a stateful request - they intend to learn the topic over multiple sessions." -->
-<!-- overrides mattpocock-picks/skills/teach/SKILL.md: "Treat the current directory as a teaching workspace." -->
 
 Teach in learning style throughout:
 
@@ -61,4 +59,3 @@ lesson. Stop when the user can do what they said they wanted, or says stop.
 Collect the terms that came up during the lesson. Offer to run mattpocock `domain-modeling` on them, so the next
 person (or session) has them in `GLOSSARY.md` (or the one `GLOSSARY-MAP.md` points at). Only on the user's yes, with
 the exact entries shown first. Terms from a concept lesson aren't the project's: they never go into its glossary.
-<!-- overrides mattpocock-picks/skills/domain-modeling/SKILL.md: "Don't batch these up: capture them as they happen." -->

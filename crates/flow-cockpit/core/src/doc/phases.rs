@@ -127,11 +127,11 @@ mod tests {
     use super::*;
     use std::path::Path;
 
-    /// The phase table of a conductor's SKILL.md: `(key, gate)` for each `| <n> <Name> | ... |` row, the gate being the
+    /// The phase table of a conductor's built SKILL.md: `(key, gate)` for each `| <n> <Name> | ... |` row, the gate being the
     /// number in a `**Gate**` / `**Gate <n>**` mark in the last cell (a bare `**Gate**` is gate 1).
     fn table(skill: &str) -> Vec<(String, Option<u8>)> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../plugins/flows/skills")
+            .join("../../../.claude-plugin/flows/skills")
             .join(skill)
             .join("SKILL.md");
         let text = std::fs::read_to_string(&path)

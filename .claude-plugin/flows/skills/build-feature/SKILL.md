@@ -72,7 +72,6 @@ Write a short summary of each into flow.md under **Grounding** and **Prior art**
 
 Follow superpowers `brainstorming` with the feature request. Hand it the grounding as context it already has: it
 doesn't need to offer recon of the codebase, and the web recon is already running. These change it:
-<!-- overrides superpowers/skills/brainstorming/SKILL.md: "Offer recon. Once you have a bit of grounding and looking further would help, offer to go look:" -->
 
 - **Options.** Brainstorming wants the user describing before seeing options; keep that. Once the "how it gets made"
   question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
@@ -86,12 +85,10 @@ doesn't need to offer recon of the codebase, and the web recon is already runnin
   permission, a setting), the approaches message names the seam where it is resolved and the modules that never see
   it. Redesign picks the seam; boundary discipline keeps the policy there. Its "propagate" covers the seam's types and
   docs, never a parameter carried through modules that don't decide on it.
-  <!-- overrides pstack-picks/skills/principle-redesign-from-first-principles/SKILL.md: "Propagate the change through every reference: types, docs, examples, rationale sections" -->
 - **Size.** A quick task (everything that matters is in the request) doesn't need this flow: say so and offer to
   leave it. Only on the user's yes, set `phase: done` with a note and do the task. A small change stays in the flow:
   its short design doc is the spec, and Gate 1, the seam lines, the plan's Global Constraints and the build stop all
   apply. The user may skip the Grill for it; record that in flow.md.
-  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "This is a quick, clear task. Do it, and say what you did." -->
 - **Skip.** If the user takes brainstorming's offer to skip the questions, brainstorming ends without a spec. Write it
   yourself from the request and the grounding, mark every choice you made as your call, and go to Phase 3; the grill
   stands in for the builder check. Gate 1 still applies.
@@ -133,13 +130,11 @@ steps use only these. Every task gets, right below its heading:
 - `**Size:** ~<N>`: the lines the task adds plus removes in its own files, one number.
 
 Split a file only where a task's `Adds:` already names the second unit.
-<!-- overrides superpowers/skills/writing-plans/SKILL.md: "Prefer smaller, focused files over large ones that do too much." -->
 
 Let it run its own self-review. Then run `node <skill-dir>/scripts/glance.mjs <plan.md>`: it writes the plan's task
 graph and table at the top of plan.md, and it fails with the reason when the plan has no `### Task <n>:` headings or
 a task lacks `Depends on:`, names no task in it, or has a `Size:` that isn't `~N`. Run it again after every plan edit. When it reaches its **Execution Handoff**, don't ask for an
 execution method yet and don't invoke an execution skill: link the plan in flow.md and go to Phase 5.
-<!-- overrides superpowers/skills/writing-plans/SKILL.md: "Otherwise, ask them to review the plan and choose an execution method before implementation." -->
 
 ## Phase 5: Evaluate the plan
 

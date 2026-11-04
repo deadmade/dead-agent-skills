@@ -14,7 +14,6 @@ tree is unchanged: not Phase 6's fix check, not the deep tests pass's baseline, 
 latest run is used next (the deep tests pass's baseline, the verdict), a tree changed since calls for one re-run
 first, which becomes the latest run. A full-suite run by an inline `/fix` is the latest run too, while the tree
 is unchanged after it.
-<!-- overrides superpowers/skills/verification-before-completion/SKILL.md: "If you haven't run the verification command in this message, you cannot claim it passes." -->
 
 A caller that says execution ran without per-task reviews also gets pstack `interrogate` offered before the lenses.
 
@@ -45,12 +44,10 @@ flow, else fixed here, and the checks re-run.
 the checks first. Then follow `finishing-a-development-branch` from its Step 2: the last run is its Step 1. Show its
 options as it lists them, with your recommendation. It's the user's choice; called from a build flow, record it and
 the confirmed decisions in its flow.md.
-<!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "Run the project's full test suite" -->
 
 **Push and PR**, when the user picks that option. Commits are shown (message and files each) before any is made: one
 sentence, no co-author lines, `git add -u` plus new paths by name. Never run `git push` or a `gh` command that writes;
 pushing is the owner's call and their hooks block it.
-<!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "git push -u origin <feature-branch>" -->
 
 - The body, saved to a scratchpad file: why; what changed, opening with the smallest picture of it (a call tree, a
   before/after line, a few boxes in plain text); blast radius (pstack `blast-radius` over the diff) with a **Door**
