@@ -55,12 +55,13 @@ implement
 └ web-mcp: fetch
 
 learn
-├ claude-code: code-review (claude-code), security-review (claude-code)
+├ claude-code: Explore (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills
 ├ pstack-picks: recall
-└ superpowers: writing-skills
+├ superpowers: writing-skills
+└ web-mcp: fetch
 
 research-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)

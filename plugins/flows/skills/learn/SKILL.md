@@ -27,6 +27,10 @@ This flow adds:
   conductor is never written here: it becomes a **Parking lot** line for the caller's Decide (standalone: for the
   user).
 
+**A missing piece** (a plugin or a pack file this flow uses):
+
+[step: missing-piece]
+
 ## Start
 
 /learn keeps no flow.md of its own.
@@ -89,7 +93,7 @@ Write the entries marked "written here" yourself. The glossary is where
 
 An ADR, a check, or a fix to a skill or conductor becomes one line under **Parking lot** in the caller's file
 (standalone: one line in the closing list): a check names the past mistake it must fail on, an ADR its trade-off, a
-fix what behaved wrong. It is not written here.
+fix what behaved wrong, to be built through superpowers `writing-skills`. It is not written here.
 
 When a skill or conductor line is built later, `writing-skills` owns skill writing, its description rule included. skill-creator, when
 installed, is used only for its eval tooling (running evals and benchmarks), never to write or reword a skill. A

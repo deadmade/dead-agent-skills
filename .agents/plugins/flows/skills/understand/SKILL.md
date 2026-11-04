@@ -132,14 +132,17 @@ Say which plugin provides it, then use the fallback. Only the rows for plugins t
 
 ## Start
 
-/understand keeps no flow.md: its record is the chat and one scratch file, `understand-<topic>.md` in the system's
-temp folder, outside the repo. Wherever a rule above says flow.md, the scratch file stands in. The argument is the
-topic (a path, a subsystem or a concept); without one, ask for it in one line.
+/understand keeps no flow.md: its record is the chat and one scratchpad file outside the repo (the host's
+scratchpad, else the system temp folder), `understand-<topic-slug>.md`, with the topic as a slug (`src/foo` →
+`src-foo`). Wherever a rule above says flow.md, the scratch file stands in. The argument is the topic (a path, a
+subsystem or a concept); without one, ask for it in one line.
 
 ## Phase 1: Map
 
 Ask the user, once: what they already know, and what they want to be able to do afterwards (change it, review it,
-explain it). Then ground the topic, which is the subsystem here; its `why` waits for Phase 2:
+explain it). Then ground the topic, which is the subsystem here; its `why` waits for Phase 2. Put the shape you
+want into the `pstack-picks:how` question: the parts, how a request or call flows through them and the entry points,
+with `file:line`, as one short diagram or table, not a wall of text.
 
 
 - **Codebase.** When the request hands over an approved research run (`docs/features/<slug>/research.md`), its
@@ -152,10 +155,8 @@ explain it). Then ground the topic, which is the subsystem here; its `why` waits
   - Read the domain docs that `<flow-root>/packs/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists
     (the glossary and the ADRs).
 
-Put the shape you want into the `pstack-picks:how` question: the parts, how a request or call flows through them and
-the entry points, with `file:line`, as one short diagram or table, not a wall of text. Show what it returns as it is,
-and write it to the scratch file. No graph: offer `/graphify` for a large repo (it costs a build), only on the
-user's yes.
+Show what `pstack-picks:how` returns as it is, and write it to the scratch file. No graph: offer `/graphify` for a
+large repo (it costs a build), only on the user's yes.
 
 ## Phase 2: Why
 

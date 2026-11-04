@@ -118,6 +118,21 @@ This flow adds:
   conductor is never written here: it becomes a **Parking lot** line for the caller's Decide (standalone: for the
   user).
 
+**A missing piece** (a plugin or a pack file this flow uses):
+
+Say which plugin provides it, then use the fallback. Only the rows for plugins this flow uses matter.
+
+| Plugin                 | Missing                                  | Fallback                                                                                            |
+| ---------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| flows                  | a pack file (`<packs>/…`)                | none: flows is broken, reinstall it                                                                 |
+| web-mcp                | `search`, `fetch`, papers                | paper-lookup for papers, the host's own web search and fetch for the rest, marked weaker provenance |
+| graphify               | a knowledge graph                        | read-only subagents                                                                                         |
+| dead-skills (context7) | library docs                             | the library's docs via `web-mcp:fetch`, else the host web fetch                                                                |
+| dead-skills            | a desktop ping                           | nothing                                                                                             |
+| host security skill    | security review                          | review the diff for exploitable vulnerabilities using the host adapter                              |
+| claude-md-management   | `claude-md-improver`, `revise-claude-md` | read applicable AGENTS.md and CLAUDE.md against the code yourself                                   |
+| its plugin             | a stack pack                             | go on without it                                                                                    |
+
 ## Start
 
 /learn keeps no flow.md of its own.
@@ -173,7 +188,7 @@ Write the entries marked "written here" yourself. The glossary is where
 
 An ADR, a check, or a fix to a skill or conductor becomes one line under **Parking lot** in the caller's file
 (standalone: one line in the closing list): a check names the past mistake it must fail on, an ADR its trade-off, a
-fix what behaved wrong. It is not written here.
+fix what behaved wrong, to be built through superpowers `writing-skills`. It is not written here.
 
 When a skill or conductor line is built later, `writing-skills` owns skill writing, its description rule included. skill-creator, when
 installed, is used only for its eval tooling (running evals and benchmarks), never to write or reword a skill. A
