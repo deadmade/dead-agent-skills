@@ -72,6 +72,22 @@ A plugin's own number, which moves only when that plugin changes. Vendored plugi
 carry upstream's number.
 _Avoid_: release version
 
+## Flows
+
+**Conductor**:
+A flows skill the user starts by name that runs other skills in order, with gates, and keeps its state in a flow.md.
+_Avoid_: workflow, flow (alone; a flow run is one execution)
+
+**Flow step**:
+A piece of conductor text written once and copied word for word into every conductor that names it. It reads the same
+in each.
+_Avoid_: step (alone; a pipeline step is something else), partial, include, snippet
+
+**Host token**:
+A placeholder in flows text that the build replaces with the wording one harness needs, such as its question tool or
+its model names.
+_Avoid_: variable, placeholder (alone)
+
 ## web-mcp
 
 **Archive**:
