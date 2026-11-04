@@ -75,7 +75,9 @@ _Avoid_: release version
 ## Flows
 
 **Conductor**:
-A flows skill the user starts by name that runs other skills in order, with gates, and keeps its state in a flow.md.
+A flows skill the user starts by name that runs other skills in order and keeps a record of the run: a flow.md for the
+build and research flows; /review-code, /understand and /learn keep their own (an audit file, a scratch file, the
+chat).
 _Avoid_: workflow, flow (alone; a flow run is one execution)
 
 **Flow step**:
