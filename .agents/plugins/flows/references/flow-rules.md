@@ -192,7 +192,7 @@ verbatim at these steps, never the whole skill:
 | Builder briefs and fixes (fix loop, fix, review-code)   | **The smallest complete change** with its Bug fix bullet, and the **Never cut** line    |
 | Brainstorm's approaches, report gates                   | the `lite` level: the smallest option is one of the options, named in one line          |
 | Plan review's Simpler angle, `/review-code`'s lean lens | `<packs>/ponytail/skills/ponytail-review/SKILL.md`                                      |
-| Finish                                                  | `<packs>/ponytail/skills/ponytail-debt/SKILL.md` over the lines the branch adds         |
+| `/review-code`'s Decide                                 | new `shortcut:` lines (what `ponytail-debt` lists), each decided under Waiting on you   |
 | Every report                                            | the footer sentence, "End your reply with one or two lines…", as its "Not checked" line |
 
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "Before you write Read the task and the code it touches." -->

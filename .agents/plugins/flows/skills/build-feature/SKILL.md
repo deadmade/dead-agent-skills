@@ -76,7 +76,9 @@ doesn't need to offer recon of the codebase, and the web recon is already runnin
 
 - **Options.** Brainstorming wants the user describing before seeing options; keep that. Once the "how it gets made"
   question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
-  it this way (links), trade-offs for _this_ codebase, rough effort. End with your recommendation and why. The user
+  it this way (links), trade-offs for _this_ codebase, rough effort. One option is always the smallest that would work
+  (flow-rules **ponytail at chosen steps**, the `lite` level), even when it isn't your pick. End with your
+  recommendation and why. The user
   picks; record the choice and the rejected options in flow.md under **Options**, one `### <decision>` with
   `Picked: <the choice in plain words>`.
 - **Seams.** Read mattpocock `codebase-design` and pstack `principle-redesign-from-first-principles` and
