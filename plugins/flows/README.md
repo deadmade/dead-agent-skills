@@ -61,9 +61,14 @@ learn
 └ superpowers: writing-skills
 
 research-feature
-├ claude-code: general-purpose
-├ mattpocock-picks: grilling
+├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
+├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
+├ claude-security@claude-plugins-official: claude-security (claude-code)
+├ flows: writing
+├ graphify: graphify
+├ mattpocock-picks: grilling, setup-matt-pocock-skills
 ├ paper-lookup: paper-lookup
+├ pstack-picks: how, why
 └ web-mcp: fetch, search
 
 review-code
