@@ -67,6 +67,18 @@ learn
 ├ superpowers: writing-skills
 └ web-mcp: fetch
 
+refactor
+├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
+├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
+├ claude-security@claude-plugins-official: claude-security (claude-code)
+├ flows: writing
+├ graphify: graphify
+├ mattpocock-picks: codebase-design, setup-matt-pocock-skills
+├ ponytail: ponytail-review
+├ pstack-picks: blast-radius, how, interrogate, principle-boundary-discipline, principle-redesign-from-first-principles, why
+├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees, writing-plans
+└ web-mcp: fetch
+
 research-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)

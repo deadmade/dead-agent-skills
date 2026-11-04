@@ -388,7 +388,7 @@ fn templates_parse_with_every_part() {
         ),
         (
             "plugins/flows/references/build-template.md",
-            "implement | fix | upgrade",
+            "implement | fix | upgrade | refactor",
             0,
             &BUILD_PARTS[..],
         ),

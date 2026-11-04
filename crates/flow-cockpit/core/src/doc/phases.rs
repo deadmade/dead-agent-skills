@@ -66,6 +66,14 @@ const UPGRADE: List = &[
     ("bump", None),
     ("finish", None),
 ];
+/// refactor/SKILL.md.
+const REFACTOR: List = &[
+    ("ground", None),
+    ("shape", None),
+    ("gate", Some(1)),
+    ("build", None),
+    ("finish", None),
+];
 
 /// The list for a `flow:` value, `None` for a conductor that is not known.
 fn list(flow: &str) -> Option<List> {
@@ -75,6 +83,7 @@ fn list(flow: &str) -> Option<List> {
         "implement" => Some(IMPLEMENT),
         "fix" => Some(FIX),
         "upgrade" => Some(UPGRADE),
+        "refactor" => Some(REFACTOR),
         _ => None,
     }
 }
@@ -170,6 +179,7 @@ mod tests {
             ("implement", "implement"),
             ("fix", "fix"),
             ("upgrade", "upgrade"),
+            ("refactor", "refactor"),
         ] {
             let ours: Vec<(String, Option<u8>)> = list(flow)
                 .unwrap()

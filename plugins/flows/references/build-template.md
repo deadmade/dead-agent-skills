@@ -1,13 +1,13 @@
 # Build template
 
-For `/implement`, `/fix` and `/upgrade`. Copy everything below the line into `docs/features/<slug>/flow.md`,
-with the placeholders its first comment names filled in. Keep the frontmatter first.
+For `/implement`, `/fix`, `/upgrade` and `/refactor`. Copy everything below the line into
+`docs/features/<slug>/flow.md`, with the placeholders its first comment names filled in. Keep the frontmatter first.
 
 ---
 
 ```markdown
 ---
-flow: implement | fix | upgrade
+flow: implement | fix | upgrade | refactor
 phase: <first phase>
 now: <one plain sentence: where the run stands and what comes next>
 ---
