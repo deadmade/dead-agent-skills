@@ -1,9 +1,9 @@
 ---
 name: build-feature
-description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /build-feature [what to build]; no argument resumes the active feature, a run's slug resumes that run."
+description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /build-feature [what to build]; no argument resumes the active feature, a run's slug resumes that run, and an approved research.md from /research-feature starts a run from that report."
 disable-model-invocation: true
-argument-hint: "What do you want to build (or a run's slug)?"
-uses: superpowers:brainstorming, mattpocock-picks:grilling, mattpocock-picks:domain-modeling, pstack-picks:architect, pstack-picks:arena, pstack-picks:blast-radius, pstack-picks:interrogate, ponytail:ponytail-review
+argument-hint: "What do you want to build (or a run's slug, or a research.md)?"
+uses: superpowers:brainstorming, mattpocock-picks:grilling, mattpocock-picks:domain-modeling, pstack-picks:architect, pstack-picks:arena, pstack-picks:blast-radius, ponytail:ponytail-review
 template: skills/build-feature/references/flow-template.md
 ---
 
@@ -35,8 +35,8 @@ This flow adds:
 is an older run of this conductor: treat it as `feature`.
 
 An argument that hands over an approved research report (`docs/features/<slug>/research.md`, from
-`/research-feature`) starts a new run, with the report's question as the request. Phase 1 links the report as the
-prior art and reuses that run's **Grounding**.
+`/research-feature`) starts a new run, with the report's question as the request and a slug of its own, never the
+research run's. Phase 1 links the report as the prior art and reuses that run's **Grounding**.
 
 [step: state]
 
@@ -57,12 +57,15 @@ Phase 2 starts with questions, so the report has time to land. Write a short sum
 
 <!-- runs: superpowers `brainstorming`, the seam question · output: spec -->
 
-Follow superpowers `brainstorming` with the feature request. Hand it the grounding as context it already has: it
-doesn't need to offer recon of the codebase, and the web recon is already running (or done, from a research run).
-These change it:
+Follow superpowers `brainstorming` with the feature request. Hand it the grounding as context it already has. These
+change it:
+[step: seams]
 
-<!-- overrides superpowers/skills/brainstorming/SKILL.md: "Offer recon. Once you have a bit of grounding and looking further would help, offer to go look:" -->
-
+- The approaches message (**Options**, below) names the seam of each cross-cutting concern, so the user picks it with
+  the approach.
+- **Recon.** It doesn't need to offer recon of the codebase, and the web recon is already running (or done, from a
+  research run).
+  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "Offer recon. Once you have a bit of grounding and looking further would help, offer to go look:" -->
 - **Options.** Brainstorming wants the user describing before seeing options; keep that. Once the "how it gets made"
   question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
   it this way (links), trade-offs for _this_ codebase, rough effort. End with your recommendation and why. The user
@@ -70,10 +73,6 @@ These change it:
   `Picked: <the choice in plain words>`. One option is always the smallest that would work, named in one line
   (ponytail's `lite` level), even when it isn't your pick.
   <!-- overrides ponytail/skills/ponytail/SKILL.md: "| lite | Build what was asked. Name the smaller option in one line and let the user pick. |" -->
-
-[step: seams]
-
-- The approaches message names the seam of each cross-cutting concern, so the user picks it with the approach.
 - **Size.** A quick task (everything that matters is in the request) doesn't need this flow: say so and offer to
   leave it. Only on the user's yes, set `phase: done` with a note and do the task. A small change stays in the flow:
   its short design doc is the spec, and Gate 1, the seam lines, the plan's Global Constraints and the build stop all
@@ -136,8 +135,8 @@ spec too if a decision changes it (say so: that edit reopens Gate 1 for that ite
 Optional, for a large or ambiguous design, offer before the review: pstack `architect` (sketch types and signatures
 first) or `arena` (several models draft the plan, best one wins). Only on the user's yes.
 
-**Gate 2, plan approved:** the plan and the execution method, in one answer. Before it, re-run glance on the edited
-plan (Phase 4) and copyedit it (Phase 3). The gate message shows glance's block, the **Test seams** list and the
+**Gate 2, plan approved:** the plan and the execution method, in one answer. Before it, copyedit the edited plan
+(Phase 3), then re-run glance on it (Phase 4). The gate message shows glance's block, the **Test seams** list and the
 findings, with plan.md linked rather than pasted. Approving the plan approves the seams.
 
 [step: gate]
@@ -159,6 +158,10 @@ Build the plan Gate 2 approved, with the method it picked.
 ## Phase 7: Finish
 
 <!-- runs: `/review-code`, `/learn` · output: walkthrough, review, lessons, branch handled -->
+
+/review-code and /learn run inline, by this rule:
+
+[step: call-conductor]
 
 [step: finish]
 

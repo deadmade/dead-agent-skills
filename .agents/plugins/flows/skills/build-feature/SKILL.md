@@ -1,8 +1,8 @@
 ---
 name: build-feature
-description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /build-feature [what to build]; no argument resumes the active feature, a run's slug resumes that run."
+description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /build-feature [what to build]; no argument resumes the active feature, a run's slug resumes that run, and an approved research.md from /research-feature starts a run from that report."
 disable-model-invocation: true
-argument-hint: "What do you want to build (or a run's slug)?"
+argument-hint: "What do you want to build (or a run's slug, or a research.md)?"
 ---
 
 # build-feature
@@ -138,8 +138,8 @@ Say which plugin provides it, then use the fallback. Only the rows for plugins t
 is an older run of this conductor: treat it as `feature`.
 
 An argument that hands over an approved research report (`docs/features/<slug>/research.md`, from
-`/research-feature`) starts a new run, with the report's question as the request. Phase 1 links the report as the
-prior art and reuses that run's **Grounding**.
+`/research-feature`) starts a new run, with the report's question as the request and a slug of its own, never the
+research run's. Phase 1 links the report as the prior art and reuses that run's **Grounding**.
 
 - The run keeps `docs/features/<slug>/flow.md`, copied from the template this conductor names, with every
   placeholder the template names filled in; none stays literal (a `phase: <first phase>` left as written gives the
@@ -207,18 +207,8 @@ Phase 2 starts with questions, so the report has time to land. Write a short sum
 
 ## Phase 2: Brainstorm
 
-Follow superpowers `brainstorming` with the feature request. Hand it the grounding as context it already has: it
-doesn't need to offer recon of the codebase, and the web recon is already running (or done, from a research run).
-These change it:
-
-
-- **Options.** Brainstorming wants the user describing before seeing options; keep that. Once the "how it gets made"
-  question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
-  it this way (links), trade-offs for _this_ codebase, rough effort. End with your recommendation and why. The user
-  picks; record the choice and the rejected options in flow.md under **Options**, one `### <decision>` with
-  `Picked: <the choice in plain words>`. One option is always the smallest that would work, named in one line
-  (ponytail's `lite` level), even when it isn't your pick.
-
+Follow superpowers `brainstorming` with the feature request. Hand it the grounding as context it already has. These
+change it:
 
 - **Seams.** Read mattpocock `codebase-design` and pstack `principle-redesign-from-first-principles` and
   `principle-boundary-discipline`. For each cross-cutting concern the work adds (who the caller is, a tenant, a
@@ -227,7 +217,16 @@ These change it:
   parameter carried through modules that don't decide on it.
 - Each seam goes into the spec as one line: `<concern>: resolved in <module>; never seen by <modules>`.
 
-- The approaches message names the seam of each cross-cutting concern, so the user picks it with the approach.
+- The approaches message (**Options**, below) names the seam of each cross-cutting concern, so the user picks it with
+  the approach.
+- **Recon.** It doesn't need to offer recon of the codebase, and the web recon is already running (or done, from a
+  research run).
+- **Options.** Brainstorming wants the user describing before seeing options; keep that. Once the "how it gets made"
+  question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
+  it this way (links), trade-offs for _this_ codebase, rough effort. End with your recommendation and why. The user
+  picks; record the choice and the rejected options in flow.md under **Options**, one `### <decision>` with
+  `Picked: <the choice in plain words>`. One option is always the smallest that would work, named in one line
+  (ponytail's `lite` level), even when it isn't your pick.
 - **Size.** A quick task (everything that matters is in the request) doesn't need this flow: say so and offer to
   leave it. Only on the user's yes, set `phase: done` with a note and do the task. A small change stays in the flow:
   its short design doc is the spec, and Gate 1, the seam lines, the plan's Global Constraints and the build stop all
@@ -343,8 +342,8 @@ spec too if a decision changes it (say so: that edit reopens Gate 1 for that ite
 Optional, for a large or ambiguous design, offer before the review: pstack `architect` (sketch types and signatures
 first) or `arena` (several models draft the plan, best one wins). Only on the user's yes.
 
-**Gate 2, plan approved:** the plan and the execution method, in one answer. Before it, re-run glance on the edited
-plan (Phase 4) and copyedit it (Phase 3). The gate message shows glance's block, the **Test seams** list and the
+**Gate 2, plan approved:** the plan and the execution method, in one answer. Before it, copyedit the edited plan
+(Phase 3), then re-run glance on it (Phase 4). The gate message shows glance's block, the **Test seams** list and the
 findings, with plan.md linked rather than pasted. Approving the plan approves the seams.
 
 - **Gate.** Ask with the host user-question tool, or ask in chat, then wait for the answer. A gate passes only on the user's explicit approval of
@@ -506,6 +505,18 @@ Without subagents: only native execution is offered, and its final review is ski
 itself; record it under **Skipped** as `final review: not checked (no subagents)`.
 
 ## Phase 7: Finish
+
+/review-code and /learn run inline, by this rule:
+
+**Calling another conductor:** read its SKILL.md (`<flow-root>/skills/<name>/SKILL.md`) and run it inline, inside this
+run:
+
+- It skips its start and resume step: the caller hands it the input, and it creates no flow.md of its own.
+- It keeps its gates; they continue the caller's numbering and name the callee.
+- It stops before its own Finish or Decide and returns to the caller's next phase. The caller's Decide covers both.
+- It writes into the outermost run's flow.md, also when it was itself called by a callee: its `now:`, and its
+  **Findings**, **Deviations** and **Rulings** under the sections of those names. It leaves that run's `phase:` as it
+  is. When no run in the chain has a flow.md, they go into the audit file, under the same headings.
 
 In this order:
 

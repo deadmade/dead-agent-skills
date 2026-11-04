@@ -55,7 +55,7 @@ is presented in Phase 2 as unverified, or not at all.
 ## Source rules
 
 - Fetched in this session or it doesn't get cited: the web, context7, GitHub, files in the repo. Search the web with
-  `web-mcp:search`, else WebSearch and open pages with `web-mcp:fetch`, else WebFetch.
+  `web-mcp:search`, else WebSearch, and open pages with `web-mcp:fetch`, else WebFetch.
 - Match the version the repo uses when docs are versioned.
 - Link to the section; code facts are `file:line` or a permalink.
 - Priority: official docs and specs → maintainer guides and examples → established references (MDN, OWASP, the

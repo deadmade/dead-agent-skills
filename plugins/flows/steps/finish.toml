@@ -1,3 +1,4 @@
+uses = ["pstack-picks:interrogate"]
 requires = ["decide", "close"]
 writes = ["Walkthrough", "Review", "Learned"]
 
