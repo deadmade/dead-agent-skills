@@ -1,7 +1,7 @@
 ---
 flow: feature
 phase: execute
-now: Task 15 (/review-code) dispatched; base 9949804.
+now: Task 19 (check every finding against the built text) dispatched; base 91480ed.
 ---
 
 # Flows compose: flow
@@ -244,7 +244,14 @@ Task 17: base efc80fa (no untracked files); files check: 5 files, all listed, pl
 Task 9: base 6def66c (no untracked files); files check: 3 source files, all listed, plus README tree and generated trees; 204 lines against ~250 (limit 500); rules plus Start: claude-code ~3457, codex ~3430 (budget 4,500); commit 2934e3f, fix da423d9 (call-conductor in Phase 7; after it claude-code ~3494, codex ~3467)
 Task 10: base da423d9 (no untracked files); files check: 2 source files, both listed, plus README tree and generated trees; 158 lines against ~120 (limit 240); rules plus Start: claude-code ~3505, codex ~3478; commit 06542a3, polish ff74e99 (resume and stop wording; after it claude-code ~3551, codex ~3524)
 Task 14: base ff74e99 (no untracked files); files check: 2 source files, both listed, plus README tree and generated trees; 143 lines against ~120 (limit 240); rules plus Start: claude-code ~3476, codex ~3449; commit 85a917b, fix 1f74ddd (no-subagent narrowing, research handover commit; the user's decisions), fix 9949804 (Codex adapter sentence)
-Task 15: base 9949804 (no untracked files)
+Task 15: base efa74f0 (no untracked files); files check: 9 files, all listed (docs.rs by ruling), plus README tree and generated trees; 390 lines against ~260 (limit 520); rules plus Start: claude-code ~3023, codex ~3015; commits c53cfdf, a293355, fix 8ee1bb5 (pr reads the PR head, the user's decision; base-red only on the same failure; Fix <n> labels), polish fc7e213 (after it claude-code ~3141, codex ~3133; ~444 lines over all four)
+Task 16: base fc7e213 (no untracked files); files check: 2 source files, both listed, plus README tree and generated trees; 155 lines against ~120 (limit 240); rules plus Start: learn ~2213/~2204, understand ~2558/~2550; commit cbf8889, polish cc3bf02 (missing-piece in /learn; after it learn ~2693/~2685, understand ~2579/~2571)
+Task 11: base cc3bf02 (no untracked files); files check: 2 source files, both listed, plus README tree and generated trees; 173 lines against ~140 (limit 280); rules plus Start: claude-code ~3546, codex ~3541; commit ef71219, polish a5edebd (proof and inline rules; review-code hands a /fix pick its Files; after it ~3575/~3570)
+Task 12: base a5edebd (no untracked files); files check: 1 source file, listed, plus README tree and generated trees; 147 lines against ~140 (limit 280); rules plus Start: claude-code ~3364, codex ~3357; commit c75c553, fix c000da5 (patch/minor read for breaking changes, 0.x minor as a major; after it ~3380/~3372)
+Task 13: base c000da5 (no untracked files); files check: 4 source files, all listed, plus README tree and generated trees; 161 lines against ~140 (limit 280); rules plus Start: claude-code ~3381, codex ~3373; commit 3aba258, polish e7b9d59 (cockpit FLOW_SKILL gains refactor by ruling; one copyedit; phase: shape on reopen)
+Task 18: base e7b9d59 (no untracked files); files check: 14 files, all listed, plus generated trees; 464 lines against ~360 (limit 720; 265 the deleted flow-rules.md); commit 1210421, fix 91480ed (two narrowed rules restored after an independent loss audit; dead warnings field removed; docs; total 556)
+Task 19: base 91480ed (no untracked files)
+Token estimates (rules plus Start, Claude Code / Codex, budget 4,500): build-feature ~3528/~3521, fix ~3575/~3570, implement ~3585/~3577, learn ~2693/~2685, refactor ~3381/~3373, research-feature ~3517/~3509, review-code ~3141/~3133, understand ~2579/~2571, upgrade ~3380/~3372
 
 ## Rulings
 
@@ -278,15 +285,36 @@ Task 15: base 9949804 (no untracked files)
 - 2026-11-04, Task 9: every conductor that runs another inline (build-feature's /review-code and /learn, and the later callers) writes `[step: call-conductor]` before the inline call; no plan task placed it, and flow-rules.md:180-182, its only other home, goes in Task 18 — the callee rules (skip start, stop before Decide, write into the outermost flow.md) lost if wrong
 - 2026-11-04, Task 9: `pstack-picks:interrogate` moves into `finish.toml`'s `uses`, out of build-feature's own `uses:` (Global Constraint: a flow's own `uses:` lists only what its own text runs) — every finishing conductor repeats the workaround if wrong
 - 2026-11-04, Task 14: research-feature runs /learn inline by one sentence of its own (skip its start, no flow.md, its lines under **Learned** and **Parking lot**) instead of `[step: call-conductor]`, whose `writes` (Findings, Deviations, Rulings) research-template.md lacks; the user's S8 decision already keeps its handover its own prose — check 3 fails on the research template if wrong
+- 2026-11-04, Task 11: a /review-code pick run through /fix takes its **Files** list and its task line from /fix's gate; /review-code writes no `Fix <n>` line of its own for it (review-code/SKILL.md, one line ruled into Task 11) — the files check raises a false deviation, or the task line is written twice, if wrong
+- 2026-11-04, Task 13: the cockpit's `FLOW_SKILL` map (crates/flow-cockpit/app/shell/start-form.js) and its test gain `refactor`, ruled into Task 13: without it every open refactor run is dropped from the start form's resume list; the README command table and AGENTS.md:63 /refactor rows go to Task 18, which edits both files — a refactor run the cockpit can't resume if wrong
+- 2026-11-04, Task 18: the added-task format (next free number, never a letter, at the end of plan.md with its own `Depends on:` and an `**Added:**` line) moves from `plan-shape` into `deviations`, so every building conductor carries it, /implement's build-feature slug route included; the independent loss audit found it reached only build-feature, refactor and upgrade — /implement adds lettered or unmarked tasks to a feature run's plan if wrong
+- 2026-11-04, Task 18: the tob spec-compliance redirect (flow-rules.md:167-172) also goes next to review-code/references/tests-all.md's Requirements probe, which dispatches tob `spec-to-code-compliance`; it had lived only in docs.md — the probe meets a slash command that doesn't exist if wrong
+- 2026-11-04, Task 18: the always-empty `warnings` field (Checked, Build) and cli.ts's `warning:` print are removed with Task 18's fix round (build.ts and cli.ts ruled in; 'no option that nobody sets') — a live warning path that invites checks to downgrade again if wrong
+- 2026-11-04, Task 18: flow-rules.md:20-21's `<skill-dir>` definition is dropped: no text outside the packs uses it, and conductors define it where they use it (spec §1) — none
 
 ## Parking lot
 
+- On Codex, run-rules' model sentence renders as "the session's model or the session's model where the judgment is hard" (the `{{model:*}}` tokens; same as the Task 9 entry).
+- `ground-code.toml`'s text opens with a blank line, so every built conductor that uses it has a double blank line there (found in Task 16).
+- review-code's audit template has no `## Gates` section; gate lines sit under Findings and Run verdict (found in Task 15).
+- `spec-compliance.md` names no models in the procedure itself; review-code's docs.md names them at the offer (found in Task 15, #46).
 - `build-feature/references/prior-art.md`: neither its agent prompt nor its source-check prompt has an untrusted-data line, and both go to fresh agents that never see run-rules (found in Task 14).
 - On Codex every `{{model:*}}` token reads "the session's model", so plan-review's model list and run-rules' Agents line repeat it (codex.ts or a one-token sentence; found in Task 9).
 - `node scripts/flows-uses.mjs` rewrites `plugins/catalog.json` and `plugins/flows/plugin.json` in JSON.stringify layout, which treefmt then reverts: its output isn't formatter-stable (found in Task 6).
 - `nix flake check` fails at 2d2141b and before: end-of-file-fixer and treefmt on 31 test fixtures (headroom-trim `tests/fixtures/*.json`, web-mcp captcha HTML, …) and one hook file; the flake's Node is 24.21 while `engines` asks for 26 (found in Task 20).
 
 ## Deviations
+
+### /review-code pr reads the PR head
+
+Task 15's two reviews found that under `pr <number>` the lens and verifier agents read the user's checked-out tree,
+not the PR; the implementer had added `gh pr view` and a fetch of `pull/<n>/head` from `origin` (outside calls spec
+§7 doesn't name) without handing the result to any agent. The user decided (2026-11-04, "Allow, with fallback"):
+`gh pr view` gives the head sha and body; the PR head is fetched from the base repo as `gh` knows it (not assuming
+`origin`), objects only, no checkout; every agent gets the head sha and reads files at that sha; when the fetch fails,
+the review runs from the diff alone and the report says so. Applied in Task 15's fix round.
+
+Status: decided 2026-11-04 (the user)
 
 ### Research handover commits and routes "do now"
 
