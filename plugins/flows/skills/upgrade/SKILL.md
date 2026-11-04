@@ -3,7 +3,7 @@ name: upgrade
 description: 'Upgrade dependencies safely: one package, a list, or everything outdated. Read each changelog and migration guide, map what the breaking changes hit, approve one task or a plan, bump on a branch, fix and test in batches, then /review-code and /learn. Resumable. Use for /upgrade [package[@version] …, or outdated]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: '<package>[@version] …, or outdated'
-uses: dead-skills:context7, superpowers:test-driven-development
+uses: dead-skills:context7, pstack-picks:blast-radius, superpowers:test-driven-development
 template: references/build-template.md
 ---
 
@@ -26,8 +26,9 @@ Know what a bump breaks before you make it, and make it on a branch, behind a ga
 ## Start or resume
 
 `flow: upgrade`, template: [build-template.md](../../references/build-template.md). The input is one package
-(`react`, `react@19`), a list, or `outdated` (everything outdated). One package's slug is `upgrade-<package>`
-(`upgrade-types-node` for `@types/node`); a list's or `outdated`'s is `upgrade-<YYYY-MM-DD>`.
+(`react`, `react@19`), a list, or `outdated` (everything outdated; a package named `outdated` is given as
+`outdated@<version>`). One package's slug is `upgrade-<package>` (`upgrade-types-node` for `@types/node`); a list's
+or `outdated`'s is `upgrade-<YYYY-MM-DD>`.
 
 [step: state]
 
@@ -40,13 +41,17 @@ Know what a bump breaks before you make it, and make it on a branch, behind a ga
 **The bump list.** Each package's current version comes from its manifest and lockfile, the target from the input,
 else the latest stable release. `outdated` means each manifest's own outdated command (`npm outdated`,
 `cargo outdated`, `dotnet list package --outdated`, …), not flake inputs, SHA-pinned Actions or vendored packs. An
-area is one manifest with its lockfile; in a monorepo each manifest is its own area. Show the list (package, area,
-from → to, majors marked) and have the user confirm it in one line before any changelog is read.
+area is one manifest with its lockfile; in a monorepo each manifest is its own area. A 0.x minor (0.3 → 0.4) is
+breaking under semver, so it is marked a major. Show the list (package, area, from → to, majors marked) and have the
+user confirm it in one line before any changelog is read; write the confirmed list under **Request**, below the
+user's words.
 
-**The changelogs.** Patch and minor bumps are read as one group: their release notes, for deprecations and changed
-defaults. Each major gets its own read: the release notes for every version in between (the changelog, GitHub
-releases, the migration guide) with {{web-fetch}}, and the new API with context7. List under **Findings** each
-breaking change, deprecation and changed default, with its source link, and link the sources under **Artifacts**.
+**The changelogs.** Patch and minor bumps are read as one group: the release notes for every version in between,
+for breaking changes, deprecations and changed defaults. A bump whose release notes call it breaking is marked a
+major in the bump list from then on, and takes the plan path. Each major gets its own read: the release notes for
+every version in between (the changelog, GitHub releases, the migration guide) with {{web-fetch}}, and the new API
+with context7. List under **Findings** each breaking change, deprecation and changed default, with its source link,
+and link the sources under **Artifacts**.
 
 ## Phase 2: Impact
 
@@ -65,20 +70,21 @@ The one task and the plan below are both written under this rule, and the builde
 [step: before-you-write]
 
 **One task**, when the list holds only patch and minor bumps, all in one area: no plan.md and no executor. The task
-is the bump list; its **Files** list is that area's manifest and lockfile plus every file the break map says a change
-hits, written under **Grounding**. The gate shows the bump list, the break map and the **Files** list, as
-`- Gate 1, upgrade approved: <date>`, and asks no execution method. flow.md is never copyedited, so the gate message
-says `not copyedited: no plan`.
+is the bump list under **Request**; its **Files** list is that area's manifest and lockfile, every file the break map
+says a change hits, and the test files those hits need, written under **Grounding**. The gate shows the bump list,
+the break map and the **Files** list, as `- Gate 1, upgrade approved: <date>`, and asks no execution method. flow.md
+is never copyedited, so the gate message says `not copyedited: no plan`.
 
 **A plan**, for any major and for bumps in several areas. The patch and minor bumps are one task together; each major
 gets its own. The bump task's check, its test command, is the package manager's install or restore (the lockfile
-updated, the restore clean), never the suite, which a breaking bump leaves red. Each later task fixes one batch (a
-project or a folder) and its check is that batch's build and tests; the last task runs the full suite. A framework
-migration (xUnit v2 → v4) plans its fixes in such batches, each one green. Where the ecosystem allows a version per
-project, a batch bumps its own manifest with its fixes; where it doesn't (one central version or lockfile), the plan
-says that the intermediate batches are checked by building that batch only. Deprecated calls are replaced only where
-the plan says so. **Global Constraints** also get: "A failed install or restore stops the task: report
-`NEEDS_CONTEXT` with the package manager's error." The plan is written, copyedited and checked by these rules:
+updated, the restore clean), never the suite, which a breaking bump leaves red; when it is the plan's last task (no
+hit to fix), its check also runs the full suite. Each later task fixes one batch (a project or a folder) and its check
+is that batch's build and tests; the last task runs the full suite. A framework migration (xUnit v2 → v4) plans its
+fixes in such batches, each one green. Where the ecosystem allows a version per project, a batch bumps its own
+manifest with its fixes, and that major gets no bump task of its own; where it doesn't (one central version or
+lockfile), the plan says that the intermediate batches are checked by building that batch only. Deprecated calls are
+replaced only where the plan says so. **Global Constraints** also get: "A failed install or restore stops the task:
+report `NEEDS_CONTEXT` with the package manager's error." The plan is written, copyedited and checked by these rules:
 
 [step: plan-shape]
 
@@ -128,9 +134,9 @@ In this order, the fixes by superpowers `test-driven-development`:
 
 [step: call-conductor]
 
-/review-code's intent is the confirmed bump list and the break map under **Findings**, with plan.md on the plan path.
-On the one-task path no per-task review ran: tell /review-code that execution ran natively. The Walkthrough's goals
-are the breaking changes that hit, one row each.
+/review-code's intent is the confirmed bump list under **Request** and the break map under **Findings**, with plan.md
+on the plan path. On the one-task path no per-task review ran: tell /review-code that execution ran natively. The
+Walkthrough's goals are the breaking changes that hit, one row each.
 
 [step: finish]
 
