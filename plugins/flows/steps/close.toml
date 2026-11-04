@@ -10,8 +10,7 @@ text = '''
 ### Close
 
 Follow superpowers `finishing-a-development-branch` from its Step 2: the last run is its Step 1. Show its options as
-it lists them, with your recommendation. It's the user's choice; record it, with the confirmed decisions, in flow.md
-(without one, the audit file).
+it lists them, with your recommendation. It's the user's choice.
 <!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "Run the project's full test suite" -->
 
 **A merge conflict** (its `git pull` or `git merge` stops on one): stop, and resolve nothing on your own. List the
@@ -27,12 +26,15 @@ writes; pushing is the owner's call and their hooks block it.
   before/after line, a few boxes in plain text); blast radius (pstack `blast-radius` over the diff) with a **Door**
   line (one-way: data, a wire format, a public interface; two-way: a revert undoes it); verification, with the
   before/after output where behaviour changed. Revise it by `flows:writing`.
-- **Gate:** show the title and body. On approval, hand over `git push -u origin <branch>`, then
+- **Gate:** show the title and body. On approval, make the closing commit below first, so the PR carries it; then
+  hand over `git push -u origin <branch>`, then
   `gh pr create --title "<title>" --body-file <file>`, one at a time: {{user-runs}}.
 - Once the PR exists, {{watch-checks}}. A red check: superpowers `systematic-debugging` to the cause, then stop with
   the check, the cause and the options (a fix, a rerun, a flaky test). The push of a fix is again the user's to run.
 
-Once the pick is carried out (for a PR, before the user's push, so the PR carries it), set `phase: done` in flow.md,
-the base branch's copy after a local merge, and `now:` to what the pick did (`Done: merged into main.`, `Done: PR
-handed over for <branch>.`, `Done: kept on <branch>.`). Show that one-file commit and make it on the user's yes.
+**The closing commit.** Once the pick is carried out (for a PR, at its gate, before the push), set `phase: done` in
+flow.md, the base branch's copy after a local merge, and `now:` to what the pick did (`Done: merged into <base>.`,
+`Done: PR handed over for <branch>.`, `Done: kept on <branch>.`). Show that one-file commit and make it on the user's
+yes. A discard deletes the branch, and the run folder with it: say that flow.md went with it, so there is nothing to
+mark done.
 '''

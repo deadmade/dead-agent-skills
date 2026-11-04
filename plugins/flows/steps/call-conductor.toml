@@ -7,7 +7,7 @@ run:
 - It skips its start and resume step: the caller hands it the input, and it creates no flow.md of its own.
 - It keeps its gates; they continue the caller's numbering and name the callee.
 - It stops before its own Finish or Decide and returns to the caller's next phase. The caller's Decide covers both.
-- It writes into the caller's flow.md: its `now:`, and its **Findings**, **Deviations** and **Rulings** under the
-  caller's sections of those names. It leaves the caller's `phase:` as it is. A caller without a flow.md gets them in
-  its audit file, under the same headings.
+- It writes into the outermost run's flow.md, also when it was itself called by a callee: its `now:`, and its
+  **Findings**, **Deviations** and **Rulings** under the sections of those names. It leaves that run's `phase:` as it
+  is. When no run in the chain has a flow.md, they go into the audit file, under the same headings.
 '''
