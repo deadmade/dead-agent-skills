@@ -44,9 +44,15 @@ fix
 └ web-mcp: fetch, search
 
 implement
-├ mattpocock-picks: codebase-design, to-tickets
-├ pstack-picks: how, principle-boundary-discipline, principle-redesign-from-first-principles
-└ superpowers: executing-plans, subagent-driven-development, writing-plans
+├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
+├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
+├ claude-security@claude-plugins-official: claude-security (claude-code)
+├ flows: writing
+├ graphify: graphify
+├ mattpocock-picks: setup-matt-pocock-skills
+├ pstack-picks: blast-radius, how, interrogate, why
+├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees
+└ web-mcp: fetch
 
 learn
 ├ claude-md-management@claude-plugins-official: revise-claude-md

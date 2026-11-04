@@ -46,7 +46,7 @@ const RESEARCH: List = &[
 /// implement/SKILL.md.
 const IMPLEMENT: List = &[
     ("read", None),
-    ("plan", Some(1)),
+    ("confirm", Some(1)),
     ("execute", None),
     ("finish", None),
 ];

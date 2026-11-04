@@ -1,72 +1,126 @@
 ---
 name: implement
-description: 'Build from a plan, spec or ticket that already exists, without the design phases of /build-feature: turn a spec into tickets or a plan if needed, approve the plan, execute it test-first through superpowers, then /review-code and /learn. One approval gate, resumable. Use for /implement [path to plan, spec or ticket]; no argument resumes.'
+description: "Implement a ticket or an approved plan as given; it never plans and never changes a plan. Read and check the input, confirm it at one gate, build it test-first (a ticket in this session, a plan through superpowers), then /review-code and /learn. A ticket that leaves a design decision open goes to /build-feature. Use for /implement [ticket, plan, or a /build-feature run's slug past Gate 2]; no argument resumes."
 disable-model-invocation: true
-argument-hint: 'Path to a plan, spec or ticket'
-uses: pstack-picks:how, pstack-picks:principle-redesign-from-first-principles, pstack-picks:principle-boundary-discipline, mattpocock-picks:codebase-design, mattpocock-picks:to-tickets, superpowers:writing-plans, superpowers:subagent-driven-development, superpowers:executing-plans
-template: references/build-template.md
+argument-hint: "Path to a ticket or an approved plan, or a /build-feature run's slug"
+template: references/build-template.md, skills/build-feature/references/flow-template.md
 ---
 
 # implement
 
-The design is done; build it. If the input turns out not to be a design (open questions, no clear behaviour), say so
-and offer `/build-feature` instead.
+Build what you are given, as given. Planning is /build-feature's.
 
-| Phase     | Runs                                                              | Output                     |
-| --------- | ----------------------------------------------------------------- | -------------------------- |
-| 1 Read    | the input, pstack `how` on the code it touches, the seam question | what's settled, what's not |
-| 2 Plan    | mattpocock `to-tickets` and/or superpowers `writing-plans`        | plan. **Gate**             |
-| 3 Execute | superpowers `subagent-driven-development` or `executing-plans`    | code, tests                |
-| 4 Finish  | `/review-code`, then `/learn`                                     | branch handled             |
+[step: phases]
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. State: `docs/features/<slug>/flow.md` from
-[build-template.md](../../references/build-template.md), `flow: implement`, phases `read | plan | execute | finish |
-done`. Packs: `<flow-root>/packs` (pstack and mattpocock are its `-picks` folders).
+## Rules for the whole run
+
+[step: host]
+
+[step: run-rules]
+
+**A missing piece** (a plugin or a pack file this flow uses):
+
+[step: missing-piece]
 
 ## Start or resume
 
-- **With an argument:** read it, derive a slug, create flow.md, Phase 1.
-- **Without one:** resume a `flow: implement` flow.md whose `phase:` isn't `done` (several: ask which; none: ask for
-  the input).
+`flow: implement`, template: [build-template.md](../../references/build-template.md). A /build-feature run keeps its
+own flow.md and template.
+
+**A /build-feature run's slug** (its flow.md says `flow: feature`; a plan path inside such a run's folder counts as
+its slug): find its flow.md as the rules below say (the same places, the newest copy) and continue inside that run,
+writing to that flow.md. `flow:` stays `feature`, so the run stays one record; the `flow:` rules below (a conductor
+only resumes its own flow, another `flow:` stops) don't apply to it.
+
+- Gate 2 is open, or `phase:` is still before `execute`: stop and offer `/build-feature <slug>`.
+- `phase:` is `finish` or `done`: say so and stop.
+- Otherwise resume it as **Resume** below says, then go straight to Phase 3 with the run's plan.md: no Read, no
+  Confirm, no new gate. The method is Gate 2's `execution:`; ask only when it is missing, and record it on that line.
+  Write `phase: execute`, then `finish`. Its `now:` says that `/build-feature <slug>` or `/implement <slug>` resumes
+  it; a bare /implement doesn't.
+
+[step: state]
+
+[step: start]
 
 ## Phase 1: Read
 
-Read the input and everything it links. Run pstack `how` (fallback: Explore agents) on the code it touches and read
-the domain docs that `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists (the glossary and the
-ADRs). Under **Findings**: where it lands (`file:line`), and every point the input
-leaves open. A cross-cutting concern the input adds without saying where it is resolved and which modules never see
-it is an open point: ask build-feature's seam question (mattpocock `codebase-design`, pstack
-`principle-redesign-from-first-principles` and `principle-boundary-discipline`). Up to three open points: ask them,
-one at a time, with a recommendation each. More: the design isn't done; offer `/build-feature`.
+<!-- runs: the input, pstack `how`, glance's check · output: the ticket's Files list, or the plan checked -->
 
-## Phase 2: Plan
+Read the input and everything it links, then ground it in the code:
 
-- **A plan** (tasks with steps): check it against the code from Phase 1; stale paths or names are fixed in place. A
-  task without a **Files** list gets one written before the Gate. Every task also gets, right below its heading,
-  `**Does:** <one plain sentence for a reader who doesn't know the code>` and `**Depends on:** Task <n>, … | none`,
-  and the `**Adds:**` and `**Size:**` lines `/build-feature` Phase 4 describes.
-- **A spec or ticket:** follow superpowers `writing-plans` on it, with flow-rules **ponytail at chosen steps**' **Before
-  you write** pasted into it. For a spec too big for one branch, first offer
-  mattpocock `to-tickets` and plan only the first ticket.
+[step: ground-code]
 
-Either way, each seam answer from Phase 1 goes verbatim into the plan's **Global Constraints**, with the
-no-interface line and the **Test seams** list from `/build-feature` Phase 4 (for a plan that has none, write
-the list and show it at the Gate), and `node <flow-root>/skills/build-feature/scripts/glance.mjs
-<plan.md>` draws the plan's graph and table at its top; the Gate shows that block.
+Write the grounding under **Grounding** in flow.md: where the work lands (`file:line`).
 
-**Gate:** read back the Global Constraints and each task's **Files** list (the deviation contract), then the user
-approves the plan and picks the execution method (subagent-driven, or native = `executing-plans`), with your
-recommendation. Record both as flow.md gate lines (`- Gate 1, <what>: <date>`).
+**A ticket** goes ahead only when it says what behaviour changes, how you'd know it's done, and leaves no design
+decision open (the approach, where it lives, a new interface), and when it is one task's work. Write its **Files**
+list from the grounding, for the gate. A gap or a ticket too big for one task: stop, name it, and offer
+`/build-feature`.
+
+**A plan** goes ahead when glance accepts it and every task has **Does**, **Depends on**, **Adds**, **Size** and a
+**Files** list. It is a plan the run was given, so glance runs on it only with `--check` (the second paragraph
+below), never in its writing mode:
+
+[step: plan-check]
+
+A missing field, or a path or name the grounding shows is stale: stop and name each one, so the user can fix the plan
+and run /implement again.
+
+Anything else (a spec, open questions): say it isn't a ticket or a plan and offer `/build-feature`.
+
+## Phase 2: Confirm
+
+<!-- runs: the gate · output: the approved ticket or plan -->
+
+- **A ticket** becomes one task: the gate shows the ticket, its **Files** list and its acceptance criteria, as
+  `- Gate 1, ticket approved: <date>`. No plan.md is written and no execution method is asked.
+- **A plan:** the gate shows glance's block, the plan's **Global Constraints** and **Test seams**, and each task's
+  **Files** list (the deviation contract). A change the user asks for stops the run: name it, so the user can change
+  the plan and run /implement again; offer `/build-feature` only when the user wants the design reopened.
+
+Neither is copyedited, since the run changes neither: for a plan, the gate message says so as the gate rules below
+give it; for a ticket, `not copyedited: a given ticket is not changed`.
+
+[step: gate]
 
 ## Phase 3: Execute
 
-Read the chosen skill by path and follow it, with flow-rules **ponytail at chosen steps** pasted into every builder
-brief. It sets up the worktree and runs TDD and reviews itself. Stop where it
-would invoke `finishing-a-development-branch`. Deviations stop the build: flow-rules **Deviations** (the fifth stop,
-the brief clause, the files check, Rulings). Before SDD deletes its workspace, copy its ledger's `Ruling:` lines into
-flow.md (flow-rules **Rulings**).
+<!-- runs: this session (a ticket), superpowers `subagent-driven-development` or `executing-plans` (a plan) · output: code, tests -->
+
+[step: worktree]
+
+The builder brief below pastes this in:
+
+[step: before-you-write]
+
+[step: builder-brief]
+
+[step: deviations]
+
+A given plan stays as it is during the build: a deviation's decision goes under **Deviations**, never into the plan.
+
+A ticket is built as one task:
+
+[step: one-task]
+
+A plan is built by the method its gate picked:
+
+[step: execute]
 
 ## Phase 4: Finish
 
-Run `/review-code branch` with the input as its intent (and that execution ran natively, if it did), then `/learn` on this flow.
-Set `phase: done`.
+<!-- runs: `/review-code`, `/learn` · output: walkthrough, review, lessons, branch handled -->
+
+/review-code and /learn run inline, by this rule:
+
+[step: call-conductor]
+
+[step: finish]
+
+On a plan path, the plan isn't this run's plan.md and stays unchanged: a decision reopened at Decide becomes the next
+numbered line under **Tasks**.
+
+[step: decide]
+
+[step: close]
