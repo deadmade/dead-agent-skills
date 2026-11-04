@@ -1,8 +1,10 @@
-- **Build flows** (`/build-feature`, `/implement`, `/fix`, `/upgrade`) and `/research-feature`, which researches
-  and builds nothing, keep `docs/features/<slug>/flow.md`. Its frontmatter names the flow (`flow: feature | research | implement | fix |
-upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it after every phase, with links to every
-  artifact. It is how the next session resumes. build-feature and research-feature have their own templates; the others
-  use [build-template.md](build-template.md).
+- The run keeps `docs/features/<slug>/flow.md`, copied from the template this conductor names, with every
+  placeholder the template names filled in; none stays literal (a `phase: <first phase>` left as written gives the
+  flow cockpit an unknown phase). Its frontmatter names the flow (`flow:`, this conductor's value) and the `phase:`;
+  a conductor only resumes its own flow.
+- **`phase:`** names the phase in progress, never the one just finished: a key from the `phases:` line under the
+  phase table. When a phase ends, set it to the next phase's key; after the last one, `done`.
+- Update flow.md after every phase, with links to every artifact. It is how the next session resumes.
 - **`now:`** (frontmatter, one plain sentence) says where the run stands and what comes next. Rewrite it after every
   phase and at every stop where you wait for the user; at such a stop it starts with `Waiting for you`, which is what
   the flow cockpit reads as the run's status. A conductor called inline writes into its caller's `now:`.

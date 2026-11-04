@@ -1,10 +1,13 @@
 ---
-uses: pstack-picks:how, pstack-picks:why, graphify:graphify
+uses: pstack-picks:how, pstack-picks:why, graphify:graphify, mattpocock-picks:setup-matt-pocock-skills
 ---
 
-- **Codebase:** pstack `how` on the subsystems the feature touches (fallback: 1–3 Explore agents), and pstack `why`
-  when the feature moves an existing concern. Also read the domain docs that
-  `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists (the glossary and the ADRs).
-- If `graphify-out/graph.json` exists, query it for the topic first (graphify's `references/query.md` only), read-only:
-  skip its `save-result` and `graphify reflect`. No graph: offer `/graphify` for a large repo (it costs a build), only
-  on the user's yes.
+- **Codebase.** When the request hands over an approved research run (`docs/features/<slug>/research.md`), its
+  flow.md's **Grounding** is this grounding: link it and run only what it doesn't cover.
+  - If `graphify-out/graph.json` exists, query it first for the subsystems the work touches (graphify's
+    `references/query.md` only), read-only: skip its `save-result` and `graphify reflect`.
+  - Then `pstack-picks:how` on those subsystems (fallback: 1–3 {{explore}}).
+  - `pstack-picks:why` only for the concern the work moves or the user asks about, with that concern as its
+    question: one `why` run is pstack's full investigation, not a quick lookup.
+  - Read the domain docs that `<flow-root>/packs/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists
+    (the glossary and the ADRs).

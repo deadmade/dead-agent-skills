@@ -1,4 +1,13 @@
-- **Prior art:** one background `general-purpose` agent with the prompt in
-  [references/prior-art.md](references/prior-art.md), writing `docs/features/<slug>/prior-art.md`. Don't wait for it; Phase 2 starts with questions anyway. When it lands, run the source check in that reference and correct the report before presenting options.
-  When the request hands over an approved `research.md` from `/research-feature`, that report is the prior art: link it
-  and skip this agent.
+---
+needs: subagents
+---
+
+- **Prior art:** one fresh agent in the background, with the prompt in
+  `<flow-root>/skills/build-feature/references/prior-art.md`, with `docs/features/<slug>/prior-art.md` as its
+  `<report path>`. Don't wait for it. When it lands, run the source check in that reference on that report file and
+  correct the report before presenting options.
+  When the request hands over an approved research report (`docs/features/<slug>/research.md`), that report is the
+  prior art: link it and skip this agent.
+
+Without subagents: skip the prior-art agent and its source check, and record both as skipped in flow.md; a skipped
+check never counts as passed.

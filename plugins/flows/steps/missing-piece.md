@@ -1,12 +1,12 @@
-Say which plugin provides it, then use the fallback:
+Say which plugin provides it, then use the fallback. Only the rows for plugins this flow uses matter.
 
-| Missing                                  | Plugin                 | Fallback                                                               |
-| ---------------------------------------- | ---------------------- | ---------------------------------------------------------------------- |
-| a pack file (`<packs>/…`)                | flows                  | none: flows is broken, reinstall it                                    |
-| `search`, `fetch`, papers                | web-mcp                | paper-lookup for papers, WebSearch/WebFetch for the rest               |
-| a knowledge graph                        | graphify               | Explore agents                                                         |
-| library docs                             | dead-skills (context7) | the library's docs via web-mcp `fetch` or WebFetch                     |
-| a desktop ping                           | dead-skills            | nothing                                                                |
-| security review                          | host security skill    | review the diff for exploitable vulnerabilities using the host adapter |
-| `claude-md-improver`, `revise-claude-md` | claude-md-management   | read applicable AGENTS.md and CLAUDE.md against the code yourself      |
-| a stack pack                             | its plugin             | go on without it                                                       |
+| Plugin                 | Missing                                  | Fallback                                                                                            |
+| ---------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| flows                  | a pack file (`<packs>/…`)                | none: flows is broken, reinstall it                                                                 |
+| web-mcp                | `search`, `fetch`, papers                | paper-lookup for papers, the host's own web search and fetch for the rest, marked weaker provenance |
+| graphify               | a knowledge graph                        | {{explore}}                                                                                         |
+| dead-skills (context7) | library docs                             | the library's docs via {{web-fetch}}                                                                |
+| dead-skills            | a desktop ping                           | nothing                                                                                             |
+| host security skill    | security review                          | review the diff for exploitable vulnerabilities using the host adapter                              |
+| claude-md-management   | `claude-md-improver`, `revise-claude-md` | read applicable AGENTS.md and CLAUDE.md against the code yourself                                   |
+| its plugin             | a stack pack                             | go on without it                                                                                    |
