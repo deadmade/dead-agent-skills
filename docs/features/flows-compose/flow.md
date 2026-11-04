@@ -1,7 +1,7 @@
 ---
 flow: feature
 phase: execute
-now: Task 5 fix round 1 (on the .md steps) next, then Task 20 (steps in TOML).
+now: Task 15 (/review-code) dispatched; base 9949804.
 ---
 
 # Flows compose: flow
@@ -235,7 +235,16 @@ Task 1: base 4e06895 (no untracked files); files check: 2 files, both listed; 50
 Task 2: base 271e5eb (no untracked files); files check: 14 source files, all listed, plus generated trees; 294 lines against ~320 (limit 640); commit 64fc793; fix 4a48556 (CRLF H1 strip)
 Task 3: base 4a48556 (no untracked files); files check: 22 source files, all listed, plus generated trees and README tree; ~410 lines against ~280 (limit 560); commit e854817
 Task 4: base e854817 (no untracked files); files check: 13 files, all listed; 206 lines against ~170 (limit 340); commit 8f4ea66
-Task 5: base 8f4ea66 (no untracked files); files check: 7 step files, all listed; 284 lines over both commits against ~260 (limit 520); commits d7f89f9, 474c372; measured stub (rules plus Start, bytes ÷ 4): claude-code 2361, codex 2333, both under 4,000, so nothing moves below Phase 1
+Task 5: base 8f4ea66 (no untracked files); files check: 7 step files, all listed; 284 lines over both commits against ~260 (limit 520); commits d7f89f9, 474c372, fix 2d2141b; measured stub (rules plus Start, bytes ÷ 4) after the fix: claude-code 2524, codex 2496, both under 4,000, so nothing moves below Phase 1
+Task 20: base 2d2141b (no untracked files); files check: 18 files, all listed (lockfile excluded); 403 lines against ~380 (limit 760); NEEDS_CONTEXT ruled (readFileSync schema; flake fixtures parked); commit d7d4ef0
+Task 6: base d7d4ef0 (no untracked files); files check: 9 files, all listed; 207 lines against ~260 (limit 520); commits 224097e, 9cb20e1
+Task 8: base 9cb20e1 (no untracked files); files check: 4 files, all listed; 114 lines against ~170 (limit 340); commits 9360992, 631d22c, fix 0ea94db (decide records its outcome before its commits), fix 4e95d6b (flow.md unchanged until the closing commit)
+Task 7: base 4e95d6b (no untracked files); files check: 8 files, all listed; 230 lines against ~300 (limit 600); commits 7c17342, efc80fa
+Task 17: base efc80fa (no untracked files); files check: 5 files, all listed, plus generated trees; 75 lines against ~60 (limit 120; 18 are the formatter re-padding writing's lesson table); commit 6def66c
+Task 9: base 6def66c (no untracked files); files check: 3 source files, all listed, plus README tree and generated trees; 204 lines against ~250 (limit 500); rules plus Start: claude-code ~3457, codex ~3430 (budget 4,500); commit 2934e3f, fix da423d9 (call-conductor in Phase 7; after it claude-code ~3494, codex ~3467)
+Task 10: base da423d9 (no untracked files); files check: 2 source files, both listed, plus README tree and generated trees; 158 lines against ~120 (limit 240); rules plus Start: claude-code ~3505, codex ~3478; commit 06542a3, polish ff74e99 (resume and stop wording; after it claude-code ~3551, codex ~3524)
+Task 14: base ff74e99 (no untracked files); files check: 2 source files, both listed, plus README tree and generated trees; 143 lines against ~120 (limit 240); rules plus Start: claude-code ~3476, codex ~3449; commit 85a917b, fix 1f74ddd (no-subagent narrowing, research handover commit; the user's decisions), fix 9949804 (Codex adapter sentence)
+Task 15: base 9949804 (no untracked files)
 
 ## Rulings
 
@@ -264,10 +273,44 @@ Task 5: base 8f4ea66 (no untracked files); files check: 7 step files, all listed
 - 2026-11-04, Task 5: run-rules keeps today's Host capabilities sentences (skip subagent-only steps with no sequential substitute, record skips, a skipped check never counts as passed) and the todo-list rule — no later task places them and Task 18 deletes flow-rules.md — rules silently lost if wrong
 - 2026-11-04, Task 5: run-rules also keeps flow-rules.md:49-51's handoff sentence (a sub-skill's "invoke the next skill" is not followed; come back to the conductor and run its next phase) and :21-22's "resolve resource paths relative to their containing document, never the shell working directory" — the Task 5 review found no other home, and Task 18 deletes flow-rules.md — rules silently lost if wrong
 - 2026-11-04, Task 5: ponytail's `lite` row for brainstorm approaches and its marker (flow-rules.md:193, :202) go into build-feature's and research-feature's own text in Tasks 9 and 14; the "report gates" half of that row and "ponytail never runs as a mode" (:186-187) are dropped — the first is conductor-specific, the others have no reader that needs them — a lost nuance if wrong
+- 2026-11-04, Task 20: compose.ts reads `step.schema.json` at runtime (`readFileSync`) instead of a JSON import; the import puts the schema into the installer's tsc program, whose catalog test then finds an emitted `plugins/flows/steps/` and fails. Still one source of keys (spec §1) — a stale key list if wrong
+- 2026-11-04, Task 20: the flake's sandboxed check gets `node_modules` (check-repo with smol-toml runs there); "`nix flake check` still passes" can't hold, because it already fails at 2d2141b on end-of-file-fixer and treefmt over 31 test fixtures. Those go to the parking lot — a red flake check stays red if wrong
+- 2026-11-04, Task 9: every conductor that runs another inline (build-feature's /review-code and /learn, and the later callers) writes `[step: call-conductor]` before the inline call; no plan task placed it, and flow-rules.md:180-182, its only other home, goes in Task 18 — the callee rules (skip start, stop before Decide, write into the outermost flow.md) lost if wrong
+- 2026-11-04, Task 9: `pstack-picks:interrogate` moves into `finish.toml`'s `uses`, out of build-feature's own `uses:` (Global Constraint: a flow's own `uses:` lists only what its own text runs) — every finishing conductor repeats the workaround if wrong
+- 2026-11-04, Task 14: research-feature runs /learn inline by one sentence of its own (skip its start, no flow.md, its lines under **Learned** and **Parking lot**) instead of `[step: call-conductor]`, whose `writes` (Findings, Deviations, Rulings) research-template.md lacks; the user's S8 decision already keeps its handover its own prose — check 3 fails on the research template if wrong
 
 ## Parking lot
 
+- `build-feature/references/prior-art.md`: neither its agent prompt nor its source-check prompt has an untrusted-data line, and both go to fresh agents that never see run-rules (found in Task 14).
+- On Codex every `{{model:*}}` token reads "the session's model", so plan-review's model list and run-rules' Agents line repeat it (codex.ts or a one-token sentence; found in Task 9).
+- `node scripts/flows-uses.mjs` rewrites `plugins/catalog.json` and `plugins/flows/plugin.json` in JSON.stringify layout, which treefmt then reverts: its output isn't formatter-stable (found in Task 6).
+- `nix flake check` fails at 2d2141b and before: end-of-file-fixer and treefmt on 31 test fixtures (headroom-trim `tests/fixtures/*.json`, web-mcp captcha HTML, …) and one hook file; the flake's Node is 24.21 while `engines` asks for 26 (found in Task 20).
+
 ## Deviations
+
+### Research handover commits and routes "do now"
+
+Task 14's review found that /research-feature's handover leaves the run folder and /learn's files uncommitted, and a
+"do now" Parking-lot line has nothing to act on it; /build-feature cuts its worktree from HEAD, so an uncommitted
+research.md never reaches the build it is offered to. The user decided (2026-11-04, "Commit + route"): a "do now" line
+goes into the offered /build-feature request, or is done in the session on the user's yes when it is a doc edit; one
+commit (run folder plus /learn's files) is shown and made on the user's yes before the /build-feature offer. Spec §7's
+/research-feature entry says so. Applied in Task 14's fix round.
+
+Status: decided 2026-11-04 (the user)
+
+### Without subagents: delegated work runs in the main session
+
+Task 14 found that a host without subagents gets a research report with no evidence: run-rules (copied verbatim from
+flow-rules' Host capabilities, #96) skips "every subagent-only step", which catches the literature and prior-art
+searches along with the reviews. The rule exists so a review isn't the author grading itself; a search loses nothing
+essential when the main session does it. The user decided (2026-11-04, "narrow it pls"): without subagents, work a
+subagent only does on the session's behalf (searching, exploring, gathering sources) runs in the main session; a step
+whose point is an independent check (a reviewer, the prior-art source check, the final review, the copyedit) is still
+skipped and recorded as not checked. Spec §6's run-rules and prior-art rows say so. Applied in Task 14's fix round
+(run-rules.toml, prior-art.toml, research-feature's literature search).
+
+Status: decided 2026-11-04 (the user)
 
 ### Step format reopened
 
