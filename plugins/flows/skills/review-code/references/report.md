@@ -4,9 +4,10 @@ Two outputs: one screen in chat, and the full table in a file.
 
 ## The file
 
-Always write `docs/audits/<YYYY-MM-DD>-review-<scope>.md`: the scope line, every verified finding in flow-rules
-**Reports**' table (most severe first, `confirmed` or `plausible` in the evidence), the dropped count, and later the
-`Picks:` and `Fixed <date>:` lines flow-rules **Reports** names.
+Always write `docs/audits/<YYYY-MM-DD>-review-<scope>.md` from [audit-template.md](audit-template.md): the scope
+line, every verified finding in flow-rules **Reports**' table with the template's `bucket` column (most severe first,
+`confirmed` or `plausible` in the evidence), the dropped count, and later the `Picks:` and `Fixed <date>:` lines
+flow-rules **Reports** names.
 
 ## The screen
 

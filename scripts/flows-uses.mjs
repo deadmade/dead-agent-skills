@@ -136,6 +136,7 @@ const TEMPLATE_FILES = [
   `${FLOWS}/references/build-template.md`,
 ];
 const RULES_FILE = `${FLOWS}/references/flow-rules.md`;
+const AUDIT_FILE = `${FLOWS}/skills/review-code/references/audit-template.md`;
 const PLAN_FILES = ['build-feature', 'implement', 'upgrade'].map((n) => `${FLOWS}/skills/${n}/SKILL.md`);
 const GATE_LINE = '- Gate <n>, <what>:';
 export function checkTemplates(root) {
@@ -157,6 +158,8 @@ export function checkTemplates(root) {
     ['the `Waiting for you` rule', 'Waiting for you'],
     [`the gate line shape \`${GATE_LINE}\``, GATE_LINE],
     ['`Status: decided`', 'Status: decided'],
+  ]);
+  need(AUDIT_FILE, [
     ['`Picks:`', 'Picks:'],
     ['`Fixed <date>`', 'Fixed <date>'],
   ]);

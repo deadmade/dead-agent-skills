@@ -53,6 +53,15 @@ reopening is appended as `Reopened <date>: <why>`. -->
 <!-- One `### <decision>` heading per decision, then `Picked: <the choice in plain words>`; below it, the options
 offered, the evidence rows and the recommendation. -->
 
+## Parking lot
+
+<!-- Checks, fixes and ideas outside the question, one line each (`file`: what); not done. The user picks at the
+end: do now, a follow-up, or drop. -->
+
+## Learned
+
+<!-- What /learn kept, and where. -->
+
 ## Run verdict
 
 <!-- The user's, at the end: worked as a whole: yes | no; clean: yes | no. -->

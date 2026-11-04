@@ -1,7 +1,7 @@
 # Flow template
 
-Copy everything below the line into `docs/features/<slug>/flow.md`, with the feature name filled in. Keep the
-frontmatter first.
+Copy everything below the line into `docs/features/<slug>/flow.md`, with the placeholders its first comment names
+filled in. Keep the frontmatter first.
 
 - `phase`: ground | brainstorm | grill | plan | evaluate | execute | finish | done
 
@@ -15,6 +15,8 @@ now: <one plain sentence: where the run stands and what comes next>
 ---
 
 # <Feature>: flow
+
+<!-- Placeholders to fill when copying: `<Feature>`; `now:` one plain sentence. -->
 
 ## Request
 
@@ -49,6 +51,10 @@ reopening is appended as `Reopened <date>: <why>`. A plan gate adds `, execution
 
 <!-- Approaches found, who uses them, key sources; source check: confirmed / not supported / couldn't open. -->
 
+## Findings
+
+<!-- /fix's reproduction and its output, when /review-code runs /fix inline. -->
+
 ## Options
 
 <!-- One `### <decision>` heading per decision, then `Picked: <the choice in plain words>`; below it, the options
@@ -78,8 +84,18 @@ offered and the recommendation. -->
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
+<!-- One row per goal: the spec goal, the ticket criterion or the fixed cause. -->
+
+| goal | plan task | file:line | test |
+| ---- | --------- | --------- | ---- |
+
+## Review
+
+<!-- /review-code's verdict and what it fixed. -->
+
+## Learned
+
+<!-- What /learn kept, and where. -->
 
 ## Run verdict
 

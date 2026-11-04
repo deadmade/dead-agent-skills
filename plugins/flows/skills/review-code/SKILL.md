@@ -4,6 +4,7 @@ description: 'Review a branch before it merges, or the whole repo: run its check
 disable-model-invocation: true
 argument-hint: '[branch|all] [base branch or commit]'
 uses: claude-code:general-purpose, claude-code:code-review, claude-code:security-review, claude-code:Monitor, claude-md-management@claude-plugins-official:claude-md-improver, claude-security@claude-plugins-official:claude-security, flows:writing, web-mcp:fetch, superpowers:verification-before-completion, superpowers:systematic-debugging, superpowers:test-driven-development, superpowers:finishing-a-development-branch, ponytail:ponytail-review, ponytail:ponytail-audit, pstack-picks:blast-radius, pstack-picks:interrogate, pstack-picks:principle-boundary-discipline, tob-picks:spec-to-code-compliance, tob-picks:spec-compliance, tob-picks:spec-compliance-checker, tob-picks:mutation-testing, tob-picks:property-based-testing, tob-picks:sharp-edges, security-audit:security-audit, mattpocock-picks:improve-codebase-architecture, mattpocock-picks:grilling
+template: skills/review-code/references/audit-template.md
 ---
 
 # review-code

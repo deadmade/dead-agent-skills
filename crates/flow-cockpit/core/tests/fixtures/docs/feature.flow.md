@@ -45,6 +45,8 @@ The settings page is `settings.ts:12`; colours come from `palette()`.
 
 Most apps follow the system setting and allow an override.
 
+## Findings
+
 ## Options
 
 <!-- One `### <decision>` heading per decision, then `Picked: <the choice in plain words>`; below it, the options
@@ -102,9 +104,17 @@ The old path no longer exists.
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test      |
+| goal      | plan task | file:line | test      |
 | --------- | --------- | --------- | --------- |
 | dark mode | Task 1    | a.ts:1    | a.test.ts |
+
+## Review
+
+Verdict: ready.
+
+## Learned
+
+The palette helper is the one place colours come from.
 
 ## Run verdict
 

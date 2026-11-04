@@ -334,18 +334,34 @@ fn headings(doc: &FlowDoc) -> Vec<&str> {
     doc.sections.iter().map(|s| s.heading.as_str()).collect()
 }
 
-/// The sections every build flow's template has; research runs build nothing, so they have no Tasks, Rulings or
-/// Deviations.
-const BUILD_PARTS: [&str; 7] = [
+/// The sections every build flow's template has, one name for what the same steps write; research runs build
+/// nothing, so they have no Tasks, Rulings or Deviations.
+const BUILD_PARTS: [&str; 15] = [
     "Request",
     "Gates",
+    "Skipped",
+    "Grounding",
+    "Findings",
     "Options",
+    "Plan review",
     "Tasks",
     "Rulings",
+    "Parking lot",
     "Deviations",
+    "Walkthrough",
+    "Review",
+    "Learned",
     "Run verdict",
 ];
-const RESEARCH_PARTS: [&str; 5] = ["Request", "Gates", "Evidence", "Options", "Run verdict"];
+const RESEARCH_PARTS: [&str; 7] = [
+    "Request",
+    "Gates",
+    "Evidence",
+    "Options",
+    "Parking lot",
+    "Learned",
+    "Run verdict",
+];
 
 #[test]
 fn templates_parse_with_every_part() {

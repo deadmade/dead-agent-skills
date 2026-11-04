@@ -56,6 +56,14 @@ offered, the evidence rows and the recommendation. -->
 
 Picked: one schema with a tenant column and row-level security
 
+## Parking lot
+
+- `docs/adr/`: an ADR for the tenant column.
+
+## Learned
+
+Row-level security needs a session variable per request.
+
 ## Run verdict
 
 <!-- The user's, at Finish: worked as a whole: yes | no; clean: yes | no. -->

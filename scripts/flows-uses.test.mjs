@@ -224,12 +224,13 @@ const TEMPLATES = [
   'plugins/flows/references/build-template.md',
 ];
 const RULES = 'plugins/flows/references/flow-rules.md';
+const AUDIT = 'plugins/flows/skills/review-code/references/audit-template.md';
 const PLANNERS = ['build-feature', 'implement', 'upgrade'].map((n) => `plugins/flows/skills/${n}/SKILL.md`);
 
 // A copy of the real files with `needle` taken out of `file`.
 function without(file, needle) {
   const fx = mkdtempSync(join(tmpdir(), 'ct-'));
-  for (const f of [...TEMPLATES, RULES, ...PLANNERS]) {
+  for (const f of [...TEMPLATES, RULES, AUDIT, ...PLANNERS]) {
     mkdirSync(dirname(join(fx, f)), { recursive: true });
     cpSync(join(ROOT, f), join(fx, f));
   }
@@ -260,14 +261,14 @@ for (const t of TEMPLATES) {
   }
 }
 
-for (const [what, needle] of [
-  ['the Waiting for you rule', 'Waiting for you'],
-  ['Picks:', 'Picks:'],
-  ['Fixed', 'Fixed <date>'],
+for (const [file, what, needle] of [
+  [RULES, 'the Waiting for you rule', 'Waiting for you'],
+  [AUDIT, 'Picks:', 'Picks:'],
+  [AUDIT, 'Fixed', 'Fixed <date>'],
 ]) {
-  test(`checkTemplates names flow-rules without ${what}`, () => {
-    const problems = without(RULES, needle);
-    assert.ok(problems.length >= 1 && problems.every((p) => p.startsWith(RULES)), problems.join('\n'));
+  test(`checkTemplates names ${file} without ${what}`, () => {
+    const problems = without(file, needle);
+    assert.ok(problems.length >= 1 && problems.every((p) => p.startsWith(file)), problems.join('\n'));
   });
 }
 
