@@ -55,8 +55,10 @@ implement
 └ web-mcp: fetch
 
 learn
-├ claude-md-management@claude-plugins-official: revise-claude-md
-├ mattpocock-picks: domain-modeling
+├ claude-code: code-review (claude-code), security-review (claude-code)
+├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
+├ claude-security@claude-plugins-official: claude-security (claude-code)
+├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills
 ├ pstack-picks: recall
 └ superpowers: writing-skills
 
@@ -85,9 +87,13 @@ review-code
 └ web-mcp: fetch
 
 understand
+├ claude-code: Explore (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
+├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
+├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ graphify: graphify
-├ mattpocock-picks: domain-modeling, teach
-└ pstack-picks: how, why
+├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills, teach
+├ pstack-picks: how, why
+└ web-mcp: fetch
 
 upgrade
 ├ dead-skills: context7

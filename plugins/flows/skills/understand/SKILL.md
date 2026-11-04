@@ -3,49 +3,69 @@ name: understand
 description: 'Learn a codebase, a subsystem or a concept by doing: map it (pstack how, graphify when a graph exists), learn why it is that way (pstack why), then a guided lesson through mattpocock teach where you write the key lines and Claude explains, and keep the terms you settled in GLOSSARY.md. Use for /understand [topic, path or concept].'
 disable-model-invocation: true
 argument-hint: 'What do you want to understand? (a path, a subsystem, a concept)'
-uses: pstack-picks:how, pstack-picks:why, graphify:graphify, mattpocock-picks:teach, mattpocock-picks:domain-modeling
+uses: pstack-picks:why, graphify:graphify, mattpocock-picks:teach, mattpocock-picks:domain-modeling
 ---
 
 # understand
 
 Reading an explanation isn't understanding. This flow maps the ground, then makes the user do the parts that matter.
 
-| Phase    | Runs                               | Output                           |
-| -------- | ---------------------------------- | -------------------------------- |
-| 1 Map    | pstack `how`, graphify             | a map: parts, flow, entry points |
-| 2 Why    | pstack `why`                       | the decisions behind it          |
-| 3 Lesson | mattpocock `teach`, learning style | the user did the key parts       |
-| 4 Keep   | mattpocock `domain-modeling`       | terms in `GLOSSARY.md`           |
+[step: phases]
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `<flow-root>/packs` (pstack
-and mattpocock are its `-picks` folders). No state file; one lesson per run. The real tree is never edited here: a
-change the user wants for real stops the lesson and goes to a build flow, with the map and the why as its input.
+## Rules for the whole run
+
+[step: host]
+
+[step: run-rules]
+
+This flow adds:
+
+- One lesson per run. The real tree is never edited here: a change the user wants for real stops the lesson and goes
+  to a build flow (Phase 3).
+
+**A missing piece** (a plugin or a pack file this flow uses):
+
+[step: missing-piece]
+
+## Start
+
+/understand keeps no flow.md: its record is the chat and one scratch file, `understand-<topic>.md` in the system's
+temp folder, outside the repo. Wherever a rule above says flow.md, the scratch file stands in. The argument is the
+topic (a path, a subsystem or a concept); without one, ask for it in one line.
 
 ## Phase 1: Map
 
-Ask the user, once: what they already know, and what they want to be able to do afterwards (change it, review it,
-explain it). Then:
+<!-- runs: `pstack-picks:how`, graphify · output: a map in the scratch file: parts, flow, entry points -->
 
-- pstack `how` on the topic (fallback: Explore agents): the parts, how a request or call flows through them, the
-  entry points, with `file:line`. Put the shape you want into its question: one short diagram or table, not a wall of
-  text. Show what it returns as it is.
-- If `graphify-out/graph.json` exists, query it for the topic first (graphify's `references/query.md` only), read-only:
-  skip its `save-result` and `graphify reflect`. No graph: offer `/graphify` for a large repo (it costs a build), only
-  on the user's yes.
+Ask the user, once: what they already know, and what they want to be able to do afterwards (change it, review it,
+explain it). Then ground the topic, which is the subsystem here; its `why` waits for Phase 2:
+
+[step: ground-code]
+
+Put the shape you want into the `pstack-picks:how` question: the parts, how a request or call flows through them and
+the entry points, with `file:line`, as one short diagram or table, not a wall of text. Show what it returns as it is,
+and write it to the scratch file. No graph: offer `/graphify` for a large repo (it costs a build), only on the
+user's yes.
 
 ## Phase 2: Why
 
-One pstack `why` run whose question names the two or three choices in the map that look strangest. Add to its code
-anchor the repo's decision records: `docs/adr/`, and the `docs/features/*/` flow.md, spec and plan that touch the
-target. Cite the commit, PR, ADR or doc for each; "unknown" is an answer.
+<!-- runs: `pstack-picks:why` · output: the decisions behind it, in the scratch file -->
+
+One `pstack-picks:why` run whose question names the two or three choices in the map that look strangest. Add to its
+code anchor the repo's decision records: `docs/adr/`, and the `docs/features/*/` flow.md, spec and plan that touch the
+target. Cite the commit, PR, ADR or doc for each; "unknown" is an answer. Add it to the scratch file, under the map.
 
 ## Phase 3: Lesson
 
-Follow mattpocock `teach` with the map, the why and the user's goal, for this one lesson. Its workspace is the chat
-and one scratch file outside the repo: no `MISSION.md`, `lessons/`, `learning-records/` or other workspace files in
-the repo. If the user wants a course over many sessions, offer `teach` in a folder of its own instead.
+<!-- runs: `mattpocock-picks:teach`'s Philosophy, learning style · output: the user did the key parts -->
+
+Teach this one lesson from the map, the why and the user's goal, by the **Philosophy** section of
+`mattpocock-picks:teach` (`<flow-root>/packs/mattpocock-picks/skills/teach/SKILL.md`) only. The rest of teach doesn't
+apply: no `MISSION.md`, `lessons/`, `assets/`, `learning-records/` or other workspace files. The lesson is the chat
+and the scratch file.
 <!-- overrides mattpocock-picks/skills/teach/SKILL.md: "This is a stateful request - they intend to learn the topic over multiple sessions." -->
 <!-- overrides mattpocock-picks/skills/teach/SKILL.md: "Treat the current directory as a teaching workspace." -->
+<!-- overrides mattpocock-picks/skills/teach/SKILL.md: "Each lesson is one self-contained HTML file, saved to `./lessons/` and titled `0001-<dash-case-name>.html` where the number increments each time." -->
 
 Teach in learning style throughout:
 
@@ -57,7 +77,12 @@ Teach in learning style throughout:
 For a codebase lesson, the map's `file:line` and why's citations are the sources; outside resources only for a concept
 lesson. Stop when the user can do what they said they wanted, or says stop.
 
+A change the user wants for real stops the lesson. Offer the build flow that fits, with the scratch file's path in its
+request as the map and the why: `/build-feature <the change>; map and why: <scratch file>` (`/fix` for a bug).
+
 ## Phase 4: Keep
+
+<!-- runs: `mattpocock-picks:domain-modeling` · output: terms in `GLOSSARY.md` -->
 
 Collect the terms that came up during the lesson. Offer to run mattpocock `domain-modeling` on them, so the next
 person (or session) has them in `GLOSSARY.md` (or the one `GLOSSARY-MAP.md` points at). Only on the user's yes, with
