@@ -25,7 +25,7 @@ Plan: flows-compose · 19 tasks · ~3990 lines · 69 files
 4   gives the run templates the same section names for what the…  8      `audit-template.md` (sections…  ~170
 5   writes the rules every conductor starts with: run rules, st…  2      seven step files                ~260
 6   writes how a plan is shaped and checked, how a gate is aske…  3      five step files; glance flag …  ~260
-7   writes how a build sets up its branch, runs its executor, b…  3      four step files, one reference  ~300
+7   writes how a build sets up its branch, runs its executor, b…  3      five step files, one reference  ~300
 8   writes the end of every run: walkthrough, review, lessons, …  1      four step files                 ~170
 9   makes /build-feature the first conductor built from steps, …  3      nothing new                     ~250
 10  makes /implement build a ticket or a given plan as given, n…  2      nothing new                     ~120
@@ -105,6 +105,10 @@ reopened it for those lines. **Findings:** [evaluation.md](evaluation.md); each 
 - **`glance.mjs` CLI**, through `plugins/flows/skills/build-feature/tests/glance.test.mjs`: catches the read-only mode.
 - **The real tree**, through `npm test` (check-repo) and `npm run check:harnesses`: catches drift, unknown steps,
   missing sections, unresolved paths and the budget on the shipped flows. Misses meaning.
+- **`writing-skill.test.mjs`** (`plugins/flows/skills/writing/tests/`): catches the copyedit command and rule
+  text (spec §5). Misses whether the copyedit runs.
+- **`lintPlugins()`** (`tools/harness-compiler/src/lint.ts`), through `test/lint.test.ts`: catches Claude-only
+  phrases in flows' own Markdown (spec §3).
 - **`phase_lists_match_skill_tables`**, `tests/docs.rs` and the audit tests, through `cargo test -p
 flow-cockpit-core`: catches phase tables, template headings and audit columns drifting from the cockpit.
 
@@ -153,7 +157,8 @@ broken.
   - `interface Composed { files: Map<string, string>; uses: Record<string, Uses> }` (`files` maps each path relative
     to the flows plugin root to its composed text, for every `skills/**/*.md` and `references/**/*.md`; `uses` is
     keyed by conductor)
-  - `interface Checked { problems: string[]; warnings: string[] }` (each line `<file>:<line>: <what>`)
+  - `interface Checked { problems: string[]; warnings: string[]; estimates: Record<string, number> }` (each problem
+    or warning `<file>:<line>: <what>`; `estimates`: conductor name → rules-plus-Start tokens, bytes ÷ 4)
   - `composeFlows(pluginDir: string, tokens: HostTokens): Composed`, throws `ComposeError`
   - `checkBuilt(dest: string, target: TargetId, composed: Composed): Checked`
   - `class ComposeError extends Error { file: string; line: number }`, message `<file>:<line>: <what>`
@@ -213,7 +218,8 @@ fail `check:harnesses` on what the checks find.
 - Modify: `crates/flow-cockpit/core/src/doc/phases.rs` (`table()` reads `.claude-plugin/flows/skills/<skill>/SKILL.md`)
 - Modify: `.github/workflows/crates.yml` (trigger paths and the cockpit filter)
 
-**Adds:** `TOKENS: HostTokens` exported from each host file; `Build.problems`, `Build.warnings`
+**Adds:** `TOKENS: HostTokens` exported from each host file; `Build.problems`, `Build.warnings`, `Build.estimates`
+(`cli.ts build` prints them)
 **Size:** ~320
 
 - [ ] Write the failing tests:
@@ -413,7 +419,8 @@ glance check a plan without writing into it.
       cockpit's `plan.rs`), and the step's prose has the agent check that every task also has Does, Adds and Size;
       a plan outside the run folder is linked, never edited; a given plan uses `--check` (#6, #42, #48).
 - [ ] `gate` (`repeat: true`): spec §6's row (#9, #15, #44, #64), the `- Gate <n>, <what>:` line, the execution offer
-      only at a plan gate.
+      only at a plan gate; `gate` declares no `writes:`, and a run without flow.md records its gate line in its
+      audit file (pre-flight decision 2, 2026-11-04).
 - [ ] `copyedit`: when it runs (spec, plan, research report, audit report, never a given plan), its command through
       `<flow-root>`, and the refused case (#1, #63).
 - [ ] Update `checkTemplates` and its tests as listed under Files. `npm run build:harnesses && npm test`. Expected:
@@ -427,12 +434,12 @@ glance check a plan without writing into it.
 **Depends on:** Task 6
 **Files:**
 
-- Create: `plugins/flows/steps/worktree.md`, `execute.md`, `builder-brief.md`, `deviations.md`
+- Create: `plugins/flows/steps/worktree.md`, `execute.md`, `builder-brief.md`, `deviations.md`, `one-task.md`
 - Create: `plugins/flows/references/stack-packs.md` (flow-rules' Stack packs table, looked up, not followed)
 - Modify: `scripts/flows-uses.mjs`, `scripts/flows-uses.test.mjs` (`checkTemplates` reads `Waiting for you` and
   `Status: decided` from `steps/deviations.md`)
 
-**Adds:** four step files, one reference
+**Adds:** five step files, one reference
 **Size:** ~300
 
 - [ ] `worktree`: spec §6's row, the move of the run folder with `diff -r` (#5, #10, #37).
@@ -444,6 +451,9 @@ glance check a plan without writing into it.
 - [ ] `builder-brief` (requires `before-you-write`, which it doesn't repeat): the brief clause, the tests rule,
       ponytail's The smallest complete change as a frozen copy without the "one small test" line, one override marker
       per copied sentence, Never cut, the stack-pack skill (#91, #29).
+- [ ] `one-task` (requires `builder-brief`, `deviations`): the main session builds a single task itself under the
+      builder brief, runs the files check against the gate's commit, and writes a `Task 1` line under **Tasks**; no
+      plan.md, no executor (pre-flight decision 4, 2026-11-04).
 - [ ] `deviations` (`writes: Tasks, Rulings, Parking lot, Deviations`): the classes as a numbered list; the fifth
       stop; the files check per task (base sha, files, size, Adds; run by the coordinating session itself in native
       mode); Rulings copied before either executor deletes its workspace; Parking lot (#38, #73, #85, #90). All of

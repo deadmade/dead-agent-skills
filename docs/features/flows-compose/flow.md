@@ -1,7 +1,7 @@
 ---
 flow: feature
 phase: execute
-now: Gate 2 approved (subagent-driven); starting Task 1.
+now: Pre-flight decided and folded into the plan; Task 1 (compose pass) is next, not yet dispatched.
 ---
 
 # Flows compose: flow
@@ -233,9 +233,63 @@ Changed: plan.md (19 tasks, glance clean); spec.md §2, §4, §6.
 
 ## Rulings
 
+- 2026-11-04, pre-flight (Task 3): check 7's short-name rule is a warning until Task 18, not a problem — spec §4 says the checks today's text fails warn until flow-rules goes; all 12 short-name uses are bare words today — Task 3's commit fails check:harnesses
+- 2026-11-04, pre-flight (Tasks 2, 5, 16): the `web-fetch` token text names `web-mcp:fetch`; ground-code writes `pstack-picks:why` as well as `pstack-picks:how`; /understand writes `mattpocock-picks:teach` — check 7's forward rule needs the qualified form for every SHORT_NAMES use; the spec leaves wording to the builder — Task 18 fails on the bare names
+- 2026-11-04, pre-flight (Task 1): checks 1-4 run only on the steps a file uses, and Task 1 adds a test that an unused step with a check-1 error builds — spec §4 checks steps against 'the including flow'; plan Stage 2 says a step is checked once a flow uses it; Task 5's verbatim commit carries flow-rules.md:162's `<skill-dir>` — Task 5's verbatim commit fails
+- 2026-11-04, pre-flight (Task 7): no override marker for the hallmark row (#17); the row change alone — checkOverrides resolves markers only under plugins/flows/packs/, and hallmark lives in plugins/opt-in/hallmark; spec §8's resolution is the row — a marker would fail npm test
+- 2026-11-04, pre-flight (Task 7): markers sit next to the sentence they override: `execute` takes the handling-reports, executing-plans final-review and stop-before-finishing markers; `deviations` takes continuous-execution, rulings, four-stops, fix-loop and NEEDS_CONTEXT — spec §1: markers sit next to the sentences they override; Task 7's 'all move to deviations' contradicts its own execute step — markers in the wrong step confuse the next upstream sync
+- 2026-11-04, pre-flight (Task 18): no new checkTemplates test; Task 18 deletes the dead RULES_FILE constant and the without() fixture's flow-rules copy — Tasks 4, 6 and 7 move all five reads off RULES_FILE, so a 'FAIL first' test can't fail — none; the real-repo test still covers checkTemplates
+- 2026-11-04, pre-flight (Task 15): two commits: the verbatim move of flow-rules' Audits, Scope, Reports and the tob lines, then the rewrite — Global Constraint: a task that moves text and fixes findings commits the move first — one commit hides the move inside 20 fixes
+- 2026-11-04, pre-flight (Tasks 9, 14, 16): drop host-only names from flows' own uses: `claude-code:general-purpose` (build-feature, research-feature) and `revise-claude-md` (learn); their text says 'a fresh agent' (or the matching token) instead — Global Constraint: a flow's own uses: lists only what its neutral text runs; Task 2's adapter uses are exactly four names — Task 18's lint or check 7 fails on Codex
+- 2026-11-04, pre-flight (Tasks 10-16): each conductor task may edit `plugins/flows/steps/*.md`, only for what its first composition shows wrong — these tasks first compose steps build-feature doesn't use and must leave no warning; Task 9 already has the clause — a needed step fix becomes a files-check deviation
+- 2026-11-04, pre-flight (Task 19): flow.md is on Task 19's Files list — its step records the token estimates in flow.md — a files-check deviation
+- 2026-11-04, pre-flight (Task 12): phases.rs is not on Task 12's Files list — its step keeps the upgrade keys, so the list doesn't change — none
+- 2026-11-04, pre-flight (Task 16): Task 16 runs cargo test -p flow-cockpit-core — Global Constraint: a task that changes a phase table runs it; [step: phases] redraws both tables — none; it can't fail, there is no list for them
+- 2026-11-04, pre-flight (Task 9): build-feature writes `[step: before-you-write]` once itself; `requires:` only checks — spec §1 and Task 1: requires is a check that refuses, not an include — a missing step fails check 2
+- 2026-11-04, pre-flight (Task 5): missing-piece stays a step — spec §6 and Task 5 make it a step; §6's list is not closed; either passes the checks — a lookup table in the rules costs budget; Task 5's measure shows it
+- 2026-11-04, pre-flight (Task 2): check() keeps its string[] return; cli.ts and check-repo split it by the `flows: ` prefix in one line each — a changed check() return type is an interface change the plan doesn't make — two one-line splits to keep in step
+- 2026-11-04, pre-flight (Task 18): Task 18's build.test adds one fixture: Codex text naming a CLAUDE_ONLY phrase makes check() return a problem — Review Focus 3 promises it; Task 18's test list lacked it — Review Focus 3 unchecked
+- 2026-11-04, pre-flight (Task 14): research-feature's handover stays its own prose, no `[step: decide]` — the user's S8 decision (plan review round 2) outranks the scan's suggestion — a little repeated prose
+
 ## Parking lot
 
 ## Deviations
+
+### Pre-flight 1: no channel for each conductor's token estimate
+
+Status: decided 2026-11-04: (a) `Checked` and `Build` gain `estimates`; cli build prints them
+
+The spec (§4, Verification) and Task 2 say the build prints each conductor's estimate, but `Checked` and `Build`
+carry only problems and warnings, and a warning won't do because Task 18 turns every warning into a problem.
+Options: (a, recommended) `Checked` and `Build` gain `estimates: Record<string, number>`, named in Task 1's and Task 2's
+Adds, and `cli.ts build` prints them; (b) drop printing from the spec, and Tasks 5 and 19 measure with a one-line
+command.
+
+### Pre-flight 2: /review-code's Phase 7 gate has nowhere to record its line
+
+Status: decided 2026-11-04: (a) both gates kept; gate declares no writes:, a run without flow.md records its gate line in its audit file
+
+Task 15 puts `[step: gate]` in Phase 7 (your S7 decision), but the gate step records its line in flow.md's Gates,
+and /review-code keeps no flow.md. Options: (a, recommended) keep both gates; the gate step declares no `writes:`, and
+its text says a run without flow.md records the gate line in its audit file; (b) Phase 7 is decide then close with no
+gate (the table loses a gate it shows today).
+
+### Pre-flight 3: two tests run through seams the Test seams list doesn't name
+
+Status: decided 2026-11-04: (a) writing-skill.test.mjs and lint.test.ts added to Test seams
+
+Task 17 tests through `writing-skill.test.mjs` and Task 18 through `lint.test.ts`; both are required by the spec (§5,
+§3), but the approved Test seams list lacks them. Options: (a, recommended) add both to Test seams; (b) drop those
+tests.
+
+### Pre-flight 4: /implement, /fix and /upgrade each restate the one-task build
+
+Status: decided 2026-11-04: (a) a `one-task` step in Task 7, used by /implement, /fix and /upgrade
+
+Tasks 10, 11 and 12 each write "the main session builds one task: builder brief, files check against the gate's
+commit, a Task 1 line" in their own prose, which is the repeated rule Goal 1 removes. Options: (a, recommended) a
+`one-task` step (written in Task 7 with the build steps, requires `builder-brief` and `deviations`) used by the three;
+(b) keep the three copies.
 
 ## Walkthrough
 
