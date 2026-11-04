@@ -1,15 +1,15 @@
 # Deep tests pass (`all`)
 
-What would the suite miss? Moved from the former test-audit conductor. flow-rules **Stack packs** applies (a
-`*.csproj`: the csharp-skills `testing` router, whose find-untested-sources, run-tests and test-gap-analysis fit the
-map, the baseline and the probes).
+What would the suite miss? Moved from the former test-audit conductor.
+[stack-packs.md](../../../references/stack-packs.md) applies (a `*.csproj`: the csharp-skills `testing` router, whose
+find-untested-sources, run-tests and test-gap-analysis fit the map, the baseline and the probes).
 
 ## Map and baseline
 
 Source files in scope (every non-test, non-vendored source file), each mapped to the tests that exercise it (by
 import, name or a coverage run if the repo already has one configured). A source file with no test at all is already
 a finding. The tests lens's `flows:pr-test-analyzer` output is an input to the map. The baseline is the latest run
-from checks.md **Checks** (re-run first if the tree changed since). Don't add tooling (coverage, mutation tools, new
+from [checks.md](checks.md) (re-run first if the tree changed since). Don't add tooling (coverage, mutation tools, new
 test frameworks) without the user's yes.
 
 ## Probes

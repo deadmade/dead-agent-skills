@@ -37,6 +37,6 @@ suite still passes. An architecture pick runs `improve-codebase-architecture`'s 
 `grilling`, read by path), which may turn it into a `/build-feature` or `/implement` instead: offer that. Re-run the
 pass that found each fixed finding.
 
-The pick is the contract: the files its finding names are its **Files** list. A fix that needs more stops: flow-rules
-**Deviations** (the fifth stop, the brief clause, the files check, Rulings), with **Deviations**, **Tasks** and
-**Rulings** kept in the audit file when there is no flow.md.
+The pick is the contract: the files its finding names are its **Files** list. A fix that needs more stops, by
+**Deviations** in the conductor's Phase 6 (the fifth stop, the brief clause, the files check, Rulings), with
+**Deviations**, **Tasks** and **Rulings** kept in the audit file when there is no flow.md.

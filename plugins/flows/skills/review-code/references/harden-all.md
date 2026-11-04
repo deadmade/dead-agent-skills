@@ -40,6 +40,6 @@ suite still passes. An architecture pick runs `improve-codebase-architecture`'s 
 pass that found each fixed finding.
 <!-- overrides mattpocock-picks/skills/improve-codebase-architecture/SKILL.md: "Once the user picks a candidate, call the Skill tool with "grilling" to walk the decision tree with them" -->
 
-The pick is the contract: the files its finding names are its **Files** list. A fix that needs more stops: flow-rules
-**Deviations** (the fifth stop, the brief clause, the files check, Rulings), with **Deviations**, **Tasks** and
-**Rulings** kept in the audit file when there is no flow.md.
+The pick is the contract: the files its finding names are its **Files** list. A fix that needs more stops, by
+**Deviations** in the conductor's Phase 6 (the fifth stop, the brief clause, the files check, Rulings), with
+**Deviations**, **Tasks** and **Rulings** kept in the audit file when there is no flow.md.

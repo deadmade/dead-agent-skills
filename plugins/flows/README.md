@@ -72,9 +72,9 @@ research-feature
 └ web-mcp: fetch, search
 
 review-code
-├ claude-code: Monitor, code-review, general-purpose, security-review
-├ claude-md-management@claude-plugins-official: claude-md-improver
-├ claude-security@claude-plugins-official: claude-security
+├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
+├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
+├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: writing
 ├ mattpocock-picks: grilling, improve-codebase-architecture
 ├ ponytail: ponytail-audit, ponytail-review

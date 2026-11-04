@@ -1,63 +1,21 @@
-# Checks and Decide
-
-## Checks
+# Checks
 
 Follow superpowers `verification-before-completion`. The checks are what the repo documents (CLAUDE.md,
 CONTRIBUTING.md, the `test`/`lint` scripts, the CI workflows the diff would trigger), not a guess: run every one that
-applies to the changed files and read the output. A red check stops the review: show the failing output, find the
-cause with superpowers `systematic-debugging`, and offer `/fix` on it with your recommendation. The review goes on
-only once the checks are green.
+applies to the changed files and read the output. A repo that documents no checks: say so in the Checks row and go on.
+
+A red check: run the same command on the merge-base, in a scratch `git worktree` (never the user's tree). Red there
+too, it is **pre-existing**: the Checks row reports it as such, with both outputs, and the review goes on. Red only
+on this tree, it stops the review: show the failing output, find the cause with superpowers `systematic-debugging`,
+and offer `/fix` on it with your recommendation. The review goes on once the checks are green or pre-existing.
 
 **One run.** This run is the latest run: its output is the evidence for every later phase and for the verdict. Keep
-it, with the commit (`git rev-parse HEAD`) and `git status --short` it ran on. Nothing re-runs the suite while the
-tree is unchanged: not Phase 6's fix check, not the deep tests pass's baseline, not finishing's Step 1. Where the
-latest run is used next (the deep tests pass's baseline, the verdict), a tree changed since calls for one re-run
-first, which becomes the latest run. A full-suite run by an inline `/fix` is the latest run too, while the tree
-is unchanged after it.
+it, with the commit (`git rev-parse HEAD`) and `git status --short` it ran on. Any full-suite run on the same commit,
+with the tree unchanged, counts as the latest run, a caller's or an inline `/fix`'s included: a caller hands over its
+commands, commit and status, and this phase runs only the checks it didn't. Nothing re-runs the suite while the tree
+is unchanged: not the deep tests pass's baseline, not finishing's Step 1. Phase 6's fixes change the tree, so where the
+latest run is used after them (the deep tests pass's baseline, the verdict), the checks re-run once first, and that
+run becomes the latest.
 <!-- overrides superpowers/skills/verification-before-completion/SKILL.md: "If you haven't run the verification command in this message, you cannot claim it passes." -->
 
 A caller that says execution ran without per-task reviews also gets pstack `interrogate` offered before the lenses.
-
-## Decide
-
-The verdict, one row each, with the evidence:
-
-| Part        | State                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------- |
-| Checks      | green: the commands of the last run, its commit, and that the tree since is unchanged |
-| Review      | findings fixed, findings the user left, and why                                       |
-| Decisions   | every item below, confirmed or reopened by the user                                   |
-| Not checked | flow-rules **ponytail at chosen steps**, the footer line                              |
-
-**Decisions** are what the build decided without the user, in the report's **Waiting on you** list:
-
-- each line under **Rulings** in the caller's flow.md, or an inline `/fix`'s when there is no caller;
-- each entry under **Deviations** in it, with the decision it got;
-- each line under **Parking lot** in it: do now, a follow-up, or drop;
-- each new `shortcut:` line the branch adds: `git diff <merge-base> | rg '^\+.*shortcut:'`, plus `rg 'shortcut:'` on
-  the untracked files.
-
-Standalone, without a flow.md, the shortcut lines and an inline `/fix`'s Rulings. **Gate:** the user confirms or
-reopens each one (`all`, or letters to reopen). A reopened one is a fix on the user's yes: back to the caller's build
-flow, else fixed here, and the checks re-run.
-
-**Ready** means every row is green or the user accepted what is left. If the tree changed since the last run, re-run
-the checks first. Then follow `finishing-a-development-branch` from its Step 2: the last run is its Step 1. Show its
-options as it lists them, with your recommendation. It's the user's choice; called from a build flow, record it and
-the confirmed decisions in its flow.md.
-<!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "Run the project's full test suite" -->
-
-**Push and PR**, when the user picks that option. Commits are shown (message and files each) before any is made: one
-sentence, no co-author lines, `git add -u` plus new paths by name. Never run `git push` or a `gh` command that writes;
-pushing is the owner's call and their hooks block it.
-<!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "git push -u origin <feature-branch>" -->
-
-- The body, saved to a scratchpad file: why; what changed, opening with the smallest picture of it (a call tree, a
-  before/after line, a few boxes in plain text); blast radius (pstack `blast-radius` over the diff) with a **Door**
-  line (one-way: data, a wire format, a public interface; two-way: a revert undoes it); verification, with the
-  before/after output where behaviour changed. Revise it by `flows:writing`.
-- **Gate:** show the title and body. On approval, hand over `! git push -u origin <branch>` and
-  `! gh pr create --title "<title>" --body-file <file>`.
-- Once the PR exists, `Monitor` on `gh pr checks <pr> --watch`. A red check: superpowers `systematic-debugging` to the
-  cause, then stop with the check, the cause and the options (a fix, a rerun, a flaky test). The push of a fix is
-  again the user's `!` line.

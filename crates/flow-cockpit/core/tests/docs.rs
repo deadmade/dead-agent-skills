@@ -263,6 +263,14 @@ fn audit_closes_when_every_pick_is_fixed() {
 }
 
 #[test]
+fn shipped_audit_template_reads_as_an_empty_audit() {
+    let path = repo_root().join("plugins/flows/skills/review-code/references/audit-template.md");
+    let audit = parse_audit(&fs::read_to_string(&path).unwrap());
+    assert!(audit.findings.is_empty());
+    assert_eq!((audit.picks, audit.fixed, audit.open), (None, vec![], None));
+}
+
+#[test]
 fn audit_without_picks_is_unknown() {
     let audit = parse_audit(&fixture("audit-no-picks.md"));
     assert_eq!(

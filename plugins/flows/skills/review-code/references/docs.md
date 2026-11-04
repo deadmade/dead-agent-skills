@@ -8,12 +8,28 @@ The docs are READMEs, `docs/` (not `docs/audits/` or `docs/features/*/` working 
 files, the `description` fields of manifests (`package.json`, `plugin.json`, a marketplace, `Cargo.toml`), and CLI
 help text and skill descriptions that document behaviour.
 
-- **all:** every such doc, vendored ones skipped per flow-rules.
+- **all:** every such doc, vendored ones skipped (Phase 1).
 - **branch:** docs the diff changed, plus docs that name what the diff changed: grep them for each changed file path,
   exported symbol, command, flag, config key and env var. New public surface (a command, option, tool, setting) with
   no doc naming it is itself a finding.
 
 ## Claims
+
+Follow tob `spec-to-code-compliance` with the docs as the specification and the scope's code as the implementation.
+The lens checks each claim it can hold against the code itself, and starts no agents. The claims it can't hold
+(under `all`, or in a long doc) it returns as a list, each with its quote and `file:line`, for the **every claim**
+pass below. Per doc, its verdicts become findings:
+
+- **contradicted** (and `partial`): the doc says X, the code does Y. Quote both with `file:line`.
+- **unbacked** (`absent`): the doc claims behaviour no code implements.
+- **undocumented** (`stronger-than-spec`, and the workflow's reverse sweep): the code does something user-facing no
+  doc mentions.
+- `undecidable`: the doc is too vague to check; a finding against the doc.
+
+## Every claim
+
+The main session offers this pass, on the claims the lens returned (under `all`, on every scoped doc), and runs it only
+on the user's yes:
 
 - tob's spec-compliance checker ships as flows' own agent: `tob-picks:spec-compliance-checker` means
   `flows:spec-compliance-checker`.
@@ -22,25 +38,17 @@ help text and skill descriptions that document behaviour.
   the target path, optional spec and limit. It uses native subagents, without a host-specific Workflow runtime.
   <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Run `/tob-picks:spec-compliance <path>`." -->
 
-Follow tob `spec-to-code-compliance` with the docs as the specification and the scope's code as the implementation.
-A handful of claims (a usual `branch`): check each yourself against the code, or one `flows:spec-compliance-checker`
-per claim when there are more than the lens can hold. Many (`all`, or a long doc): the **every claim** pass, the tob
-`spec-compliance` workflow (flow-rules **Loading skills**; `path` the scope's code, `spec` the doc, `outDir` under
-`$TMPDIR`), offered with its cost: one checker agent per requirement plus two refuters per divergence. Per doc, its
-verdicts become findings:
-
-- **contradicted** (and `partial`): the doc says X, the code does Y. Quote both with `file:line`.
-- **unbacked** (`absent`): the doc claims behaviour no code implements.
-- **undocumented** (`stronger-than-spec`, and the workflow's reverse sweep): the code does something user-facing no
-  doc mentions.
-- `undecidable`: the doc is too vague to check; a finding against the doc.
+Its inputs are the scope's code as the target path, the doc as the spec, and the requirement limit agreed at the
+offer. The offer states its cost: one checker per requirement and one reviewer of uncovered behaviour, on
+{{model:standard}}, plus one refuter per claimed divergence, on {{model:strongest}}. Its findings come back to the main
+session and are sorted as **Claims** says.
 
 ## Mechanics
 
 In the scoped docs, check what can be checked by running something:
 
 - **Paths and links:** every repo path exists; every relative link and anchor resolves.
-- **URLs:** fetch each with web-mcp `fetch` (fallback WebFetch); report errors, and redirects to a different page.
+- **URLs:** fetch each with {{web-fetch}}; report errors, and redirects to a different page.
 - **Commands:** the binary, script, subcommand and flag each exist (`--help`, the script's source, the manifest).
   Run a documented command only when it's read-only or the repo's own check; never one that installs, deletes,
   pushes or publishes.
@@ -49,8 +57,8 @@ In the scoped docs, check what can be checked by running something:
 
 ## Prose
 
-Docs the diff changed, read against `flows:writing`, loaded with the Skill tool. Findings only, severity low unless
-the wording misleads.
+Docs the diff changed, read against `flows:writing`, loaded with the host's skill tool. Findings only, severity low
+unless the wording misleads.
 
 ## Severity and fixes
 
