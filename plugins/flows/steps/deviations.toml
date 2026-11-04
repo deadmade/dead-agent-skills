@@ -1,52 +1,70 @@
 writes = ["Tasks", "Rulings", "Parking lot", "Deviations"]
 
 text = '''
-- **Deviations** while building: the approved plan is the contract, and each task's **Files** list is part of it. A
-  deviation is anything the plan doesn't decide: a new or changed public interface, a new library or outside call, a
-  changed data flow or error handling, a file the task didn't list, or, for a task with an `**Adds:**` line, a new
-  type, exported function, flag, config key or dependency that line doesn't name, or, for a plan with **Test seams**,
-  a test through a seam that list doesn't name. Private names aren't deviations. A
-  cleanup or idea outside the task is one line under **Parking lot** in flow.md (`file`: what), and not done; the user
-  picks from the Parking lot at Finish. This holds in every build flow (`/build-feature`, `/implement`,
-  `/fix`, `/upgrade`) and in `/review-code`'s fixes.
-  - **The fifth stop.** A deviation is never ruled on, by the coordinating session or by a subagent. The coordinating
-    session writes it under **Deviations** in flow.md as `### <deviation>` with `Status: open` (then what, why the plan
-    doesn't hold, options with a recommendation), sets `now:` to `Waiting for you: …`, and asks the user with the host question tool; the build waits for the answer. A decision that changes
-    the plan needs the user's approval of that change before work continues. Only the main session can ask: a
-    subagent that meets a deviation stops and reports `NEEDS_CONTEXT` with the decision, the options and its
-    recommendation, and the coordinating session asks. The answer is recorded as `Status: decided <date>: <what>`. This is a fifth stop next to the four that
-    `subagent-driven-development` and `executing-plans` name. For deviations it overrides their continuous execution
-    and their rulings, and a plan correction that is a deviation goes to the user too.
-    <!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Rulings, not stalls. A running plan does not wait on a human." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
-    <!-- overrides superpowers/skills/subagent-driven-development/references/handling-reports.md: "If the plan itself is wrong, rule on the correction, ledger it, and re-dispatch with the ruling carried in the dispatch" -->
-    <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
-    <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Rulings, not stalls. Conflicts, ambiguities, plan defects — decide them." -->
-    <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
-  - **Review findings and reports.** Where `subagent-driven-development` rules on what review or a subagent turns up,
-    a deviation still goes to the user. In the fix loop (a plan-mandated finding), at the breaker and in the final
-    review's fix wave, a finding whose fix is deviation-class goes to the user, not a ruling. A `NEEDS_CONTEXT` that
-    carries a deviation goes to the user too; the session doesn't supply the missing decision itself. The final
-    review's single fix subagent gets the brief clause, with the union of the plan's **Files** lists as its list.
-    <!-- overrides superpowers/skills/subagent-driven-development/references/fix-loop.md: "A finding labeled plan-mandated — or any finding that conflicts with what the plan's text requires — is yours to rule on: weigh the finding against the plan text, decide with the spec as the binding authority, and ledger the ruling before you act on it." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/references/fix-loop.md: "Real and load-bearing — a later task builds on it, or it reveals a plan defect: rule on the smallest change that unblocks the dependent work, ledger it as `Task <N>: Ruling: <finding> — <what you decided and why>`, and carry it into the next task's dispatch." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Adjudicate any residual findings as in the fix loop's breaker (references/fix-loop.md): park with rulings, or rule on the load-bearing ones and ledger what you decided. Only the four things that stop a running plan (top of SKILL.md) stop you here." -->
-    <!-- overrides superpowers/skills/subagent-driven-development/references/handling-reports.md: "NEEDS_CONTEXT: The implementer needs information that wasn't provided. Provide the missing context and re-dispatch." -->
-  - **The files check.** When a task starts, write its line under **Tasks** in flow.md:
-    `Task <N>: base <sha>` (`git rev-parse HEAD`), with the untracked files then present
-    (`git ls-files -o --exclude-standard`). When the implementer is done, before the task review, run
-    `git diff --name-only <base>` (commits and working tree) and `git ls-files -o --exclude-standard` again, and compare
-    both with the task's **Files** list, leaving out the untracked files recorded at the start. Generated output the
-    repo's build writes (its documented generated folders and files) counts as on every list. A file not on the list
-    is a deviation. For a task with a `**Size:** ~N` line, also count its size: `git diff --numstat <base> -- <the
-task's Files paths>` (added plus removed) plus the lines of its new untracked files; more than twice N is a
-    deviation. Add the result to the task's line: `files clean`, or `deviation` (`deviation (size <n> of ~N)` for
-    size) with the decision it went to under **Deviations**, which holds only decisions that go to the user.
-  - **Rulings.** Every other call the build makes on its own (a pre-flight conflict, a plan ambiguity, a parked
-    finding, a private name) is one line under **Rulings** in flow.md, written as it is made:
-    `<date>, Task <N>: <what was decided> — <why> — <what it costs if wrong>`. The skill's own ledger keeps its
-    `Ruling:` lines as well. At the build's end, before `subagent-driven-development` deletes its workspace (and its
-    ledger with it), copy every ledger `Ruling:` line missing from **Rulings** into it, one dated line each: `/review-code`'s
-    Decide gate reads only flow.md.
+### Deviations
+
+The approved plan is the contract, and each task's **Files** list is part of it. Without a flow.md, the audit file
+stands in for it below. A deviation is anything the plan doesn't decide:
+
+1. a new or changed public interface;
+2. a new library or outside call;
+3. a changed data flow or error handling;
+4. a file the task didn't list (generated output the repository's build writes, its documented generated folders and
+   files, is on every list);
+5. for a task with an `**Adds:**` line: a new type, exported function, flag, config key or dependency that line
+   doesn't name;
+6. for a plan with **Test seams**: a test through a seam that list doesn't name;
+7. for a task with a `**Size:** ~N` line: a diff of more than twice N.
+
+Private names aren't deviations. A cleanup or idea outside the task is one line under **Parking lot** in flow.md
+(`file`: what), and not done; the user picks from the Parking lot at Decide.
+
+**The fifth stop.** A deviation is never ruled on, by the coordinating session or by a subagent. The coordinating
+session writes it under **Deviations** in flow.md as `### <deviation>` with `Status: open` (then what, why the plan
+doesn't hold, options with a recommendation) and sets `now:` to `Waiting for you: …`. Ask with {{ask-user}}, then wait
+for the answer before the build goes on. A decision that changes the plan needs the user's approval of that change
+before work continues. Only the main session can ask: a subagent that meets a deviation stops and reports
+`NEEDS_CONTEXT` with the decision, the options and its recommendation, and the coordinating session asks. The answer is
+recorded as `Status: decided <date>: <what>`. This is a fifth stop next to the four that `subagent-driven-development`
+and `executing-plans` name. For deviations it overrides their continuous execution and their rulings, and a plan
+correction that is a deviation goes to the user too.
+<!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
+<!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Rulings, not stalls. A running plan does not wait on a human." -->
+<!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
+<!-- overrides superpowers/skills/subagent-driven-development/references/handling-reports.md: "If the plan itself is wrong, rule on the correction, ledger it, and re-dispatch with the ruling carried in the dispatch" -->
+<!-- overrides superpowers/skills/executing-plans/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
+<!-- overrides superpowers/skills/executing-plans/SKILL.md: "Rulings, not stalls. Conflicts, ambiguities, plan defects — decide them." -->
+<!-- overrides superpowers/skills/executing-plans/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
+
+**Review findings and reports.** Where `subagent-driven-development` rules on what review or a subagent turns up, a
+deviation still goes to the user. In the fix loop (a plan-mandated finding), at the breaker and in the final review's
+fix wave, a finding whose fix is deviation-class goes to the user, not a ruling. A `NEEDS_CONTEXT` that carries a
+deviation goes to the user too; the session doesn't supply the missing decision itself.
+<!-- overrides superpowers/skills/subagent-driven-development/references/fix-loop.md: "A finding labeled plan-mandated — or any finding that conflicts with what the plan's text requires — is yours to rule on: weigh the finding against the plan text, decide with the spec as the binding authority, and ledger the ruling before you act on it." -->
+<!-- overrides superpowers/skills/subagent-driven-development/references/fix-loop.md: "Real and load-bearing — a later task builds on it, or it reveals a plan defect: rule on the smallest change that unblocks the dependent work, ledger it as `Task <N>: Ruling: <finding> — <what you decided and why>`, and carry it into the next task's dispatch." -->
+<!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Adjudicate any residual findings as in the fix loop's breaker (references/fix-loop.md): park with rulings, or rule on the load-bearing ones and ledger what you decided. Only the four things that stop a running plan (top of SKILL.md) stop you here." -->
+<!-- overrides superpowers/skills/subagent-driven-development/references/handling-reports.md: "NEEDS_CONTEXT: The implementer needs information that wasn't provided. Provide the missing context and re-dispatch." -->
+
+**The files check.** The coordinating session runs it itself for every task, also when execution is native and no
+task reviewer runs. When a task starts, write its line under **Tasks** in flow.md: `Task <N>: base <sha>`
+(`git rev-parse HEAD`), with the untracked files then present (`git ls-files -o --exclude-standard`). When the task's
+code is done, before its task review where one runs, check:
+
+1. Files: `git diff --name-only <base>` (commits and working tree) and `git ls-files -o --exclude-standard` again,
+   compared with the task's **Files** list, leaving out the untracked files recorded at the start.
+2. Size, for a task with a `**Size:** ~N` line: `git diff --numstat <base> -- <the task's Files paths>` (added plus
+   removed) plus the lines of its new untracked files.
+3. Adds, for a task with an `**Adds:**` line: the new types, exported functions, flags, config keys and dependencies
+   in `git diff <base>` and its new untracked files, compared with that line.
+
+Add the result to the task's line: `files clean`, or `deviation` (`deviation (size <n> of ~N)` for size,
+`deviation (adds: <name>)` for Adds) with the decision it went to under **Deviations**, which holds only decisions
+that go to the user.
+
+**Rulings.** Every other call the build makes on its own (a pre-flight conflict, a plan ambiguity, a parked finding,
+a private name) is one line under **Rulings** in flow.md, written as it is made:
+`<date>, Task <N>: <what was decided> — <why> — <what it costs if wrong>`. The execution skill's own ledger keeps its
+`Ruling:` lines as well. Before either executor, `subagent-driven-development` or `executing-plans`, deletes its
+workspace (and its ledger with it), copy every ledger `Ruling:` line missing from **Rulings** into it, one dated line
+each: Decide reads only flow.md.
 '''

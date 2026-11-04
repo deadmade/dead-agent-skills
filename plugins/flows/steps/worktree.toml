@@ -1,0 +1,23 @@
+uses = ["superpowers:using-git-worktrees"]
+writes = ["Findings"]
+
+text = '''
+### Worktree
+
+Before any code is written, the run gets a branch of its own:
+
+- Already in this run's worktree (the one holding its flow.md): stay there.
+- Called inline by another conductor: never create one; work in the caller's tree and on its branch.
+- Otherwise follow superpowers `using-git-worktrees`. When the user declines a worktree, create the branch in place
+  with `git switch -c <slug>`. Never build on the default branch.
+  <!-- overrides superpowers/skills/using-git-worktrees/SKILL.md: "If the user declines consent, work in place and skip to Step 2." -->
+
+A new worktree is cut from HEAD, so it lacks the run folder: the spec, plan and flow.md aren't committed. Move the
+folder: copy `docs/features/<slug>/` to the same path in the worktree, confirm the copy with
+`diff -r <main checkout>/docs/features/<slug> <worktree>/docs/features/<slug>` (no output), then remove the main
+checkout's copy. Only one copy exists from then on, it is the one the run updates, and finishing's `git merge` doesn't
+abort on untracked files that the branch also adds. A branch made in place has nothing to move.
+
+The skill's baseline: when the test suite fails before any change, write the command and the failing tests under
+**Findings** in flow.md, then ask the user whether to go on or investigate first.
+'''

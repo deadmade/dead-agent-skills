@@ -1,12 +1,23 @@
 uses = ["superpowers:subagent-driven-development", "superpowers:executing-plans"]
+requires = ["worktree", "builder-brief", "deviations"]
+writes = ["Skipped"]
+needs = "subagents"
 
 text = '''
-Read the chosen skill by path and follow it: superpowers `subagent-driven-development` or `executing-plans`. They set
-up the worktree (`using-git-worktrees`), run TDD and reviews themselves, with flow-rules **ponytail at chosen
-steps** pasted into every builder brief. Stop when they would invoke `finishing-a-development-branch`.
+### Execute
+
+Read the execution skill the plan's gate picked by path and follow it: superpowers `subagent-driven-development`
+(subagent-driven) or `executing-plans` (native). It works in the branch or worktree the worktree step set up, and runs
+TDD and reviews itself, with the builder brief pasted into every brief it writes. Stop where it would invoke
+`finishing-a-development-branch`, and come back to this flow's next step.
 <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Use superpowers:finishing-a-development-branch." -->
 <!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Use superpowers:finishing-a-development-branch." -->
 
-Deviations stop the build: flow-rules **Deviations** (the fifth stop, the brief clause, the files check, Rulings).
-Before SDD deletes its workspace, copy its ledger's `Ruling:` lines into flow.md (flow-rules **Rulings**).
+A BLOCKED task is split into smaller tasks only through a deviation (the fifth stop): splitting it changes the plan.
+More context or a more capable model for the same task stays the executor's call.
+<!-- overrides superpowers/skills/subagent-driven-development/references/handling-reports.md: "If the task is too large, break it into smaller pieces" -->
+
+Without subagents: only native execution is offered, and its final review is skipped, not done by the main session
+itself; record it under **Skipped** as `final review: not checked (no subagents)`.
+<!-- overrides superpowers/skills/executing-plans/SKILL.md: "Without a subagent tool: read code-reviewer.md and perform that review yourself against the package, as a separate pass after the last task's ledger line." -->
 '''
