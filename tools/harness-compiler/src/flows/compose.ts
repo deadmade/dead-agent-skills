@@ -234,8 +234,10 @@ function parseUses(keys: Keys, file: string): Uses {
 const BUDGET = 4500;
 const NODE = /\bnode\s+["`]?([^\s"`]+\.[cm]?js)\b/g;
 const LINK = /\]\(([^)\s#]*references\/[^)\s#]+)/g;
+const PACK = /(?:<packs>|<flow-root>\/packs)\/([^\s/`'"()[\]]+)\/skills\/([^\s/`'"()[\]]+)/g;
 
-// Checks 6 and 8 and the Codex phrase check on the composed files as built; check 6 and the phrases warn until Task 18.
+// Checks 6, 7 and 8 and the Codex phrase check on the composed files as built; check 6, check 7's short-name and
+// pack-path rules and the phrases warn until Task 18.
 export function checkBuilt(dest: string, target: TargetId, composed: Composed): Checked {
   const checked: Checked = { problems: [], warnings: [], estimates: {} };
   for (const rel of composed.files.keys()) {
@@ -275,6 +277,50 @@ export function checkBuilt(dest: string, target: TargetId, composed: Composed): 
       checked.problems.push(
         `[${target}] ${rel}:${start.split('\n').length}: rules plus Start are ~${tokens} tokens, over the ${BUDGET} budget`,
       );
+
+    // Check 7: the conductor's uses against its SKILL.md and the references it links.
+    const uses = composed.uses[flow!];
+    const linked = [...text.matchAll(LINK)]
+      .filter(([, link]) => !/^\w+:/.test(link))
+      .map(([, link]) =>
+        relative(dest, placed(link) ?? join(dest, rel, '..', link))
+          .split(sep)
+          .join('/'),
+      );
+    const texts = [rel, ...new Set(linked)]
+      .filter((file) => existsSync(join(dest, file)))
+      .map((file) => ({ file, lines: read(join(dest, file)).split('\n') }));
+    const paths = new Set<string>();
+    for (const { file, lines } of texts)
+      lines.forEach((line, i) => {
+        for (const [, pack, raw] of line.matchAll(PACK)) {
+          const name = raw.replace(/[.,;:]+$/, '');
+          if (/[<>…*]/.test(pack + name)) continue;
+          paths.add(`${pack}:${name}`);
+          if (!uses[pack]?.includes(name))
+            checked.warnings.push(
+              `[${target}] ${file}:${i + 1}: names <packs>/${pack}/skills/${name}, but ${pack}:${name} is not in ${flow}'s uses`,
+            );
+        }
+      });
+    const all = texts.map(({ lines }) => lines.join('\n')).join('\n');
+    for (const [owner, names] of Object.entries(uses))
+      for (const name of names) {
+        const id = `${owner}:${name}`;
+        const short = SHORT_NAMES.includes(name);
+        if (short ? all.includes(id) || paths.has(id) : all.includes(name)) continue;
+        const word = short ? new RegExp(`\\b${name}\\b`) : undefined;
+        const bare = word
+          ? texts.flatMap(({ file, lines }) =>
+              lines.flatMap((line, i) => (word.test(line) ? [`${file}:${i + 1}`] : [])),
+            )
+          : [];
+        if (bare.length)
+          checked.warnings.push(
+            `[${target}] ${bare[0]}: uses ${id} but names it only as the bare word "${name}"; write ${id} or its pack path`,
+          );
+        else checked.problems.push(`[${target}] ${rel}:1: uses ${id}, which neither it nor a reference it links names`);
+      }
   }
   return checked;
 }

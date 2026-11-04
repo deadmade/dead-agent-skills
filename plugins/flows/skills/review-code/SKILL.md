@@ -3,6 +3,7 @@ name: review-code
 description: 'Review a branch before it merges, or the whole repo: run its checks once, pick review lenses from what the diff touches (correctness, lean and spec, tests, docs, security, risk), verify every finding, and report on one screen with the full table in docs/audits/. Fixes only what you pick, then confirms the decisions the build made on its own and offers how to integrate. Never posts or pushes. Use for /review-code [branch|all] [base].'
 disable-model-invocation: true
 argument-hint: '[branch|all] [base branch or commit]'
+uses: claude-code:general-purpose, claude-code:code-review, claude-code:security-review, claude-code:Monitor, claude-md-management@claude-plugins-official:claude-md-improver, claude-security@claude-plugins-official:claude-security, flows:writing, web-mcp:fetch, superpowers:verification-before-completion, superpowers:systematic-debugging, superpowers:test-driven-development, superpowers:finishing-a-development-branch, ponytail:ponytail-review, ponytail:ponytail-audit, pstack-picks:blast-radius, pstack-picks:interrogate, pstack-picks:principle-boundary-discipline, tob-picks:spec-to-code-compliance, tob-picks:spec-compliance, tob-picks:spec-compliance-checker, tob-picks:mutation-testing, tob-picks:property-based-testing, tob-picks:sharp-edges, security-audit:security-audit, mattpocock-picks:improve-codebase-architecture, mattpocock-picks:grilling
 ---
 
 # review-code

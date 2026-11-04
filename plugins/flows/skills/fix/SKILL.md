@@ -3,6 +3,8 @@ name: fix
 description: 'Fix a bug from symptom to verified branch: reproduce it, map where it lives and what a fix could break, search upstream for the same issue, find the root cause with systematic debugging, approve it, write the failing regression test first, fix, then /review-code and /learn. Resumable. Use for /fix [symptom, error or issue]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: 'What is broken? (symptom, error text, issue link)'
+uses: pstack-picks:how, pstack-picks:why, pstack-picks:blast-radius, web-mcp:search, web-mcp:fetch, superpowers:systematic-debugging, superpowers:test-driven-development
+template: references/build-template.md
 ---
 
 # fix

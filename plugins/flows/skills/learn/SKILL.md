@@ -3,6 +3,7 @@ name: learn
 description: 'Keep what a piece of work taught, so the next session starts smarter: collect the surprises, decisions and root causes from a flow or the current session, sort each to its home (CLAUDE.md, GLOSSARY.md, an ADR, docs/solutions/, a skill, or memory), and write the few that matter without asking. The last step of every build flow. Use for /learn [flow.md or topic].'
 disable-model-invocation: true
 argument-hint: '[path to a flow.md, or what to look back on]'
+uses: claude-md-management@claude-plugins-official:revise-claude-md, mattpocock-picks:domain-modeling, pstack-picks:recall, superpowers:writing-skills
 ---
 
 # learn

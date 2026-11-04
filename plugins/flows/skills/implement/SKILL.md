@@ -3,6 +3,8 @@ name: implement
 description: 'Build from a plan, spec or ticket that already exists, without the design phases of /build-feature: turn a spec into tickets or a plan if needed, approve the plan, execute it test-first through superpowers, then /review-code and /learn. One approval gate, resumable. Use for /implement [path to plan, spec or ticket]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: 'Path to a plan, spec or ticket'
+uses: pstack-picks:how, pstack-picks:principle-redesign-from-first-principles, pstack-picks:principle-boundary-discipline, mattpocock-picks:codebase-design, mattpocock-picks:to-tickets, superpowers:writing-plans, superpowers:subagent-driven-development, superpowers:executing-plans
+template: references/build-template.md
 ---
 
 # implement

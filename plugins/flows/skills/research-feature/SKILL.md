@@ -3,6 +3,8 @@ name: research-feature
 description: "Research a design question before anything is built: frame it against this codebase, search papers and engineering sources (vendor docs, postmortems, how other projects do it), weigh the options against the evidence, and write a decision report with a recommendation. One approval gate, no plan, no build, no benchmark; then offers /build-feature with the report as its input. Use for /research-feature [question]; no argument resumes the active research, a run's slug resumes that run."
 disable-model-invocation: true
 argument-hint: "What should the research answer (or a run's slug)?"
+uses: claude-code:general-purpose, web-mcp:search, web-mcp:fetch, paper-lookup:paper-lookup, mattpocock-picks:grilling
+template: skills/research-feature/references/research-template.md
 ---
 
 # research-feature

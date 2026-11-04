@@ -26,21 +26,21 @@ Installing flows installs every plugin below; the packs ship inside flows itself
 
 ```text
 build-feature
-├ pstack-picks: how, why, architect, arena, interrogate, blast-radius, principle-redesign-from-first-principles, principle-boundary-discipline
 ├ claude-code: general-purpose
-├ superpowers: brainstorming, writing-plans, using-git-worktrees, subagent-driven-development, executing-plans
-├ mattpocock-picks: codebase-design, grilling, domain-modeling
-└ ponytail: ponytail-review
+├ mattpocock-picks: codebase-design, domain-modeling, grilling
+├ ponytail: ponytail-review
+├ pstack-picks: architect, arena, blast-radius, how, interrogate, principle-boundary-discipline, principle-redesign-from-first-principles, why
+└ superpowers: brainstorming, executing-plans, subagent-driven-development, using-git-worktrees, writing-plans
 
 fix
-├ pstack-picks: how, why, blast-radius
-├ web-mcp: search, fetch
-└ superpowers: systematic-debugging, test-driven-development
+├ pstack-picks: blast-radius, how, why
+├ superpowers: systematic-debugging, test-driven-development
+└ web-mcp: fetch, search
 
 implement
-├ pstack-picks: how, principle-redesign-from-first-principles, principle-boundary-discipline
 ├ mattpocock-picks: codebase-design, to-tickets
-└ superpowers: writing-plans, subagent-driven-development, executing-plans
+├ pstack-picks: how, principle-boundary-discipline, principle-redesign-from-first-principles
+└ superpowers: executing-plans, subagent-driven-development, writing-plans
 
 learn
 ├ claude-md-management@claude-plugins-official: revise-claude-md
@@ -50,33 +50,33 @@ learn
 
 research-feature
 ├ claude-code: general-purpose
-├ web-mcp: search, fetch
+├ mattpocock-picks: grilling
 ├ paper-lookup: paper-lookup
-└ mattpocock-picks: grilling
+└ web-mcp: fetch, search
 
 review-code
-├ claude-code: general-purpose, code-review, security-review, Monitor
+├ claude-code: Monitor, code-review, general-purpose, security-review
 ├ claude-md-management@claude-plugins-official: claude-md-improver
 ├ claude-security@claude-plugins-official: claude-security
 ├ flows: writing
-├ web-mcp: fetch
-├ superpowers: verification-before-completion, systematic-debugging, test-driven-development, finishing-a-development-branch
-├ ponytail: ponytail-review, ponytail-audit
+├ mattpocock-picks: grilling, improve-codebase-architecture
+├ ponytail: ponytail-audit, ponytail-review
 ├ pstack-picks: blast-radius, interrogate, principle-boundary-discipline
-├ tob-picks: spec-to-code-compliance, spec-compliance, spec-compliance-checker, mutation-testing, property-based-testing, sharp-edges
 ├ security-audit: security-audit
-└ mattpocock-picks: improve-codebase-architecture, grilling
+├ superpowers: finishing-a-development-branch, systematic-debugging, test-driven-development, verification-before-completion
+├ tob-picks: mutation-testing, property-based-testing, sharp-edges, spec-compliance, spec-compliance-checker, spec-to-code-compliance
+└ web-mcp: fetch
 
 understand
-├ pstack-picks: how, why
 ├ graphify: graphify
-└ mattpocock-picks: teach, domain-modeling
+├ mattpocock-picks: domain-modeling, teach
+└ pstack-picks: how, why
 
 upgrade
 ├ dead-skills: context7
-├ web-mcp: fetch
 ├ pstack-picks: blast-radius
-└ superpowers: writing-plans, test-driven-development
+├ superpowers: test-driven-development, writing-plans
+└ web-mcp: fetch
 ```
 
 <!-- uses:end -->

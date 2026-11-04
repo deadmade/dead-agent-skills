@@ -3,6 +3,8 @@ name: upgrade
 description: 'Bump a dependency safely: read its changelog and migration guide, find every use in the code and what the breaking changes hit, approve a plan, bump, fix and test, then /review-code. Resumable. Use for /upgrade [package@version]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: '<package>[@version]'
+uses: dead-skills:context7, web-mcp:fetch, pstack-picks:blast-radius, superpowers:writing-plans, superpowers:test-driven-development
+template: references/build-template.md
 ---
 
 # upgrade

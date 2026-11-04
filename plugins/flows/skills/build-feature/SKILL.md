@@ -3,6 +3,8 @@ name: build-feature
 description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /build-feature [what to build]; no argument resumes the active feature, a run's slug resumes that run."
 disable-model-invocation: true
 argument-hint: "What do you want to build (or a run's slug)?"
+uses: pstack-picks:how, pstack-picks:why, pstack-picks:architect, pstack-picks:arena, pstack-picks:interrogate, pstack-picks:blast-radius, pstack-picks:principle-redesign-from-first-principles, pstack-picks:principle-boundary-discipline, claude-code:general-purpose, superpowers:brainstorming, superpowers:writing-plans, superpowers:using-git-worktrees, superpowers:subagent-driven-development, superpowers:executing-plans, mattpocock-picks:codebase-design, mattpocock-picks:grilling, mattpocock-picks:domain-modeling, ponytail:ponytail-review
+template: skills/build-feature/references/flow-template.md
 ---
 
 # build-feature

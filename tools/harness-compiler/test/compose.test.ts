@@ -274,9 +274,12 @@ test('reads CRLF as LF', () => {
   assert.deepEqual(compose(crlf), compose(FLOW));
 });
 
-const checked = (files: Record<string, string>, target: TargetId = 'claude-code') => {
+// checkBuilt on the composed files written over their sources, as the build writes them into the target tree.
+const checked = (files: Record<string, string>, target: TargetId = 'claude-code', tokens = TOKENS) => {
   const dir = plugin(files);
-  return checkBuilt(dir, target, composeFlows(dir, TOKENS));
+  const composed = composeFlows(dir, tokens);
+  for (const [path, text] of composed.files) put(dir, path, text);
+  return checkBuilt(dir, target, composed);
 };
 const CONDUCTOR = '---\nname: c\ndisable-model-invocation: true\n---\n';
 
@@ -322,6 +325,55 @@ test('checkBuilt: Codex text naming a Claude-only phrase outside packs/ and reso
   assert.equal(codex.warnings.length, 1);
   assert.match(codex.warnings[0], /skills\/c\/SKILL\.md:2: .*AskUserQuestion/);
   assert.deepEqual(checked(files, 'claude-code').warnings, []);
+});
+
+// A conductor whose frontmatter uses `uses` and whose body reads `body`.
+const usesFlow = (uses: string, body: string) =>
+  `---\nname: c\ndisable-model-invocation: true\nuses: ${uses}\n---\n${body}\n`;
+
+test("checkBuilt: a uses name absent from the conductor's SKILL.md and linked references is a problem, per target", () => {
+  const uses = 'superpowers:writing-plans, ponytail:ponytail-review';
+  const ref = { 'skills/c/references/r.md': 'Then ponytail-review.\n' };
+  const linked = checked({
+    ...ref,
+    'skills/c/SKILL.md': usesFlow(uses, 'Run writing-plans. See [r](references/r.md).'),
+  });
+  assert.deepEqual(linked, { problems: [], warnings: [], estimates: { c: linked.estimates.c } });
+  const unlinked = checked({ ...ref, 'skills/c/SKILL.md': usesFlow(uses, 'Run writing-plans.') });
+  assert.equal(unlinked.problems.length, 1);
+  assert.match(unlinked.problems[0], /^\[claude-code\] skills\/c\/SKILL\.md:\d+: .*ponytail:ponytail-review/);
+  // Each target checks its own uses against its own text: only Claude Code's token uses Monitor without naming it.
+  const files = { 'skills/c/SKILL.md': usesFlow('superpowers:writing-plans', 'Run writing-plans, then {{watch}}.') };
+  const claude = checked(files, 'claude-code', { watch: { text: 'watch it', uses: { 'claude-code': ['Monitor'] } } });
+  assert.equal(claude.problems.length, 1);
+  assert.match(claude.problems[0], /^\[claude-code\] .*claude-code:Monitor/);
+  assert.deepEqual(checked(files, 'codex', { watch: { text: 'poll it' } }).problems, []);
+});
+
+test('checkBuilt: a short-name use counts only as plugin:name or a pack path, and bare words are never flagged', () => {
+  const plain = checked({
+    'skills/c/SKILL.md': usesFlow('superpowers:writing-plans', 'Run writing-plans: how and why.'),
+  });
+  assert.deepEqual([plain.problems, plain.warnings], [[], []]);
+  for (const mention of ['pstack-picks:how', '<packs>/pstack-picks/skills/how/SKILL.md'])
+    assert.deepEqual(checked({ 'skills/c/SKILL.md': usesFlow('pstack-picks:how', `Read ${mention}.`) }).warnings, []);
+  // Short names warn until the conductors are converted.
+  const bare = checked({ 'skills/c/SKILL.md': usesFlow('pstack-picks:how', 'Ask how it works.') });
+  assert.deepEqual(bare.problems, []);
+  assert.equal(bare.warnings.length, 1);
+  assert.match(bare.warnings[0], /^\[claude-code\] skills\/c\/SKILL\.md:\d+: .*pstack-picks:how/);
+});
+
+test("checkBuilt: a pack path in a conductor's text that isn't in its uses is a warning", () => {
+  const body = [
+    'Read <packs>/superpowers/skills/writing-plans/SKILL.md and <packs>/<pack>/skills/<name>/SKILL.md.',
+    'Then <packs>/ponytail/skills/ponytail/SKILL.md and `<flow-root>/packs/tob-picks/skills/sharp-edges/SKILL.md`.',
+  ].join('\n');
+  const { problems, warnings } = checked({ 'skills/c/SKILL.md': usesFlow('superpowers:writing-plans', body) });
+  assert.deepEqual(problems, []);
+  assert.equal(warnings.length, 2, warnings.join('\n'));
+  assert.match(warnings[0], /skills\/c\/SKILL\.md:6: .*ponytail:ponytail/);
+  assert.match(warnings[1], /skills\/c\/SKILL\.md:6: .*tob-picks:sharp-edges/);
 });
 
 test('the host maps agree', () => {

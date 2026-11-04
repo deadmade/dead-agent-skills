@@ -1,6 +1,0 @@
-{
-  "claude-code": ["general-purpose"],
-  "web-mcp": ["search", "fetch"],
-  "paper-lookup": ["paper-lookup"],
-  "mattpocock-picks": ["grilling"]
-}
