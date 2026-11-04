@@ -6,9 +6,10 @@ silently edited plan.
 
 ## Reviewers
 
-Spawn 2–3 `general-purpose` subagents in one message, fresh (never a fork). Each receives only the named files, not this conversation or rejected options. Each gets: the spec, the plan, the grounding and prior-art
-sections of flow.md, the ADRs, its angle below, and the rubric. Spread the angles over `fable`, `opus` and
-`sonnet`, one angle per model; every angle below still runs, Simpler included.
+Spawn 2–3 fresh subagents in one message (never a fork). Each receives only the named files, not this conversation
+or rejected options. Each gets: the spec, the plan, the grounding and prior-art sections of flow.md, the ADRs, its
+angle below, and the rubric. Run the angles on {{model:other}}, {{model:strongest}} and {{model:standard}}, one angle
+per model where the host offers more than one; every angle below still runs, Simpler included.
 
 | Angle           | Looks for                                                                                                                                                                                                                                                                                  |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -17,6 +18,7 @@ sections of flow.md, the ADRs, its angle below, and the rubric. Spread the angle
 | **Simpler**     | `<packs>/ponytail/skills/ponytail-review/SKILL.md`, with the plan in place of a diff: tasks the spec doesn't need, a library or built-in that replaces custom code. Also a smaller first slice that delivers the core, and divergence from every prior-art approach with no stated reason. |
 
 Reviewer prompt tail (the Simpler reviewer reports in it, not in ponytail-review's Output format):
+
 <!-- overrides ponytail/skills/ponytail-review/SKILL.md: "Then the findings in three groups, skip empty groups:" -->
 
 ```

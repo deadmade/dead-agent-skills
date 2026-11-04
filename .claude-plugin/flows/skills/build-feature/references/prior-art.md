@@ -5,7 +5,7 @@ inventions.
 
 ## Agent prompt
 
-Launch one `general-purpose` agent in the background with this prompt, filled in:
+Launch one fresh agent in the background with this prompt, filled in:
 
 ```
 Research how other projects implement: <feature, in one paragraph>.
@@ -17,7 +17,7 @@ Find:
    this. For each: what shape they chose (data model, where the logic lives, sync vs async, …), the one or two
    decisions that matter, and a link to the code or docs (file or section, not the repo root).
 2. The official docs of every library, API or protocol involved, at the version this codebase uses (context7 MCP
-   tools if available: resolve the library id, then query; otherwise WebFetch). The sections that constrain the
+   tools if available: resolve the library id, then query; otherwise `web-mcp:fetch`, else WebFetch). The sections that constrain the
    design: limits, retries, idempotency, auth, ordering, deprecations.
 3. Known pitfalls: issues, postmortems or maintainer notes on how this goes wrong.
 
@@ -37,7 +37,7 @@ you can't write files.
 ## Source check
 
 Research agents misquote sources, cite a page that doesn't say it, or read docs for the wrong version. Once the
-report lands, give one fresh agent, on a different model where available (the Agent tool's `model`), only the
+report lands, give one fresh agent, on a different model from the report's where the host offers one, only the
 report file and the codebase facts from the prompt above, with this prompt:
 
 ```
@@ -54,7 +54,8 @@ is presented in Phase 2 as unverified, or not at all.
 
 ## Source rules
 
-- Fetched in this session or it doesn't get cited: WebSearch/WebFetch, context7, GitHub, files in the repo.
+- Fetched in this session or it doesn't get cited: the web, context7, GitHub, files in the repo. Search the web with
+  `web-mcp:search`, else WebSearch and open pages with `web-mcp:fetch`, else WebFetch.
 - Match the version the repo uses when docs are versioned.
 - Link to the section; code facts are `file:line` or a permalink.
 - Priority: official docs and specs → maintainer guides and examples → established references (MDN, OWASP, the
