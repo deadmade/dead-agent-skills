@@ -1,30 +1,44 @@
-writes = ["Run verdict"]
+writes = ["Skipped", "Run verdict"]
 
 text = '''
+### Decide
+
+Without a flow.md, the audit file stands in for it below.
+
 The verdict, one row each, with the evidence:
 
-| Part        | State                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------- |
-| Checks      | green: the commands of the last run, its commit, and that the tree since is unchanged |
-| Review      | findings fixed, findings the user left, and why                                       |
-| Decisions   | every item below, confirmed or reopened by the user                                   |
-| Not checked | flow-rules **ponytail at chosen steps**, the footer line                              |
+| Part            | State                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------- |
+| Checks          | green: the commands of the last run, its commit, and that the tree since is unchanged |
+| Review          | findings fixed, findings the user left, and why                                       |
+| Decisions       | every item below, confirmed or reopened by the user                                   |
+| Skipped: <what> | one row per skipped check or step: why, and whether the user accepted it              |
+| Not checked     | the footer line every report ends with                                                |
 
-**Decisions** are what the build decided without the user, in the report's **Waiting on you** list:
+A skipped check never counts as passed. The Skipped rows come from **Skipped** in flow.md and from this run's own
+skips (no subagents, a phase the user skipped); write any that is missing under **Skipped**.
 
-- each line under **Rulings** in the caller's flow.md, or an inline `/fix`'s when there is no caller;
-- each entry under **Deviations** in it, with the decision it got;
-- each line under **Parking lot** in it: do now, a follow-up, or drop;
+**Decisions** are what the run decided without the user, lettered so the user can reopen one by its letter:
+
+- each line under **Rulings**;
+- each entry under **Deviations**, with the decision it got;
+- each line under **Parking lot**, /learn's included: do now, a follow-up, or drop;
 - each new `shortcut:` line the branch adds: `git diff <merge-base> | rg '^\+.*shortcut:'`, plus `rg 'shortcut:'` on
   the untracked files.
 
-Standalone, without a flow.md, the shortcut lines and an inline `/fix`'s Rulings. **Gate:** the user confirms or
-reopens each one (`all`, or letters to reopen). A reopened one is a fix on the user's yes: back to the caller's build
-flow, else fixed here, and the checks re-run.
+**Gate:** the user confirms or reopens each decision (`all`, or the letters to reopen) and accepts or refuses each
+Skipped row. A reopened decision is handled as a deviation and goes back to the phase that built the code: as the next
+free task number in plan.md or, when the run has no plan.md, as the next numbered line under **Tasks**. Then the checks
+re-run and Decide starts again.
 
-**Ready** means every row is green or the user accepted what is left. If the tree changed since the last run, re-run
-the checks first.
+**Ready** means every row is green or the user accepted it in so many words; a Skipped row is never green. If the tree
+changed since the last run (a fix, /learn's files), re-run the checks first; committing the same files doesn't change
+it.
 
-At Finish, ask the user for the **Run verdict** and record it in flow.md: worked as a whole, yes or no; clean, yes
-or no.
+Once Ready, ask in one question:
+
+- the **Run verdict**, recorded under **Run verdict**: worked as a whole, yes or no; clean, yes or no;
+- the commits for everything uncommitted (`git status --short`: the code, flow.md, the audit file, what /learn wrote),
+  each shown with its message and files, made as the run rules say on the user's yes. Nothing is merged, pushed or
+  kept before they are made.
 '''

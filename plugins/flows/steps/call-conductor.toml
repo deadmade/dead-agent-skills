@@ -1,5 +1,13 @@
+writes = ["Findings", "Deviations", "Rulings"]
+
 text = '''
-- **Calling another conductor** (`/fix` → `/review-code`): read its SKILL.md and run it inline. Skip its start and
-  resume step (the caller hands it the input), keep its gates, then return to the caller's next phase. Its `now:`
-  goes into the caller's flow.md.
+**Calling another conductor:** read its SKILL.md (`<flow-root>/skills/<name>/SKILL.md`) and run it inline, inside this
+run:
+
+- It skips its start and resume step: the caller hands it the input, and it creates no flow.md of its own.
+- It keeps its gates; they continue the caller's numbering and name the callee.
+- It stops before its own Finish or Decide and returns to the caller's next phase. The caller's Decide covers both.
+- It writes into the caller's flow.md: its `now:`, and its **Findings**, **Deviations** and **Rulings** under the
+  caller's sections of those names. It leaves the caller's `phase:` as it is. A caller without a flow.md gets them in
+  its audit file, under the same headings.
 '''
