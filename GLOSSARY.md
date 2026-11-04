@@ -114,7 +114,7 @@ _Avoid_: session (one browser), user profile
 
 **Automation flag**:
 `navigator.webdriver` reading `true`: what a browser started for automation tells every page. web-mcp's window turns
-it off (ADR 0009); bot checks, Google's among them, treat it as a bot.
+it off (ADR 0009). Bot checks read it first; in the spike, Google sent the flagged window's typed search to `/sorry`.
 _Avoid_: stealth, webdriver mode
 
 **Typed search**:

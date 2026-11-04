@@ -39,11 +39,20 @@ you are researching. Shodan InternetDB is free for non-commercial use only.
 
 Each web-mcp server (one per Claude Code session) opens one visible browser window, on the first `search`, `browser`
 call or fetch fallback, and closes it when it exits. Everything runs as a tab of that window: one tab per engine, kept
-and reused by later searches, one per `browser` session, and one per fetch fallback, closed after it. An engine's next
-search types its query into the result page already open in that tab (Google, Bing, DuckDuckGo, Brave, Scholar), as a
-person would; a tab's first search, any `since`, a repeated query or a failed typing loads the result URL. Engines
-still run in parallel. If you close the window, the next call opens a new one; if the browser crashes, it is restarted. On
-Windows the browser also goes when web-mcp is killed.
+and reused by later searches, one per `browser` session, and one per fetch fallback, closed after it. When an engine's
+last search in this session got results for another query, its next search types the query into the result page
+already open in that tab, as a person would (Bing, DuckDuckGo, Brave and Scholar; not Semantic Scholar, and not Google
+yet: its result links don't parse, so it gets no results today). Every other search loads the result URL: a tab's
+first, one after a search that got no results or used `since`, any `since`, a repeated query, one with odd spacing,
+or a typing that doesn't land on this query's page; a typing that runs out of time skips the engine as timed out.
+Engines still run in parallel. If you close the window, the next call opens a new one; if the browser crashes, it is
+restarted. On Windows the browser also goes when web-mcp is killed.
+
+The window doesn't announce automation: it launches with `--disable-blink-features=AutomationControlled`, so
+`navigator.webdriver` reads `false`, and it sets no user agent of its own, so every tab sends the browser's real one.
+Nothing makes the browser report a value other than its own. Google's terms forbid bypassing its protective measures,
+and this can be read that way; ADR 0009 in the repository (`docs/adr/0009-no-automation-flag.md`) records why it's
+done and where the line is.
 
 The window's profile lives under `WEB_MCP_SEARCH_DIR` (default `$XDG_DATA_HOME/web-mcp`, `~/.local/share/web-mcp`, or
 `%LOCALAPPDATA%\web-mcp`), in `profiles/<n>/`: each server takes the first one no other server holds, so cookies carry

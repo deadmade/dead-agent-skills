@@ -16,8 +16,9 @@
 //! the session has no stored URL or `$FAKE_AB_PAGES/<engine>.nobox` exists (the engine of the stored URL's host, as
 //! in `engine_page`). It collects the text of its `press <one char>` (`Space`: a space) and `keyboard inserttext`
 //! commands, and at `press Enter` writes it to `<state>/<session>.typed` and sets the stored URL's `q` to it, other
-//! parameters kept; with `<engine>.nonav` the URL stays and the session's next batch without an `open` runs out its
-//! `wait`'s `--timeout` and fails that wait.
+//! parameters kept; with `<engine>.nonav` the URL stays, `<state>/<session>.stuck` marks it, and the session's next
+//! read (a batch with no `open` and no `click`, on a tab not gone) runs out its `wait`s' `--timeout`, fails them and
+//! removes the mark; `tab new` leaves it. With `<engine>.slowtype` the typing batch sleeps 60 s first.
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -199,6 +200,9 @@ fn typing(
             .zip(engine)
             .is_some_and(|(d, e)| d.join(format!("{e}.{m}")).exists())
     };
+    if marked("slowtype") {
+        std::thread::sleep(Duration::from_mins(1)); // past any deadline; the server kills the call
+    }
     let mut typed = String::new();
     let mut entries = Vec::new();
     for (i, c) in cmds.iter().enumerate() {

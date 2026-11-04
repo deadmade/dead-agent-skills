@@ -108,7 +108,7 @@ pub struct Profiles {
     /// `profiles/<n>` and its held lock, taken on the first `slot()` and kept until exit.
     slot: OnceLock<(PathBuf, File)>,
     /// One turn per engine, indexed by its discriminant: an engine's tab serves one search at a time. Each holds the
-    /// engine's last query that parsed as results, in this process.
+    /// engine's last query without `since` that parsed as results, in this process.
     turns: [tokio::sync::Mutex<Option<String>>; Engine::ALL.len()],
     /// The browser `ready()` uses in tests instead of looking for one.
     #[cfg(test)]
@@ -223,7 +223,7 @@ impl Profiles {
     }
 
     /// The engine's turn in this process, waited for until `until`; dropping it ends the turn. It holds the engine's
-    /// last query that parsed as results, in this process.
+    /// last query without `since` that parsed as results, in this process.
     pub async fn turn(
         &self,
         e: Engine,

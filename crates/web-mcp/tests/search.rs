@@ -285,25 +285,34 @@ fn search_fuses_all_four_engines() {
 fn engine_tab_stays_between_searches() {
     let (_fx, pages) = setup();
     let mut mcp = start(&pages, &[]);
-    for q in ["zebra", "zebra stripes"] {
+    for q in ["zebra", "zebra stripes", "zebra mane"] {
         all_answer(&mut mcp, json!({"query": q}));
     }
-    // Each tab: the first search's load, then the second's typing and its read.
-    assert_eq!(batches(&pages), engine_sessions(&mcp, 1, 3));
+    // Each tab: the first search's load, then each later search's typing and its read.
+    assert_eq!(batches(&pages), engine_sessions(&mcp, 1, 5));
     for cmd in ["tab new", "tab close", "close"] {
         assert_eq!(ran(&pages, cmd), [], "{cmd}");
     }
     for e in ENGINES {
-        let b = session_batches(&pages, &engine_session(&mcp, 1, e));
+        let session = engine_session(&mcp, 1, e);
+        let b = session_batches(&pages, &session);
         assert!(b[0].has("open") && !b[0].bail, "{e}");
-        assert!(
-            b[1].bail && b[1].holds(&["press", "Space"]) && !b[1].has("open"),
-            "{e}"
-        );
-        assert!(!b[2].has("open") && !b[2].has("click"), "{e}");
-        // The typed read waits for a new document, so the old page never ends it.
-        let ready = b[2].wait_arg("--fn").unwrap_or_default();
-        assert!(ready.contains("performance.timeOrigin !=="), "{e}");
+        // A typed search's results are remembered too, so the next one types again.
+        for at in [1, 3] {
+            assert!(
+                b[at].bail && b[at].holds(&["press", "Space"]) && !b[at].has("open"),
+                "{e} {at}"
+            );
+            assert!(
+                !b[at + 1].has("open") && !b[at + 1].has("click"),
+                "{e} {at}"
+            );
+            // The typed read waits for a new document, so the old page never ends it.
+            let ready = b[at + 1].wait_arg("--fn").unwrap_or_default();
+            assert!(ready.contains("performance.timeOrigin !=="), "{e} {at}");
+        }
+        let typed = std::fs::read_to_string(mcp.state.join(format!("{session}.typed"))).unwrap();
+        assert_eq!(typed, "zebra mane", "{e}");
     }
 }
 
@@ -392,6 +401,26 @@ fn no_navigation_falls_back_to_the_url() {
     assert!(!b[2].has("open"));
     assert_eq!(b[2].wait_timeout(), Some("4000"));
     assert!(b[3].has("open"));
+    assert!(!any_rest(&mcp));
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn slow_typing_times_out_without_a_second_load() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    mark(&pages, "bing.slowtype");
+    let t0 = Instant::now();
+    let r = search(&mut mcp, json!({"query": "zebra stripes"}));
+    // The fake types for 60 s; the 10 s deadline ends the call (slack for slow runners).
+    assert!(t0.elapsed() < Duration::from_secs(25), "{:?}", t0.elapsed());
+    let t = text(&r);
+    assert!(first_line(t).contains("(skipped: bing: timed out)"), "{t}");
+    // The typing ran out the time a fallback load would need, so none is tried.
+    let b = session_batches(&pages, &engine_session(&mcp, 1, "bing"));
+    assert_eq!(b.len(), 2);
+    assert!(b[1].bail && b[1].has("click"));
     assert!(!any_rest(&mcp));
 }
 

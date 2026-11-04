@@ -148,7 +148,7 @@ pub async fn run_engine(
         return Err(why);
     }
     let mut last = profiles.turn(e, deadline).await.ok_or("busy")?;
-    // Put back only on results.
+    // Put back only on results without `since`.
     let prev = last.take();
     // Another process may have rested it while we waited.
     if let Some(why) = resting() {
@@ -259,7 +259,7 @@ async fn typed_page(
 }
 
 /// Whether this search types its query into the result page the engine's tab holds: the engine's last search here
-/// parsed as results for another query (`prev`), there is no `since`, the engine has a search box, and the query has
+/// without `since` parsed as results for another query (`prev`), there is no `since`, the engine has a search box, and the query has
 /// no control characters and no leading, trailing or doubled whitespace.
 fn types(e: Engine, prev: Option<&str>, query: &str, since: Option<Since>) -> bool {
     prev.is_some_and(|p| p != query)
@@ -609,6 +609,19 @@ mod tests {
                 v(&["press", "1"]),
                 v(&["keyboard", "inserttext", "+ü-"]),
                 v(&["press", "x"]),
+                v(&["press", "Enter"]),
+            ]
+        );
+        // A trailing run is inserted before Enter.
+        assert_eq!(
+            typing("#b", "x é+"),
+            vec![
+                v(&["eval", "performance.timeOrigin"]),
+                v(&["click", "#b"]),
+                v(&["press", "Control+a"]),
+                v(&["press", "x"]),
+                v(&["press", "Space"]),
+                v(&["keyboard", "inserttext", "é+"]),
                 v(&["press", "Enter"]),
             ]
         );
