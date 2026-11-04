@@ -1,0 +1,5 @@
+text = '''
+- **Calling another conductor** (`/fix` → `/review-code`): read its SKILL.md and run it inline. Skip its start and
+  resume step (the caller hands it the input), keep its gates, then return to the caller's next phase. Its `now:`
+  goes into the caller's flow.md.
+'''

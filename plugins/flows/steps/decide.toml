@@ -1,0 +1,30 @@
+writes = ["Run verdict"]
+
+text = '''
+The verdict, one row each, with the evidence:
+
+| Part        | State                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------- |
+| Checks      | green: the commands of the last run, its commit, and that the tree since is unchanged |
+| Review      | findings fixed, findings the user left, and why                                       |
+| Decisions   | every item below, confirmed or reopened by the user                                   |
+| Not checked | flow-rules **ponytail at chosen steps**, the footer line                              |
+
+**Decisions** are what the build decided without the user, in the report's **Waiting on you** list:
+
+- each line under **Rulings** in the caller's flow.md, or an inline `/fix`'s when there is no caller;
+- each entry under **Deviations** in it, with the decision it got;
+- each line under **Parking lot** in it: do now, a follow-up, or drop;
+- each new `shortcut:` line the branch adds: `git diff <merge-base> | rg '^\+.*shortcut:'`, plus `rg 'shortcut:'` on
+  the untracked files.
+
+Standalone, without a flow.md, the shortcut lines and an inline `/fix`'s Rulings. **Gate:** the user confirms or
+reopens each one (`all`, or letters to reopen). A reopened one is a fix on the user's yes: back to the caller's build
+flow, else fixed here, and the checks re-run.
+
+**Ready** means every row is green or the user accepted what is left. If the tree changed since the last run, re-run
+the checks first.
+
+At Finish, ask the user for the **Run verdict** and record it in flow.md: worked as a whole, yes or no; clean, yes
+or no.
+'''

@@ -1,0 +1,31 @@
+uses = [
+  "superpowers:finishing-a-development-branch",
+  "superpowers:systematic-debugging",
+  "pstack-picks:blast-radius",
+  "flows:writing",
+]
+requires = ["decide"]
+
+text = '''
+Then follow `finishing-a-development-branch` from its Step 2: the last run is its Step 1. Show its options as it
+lists them, with your recommendation. It's the user's choice; called from a build flow, record it and the confirmed
+decisions in its flow.md.
+<!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "Run the project's full test suite" -->
+
+**Push and PR**, when the user picks that option. Commits are shown (message and files each) before any is made: one
+sentence, no co-author lines, `git add -u` plus new paths by name. Never run `git push` or a `gh` command that writes;
+pushing is the owner's call and their hooks block it.
+<!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "git push -u origin <feature-branch>" -->
+
+- The body, saved to a scratchpad file: why; what changed, opening with the smallest picture of it (a call tree, a
+  before/after line, a few boxes in plain text); blast radius (pstack `blast-radius` over the diff) with a **Door**
+  line (one-way: data, a wire format, a public interface; two-way: a revert undoes it); verification, with the
+  before/after output where behaviour changed. Revise it by `flows:writing`.
+- **Gate:** show the title and body. On approval, hand over `! git push -u origin <branch>` and
+  `! gh pr create --title "<title>" --body-file <file>`.
+- Once the PR exists, `Monitor` on `gh pr checks <pr> --watch`. A red check: superpowers `systematic-debugging` to the
+  cause, then stop with the check, the cause and the options (a fix, a rerun, a flaky test). The push of a fix is
+  again the user's `!` line.
+
+Set `phase: done`.
+'''

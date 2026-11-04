@@ -1,0 +1,10 @@
+requires = ["decide", "close"]
+writes = ["Walkthrough"]
+
+text = '''
+1. Walkthrough table in flow.md: every spec goal → plan task → `file:line` → test. A goal with no code, or code with
+   no goal, is a deviation: report it.
+2. Run `/review-code branch` (read `<flow-root>/skills/review-code/SKILL.md`) on the branch, with the spec as its intent. If
+   execution ran natively (no per-task reviews), tell it so: it then also offers pstack `interrogate`.
+3. Run `/learn` (`<flow-root>/skills/learn/SKILL.md`) on this flow.
+'''
