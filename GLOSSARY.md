@@ -79,8 +79,8 @@ A flows skill the user starts by name that runs other skills in order, with gate
 _Avoid_: workflow, flow (alone; a flow run is one execution)
 
 **Flow step**:
-A piece of conductor text written once and copied word for word into every conductor that names it. It reads the same
-in each.
+A piece of conductor text written once, in `plugins/flows/steps/<name>.toml`, and copied word for word into every
+conductor that names it. It reads the same in each.
 _Avoid_: step (alone; a pipeline step is something else), partial, include, snippet
 
 **Host token**:

@@ -34,7 +34,8 @@ decided on.
 
 - The flow cockpit. Nothing is designed for it; its tests that read SKILL.md tables and template headings keep passing
   for free where they can.
-- Structure as data: no schema, no phase fields, no `kinds.json`.
+- Conductors as data: no phase fields, no `kinds.json`. Only steps are data: TOML with a schema (step format
+  reopened 2026-11-04, §1).
 - New flows beyond `/refactor`. Spike, release, incident and onboarding flows come later, built from the same steps.
 - Changing vendored packs. They change only through their sync transforms, and conductors override them with markers.
 
@@ -56,7 +57,11 @@ decided on.
 - After compaction, Claude Code keeps only a skill's first 5,000 tokens, with 25,000 shared across skills. The Agent
   Skills spec recommends under 500 lines and 5,000 tokens. Codex gives the skill list 2% of context (prior-art.md,
   source checked).
-- No new npm dependency; Node 26 runs `.ts` directly (`package.json` engines; `check-repo.mjs` imports `.ts`).
+- One parser library, `smol-toml` (zero dependencies), pinned exactly in `tools/harness-compiler/package.json`, for
+  the step files; nothing else new. Every job that runs check-repo or the compiler installs packages first (sync.yml
+  gains `npm ci`; the flake's sandboxed pre-commit check gets `node_modules`), and a fresh clone runs `npm ci` before
+  committing (user decisions after the TOML recheck, 2026-11-04). Node 26 runs `.ts` directly (`package.json` engines; `check-repo.mjs` imports
+  `.ts`).
 
 ## Approaches
 
@@ -80,7 +85,8 @@ Both judges started from A (designs.md). The design takes these grafts:
 
 ```
 plugins/flows/
-  steps/<name>.md                 shared steps; not a catalog resource, never shipped
+  steps/<name>.toml               shared steps; not a catalog resource, never shipped
+  steps/step.schema.json          the step keys, types and values; compose reads them, editors complete from them
   skills/<flow>/SKILL.md          the flow source: frontmatter, own prose, ## Phase headings, [step: name] lines
   skills/<flow>/references/       lookups only: templates, subagent briefs, deep methods (also composed)
   skills/<flow>/scripts/          unchanged
@@ -91,17 +97,29 @@ tools/harness-compiler/src/
                                   adapter token's source text, without its H1)
 ```
 
-**A step file** is plain Markdown, copied byte for byte. It has no `#`/`##` headings, because it lives under the
-flow's heading, and when it is long it may use `###` for its own name. It may have frontmatter: `key: value` lines,
-parsed without a YAML library.
+**A step file** is TOML (step format reopened after Task 5 and decided 2026-11-04, after two format panels; the
+user: "using json in the steps is way easier to combine to one proper markdown file and is easier to create and
+validate than just text"). Every key but `text` is optional:
 
-- `uses:` the skills, agents and tools its text runs (`superpowers:executing-plans, pstack-picks:how`);
-- `requires:` steps that must also be in any flow using it (`execute` requires `worktree`);
-- `writes:` flow.md sections it writes (`Rulings, Parking lot`), checked against the flow's template;
-- `needs: subagents` when its text dispatches subagents; the step must then contain a line starting
-  `Without subagents:` saying what happens instead.
+- `uses`: the skills, agents and tools its text runs (`["superpowers:executing-plans", "pstack-picks:how"]`);
+- `requires`: steps that must also be in any flow using it (`execute` requires `["worktree"]`);
+- `writes`: flow.md sections it writes (`["Rulings", "Parking lot"]`), checked against the flow's template;
+- `needs = "subagents"` when its text dispatches subagents; the text must then contain a line starting
+  `Without subagents:` saying what happens instead;
+- `repeat = true`: the step may appear more than once in a file (only `gate`);
+- `in = "every-conductor"` (only `run-rules` has it): every converted conductor (a SKILL.md holding `[step: phases]`)
+  must use the step. No step names a conductor;
+- `text`: the step's Markdown, a multi-line literal string whose opener stands alone on its line (`text = '''`), so
+  nothing in it is escaped and its lines map to file lines. Compose copies it byte for byte. It can't contain `'''`. It
+  has no `#`/`##` headings, because it lives under the flow's heading, and when it is long it may use `###` for its
+  own name.
 
-In steps as in flows, override markers sit next to the sentences they override, and they are stripped from the built
+`smol-toml` parses the files. Compose loads only `steps/<name>.toml` files whose name is a step name
+(`[a-z][a-z-]*`), and takes the key list, types and allowed values from `steps/step.schema.json`, so the schema is the
+one source. `.taplo.toml` at the repository root points editors at the schema, so completion and squiggles work while
+writing. Nothing formats the step files: taplo would never touch the text inside `'''`.
+
+In steps (inside `text`) as in flows, override markers sit next to the sentences they override, and they are stripped from the built
 output.
 
 **A flow file** stays `skills/<flow>/SKILL.md`, so the loader, the catalog `skills` resource, conductor detection in
@@ -255,20 +273,31 @@ can rewrite. The workspace test glob and `flake.nix:47` already pick them up.
 Each flow's SKILL.md names its run template in a `template:` frontmatter key, a comma list of paths relative to the
 flows plugin root; review-code names `skills/review-code/references/audit-template.md`, a new audit template with
 the sections its steps write (Findings, Tasks, Rulings, Parking lot, Deviations, Skipped, Run verdict). The build strips `template:` along with `uses:`. A step whose
-frontmatter says `repeat: true` (only `gate` does) may appear more than once in a file, and each time it is copied in
+file says `repeat = true` (only `gate` does) may appear more than once in a file, and each time it is copied in
 full.
+
+Compose reads every `steps/*.toml` once per build and checks it whether or not a flow uses it: a TOML syntax error
+(with smol-toml's line and caret, and a hint when a `'''` inside the text ended it), an unknown key (the message
+lists the valid keys), a wrong type (`repeat` not a boolean; `uses`, `requires` or `writes` not a list of strings; a
+`uses` entry not `plugin:name`), a `needs` or `in` value outside its one allowed value, and a missing `text` or one
+whose opener isn't alone on its line. The checks on a step's text (check 1's headings, `[step:` lines and
+`<skill-dir>`, check 4's `Without subagents:` line, and its tokens) still run only on the steps a file uses, so a
+verbatim commit can carry today's wording (the Task 1 ruling, narrowed to the text on 2026-11-04).
 
 The build reports, citing `file:line`:
 
-1. an unknown step or token, a token missing in one target, a step without `repeat: true` used twice in one file, a
+1. an unknown step or token, a token missing in one target, a step without `repeat = true`
+   used twice in one file, a
    `[step:` line, a `#`/`##` heading or `<skill-dir>` inside a step, a phase name longer than one word in a file
-   that contains `[step: phases]` (today's unconverted conductors build unchanged); the two host maps' keys must match
-   (a test, since `composeFlows` sees one map);
-2. an unmet `requires:`;
-3. a `writes:` section missing from a template: checked against every template the including flow names
+   that contains `[step: phases]` (today's unconverted conductors build unchanged), and in such a file a line that
+   looks like a step line but isn't exactly `[step: <name>]` (`[step:x]`, `[Step: x]`, a trailing space) or a
+   converted conductor missing an `in = "every-conductor"` step; the two host maps' keys
+   must match (a test, since `composeFlows` sees one map);
+2. an unmet `requires`;
+3. a `writes` section missing from a template: checked against every template the including flow names
    (/implement names both run templates, because of the slug route); a flow with no `template:` fails if any step it
-   uses declares `writes:`. A callee's writes land in the caller's own template, so nothing follows a call;
-4. a `needs: subagents` step without a `Without subagents:` line;
+   uses declares `writes`. A callee's writes land in the caller's own template, so nothing follows a call;
+4. a `needs = "subagents"` step without a `Without subagents:` line;
 5. built text that names `flow-rules` (the file is gone);
 6. a `node …` command or `references/…` link in built text that doesn't resolve in that target's tree, or a
    `node "./…"` path relative to the working directory;
@@ -294,7 +323,7 @@ a marker therefore fails check-repo in the sync job before its PR opens (`sync.y
 review, 2026-11-04; the earlier sentence that the sync PR still opens was wrong). Before resolving, checks 6 and 7 and
 `checkPackPaths` map `<flow-root>` to the target's built plugin folder.
 
-Traceability: steps are verbatim, so `grep -rF "<sentence>" plugins/flows` finds the one source file.
+Traceability: step text is verbatim inside `text`, so `grep -rF "<sentence>" plugins/flows` finds the one source file.
 
 ### 5. What happens to existing pieces
 
@@ -303,13 +332,16 @@ Traceability: steps are verbatim, so `grep -rF "<sentence>" plugins/flows` finds
 | `references/flow-rules.md`                       | split into steps, then deleted; Audits, Scope, Reports and the tob spec-compliance lines move into review-code (#71)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `skills/*/uses.json`                             | deleted; `flows-uses.mjs` takes `composeFlows(…, TOKENS).uses` from compose.ts for the dependencies and README tree (#47, #61). A flow's uses per target = its own `uses:`, its steps', and the uses of the host text its tokens resolve to: each token map entry carries its own uses (`{{watch-checks}}` on Claude Code uses `claude-code:Monitor`; `{{adapter}}` on Claude Code uses `claude-code: code-review, security-review`, `claude-md-management@claude-plugins-official: claude-md-improver`, `claude-security@claude-plugins-official: claude-security`, and its text names claude-md-improver). `plugin.json` dependencies come from the Claude Code union; the neutral README tree lists the neutral union and marks host-only entries with the host (my call) |
 | override markers                                 | unchanged syntax; `checkOverrides` already scans `steps/`; compose strips them from output                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `checkTemplates`                                 | the gate line from `steps/gate.md`; `Waiting for you` and `Status: decided` from `steps/deviations.md`; `**Does:**` and `**Depends on:**` from `steps/plan-shape.md`; `Picks:` and `Fixed <date>` from review-code's `audit-template.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `checkTemplates`                                 | the gate line from `steps/gate.toml`; `Waiting for you` and `Status: decided` from `steps/deviations.toml`; `**Does:**` and `**Depends on:**` from `steps/plan-shape.toml`; `Picks:` and `Fixed <date>` from review-code's `audit-template.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | run templates                                    | the two use the same section names for what the same steps write: Grounding replaces Findings; flow-template gains /fix's Findings (#9), Review and Learned; both get a Walkthrough whose first column is `goal` (spec goal, ticket criterion or the fixed cause)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `checks.md`'s Decide section                     | becomes the `decide` step                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `hosts/*.md`, `hosts.ts`, `references/host.md`   | the `{{adapter}}` token and the token maps                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| writing's tests (`writing-skill.test.mjs:31-43`) | assert on `steps/copyedit.md`; the `readUses` call goes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| writing's tests (`writing-skill.test.mjs:31-43`) | assert on `steps/copyedit.toml`; the `readUses` call goes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `phases.rs` table test                           | reads `.claude-plugin/flows/skills/*/SKILL.md`; its lists and `tests/docs.rs` updated in one task (§2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `npm run scan-skills`                            | also scans `.claude-plugin/flows/skills/`, where composed text lives (not the whole generated tree, which would scan every skill twice)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `steps/*.md` (Tasks 5)                           | renamed with `git mv` and converted to `steps/*.toml` with bodies unchanged byte for byte; `run-rules` gains `in = "every-conductor"`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `checkOverrides`, `checkPackPaths`               | their shared walker (`conductorDocs`) takes `steps/*.toml` as well as `.md`. The prose hook stays on `.md`: its hooks.json gates on `**/*.md`, and it ships to users                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| package.json, `sync.yml`, `flake.nix`, AGENTS.md | `smol-toml` 1.9.1 pinned exactly; `npm ci` before every workflow step that runs check-repo or the compiler; the sandboxed pre-commit check gets `node_modules`; AGENTS.md says a fresh clone runs `npm ci` before committing                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | AGENTS.md:63-66, README, GLOSSARY                | rewritten for steps and the new flow set                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### 6. Steps
@@ -327,7 +359,7 @@ The builder splits today's text into steps. This table is the expected set of st
 | `before-you-write`                            | a frozen copy of ponytail's Before you write, one override marker per copied sentence; required by `plan-shape` and `builder-brief`, so the rule lives once                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | #91                            |
 | `plan-shape` (requires `before-you-write`)    | writing-plans with Before you write; Does/Depends on/Adds/Size per task; Global Constraints with the seam lines, the no-interface line and Test seams; Files entries are plain paths (line ranges go in the step text); an added task takes the next free integer and states `Depends on:`; the execution handoff is overridden; stack-pack detection names the matching skill in Global Constraints; requires `plan-check`                                                                                                                                                                                                    | #4, #6, #8, #16, #34, #39, #48 |
 | `plan-check`                                  | glance runs and accepts the plan (after every edit and after the copyedit); every task has Does, Depends on, Adds and Size; a plan outside the run folder is linked from flow.md, never edited in place. glance gains a read-only mode that prints its block and writes nothing (today `glance.mjs:234` writes into the plan), used for a plan /implement is given                                                                                                                                                                                                                                                             | #6, #42, #48                   |
-| `gate` (`repeat: true`)                       | how a gate is asked and recorded: one line `- Gate <n>, <what>: <date>[, execution: …]`; an inline conductor's gates continue the caller's numbering and name the callee (`- Gate 3, fix: cause approved`); an execution method is offered only at a plan gate, and subagent-driven only when subagents exist; the copyedit line, and "not copyedited: no subagents" (or "a given plan is not changed") when skipped                                                                                                                                                                                                           | #9, #15, #44, #64              |
+| `gate` (`repeat = true`)                      | how a gate is asked and recorded: one line `- Gate <n>, <what>: <date>[, execution: …]`; an inline conductor's gates continue the caller's numbering and name the callee (`- Gate 3, fix: cause approved`); an execution method is offered only at a plan gate, and subagent-driven only when subagents exist; the copyedit line, and "not copyedited: no subagents" (or "a given plan is not changed") when skipped                                                                                                                                                                                                           | #9, #15, #44, #64              |
 | `copyedit`                                    | when and how the copyedit runs; spec, plan, research report and audit report; never on a plan /implement is given                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | #1, #63                        |
 | `worktree`                                    | already in this run's worktree: stay; called inline: never create one, work in the caller's tree; worktree declined: `git switch -c` in place, never work on main. It moves the run folder: copy `docs/features/<slug>/` into the worktree, confirm with `diff -r`, remove the main checkout's copy, so only one copy exists and finishing's `git merge` doesn't abort on untracked files                                                                                                                                                                                                                                      | #5, #10, #37                   |
 | `execute` (requires `worktree`)               | read the chosen execution skill by path; baseline failures recorded in flow.md; stop before `finishing-a-development-branch`; split a BLOCKED task only through a deviation                                                                                                                                                                                                                                                                                                                                                                                                                                                    | #5, #92                        |

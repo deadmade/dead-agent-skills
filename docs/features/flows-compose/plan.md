@@ -3,20 +3,22 @@
 <!-- glance -->
 
 ```
-Plan: flows-compose · 19 tasks · ~3990 lines · 69 files
+Plan: flows-compose · 20 tasks · ~4370 lines · 76 files
  1  [1 The compose pass and it…]
  2  [2 Host token maps, build … ←1]
  3  [3 Uses from the composed … ←2]
  4  [4 One set of section name… ←3]
- 5  [5 Run-level steps ←4]  [6 Plan and gate steps, an… ←4]  [8 Finish steps ←4]
- 6  [7 Build steps ←6]  [17 writing and the copyedi… ←6]
- 7  [9 /build-feature ←5,6,7,8]
- 8  [10 /implement ←9]  [14 /research-feature ←9]  [15 /review-code ←9]  [16 /understand and /learn ←9]
- 9  [11 /fix ←10]
-10  [12 /upgrade ←11]
-11  [13 /refactor ←12]
-12  [18 Delete flow-rules, the … ←10,11,12,13,14,15,16,17]
-13  [19 Check every finding aga… ←18]
+ 5  [5 Run-level steps ←4]
+ 6  [20 Steps in TOML ←5]
+ 7  [6 Plan and gate steps, an… ←20]  [8 Finish steps ←20]
+ 8  [7 Build steps ←6]  [17 writing and the copyedi… ←6]
+ 9  [9 /build-feature ←5,6,7,8]
+10  [10 /implement ←9]  [14 /research-feature ←9]  [15 /review-code ←9]  [16 /understand and /learn ←9]
+11  [11 /fix ←10]
+12  [12 /upgrade ←11]
+13  [13 /refactor ←12]
+14  [18 Delete flow-rules, the … ←10,11,12,13,14,15,16,17]
+15  [19 Check every finding aga… ←18]
 
 #   does                                                          files  adds                            size
 1   turns a conductor with `[step: name]` lines and host tokens…  2      `compose.ts` exporting `compo…  ~420
@@ -38,6 +40,7 @@ Plan: flows-compose · 19 tasks · ~3990 lines · 69 files
 17  makes the copyedit find its script from any working directo…  4      nothing new                     ~60
 18  removes the shared rules file and the separate host file no…  8      check 5; the lint's flows phr…  ~360
 19  confirms each of the 93 findings is fixed in what agents ac…  1      nothing new                     ~100
+20  turns the seven step files into TOML with typed keys, so a …  7      the dependency `smol-toml` (i…  ~380
 ```
 
 <!-- /glance -->
@@ -48,7 +51,7 @@ Plan: flows-compose · 19 tasks · ~3990 lines · 69 files
 **Goal:** every flows conductor is built from shared flow steps into one self-contained file per harness, the build
 catches drift, and all 93 evaluation findings are fixed.
 
-**Architecture:** a compose pass in the harness compiler (`src/flows/compose.ts`) copies `plugins/flows/steps/*.md`
+**Architecture:** a compose pass in the harness compiler (`src/flows/compose.ts`) copies the `text` of `plugins/flows/steps/*.toml`
 into each conductor at its `[step: name]` lines, resolves host tokens from `src/templates/hosts/<target>.ts`, and
 checks the result. `check()` and check-repo fail on what the checks report. The machinery lands first: at that point
 compose is a no-op on today's files, and the checks that today's text would fail only warn. Then the steps are
@@ -59,7 +62,7 @@ failure.
 flow-cockpit Rust core tests.
 
 **Spec:** [spec.md](spec.md), approved at Gate 1 on 2026-11-04; plan review round 1's edits to §2, §3, §4 and §5
-reopened it for those lines. **Findings:** [evaluation.md](evaluation.md); each `#n` below names finding n there.
+reopened it for those lines, and the step format was reopened after Task 5 (steps are TOML, Task 20). **Findings:** [evaluation.md](evaluation.md); each `#n` below names finding n there.
 
 ## Global Constraints
 
@@ -70,6 +73,9 @@ reopened it for those lines. **Findings:** [evaluation.md](evaluation.md); each 
 - What a flow runs: resolved by its `[step:]` lines; a step never names the flows that use it.
 - No interface for a single implementation, no helper for a single caller, and no option that nobody sets.
 - A step reads the same in every flow: no slots, no parameters. A flow writes its own sentence around a step.
+- Steps are TOML from Task 20 on (`plugins/flows/steps/<name>.toml`, spec §1). Where a task names a step's `uses:`,
+  `requires:`, `writes:`, `needs:` or `repeat:`, write the TOML key (`writes = ["Rulings"]`); the step's Markdown goes
+  in `text = '''`, and only `run-rules` says `in = "every-conductor"`.
 - A phase's name is one word, and that word is both the cockpit key and the `phase:` value. Existing keys never
   change, except that /implement's `plan` becomes `confirm` (no `flow: implement` run exists for the rename to
   break); new phases add keys.
@@ -344,10 +350,11 @@ own; in research-template Parking lot and Learned
 
 ## Stage 2: the steps
 
-Each step is a file `plugins/flows/steps/<name>.md`: optional frontmatter, then text with no `#`/`##` heading and no
-`<skill-dir>`. Its text comes from today's `references/flow-rules.md` and the conductors' repeated passages, changed
-only where a named finding says so: the verbatim copy goes in one commit and the finding fixes in the next. A step is
-checked only once a flow uses it, which happens from Task 9 on.
+Each step is a file `plugins/flows/steps/<name>.md` until Task 20 converts them, then `<name>.toml`: typed keys and a
+`text = '''` block with no `#`/`##` heading and no `<skill-dir>`. Tasks 6, 7 and 8 write TOML. Its text comes from today's `references/flow-rules.md` and the conductors' repeated passages, changed
+only where a named finding says so: the verbatim copy goes in one commit and the finding fixes in the next. From Task 20 on,
+every step's keys and types are checked on every build; its text is checked once a flow uses it, which happens from
+Task 9 on.
 
 ### Task 5: Run-level steps
 
@@ -390,17 +397,71 @@ seams, and the missing-piece fallbacks.
 - [ ] Commit (twice, per the Global Constraints): `Copy the run-level rules into flow steps.`, then
       `Fix the run-level findings in the flow steps.`
 
+### Task 20: Steps in TOML
+
+**Does:** turns the seven step files into TOML with typed keys, so a typo'd key, a wrong type, a converted conductor
+without the run rules or a malformed step line fails the build with its file and line, and editors complete the keys.
+**Depends on:** Task 5
+**Files:**
+
+- Modify: `tools/harness-compiler/package.json`, `package-lock.json` (`smol-toml` 1.9.1, exact)
+- Create: `plugins/flows/steps/step.schema.json`
+- Create: `.taplo.toml` (repository root: one rule pointing `plugins/flows/steps/*.toml` at the schema)
+- Rename with `git mv` and convert: `plugins/flows/steps/run-rules.md`, `state.md`, `start.md`, `ground-code.md`,
+  `prior-art.md`, `seams.md`, `missing-piece.md`, each to `<name>.toml`
+- Modify: `tools/harness-compiler/src/flows/compose.ts`, `test/compose.test.ts`, `test/build.test.ts`
+- Modify: `scripts/flows-uses.mjs`, `scripts/flows-uses.test.mjs` (`conductorDocs` takes `steps/*.toml`, so
+  `checkOverrides` and `checkPackPaths` read them)
+- Modify: `.github/workflows/sync.yml` (and any other workflow step that runs check-repo or the compiler without
+  `npm ci`), `flake.nix` (the sandboxed `checks.pre-commit` gets `node_modules`), `AGENTS.md` (a fresh clone runs
+  `npm ci` before committing)
+
+**Adds:** the dependency `smol-toml` (imported only by compose.ts); `step.schema.json`; `.taplo.toml`; the step key
+`in`. No new export.
+**Size:** ~380
+
+- [ ] Write the failing tests in `compose.test.ts`; the `put` fixtures write `steps/<name>.toml`. One test per rule in
+      spec §4's TOML paragraph and check 1's new clauses: a syntax error cites file:line; a `'''` inside `text` gets
+      the hint that it ends the text; an unknown key lists the valid keys; `repeat = "true"` and `uses = "a:b"` are
+      type errors, and so is a `uses` entry that isn't `plugin:name`; `needs` and `in` outside their values fail; a
+      missing `text`, or one whose opener isn't alone on its line, fails; a step no flow uses is still checked for all
+      of these, while `<skill-dir>` and a missing `Without subagents:` line in an unused step still build (Task 1's
+      test keeps that half); a converted conductor without `[step: run-rules]` fails when `run-rules` says
+      `in = "every-conductor"`; `[step:x]`, `[Step: x]` and a trailing space fail in a file with `[step: phases]`; a
+      dotfile in `steps/` is not loaded. `build.test.ts`'s fixture step becomes TOML. `flows-uses.test.mjs`: a
+      missing `<packs>/…` path and a marker whose sentence the pack lacks, each in a `steps/x.toml`, are problems.
+- [ ] Run them. Expected: FAIL.
+- [ ] `npm install --save-exact smol-toml@1.9.1 --workspace=@dead-claude-skills/harness-compiler`. `compose.ts`
+      reads `steps/<name>.toml` with it; a parse error becomes a `ComposeError` at its line. It imports
+      `step.schema.json` for the key list, types and allowed values (one source), and implements the checks,
+      `in = "every-conductor"` and the near-miss step lines. The prototype the decision rests on preloads every step
+      and runs all checks there; split it: keys and types on every step, the text checks only on used ones.
+- [ ] Convert the seven steps: `git mv` each `.md` to `.toml`, then edit in place. Each frontmatter key becomes its
+      TOML key, and the body goes into `text = '''` byte for byte. Compose a stub conductor that uses all seven on both
+      targets before and after; the bytes must match. Add `in = "every-conductor"` to `run-rules`.
+- [ ] Write `step.schema.json` (every key, its type and allowed value, `additionalProperties: false`) and
+      `.taplo.toml` at the root.
+- [ ] `conductorDocs` in `flows-uses.mjs` takes `steps/*.toml` as well as `.md`.
+- [ ] Add `npm ci` after setup-node in every workflow job that runs check-repo or the compiler (grep
+      `.github/workflows/`). Give the flake's sandboxed `checks.pre-commit` the workspace's `node_modules` (for
+      example `pkgs.importNpmLock`), so `nix flake check` still passes; if it can't, report NEEDS_CONTEXT. One line in
+      AGENTS.md's setup says a fresh clone runs `npm ci` before committing.
+- [ ] `npm run build:harnesses`, `node scripts/flows-uses.mjs`, `npm test`, `npm run typecheck`,
+      `npm run check:harnesses`, `node tools/harness-compiler/src/cli.ts lint`, and `nix flake check` where nix is
+      available. Expected: PASS; the generated trees don't change.
+- [ ] Commit: `Write the flow steps in TOML parsed by a pinned smol-toml, and check their keys, types, the run rules' membership and near-miss step lines.`
+
 ### Task 6: Plan and gate steps, and glance's read-only mode
 
 **Does:** writes how a plan is shaped and checked, how a gate is asked and recorded, and when a copyedit runs; lets
 glance check a plan without writing into it.
-**Depends on:** Task 4
+**Depends on:** Task 20
 **Files:**
 
-- Create: `plugins/flows/steps/plan-shape.md`, `plan-check.md`, `gate.md`, `copyedit.md`, `before-you-write.md`
+- Create: `plugins/flows/steps/plan-shape.toml`, `plan-check.toml`, `gate.toml`, `copyedit.toml`, `before-you-write.toml`
 - Modify: `plugins/flows/skills/build-feature/scripts/glance.mjs`, `plugins/flows/skills/build-feature/tests/glance.test.mjs`
 - Modify: `scripts/flows-uses.mjs`, `scripts/flows-uses.test.mjs` (`checkTemplates`: the gate line is read from
-  `steps/gate.md`, `**Does:**` and `**Depends on:**` from `steps/plan-shape.md` instead of three SKILL.md files; the
+  `steps/gate.toml`, `**Does:**` and `**Depends on:**` from `steps/plan-shape.toml` instead of three SKILL.md files; the
   `without()` fixture copies `plugins/flows/steps/`)
 
 **Adds:** five step files; glance flag `--check` (prints the block, writes nothing, same exit codes)
@@ -434,10 +495,10 @@ glance check a plan without writing into it.
 **Depends on:** Task 6
 **Files:**
 
-- Create: `plugins/flows/steps/worktree.md`, `execute.md`, `builder-brief.md`, `deviations.md`, `one-task.md`
+- Create: `plugins/flows/steps/worktree.toml`, `execute.toml`, `builder-brief.toml`, `deviations.toml`, `one-task.toml`
 - Create: `plugins/flows/references/stack-packs.md` (flow-rules' Stack packs table, looked up, not followed)
 - Modify: `scripts/flows-uses.mjs`, `scripts/flows-uses.test.mjs` (`checkTemplates` reads `Waiting for you` and
-  `Status: decided` from `steps/deviations.md`)
+  `Status: decided` from `steps/deviations.toml`)
 
 **Adds:** five step files, one reference
 **Size:** ~300
@@ -466,10 +527,10 @@ glance check a plan without writing into it.
 
 **Does:** writes the end of every run: walkthrough, review, lessons, the decision list, commits and branch handling;
 and how one conductor runs another inline.
-**Depends on:** Task 4
+**Depends on:** Task 20
 **Files:**
 
-- Create: `plugins/flows/steps/finish.md`, `decide.md`, `close.md`, `call-conductor.md`
+- Create: `plugins/flows/steps/finish.toml`, `decide.toml`, `close.toml`, `call-conductor.toml`
 
 **Adds:** four step files
 **Size:** ~170
@@ -505,7 +566,7 @@ includes "no warning left in this conductor's files" (its SKILL.md and the refer
 
 - Modify: `plugins/flows/skills/build-feature/SKILL.md`
 - Modify: `plugins/flows/skills/build-feature/references/prior-art.md`, `plan-review.md` (tokens for models and tools)
-- Modify: `plugins/flows/steps/*.md` (only what the first real composition shows is wrong)
+- Modify: `plugins/flows/steps/*.toml` (only what the first real composition shows is wrong)
 
 **Adds:** nothing new
 **Size:** ~250
@@ -673,7 +734,7 @@ always work on a branch behind a gate.
 **Files:**
 
 - Modify: `plugins/flows/skills/writing/SKILL.md` (defines `<flow-root>`), `references/copyedit.md`
-- Modify: `plugins/flows/skills/writing/tests/writing-skill.test.mjs` (asserts on `steps/copyedit.md`)
+- Modify: `plugins/flows/skills/writing/tests/writing-skill.test.mjs` (asserts on `steps/copyedit.toml`)
 - Modify: `tools/harness-compiler/src/transforms/text.ts` (the rewrite of `${CLAUDE_SKILL_DIR}` to `.` applies only
   to `packs/`)
 - Modify: `plugins/flows/README.md` (a `/flows:writing copyedit` row, #74)
@@ -683,7 +744,7 @@ always work on a branch behind a gate.
 
 - [ ] `writing-skill.test.mjs`: replace line 31's assertion on `${CLAUDE_SKILL_DIR}/../writing/scripts/compare.mjs`
       with one on `node "<flow-root>/skills/writing/scripts/compare.mjs"`, and replace the test that reads
-      flow-rules.md (lines 40-44) with one on `steps/copyedit.md`'s copyedit rule. Run it. Expected: FAIL on the
+      flow-rules.md (lines 40-44) with one on `steps/copyedit.toml`'s copyedit rule. Run it. Expected: FAIL on the
       first assertion until copyedit.md changes.
 - [ ] copyedit.md: `node "<flow-root>/skills/writing/scripts/compare.mjs"` and `<flow-root>/skills/writing/SKILL.md`
       as the standard; line 24's agent sentence becomes neutral (one fresh agent on `{{model:strongest}}`, no
@@ -723,7 +784,7 @@ makes every built-text check fail the build.
 
 - [ ] Write the failing tests: `compose.test.ts` check 5 and "a check-6 path is a problem"; `build.test.ts` "an
       unresolved `node` path makes `check()` return a problem"; `lint.test.ts`: `AskUserQuestion` in a fixture
-      `plugins/flows/steps/x.md` is a problem, on an override-marker line it isn't, in `plugins/flows/README.md` it
+      `plugins/flows/steps/x.toml` is a problem, on an override-marker line it isn't, in `plugins/flows/README.md` it
       isn't; `flows-uses.test.mjs`: `checkTemplates` without flow-rules.md. Run them. Expected: FAIL.
 - [ ] Implement check 5, move every warning to `problems`, add the phrase lint; delete the files; remove
       `references/host.md` emission; repoint `checkTemplates`.

@@ -1,7 +1,7 @@
 ---
 flow: feature
 phase: execute
-now: Pre-flight decided and folded into the plan; Task 1 (compose pass) is next, not yet dispatched.
+now: Task 5 fix round 1 (on the .md steps) next, then Task 20 (steps in TOML).
 ---
 
 # Flows compose: flow
@@ -26,8 +26,8 @@ what they do and also if how they are currently structured is proper, if we are 
 
 ## Gates
 
-- Gate 1, spec approved: 2026-11-04 (copyedited; "I approve", the user). Reopened 2026-11-04: plan review round 1 changed §2 (drawn phase table as a decision, one-word phase names), §3 (path placeholders are not tokens), §4 (check() fails on check problems; warnings until flow-rules goes; the sync-PR sentence was wrong) and §5 (uses from composeFlows, audit template, scan scope); approved with "pls fix all the issus!", the user, 2026-11-04
-- Gate 2, plan approved: 2026-11-04, execution: subagent-driven (copyedited; "I approve sdd pls", the user)
+- Gate 1, spec approved: 2026-11-04 (copyedited; "I approve", the user). Reopened 2026-11-04: plan review round 1 changed §2 (drawn phase table as a decision, one-word phase names), §3 (path placeholders are not tokens), §4 (check() fails on check problems; warnings until flow-rules goes; the sync-PR sentence was wrong) and §5 (uses from composeFlows, audit template, scan scope); approved with "pls fix all the issus!", the user, 2026-11-04 Reopened 2026-11-04: the user asked for structured steps after Task 5; steps became TOML (spec §1, §4, §5, Constraints, Non-goals; ADR 0009 amendment). Re-approved 2026-11-04 ("Approve both", the user).
+- Gate 2, plan approved: 2026-11-04, execution: subagent-driven (copyedited; "I approve sdd pls", the user) Reopened 2026-11-04: Task 20 (steps in TOML) added, Tasks 6-8 write .toml. Re-approved 2026-11-04 ("Approve both", the user).
 
 ## Skipped
 
@@ -231,6 +231,12 @@ Changed: plan.md (19 tasks, glance clean); spec.md §2, §4, §6.
 
 ## Tasks
 
+Task 1: base 4e06895 (no untracked files); files check: 2 files, both listed; 509 lines against ~420 (limit 840); commit 271e5eb
+Task 2: base 271e5eb (no untracked files); files check: 14 source files, all listed, plus generated trees; 294 lines against ~320 (limit 640); commit 64fc793; fix 4a48556 (CRLF H1 strip)
+Task 3: base 4a48556 (no untracked files); files check: 22 source files, all listed, plus generated trees and README tree; ~410 lines against ~280 (limit 560); commit e854817
+Task 4: base e854817 (no untracked files); files check: 13 files, all listed; 206 lines against ~170 (limit 340); commit 8f4ea66
+Task 5: base 8f4ea66 (no untracked files); files check: 7 step files, all listed; 284 lines over both commits against ~260 (limit 520); commits d7f89f9, 474c372; measured stub (rules plus Start, bytes ÷ 4): claude-code 2361, codex 2333, both under 4,000, so nothing moves below Phase 1
+
 ## Rulings
 
 - 2026-11-04, pre-flight (Task 3): check 7's short-name rule is a warning until Task 18, not a problem — spec §4 says the checks today's text fails warn until flow-rules goes; all 12 short-name uses are bare words today — Task 3's commit fails check:harnesses
@@ -250,10 +256,45 @@ Changed: plan.md (19 tasks, glance clean); spec.md §2, §4, §6.
 - 2026-11-04, pre-flight (Task 2): check() keeps its string[] return; cli.ts and check-repo split it by the `flows: ` prefix in one line each — a changed check() return type is an interface change the plan doesn't make — two one-line splits to keep in step
 - 2026-11-04, pre-flight (Task 18): Task 18's build.test adds one fixture: Codex text naming a CLAUDE_ONLY phrase makes check() return a problem — Review Focus 3 promises it; Task 18's test list lacked it — Review Focus 3 unchecked
 - 2026-11-04, pre-flight (Task 14): research-feature's handover stays its own prose, no `[step: decide]` — the user's S8 decision (plan review round 2) outranks the scan's suggestion — a little repeated prose
+- 2026-11-04, Task 1: implementers stage their task's Files paths and the generated trees by name, never `git add -u` — the coordinating session keeps uncommitted flow.md bookkeeping that `-u` would sweep into a task commit — a stray flow.md hunk in a task commit if wrong
+- 2026-11-04, Task 2: commands.ts build() returns Build (estimates, warnings, problems) instead of Diagnostic[]; its one caller is cli.ts — the user's pre-flight decision 1(a) has cli build print estimates, and this is the one path that carries them there — a public-signature change outside an Adds line if wrong
+- 2026-11-04, Task 3: renderTree takes both hosts' uses (renderTree(byHost)) — the brief's test needs the neutral union and (claude-code) marks — an exported signature change outside Adds if wrong
+- 2026-11-04, Task 3: the README uses tree is sorted, not in the authors' order — composeFlows sorts uses (Task 1 contract); same 78 entries — a readability loss if wrong
+- 2026-11-04, Task 5: the implementer reports the two measured stub sizes and the controller writes them under **Tasks**; flow.md stays off the implementer's commits — flow.md holds the controller's uncommitted bookkeeping, and staging it would sweep that in — the numbers land one step later than the commit if wrong
+- 2026-11-04, Task 5: run-rules keeps today's Host capabilities sentences (skip subagent-only steps with no sequential substitute, record skips, a skipped check never counts as passed) and the todo-list rule — no later task places them and Task 18 deletes flow-rules.md — rules silently lost if wrong
+- 2026-11-04, Task 5: run-rules also keeps flow-rules.md:49-51's handoff sentence (a sub-skill's "invoke the next skill" is not followed; come back to the conductor and run its next phase) and :21-22's "resolve resource paths relative to their containing document, never the shell working directory" — the Task 5 review found no other home, and Task 18 deletes flow-rules.md — rules silently lost if wrong
+- 2026-11-04, Task 5: ponytail's `lite` row for brainstorm approaches and its marker (flow-rules.md:193, :202) go into build-feature's and research-feature's own text in Tasks 9 and 14; the "report gates" half of that row and "ponytail never runs as a mode" (:186-187) are dropped — the first is conductor-specific, the others have no reader that needs them — a lost nuance if wrong
 
 ## Parking lot
 
 ## Deviations
+
+### Step format reopened
+
+Status: decided 2026-11-04 (see the end of this entry)
+
+After Task 5 the user wrote "I think json or xml or something would be way better for the steps" (2026-11-04).
+Design A (plain-Markdown steps plus a compose pass, ADR 0009) is Gate 1's decision, so this reopens Gate 1 for the
+step format. Tasks 1–5 are built and pushed (474c372); Task 5's fix round and Task 6 wait on the decision.
+Asked what a data format should give, the user said (2026-11-04): "at the end there should be markdown, I just
+thought using json in the steps is way easier to combine to one proper markdown file and is easier to create and
+validate than just text". A format panel (Markdown, XML, JSON, YAML, hybrid; real steps and /fix converted, no library) picked Markdown
+(author, cost) and XML (checks); JSON scored worst. The user then allowed a small parser library and said source
+preview doesn't matter ("I can see it in the skills itself in md"); a second panel (TOML, YAML, XML, Markdoc, a JSON
+sidecar, each with a real library) scored Markdown with strict checks 23.5, TOML 20, sidecar 18, YAML and Markdoc
+17.5, XML 15, JSON 8.5 (author, checks, cost). The user picked TOML steps (2026-11-04). Spec §1, §4, §5, Constraints
+and Non-goals, ADR 0009 (amendment) and GLOSSARY edited; plan gains Task 20 (Steps in TOML, after Task 5, before
+Tasks 6 and 8) and a Global Constraint. Vendored smol-toml is the controller's recommendation, not yet decided. A
+two-reviewer recheck (fit, simpler) found 5 important and 7 minor problems. Applied as corrections: the prose hook's
+second gate (hooks.json), `conductorDocs` shared by checkOverrides and checkPackPaths, `.taplo.toml` at the root and a
+step-name filter, one key list (compose reads the schema), TOML key forms in checks 2-4 and the gate row, Size ~380
+with `git mv`, Task 5's fix round first on the .md files. The user decided (2026-11-04): smol-toml as a pinned npm
+dependency (sync.yml `npm ci`, the flake check gets node_modules), not vendored; `in = "every-conductor"` on run-rules
+only, no `except`; keys and types checked on every step, text checks only on used ones, no did-you-mean; no taplo
+formatter; the prose hook stays on `.md`.
+
+Status: decided 2026-11-04: steps are TOML (spec §1, §4, §5; ADR 0009 amendment; plan Task 20). Gate 1 and Gate 2 re-approved
+2026-11-04.
 
 ### Pre-flight 1: no channel for each conductor's token estimate
 
