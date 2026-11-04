@@ -24,17 +24,17 @@ diagnostic, revision technique, exception and caution the lesson gives, with exa
 the reference for a pass when you revise a long document, when a check below doesn't settle a sentence, or when you
 copyedit.
 
-| Pass                       | References                                                                                                                                                           |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Why and how to revise      | [Lesson 1, Understanding Style](references/lesson-01-understanding-style.md)                                                                                         |
-| 1. The document            | [Lesson 7, Motivation](references/lesson-07-motivation.md), [Lesson 8, Global Coherence](references/lesson-08-global-coherence.md)                                   |
-| 2. Sections and paragraphs | [Lesson 5, Cohesion and Coherence](references/lesson-05-cohesion-and-coherence.md), [Lesson 6, Emphasis](references/lesson-06-emphasis.md)                           |
+| Pass                       | References                                                                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Why and how to revise      | [Lesson 1, Understanding Style](references/lesson-01-understanding-style.md)                                                                                        |
+| 1. The document            | [Lesson 7, Motivation](references/lesson-07-motivation.md), [Lesson 8, Global Coherence](references/lesson-08-global-coherence.md)                                  |
+| 2. Sections and paragraphs | [Lesson 5, Cohesion and Coherence](references/lesson-05-cohesion-and-coherence.md), [Lesson 6, Emphasis](references/lesson-06-emphasis.md)                          |
 | 3. Sentences               | [Lesson 3, Actions](references/lesson-03-actions.md), [Lesson 4, Characters](references/lesson-04-characters.md), [Lesson 10, Shape](references/lesson-10-shape.md) |
-| 4. Words                   | [Lesson 9, Concision](references/lesson-09-concision.md)                                                                                                             |
-| 5. Honesty                 | [Lesson 12, The Ethics of Style](references/lesson-12-ethics.md)                                                                                                     |
-| Last, and small            | [Lesson 2, Correctness](references/lesson-02-correctness.md), [Appendix I, Punctuation](references/appendix-1-punctuation.md)                                        |
-| Quoting and citing         | [Appendix II, Using Sources](references/appendix-2-using-sources.md)                                                                                                 |
-| Rarely, in technical text  | [Lesson 11, Elegance](references/lesson-11-elegance.md)                                                                                                              |
+| 4. Words                   | [Lesson 9, Concision](references/lesson-09-concision.md)                                                                                                            |
+| 5. Honesty                 | [Lesson 12, The Ethics of Style](references/lesson-12-ethics.md)                                                                                                    |
+| Last, and small            | [Lesson 2, Correctness](references/lesson-02-correctness.md), [Appendix I, Punctuation](references/appendix-1-punctuation.md)                                       |
+| Quoting and citing         | [Appendix II, Using Sources](references/appendix-2-using-sources.md)                                                                                                |
+| Rarely, in technical text  | [Lesson 11, Elegance](references/lesson-11-elegance.md)                                                                                                             |
 
 ## 1. The document: a problem, a point, and the order the reader needs
 
@@ -236,9 +236,10 @@ These keep a technical document from being read two ways, or from reading as not
 ## Copyedit a finished document
 
 You can't see your own draft as a reader who wasn't there would. When asked to copyedit a file, or when a flow reaches a
-gate with a spec, a plan or an audit report, follow [references/copyedit.md](references/copyedit.md): a fresh Opus agent
-revises the document by this standard, and `scripts/compare.mjs` writes the edit over the document only when nothing
-code can check was lost. It commits nothing.
+gate with a spec, a plan or an audit report, follow [references/copyedit.md](references/copyedit.md): a fresh agent on
+the session's model revises the document by this standard, and `scripts/compare.mjs` writes the edit over the document
+only when nothing code can check was lost. It commits nothing. `<flow-root>` is the flows plugin folder: two levels
+above this SKILL.md.
 
 ## Length, correctness and punctuation
 

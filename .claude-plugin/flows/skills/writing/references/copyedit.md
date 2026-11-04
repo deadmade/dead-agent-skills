@@ -5,9 +5,8 @@ wasn't, revise it, and lets the edit through only when code finds nothing lost t
 it works the same on any branch and inside the other flows.
 
 The `writing` skill runs it when asked to copyedit a file (`/flows:writing copyedit <file.md>`), and the flows run it by
-reading this file before a gate. Its paths go through `"${CLAUDE_SKILL_DIR}/../writing/"`, so they resolve from
-whichever skill read it. When the variable isn't set in your shell, replace `${CLAUDE_SKILL_DIR}/../writing/` with the
-absolute path of flows' `skills/writing/` folder.
+reading this file before a gate. Its paths go through `<flow-root>`, the flows plugin folder that writing's SKILL.md
+and the flow rules define, so they resolve from whichever skill read it, never from the shell's working directory.
 
 ## 1. Save the document
 
@@ -21,9 +20,9 @@ rm -rf "<run folder>" && mkdir -p "<run folder>" && cp "<document>" "<run folder
 
 ## 2. Edit
 
-Start one fresh agent with the Agent tool: `subagent_type: "general-purpose"`, `model: "opus"`. Its prompt is exactly
-the text below, with `<doc>` the document's absolute path, `<standard>` the absolute path of
-`"${CLAUDE_SKILL_DIR}/../writing/SKILL.md"` and `<out>` the absolute path of `<run folder>/edited.txt`.
+Start one fresh agent on opus. Its prompt is exactly the text below, with `<doc>` the document's
+absolute path, `<standard>` the absolute path of `<flow-root>/skills/writing/SKILL.md` and `<out>` the absolute path
+of `<run folder>/edited.txt`.
 
 ```
 You are a copy editor. Edit the Markdown document <doc> so it reads clearly to a smart reader who was not in the conversation that produced it.
@@ -40,7 +39,7 @@ The editor writes a `.txt` file because subagents may not be allowed to write Ma
 ## 3. Check and show
 
 ```bash
-node "${CLAUDE_SKILL_DIR}/../writing/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"
+node "<flow-root>/skills/writing/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"
 ```
 
 - **Exit 1:** it printed what the edit lost, one item per line, that the editor wrote no document, or that the

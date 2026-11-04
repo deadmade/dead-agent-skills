@@ -27,13 +27,14 @@ test('the writing skill is model-invocable and states the rule', () => {
 test('the copyedit procedure and its script sit in the writing skill', () => {
   assert.match(read('plugins/flows/skills/writing/SKILL.md'), /\(references\/copyedit\.md\)/);
   const procedure = read('plugins/flows/skills/writing/references/copyedit.md');
-  assert.match(procedure, /\$\{CLAUDE_SKILL_DIR\}\/\.\.\/writing\/scripts\/compare\.mjs/);
+  assert.ok(procedure.includes('node "<flow-root>/skills/writing/scripts/compare.mjs"'));
 });
 
-test('flow-rules runs the copyedit before gates', () => {
-  const rules = read('plugins/flows/references/flow-rules.md');
-  assert.match(rules, /<flow-root>\/skills\/writing\/references\/copyedit\.md/);
-  assert.match(rules, /flows:writing/);
+test('the copyedit step runs the copyedit before gates', () => {
+  const step = read('plugins/flows/steps/copyedit.toml');
+  assert.ok(step.includes('read `<flow-root>/skills/writing/references/copyedit.md` and follow it'));
+  assert.ok(step.includes('`node "<flow-root>/skills/writing/scripts/compare.mjs"'));
+  assert.match(step, /flows:writing/);
 });
 
 test('SKILL.md links every lesson reference, and every link resolves', () => {
