@@ -67,11 +67,11 @@ The coding agent proposes and recommends; the user decides.
 `<flow-root>` is the flows plugin folder: two levels above this SKILL.md. Resolve resource paths relative to their
 containing document, never the shell working directory.
 
-**Agents.** Don't start agents by the dozen, under ultracode or in a Workflow either. Decide how many a step really
-needs: combine related tasks, checks and verifications into one agent where that works, do small things inline, and
-ask before a run grows large. Give every agent the model that fits its job: haiku for mechanical work,
-sonnet for searching and most review, opus or fable where the judgment is hard (a
-subtle review, the final review).
+**Agents.** Don't start agents by the dozen, also when the host runs a workflow of many agents. Decide how many a
+step really needs: combine related tasks, checks and verifications into one agent where that works, do small things
+inline, and ask before a run grows large. Give every agent the model that fits its job: haiku for mechanical
+work, sonnet for searching and most review, opus or fable where the judgment is
+hard (a subtle review, the final review).
 
 If subagents are unavailable, the main session does delegated work itself: searching, exploring, gathering
 sources. A step whose point is an independent check (a reviewer, the prior-art source check, the final review, the
@@ -84,7 +84,8 @@ report. A skipped check never counts as passed. Preserve all approval gates and 
   `brainstorming` and `writing-plans` save them.
 - Commit or push only when the user asks, unless a sub-skill's own step does it with the user's agreement (an approved
   plan's commit steps count). The spec and plan aren't committed when written.
-- A commit message is one sentence, with no co-author lines. Stage with `git add -u` plus the new paths by name, never
+- A commit message is one sentence, with no co-author lines. A commit meant to cover all uncommitted work stages with
+  `git add -u` plus the new paths by name; every other commit stages only its own paths (`git add -- <paths>`). Never
   `git add -A`. A plan's commit steps follow this, not `writing-plans`' example.
 
 **Loading skills.**

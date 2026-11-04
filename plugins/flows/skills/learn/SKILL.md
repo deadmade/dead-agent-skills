@@ -38,7 +38,8 @@ This flow adds:
 - **Called inline** (by another conductor): skip this start and create no flow.md. Write into the
   caller's file (its flow.md, or the audit file for a standalone /review-code): what was written under its
   **Learned**, where it has one, the Parking-lot lines under its **Parking lot**, and its `now:` where it keeps one.
-  Then return to the caller.
+  When the caller reviewed a pull request (`/review-code pr`), Phase 1 reads the PR's diff and this conversation in
+  place of the branch's commits: the checked-out branch isn't the PR. Then return to the caller.
 - **Standalone,** the argument is a flow.md path or a topic. Wherever a rule above says flow.md, the closing list
   stands in.
 

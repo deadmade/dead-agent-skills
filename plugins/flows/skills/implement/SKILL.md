@@ -126,8 +126,8 @@ On the ticket path no per-task review ran: tell /review-code that execution ran 
 
 [step: finish]
 
-On a plan path, the plan isn't this run's plan.md and stays unchanged: a decision reopened at Decide becomes the next
-numbered line under **Tasks**.
+On a plan given by path that isn't a feature run's own plan.md, the plan stays unchanged: a decision reopened at
+Decide becomes the next numbered line under **Tasks**.
 
 [step: decide]
 

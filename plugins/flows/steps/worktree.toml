@@ -6,7 +6,8 @@ text = '''
 
 Before any code is written, the run gets a branch of its own:
 
-- Already in this run's worktree (the one holding its flow.md): stay there.
+- Already in this run's worktree (the one holding its flow.md), or on its branch: stay there. A resumed run whose
+  branch was made in place, found on another branch: switch to its branch first (`git switch <slug>`).
 - Called inline by another conductor: never create one; work in the caller's tree and on its branch.
 - Otherwise follow superpowers `using-git-worktrees`. When the user declines a worktree, create the branch in place
   with `git switch -c <slug>`. Never build on the default branch.

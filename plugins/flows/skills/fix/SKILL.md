@@ -123,11 +123,11 @@ command and its output. It never touches the user's tree:
 1. A scratch `git worktree` of `git stash create` (HEAD when the tree is clean), with the untracked files the fix and
    its test added copied in. Nothing there is committed.
 2. With the fix: the test, or the agreed check.
-3. Before the fix: every file on the **Files** list but the test, restored to the gate commit's version
-   (`git checkout <base sha> -- <files>`, the base on the task's line under **Tasks**; a file the fix added is
-   deleted), then the same run. Where the test lives in a file the fix also changes (a Rust `#[cfg(test)]` module),
-   revert only the fix's hunks in that file. The failure has to be the bug, as in Phase 4: a test that no longer
-   compiles or crashes on the way doesn't count.
+3. Before the fix: every file on the **Files** list but the test, restored to its version at the task's base, the
+   snapshot that keeps any earlier uncommitted work (`git checkout <base sha> -- <files>`, the base on the task's line
+   under **Tasks**; a file the fix added is deleted), then the same run. Where the test lives in a file the fix also
+   changes (a Rust `#[cfg(test)]` module), revert only the fix's hunks in that file. The failure has to be the bug, as
+   in Phase 4: a test that no longer compiles or crashes on the way doesn't count.
 4. `git worktree remove --force <scratch>`.
 
 A bug that shows only sometimes is proven by 20 runs each way: before the fix it fails at least once, with the fix

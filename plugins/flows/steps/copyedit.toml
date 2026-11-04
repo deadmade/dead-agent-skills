@@ -5,7 +5,7 @@ text = '''
 - **Copyedit.** Before a gate shows the user a spec, a plan, a research report or an audit report, copyedit it, each
   time the document goes to a gate: read `<flow-root>/skills/writing/references/copyedit.md` and follow it. Its check
   runs through `<flow-root>`, never from the shell's working directory:
-  `node "<flow-root>/skills/writing/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"`.
+  `node "<flow-root>/skills/writing/scripts/compare.mjs" "<copyedit folder>/saved.md" "<copyedit folder>/edited.txt" "<document>"`.
 - When the copyedit refuses the edit (it lost something, or failed), the flow goes on: the gate shows the unedited
   document and the lines `compare.mjs` printed, and says the copyedit was refused.
 - Never copyedit flow.md (the prose check skips it too: it changes after every phase), and never a plan the run was

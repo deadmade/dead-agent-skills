@@ -70,11 +70,11 @@ The coding agent proposes and recommends; the user decides.
 `<flow-root>` is the flows plugin folder: two levels above this SKILL.md. Resolve resource paths relative to their
 containing document, never the shell working directory.
 
-**Agents.** Don't start agents by the dozen, under ultracode or in a Workflow either. Decide how many a step really
-needs: combine related tasks, checks and verifications into one agent where that works, do small things inline, and
-ask before a run grows large. Give every agent the model that fits its job: the session's model for mechanical work,
-the session's model for searching and most review, the session's model or the session's model where the judgment is hard (a
-subtle review, the final review).
+**Agents.** Don't start agents by the dozen, also when the host runs a workflow of many agents. Decide how many a
+step really needs: combine related tasks, checks and verifications into one agent where that works, do small things
+inline, and ask before a run grows large. Give every agent the model that fits its job: the session's model for mechanical
+work, the session's model for searching and most review, the session's model or the session's model where the judgment is
+hard (a subtle review, the final review).
 
 If subagents are unavailable, the main session does delegated work itself: searching, exploring, gathering
 sources. A step whose point is an independent check (a reviewer, the prior-art source check, the final review, the
@@ -87,7 +87,8 @@ report. A skipped check never counts as passed. Preserve all approval gates and 
   `brainstorming` and `writing-plans` save them.
 - Commit or push only when the user asks, unless a sub-skill's own step does it with the user's agreement (an approved
   plan's commit steps count). The spec and plan aren't committed when written.
-- A commit message is one sentence, with no co-author lines. Stage with `git add -u` plus the new paths by name, never
+- A commit message is one sentence, with no co-author lines. A commit meant to cover all uncommitted work stages with
+  `git add -u` plus the new paths by name; every other commit stages only its own paths (`git add -- <paths>`). Never
   `git add -A`. A plan's commit steps follow this, not `writing-plans`' example.
 
 **Loading skills.**
@@ -149,7 +150,9 @@ Say which plugin provides it, then use the fallback. Only the rows for plugins t
 
 /review-code keeps no flow.md: its record is the audit file (Phase 5), and without a flow.md the audit file stands in
 for it wherever a step below says flow.md. Standalone, it has no `now:` either (the audit template keeps none); called
-inline, it writes `now:` into the caller's flow.md, as the call rule says. Gate lines go into the audit file: Gate 1 under **Findings**, after the `Picks:` line; Gate 2 under **Run verdict**.
+inline, it writes `now:` into the caller's flow.md, as the call rule says. Gate lines go into the audit file, numbered
+in the order reached: the report's gate under **Findings**, after the `Picks:` line; an inline /fix's gate under
+**Findings** with its pick; Decide's gate under **Run verdict**.
 
 - **Standalone,** the argument is the target, `branch` (the default), `all` or `pr <number>`, then an optional base.
 - **Called inline** (a build flow's Finish, or /fix), the caller hands over the target, the intent, whether execution
@@ -213,7 +216,7 @@ Follow [references/report.md](references/report.md), then copyedit the audit fil
 - **Copyedit.** Before a gate shows the user a spec, a plan, a research report or an audit report, copyedit it, each
   time the document goes to a gate: read `<flow-root>/skills/writing/references/copyedit.md` and follow it. Its check
   runs through `<flow-root>`, never from the shell's working directory:
-  `node "<flow-root>/skills/writing/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"`.
+  `node "<flow-root>/skills/writing/scripts/compare.mjs" "<copyedit folder>/saved.md" "<copyedit folder>/edited.txt" "<document>"`.
 - When the copyedit refuses the edit (it lost something, or failed), the flow goes on: the gate shows the unedited
   document and the lines `compare.mjs` printed, and says the copyedit was refused.
 - Never copyedit flow.md (the prose check skips it too: it changes after every phase), and never a plan the run was
@@ -232,9 +235,10 @@ nothing to pick: the gate approves the report, with `Picks: none`, and Phase 6 d
   passes.
 - Record it as one line under **Gates** in flow.md: `- Gate <n>, <what>: <date>[, execution: subagent-driven | native]`,
   the date empty while the gate is open; a reopening is appended to that line as `Reopened <date>: <why>`, then the
-  date it is approved again. Gates are numbered in the order the run reaches them. A conductor run inline continues
-  its caller's numbering and names itself (`- Gate 3, fix: cause approved`). A run without flow.md records the line
-  in its audit file.
+  date it is approved again. A reopening also sets `phase:`, where the run keeps one, to the key of the phase that
+  produces the reopened artifact. Gates are numbered in the order the run reaches them. A conductor run inline
+  continues its caller's numbering and names itself (`- Gate 3, fix: cause approved`). A run without flow.md records
+  the line in its audit file.
 - Only a plan gate offers an execution method, and on that gate's own line: subagent-driven (offered only when
   subagents are available) or native = `executing-plans`, with your recommendation. The user approves the plan **and**
   picks the method in the same answer. Every other gate asks for approval alone.
@@ -349,8 +353,10 @@ deviation goes to the user too; the session doesn't supply the missing decision 
 
 **The files check.** The coordinating session runs it itself for every task, also when execution is native and no
 task reviewer runs. When a task starts, write its line under **Tasks** in flow.md: `Task <N>: base <sha>`
-(`git rev-parse HEAD`), with the untracked files then present (`git ls-files -o --exclude-standard`). When the task's
-code is done, before its task review where one runs, check:
+(`git stash create`, a snapshot of the tracked files' uncommitted changes, or `git rev-parse HEAD` when it prints
+nothing), with the untracked files then present (`git ls-files -o --exclude-standard`). Changes already in the tree
+when the task starts stay out of the checks below. When the task's code is done, before its task review where one
+runs, check:
 
 1. Files: `git diff --name-only <base>` (commits and working tree) and `git ls-files -o --exclude-standard` again,
    compared with the task's **Files** list, leaving out the untracked files recorded at the start.
@@ -378,7 +384,8 @@ run:
 
 - It skips its start and resume step: the caller hands it the input, and it creates no flow.md of its own.
 - It keeps its gates; they continue the caller's numbering and name the callee.
-- It stops before its own Finish or Decide and returns to the caller's next phase. The caller's Decide covers both.
+- It stops before its own Finish or Decide and returns to the caller, which goes on right after the call. The
+  caller's Decide covers both.
 - It writes into the outermost run's flow.md, also when it was itself called by a callee: its `now:`, and its
   **Findings**, **Deviations** and **Rulings** under the sections of those names. It leaves that run's `phase:` as it
   is. When no run in the chain has a flow.md, they go into the audit file, under the same headings.
@@ -410,9 +417,10 @@ the output of `gh pr checks`.
   passes.
 - Record it as one line under **Gates** in flow.md: `- Gate <n>, <what>: <date>[, execution: subagent-driven | native]`,
   the date empty while the gate is open; a reopening is appended to that line as `Reopened <date>: <why>`, then the
-  date it is approved again. Gates are numbered in the order the run reaches them. A conductor run inline continues
-  its caller's numbering and names itself (`- Gate 3, fix: cause approved`). A run without flow.md records the line
-  in its audit file.
+  date it is approved again. A reopening also sets `phase:`, where the run keeps one, to the key of the phase that
+  produces the reopened artifact. Gates are numbered in the order the run reaches them. A conductor run inline
+  continues its caller's numbering and names itself (`- Gate 3, fix: cause approved`). A run without flow.md records
+  the line in its audit file.
 - Only a plan gate offers an execution method, and on that gate's own line: subagent-driven (offered only when
   subagents are available) or native = `executing-plans`, with your recommendation. The user approves the plan **and**
   picks the method in the same answer. Every other gate asks for approval alone.
@@ -421,7 +429,7 @@ the output of `gh pr checks`.
 
 Under `pr`, Decide stays off the local tree: the new `shortcut:` lines come from `gh pr diff`, a fresh `gh pr checks`
 stands in for re-running the checks, `now:` isn't set to Close's waiting line, and the one commit offered is the audit
-file plus what /learn wrote, on the branch checked out now, named in the offer.
+file plus what /learn wrote, staged by name, on the branch checked out now, named in the offer.
 
 ### Decide
 
@@ -449,9 +457,10 @@ skips (no subagents, a phase the user skipped); write any that is missing under 
   the untracked files.
 
 **Gate:** the user confirms or reopens each decision (`all`, or the letters to reopen) and accepts or refuses each
-Skipped row. A reopened decision is handled as a deviation and goes back to the phase that built the code: as the next
-free task number in plan.md or, when the run has no plan.md, as the next numbered line under **Tasks**. Then the checks
-re-run and Decide starts again.
+Skipped row. A reopened decision is handled as a deviation and goes back to the phase that built the code, with
+`phase:` set to that phase's key where the run keeps one. It goes as the next free task number in plan.md or, when the
+run has no plan.md, as the next numbered line under **Tasks** (in an audit file, the next free `Fix` number above its
+findings' numbers). Then the checks re-run and Decide starts again.
 
 **Ready** means every row is green or the user accepted it in so many words; a Skipped row is never green. If the tree
 changed since the last run (a fix, /learn's files), re-run the checks first; committing the same files doesn't change

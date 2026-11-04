@@ -6,7 +6,7 @@ text = '''
 
 The run builds a single task, with no plan.md and no executor: what the gate approved is the task, and the files it
 names are its **Files** list. The main session builds it itself, under the builder brief. Its files check runs against
-the commit HEAD was on when the gate passed: write that commit under **Tasks** as `Task 1: base <sha>`, with the
-untracked files then present, and add the check's result to that line when the code is done. A change the task needs
-beyond its **Files** list is a deviation.
+the tree as it is when the build starts, after the gate: write that base, taken as the files check says, under
+**Tasks** as `Task 1: base <sha>`, with the untracked files then present, and add the check's result to that line
+when the code is done. A change the task needs beyond its **Files** list is a deviation.
 '''

@@ -52,8 +52,10 @@ deviation goes to the user too; the session doesn't supply the missing decision 
 
 **The files check.** The coordinating session runs it itself for every task, also when execution is native and no
 task reviewer runs. When a task starts, write its line under **Tasks** in flow.md: `Task <N>: base <sha>`
-(`git rev-parse HEAD`), with the untracked files then present (`git ls-files -o --exclude-standard`). When the task's
-code is done, before its task review where one runs, check:
+(`git stash create`, a snapshot of the tracked files' uncommitted changes, or `git rev-parse HEAD` when it prints
+nothing), with the untracked files then present (`git ls-files -o --exclude-standard`). Changes already in the tree
+when the task starts stay out of the checks below. When the task's code is done, before its task review where one
+runs, check:
 
 1. Files: `git diff --name-only <base>` (commits and working tree) and `git ls-files -o --exclude-standard` again,
    compared with the task's **Files** list, leaving out the untracked files recorded at the start.

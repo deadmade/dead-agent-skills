@@ -44,7 +44,9 @@ subagents)`. The main session never reviews its own diff.
 
 /review-code keeps no flow.md: its record is the audit file (Phase 5), and without a flow.md the audit file stands in
 for it wherever a step below says flow.md. Standalone, it has no `now:` either (the audit template keeps none); called
-inline, it writes `now:` into the caller's flow.md, as the call rule says. Gate lines go into the audit file: Gate 1 under **Findings**, after the `Picks:` line; Gate 2 under **Run verdict**.
+inline, it writes `now:` into the caller's flow.md, as the call rule says. Gate lines go into the audit file, numbered
+in the order reached: the report's gate under **Findings**, after the `Picks:` line; an inline /fix's gate under
+**Findings** with its pick; Decide's gate under **Run verdict**.
 
 - **Standalone,** the argument is the target, `branch` (the default), `all` or `pr <number>`, then an optional base.
 - **Called inline** (a build flow's Finish, or /fix), the caller hands over the target, the intent, whether execution
@@ -175,7 +177,7 @@ the output of `gh pr checks`.
 
 Under `pr`, Decide stays off the local tree: the new `shortcut:` lines come from `gh pr diff`, a fresh `gh pr checks`
 stands in for re-running the checks, `now:` isn't set to Close's waiting line, and the one commit offered is the audit
-file plus what /learn wrote, on the branch checked out now, named in the offer.
+file plus what /learn wrote, staged by name, on the branch checked out now, named in the offer.
 
 [step: decide]
 

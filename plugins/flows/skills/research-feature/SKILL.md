@@ -119,7 +119,7 @@ Then, in this order:
    line) is done in this session instead, on the user's yes.
 5. **Commit.** Set `phase: done` and `now:` first, since nothing rewrites flow.md after this commit. Then show one
    commit, its message and files: the run folder plus /learn's files and any doc edit from 4. Make it on the user's
-   yes, as the run rules say, so the report is in HEAD when a build's worktree is cut.
+   yes, as the run rules say, staged by name, so the report is in HEAD when a build's worktree is cut.
 6. Offer `/build-feature docs/features/<slug>/research.md`, with the "do now" lines in its request and your
    recommendation: it starts a run of its own that links the report as its prior art and reuses this run's
    **Grounding**.

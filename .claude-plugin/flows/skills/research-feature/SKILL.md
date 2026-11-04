@@ -68,11 +68,11 @@ The coding agent proposes and recommends; the user decides.
 `<flow-root>` is the flows plugin folder: two levels above this SKILL.md. Resolve resource paths relative to their
 containing document, never the shell working directory.
 
-**Agents.** Don't start agents by the dozen, under ultracode or in a Workflow either. Decide how many a step really
-needs: combine related tasks, checks and verifications into one agent where that works, do small things inline, and
-ask before a run grows large. Give every agent the model that fits its job: haiku for mechanical work,
-sonnet for searching and most review, opus or fable where the judgment is hard (a
-subtle review, the final review).
+**Agents.** Don't start agents by the dozen, also when the host runs a workflow of many agents. Decide how many a
+step really needs: combine related tasks, checks and verifications into one agent where that works, do small things
+inline, and ask before a run grows large. Give every agent the model that fits its job: haiku for mechanical
+work, sonnet for searching and most review, opus or fable where the judgment is
+hard (a subtle review, the final review).
 
 If subagents are unavailable, the main session does delegated work itself: searching, exploring, gathering
 sources. A step whose point is an independent check (a reviewer, the prior-art source check, the final review, the
@@ -85,7 +85,8 @@ report. A skipped check never counts as passed. Preserve all approval gates and 
   `brainstorming` and `writing-plans` save them.
 - Commit or push only when the user asks, unless a sub-skill's own step does it with the user's agreement (an approved
   plan's commit steps count). The spec and plan aren't committed when written.
-- A commit message is one sentence, with no co-author lines. Stage with `git add -u` plus the new paths by name, never
+- A commit message is one sentence, with no co-author lines. A commit meant to cover all uncommitted work stages with
+  `git add -u` plus the new paths by name; every other commit stages only its own paths (`git add -- <paths>`). Never
   `git add -A`. A plan's commit steps follow this, not `writing-plans`' example.
 
 **Loading skills.**
@@ -249,7 +250,7 @@ Write `docs/features/<slug>/research.md` and link it under **Artifacts** as the 
 - **Copyedit.** Before a gate shows the user a spec, a plan, a research report or an audit report, copyedit it, each
   time the document goes to a gate: read `<flow-root>/skills/writing/references/copyedit.md` and follow it. Its check
   runs through `<flow-root>`, never from the shell's working directory:
-  `node "<flow-root>/skills/writing/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"`.
+  `node "<flow-root>/skills/writing/scripts/compare.mjs" "<copyedit folder>/saved.md" "<copyedit folder>/edited.txt" "<document>"`.
 - When the copyedit refuses the edit (it lost something, or failed), the flow goes on: the gate shows the unedited
   document and the lines `compare.mjs` printed, and says the copyedit was refused.
 - Never copyedit flow.md (the prose check skips it too: it changes after every phase), and never a plan the run was
@@ -266,9 +267,10 @@ Without subagents: skip the copyedit; the gate message says `not copyedited: no 
   passes.
 - Record it as one line under **Gates** in flow.md: `- Gate <n>, <what>: <date>[, execution: subagent-driven | native]`,
   the date empty while the gate is open; a reopening is appended to that line as `Reopened <date>: <why>`, then the
-  date it is approved again. Gates are numbered in the order the run reaches them. A conductor run inline continues
-  its caller's numbering and names itself (`- Gate 3, fix: cause approved`). A run without flow.md records the line
-  in its audit file.
+  date it is approved again. A reopening also sets `phase:`, where the run keeps one, to the key of the phase that
+  produces the reopened artifact. Gates are numbered in the order the run reaches them. A conductor run inline
+  continues its caller's numbering and names itself (`- Gate 3, fix: cause approved`). A run without flow.md records
+  the line in its audit file.
 - Only a plan gate offers an execution method, and on that gate's own line: subagent-driven (offered only when
   subagents are available) or native = `executing-plans`, with your recommendation. The user approves the plan **and**
   picks the method in the same answer. Every other gate asks for approval alone.
@@ -286,7 +288,7 @@ Then, in this order:
    line) is done in this session instead, on the user's yes.
 5. **Commit.** Set `phase: done` and `now:` first, since nothing rewrites flow.md after this commit. Then show one
    commit, its message and files: the run folder plus /learn's files and any doc edit from 4. Make it on the user's
-   yes, as the run rules say, so the report is in HEAD when a build's worktree is cut.
+   yes, as the run rules say, staged by name, so the report is in HEAD when a build's worktree is cut.
 6. Offer `/build-feature docs/features/<slug>/research.md`, with the "do now" lines in its request and your
    recommendation: it starts a run of its own that links the report as its prior art and reuses this run's
    **Grounding**.

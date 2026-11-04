@@ -27,9 +27,10 @@ skips (no subagents, a phase the user skipped); write any that is missing under 
   the untracked files.
 
 **Gate:** the user confirms or reopens each decision (`all`, or the letters to reopen) and accepts or refuses each
-Skipped row. A reopened decision is handled as a deviation and goes back to the phase that built the code: as the next
-free task number in plan.md or, when the run has no plan.md, as the next numbered line under **Tasks**. Then the checks
-re-run and Decide starts again.
+Skipped row. A reopened decision is handled as a deviation and goes back to the phase that built the code, with
+`phase:` set to that phase's key where the run keeps one. It goes as the next free task number in plan.md or, when the
+run has no plan.md, as the next numbered line under **Tasks** (in an audit file, the next free `Fix` number above its
+findings' numbers). Then the checks re-run and Decide starts again.
 
 **Ready** means every row is green or the user accepted it in so many words; a Skipped row is never green. If the tree
 changed since the last run (a fix, /learn's files), re-run the checks first; committing the same files doesn't change
