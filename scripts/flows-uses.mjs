@@ -135,9 +135,9 @@ const TEMPLATE_FILES = [
   `${FLOWS}/skills/research-feature/references/research-template.md`,
   `${FLOWS}/references/build-template.md`,
 ];
-const RULES_FILE = `${FLOWS}/references/flow-rules.md`;
 const AUDIT_FILE = `${FLOWS}/skills/review-code/references/audit-template.md`;
 const GATE_STEP = `${FLOWS}/steps/gate.toml`;
+const DEVIATIONS_STEP = `${FLOWS}/steps/deviations.toml`;
 const PLAN_STEP = `${FLOWS}/steps/plan-shape.toml`;
 const GATE_LINE = '- Gate <n>, <what>:';
 export function checkTemplates(root) {
@@ -155,7 +155,7 @@ export function checkTemplates(root) {
       // A research run builds nothing, so its template has no Deviations.
       ...(file.includes('research') ? [] : [['`Status:`', 'Status: open']]),
     ]);
-  need(RULES_FILE, [
+  need(DEVIATIONS_STEP, [
     ['the `Waiting for you` rule', 'Waiting for you'],
     ['`Status: decided`', 'Status: decided'],
   ]);

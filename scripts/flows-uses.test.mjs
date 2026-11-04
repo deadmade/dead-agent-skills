@@ -236,14 +236,13 @@ const TEMPLATES = [
   'plugins/flows/skills/research-feature/references/research-template.md',
   'plugins/flows/references/build-template.md',
 ];
-const RULES = 'plugins/flows/references/flow-rules.md';
 const AUDIT = 'plugins/flows/skills/review-code/references/audit-template.md';
 const STEPS = 'plugins/flows/steps';
 
 // A copy of the real files with `needle` taken out of `file`.
 function without(file, needle) {
   const fx = mkdtempSync(join(tmpdir(), 'ct-'));
-  for (const f of [...TEMPLATES, RULES, AUDIT, STEPS]) {
+  for (const f of [...TEMPLATES, AUDIT, STEPS]) {
     mkdirSync(dirname(join(fx, f)), { recursive: true });
     cpSync(join(ROOT, f), join(fx, f), { recursive: true });
   }
@@ -275,7 +274,8 @@ for (const t of TEMPLATES) {
 }
 
 for (const [file, what, needle] of [
-  [RULES, 'the Waiting for you rule', 'Waiting for you'],
+  [`${STEPS}/deviations.toml`, 'the Waiting for you rule', 'Waiting for you'],
+  [`${STEPS}/deviations.toml`, 'Status: decided', 'Status: decided'],
   [`${STEPS}/gate.toml`, 'the gate line shape', '- Gate <n>, <what>:'],
   [`${STEPS}/plan-shape.toml`, '**Does:**', '**Does:**'],
   [`${STEPS}/plan-shape.toml`, '**Depends on:**', '**Depends on:**'],

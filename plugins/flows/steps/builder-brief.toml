@@ -1,0 +1,33 @@
+requires = ["before-you-write"]
+
+text = '''
+  - **The brief clause.** Paste into every implementer and task-review prompt, verbatim: the deviation classes above,
+    that a deviation is reported as `NEEDS_CONTEXT` and not decided, the task's **Files** list, the plan's **Global
+    Constraints** (the seam lines included), and this line, ours,
+    after pstack's `principle-laziness-protocol` (an earlier version; upstream has since dropped it): "If a task asks
+    you to pass a new signal through types, schemas, pipelines, or similar layers, stop and look for a more direct
+    path." A task that seems to need one value threaded through many modules is a deviation. The task reviewer reports
+    a deviation it finds as one, not as a quality note. The task reviewer's prompt also gets the task's `**Adds:**`
+    and `**Size:**` lines, when it has them: anything new in the diff that `Adds:` doesn't name is a deviation.
+
+| Step                                                    | Text                                                                                    |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Builder briefs and fixes (fix loop, fix, review-code)   | **The smallest complete change** with its Bug fix bullet, and the **Never cut** line    |
+
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "The smallest complete change Take the first option that fully works:" -->
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared code." -->
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for." -->
+
+In a build flow every behaviour change gets its failing test first, and code that changes no behaviour gets none.
+Wherever **The smallest complete change** is pasted into a brief, this line goes with it: "A behaviour change gets its
+failing test first; a rename, a move, config, generated code and prose get none. Tests go only through the plan's
+**Test seams** (in `/fix`, the regression test's code path), one test per behaviour the spec states; no tests of
+private helpers, of the framework or of the language. The plan's Review Focus tests count towards that, not on top of
+it."
+<!-- overrides superpowers/skills/test-driven-development/SKILL.md: "NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST" -->
+
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none." -->
+
+Detect the stack from the files the plan touches and the repo root. Only the matching skill goes into the plan,
+builder and review briefs, by name, for the subagent to load with the Skill tool; never a whole library.
+'''
