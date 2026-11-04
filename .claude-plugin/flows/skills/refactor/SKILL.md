@@ -218,8 +218,7 @@ The user picks one, recorded as `Picked:` under `### Shape`.
 **Both sizes** get a plan: a local one short (often one task), a restructuring one a task per seam or module. Its
 **Global Constraints** add: "Behaviour doesn't change: tests that passed before still pass." Its **Test seams** list
 the characterization tests: one per thin spot Ground listed, through the public boundary that code already has. The
-first task writes them. The plan is written, copyedited and checked by these rules, and the builder brief pastes in
-the first:
+first task writes them. The plan is written and checked by these rules, and the builder brief pastes in the first:
 
 **Before you write.** Read the task and the code it touches. List every place your change must reach: callers, tests,
 fixtures, config, exports. Check what your change could break for users: data it would destroy or expose, callers that
@@ -255,6 +254,24 @@ gate.
   `**Depends on:**` line; below that line, write
   `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
 
+Run `node "<flow-root>/skills/build-feature/scripts/glance.mjs" "<plan.md>"` after every edit to the plan and again
+after its copyedit, so the block a gate shows matches the plan below it. It writes the plan's task graph and table at
+the top of plan.md, and it fails with the reason when the plan has no `### Task <n>:` headings or a task lacks
+`Depends on:`, names no task in it, or has a `Size:` that isn't `~N`. A missing **Does:**, **Adds:** or **Size:**
+line doesn't fail it, so read its table as well: every task has all four lines, and an empty `does` or a `?` under
+`adds` or `size` is a line to add.
+
+A plan the run was given, or one outside `docs/features/<slug>/`, is linked from flow.md and never edited in place.
+Check it with `node "<flow-root>/skills/build-feature/scripts/glance.mjs" --check "<plan>"`, which prints the same
+block and the same errors and writes nothing, and name each failure or missing line instead of fixing it.
+
+**A restructuring** then gets plan review: follow [plan-review.md](../build-feature/references/plan-review.md), with
+`### Shape` and its pick in place of the spec and no prior-art sections, logged under **Plan review**. Without
+subagents: plan review is an independent check, so it is skipped and recorded under **Skipped**
+(`plan review: no subagents`).
+
+Then, for both sizes and once, after any plan review, the plan is copyedited and checked again before the gate:
+
 - **Copyedit.** Before a gate shows the user a spec, a plan, a research report or an audit report, copyedit it, each
   time the document goes to a gate: read `<flow-root>/skills/writing/references/copyedit.md` and follow it. Its check
   runs through `<flow-root>`, never from the shell's working directory:
@@ -268,28 +285,12 @@ Flows' `flows:writing` skill may be invoked by the host skill tool; it supplies 
 
 Without subagents: skip the copyedit; the gate message says `not copyedited: no subagents`.
 
-Run `node "<flow-root>/skills/build-feature/scripts/glance.mjs" "<plan.md>"` after every edit to the plan and again
-after its copyedit, so the block a gate shows matches the plan below it. It writes the plan's task graph and table at
-the top of plan.md, and it fails with the reason when the plan has no `### Task <n>:` headings or a task lacks
-`Depends on:`, names no task in it, or has a `Size:` that isn't `~N`. A missing **Does:**, **Adds:** or **Size:**
-line doesn't fail it, so read its table as well: every task has all four lines, and an empty `does` or a `?` under
-`adds` or `size` is a line to add.
-
-A plan the run was given, or one outside `docs/features/<slug>/`, is linked from flow.md and never edited in place.
-Check it with `node "<flow-root>/skills/build-feature/scripts/glance.mjs" --check "<plan>"`, which prints the same
-block and the same errors and writes nothing, and name each failure or missing line instead of fixing it.
-
-**A restructuring** then gets plan review: follow [plan-review.md](../build-feature/references/plan-review.md), with
-`### Shape` and its pick in place of the spec and no prior art, logged under **Plan review**. Copyedit and check the
-plan again after its edits. Without subagents: plan review is an independent check, so it is skipped and recorded
-under **Skipped** (`plan review: no subagents`).
-
 ## Phase 3: Gate
 
 **Gate 1** is a plan gate: the target shape, the size you recommend and why, the plan (glance's block, its **Test
 seams**, each task's **Files** list) and, for a restructuring, the picked option and the plan review's findings.
 Record the size the user approves as `Picked:` under `### Size`. A different size sends the run back to Phase 2 for
-that size's path, and this gate reopens.
+that size's path (`phase: shape`), and this gate reopens.
 
 - **Gate.** Ask with the AskUserQuestion tool, then wait for the answer. A gate passes only on the user's explicit approval of
   the artifact it names: "Sounds good" to an idea isn't approval of a document. Nothing past a gate starts before it
@@ -445,6 +446,8 @@ This flow adds an eighth class, which the builder brief pastes in with the other
 8. a test edit beyond the moved names. A test that passed on the base may change only where a refactored name or path
    appears in it (imports, identifiers, a moved file). A changed assertion or expected value, or a deleted test, is a
    deviation; its recommendation keeps the test, and the behaviour change it points at goes under **Parking lot**.
+   The files check looks for it too, in `git diff <base> -- <the task's test files>`, so native execution doesn't rest
+   on the builder's word.
 
 The plan is built by the method its gate picked, the characterization tests first, then the moves:
 

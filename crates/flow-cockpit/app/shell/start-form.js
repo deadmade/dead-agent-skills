@@ -22,6 +22,7 @@ const FLOW_SKILL = Object.freeze({
   implement: 'implement',
   fix: 'fix',
   upgrade: 'upgrade',
+  refactor: 'refactor',
 });
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 /** The terminal pane isn't there yet to measure: its fit sends the real size as soon as it mounts. */

@@ -71,21 +71,22 @@ The user picks one, recorded as `Picked:` under `### Shape`.
 **Both sizes** get a plan: a local one short (often one task), a restructuring one a task per seam or module. Its
 **Global Constraints** add: "Behaviour doesn't change: tests that passed before still pass." Its **Test seams** list
 the characterization tests: one per thin spot Ground listed, through the public boundary that code already has. The
-first task writes them. The plan is written, copyedited and checked by these rules, and the builder brief pastes in
-the first:
+first task writes them. The plan is written and checked by these rules, and the builder brief pastes in the first:
 
 [step: before-you-write]
 
 [step: plan-shape]
 
-[step: copyedit]
-
 [step: plan-check]
 
 **A restructuring** then gets plan review: follow [plan-review.md](../build-feature/references/plan-review.md), with
-`### Shape` and its pick in place of the spec and no prior art, logged under **Plan review**. Copyedit and check the
-plan again after its edits. Without subagents: plan review is an independent check, so it is skipped and recorded
-under **Skipped** (`plan review: no subagents`).
+`### Shape` and its pick in place of the spec and no prior-art sections, logged under **Plan review**. Without
+subagents: plan review is an independent check, so it is skipped and recorded under **Skipped**
+(`plan review: no subagents`).
+
+Then, for both sizes and once, after any plan review, the plan is copyedited and checked again before the gate:
+
+[step: copyedit]
 
 ## Phase 3: Gate
 
@@ -94,7 +95,7 @@ under **Skipped** (`plan review: no subagents`).
 **Gate 1** is a plan gate: the target shape, the size you recommend and why, the plan (glance's block, its **Test
 seams**, each task's **Files** list) and, for a restructuring, the picked option and the plan review's findings.
 Record the size the user approves as `Picked:` under `### Size`. A different size sends the run back to Phase 2 for
-that size's path, and this gate reopens.
+that size's path (`phase: shape`), and this gate reopens.
 
 [step: gate]
 
@@ -119,6 +120,8 @@ This flow adds an eighth class, which the builder brief pastes in with the other
 8. a test edit beyond the moved names. A test that passed on the base may change only where a refactored name or path
    appears in it (imports, identifiers, a moved file). A changed assertion or expected value, or a deleted test, is a
    deviation; its recommendation keeps the test, and the behaviour change it points at goes under **Parking lot**.
+   The files check looks for it too, in `git diff <base> -- <the task's test files>`, so native execution doesn't rest
+   on the builder's word.
 
 The plan is built by the method its gate picked, the characterization tests first, then the moves:
 
