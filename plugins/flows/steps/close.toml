@@ -13,6 +13,9 @@ Follow superpowers `finishing-a-development-branch` from its Step 2: the last ru
 it lists them, with your recommendation. It's the user's choice.
 <!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "Run the project's full test suite" -->
 
+Nothing writes flow.md between Decide's commits and the closing commit: Close's stops (this menu, a merge conflict, the
+PR gate, the push) leave `now:` as Decide set it.
+
 **A merge conflict** (its `git pull` or `git merge` stops on one): stop, and resolve nothing on your own. List the
 conflicting files (`git diff --name-only --diff-filter=U`) and offer, with a recommendation: resolve them here and
 re-run the checks on the merged result; abort (`git merge --abort`), rebase the branch on the base, re-run the checks
@@ -26,8 +29,8 @@ writes; pushing is the owner's call and their hooks block it.
   before/after line, a few boxes in plain text); blast radius (pstack `blast-radius` over the diff) with a **Door**
   line (one-way: data, a wire format, a public interface; two-way: a revert undoes it); verification, with the
   before/after output where behaviour changed. Revise it by `flows:writing`.
-- **Gate:** show the title and body. On approval, make the closing commit below first, so the PR carries it; then
-  hand over `git push -u origin <branch>`, then
+- **Gate:** show the title, the body and the closing commit below, and ask once: one yes approves all three. Make the
+  closing commit first, so the PR carries it; then hand over `git push -u origin <branch>`, then
   `gh pr create --title "<title>" --body-file <file>`, one at a time: {{user-runs}}.
 - Once the PR exists, {{watch-checks}}. A red check: superpowers `systematic-debugging` to the cause, then stop with
   the check, the cause and the options (a fix, a rerun, a flaky test). The push of a fix is again the user's to run.
@@ -35,6 +38,6 @@ writes; pushing is the owner's call and their hooks block it.
 **The closing commit.** Once the pick is carried out (for a PR, at its gate, before the push), set `phase: done` in
 flow.md, the base branch's copy after a local merge, and `now:` to what the pick did (`Done: merged into <base>.`,
 `Done: PR handed over for <branch>.`, `Done: kept on <branch>.`). Show that one-file commit and make it on the user's
-yes. A discard deletes the branch, and the run folder with it: say that flow.md went with it, so there is nothing to
-mark done.
+yes (for a PR, the gate's). A discard deletes the branch, and the run folder with it: say that flow.md went with it, so
+there is nothing to mark done. Without a flow.md (the outermost run keeps none), there is no closing commit.
 '''
