@@ -8,4 +8,4 @@ uses: mattpocock-picks:codebase-design, pstack-picks:principle-redesign-from-fir
   seam; boundary discipline keeps the policy there. Its "propagate" covers the seam's types and docs, never a
   parameter carried through modules that don't decide on it.
   <!-- overrides pstack-picks/skills/principle-redesign-from-first-principles/SKILL.md: "Propagate the change through every reference: types, docs, examples, rationale sections" -->
-- Each answer goes into the spec as one line: `<concern>: resolved in <module>; never seen by <modules>`.
+- Each seam goes into the spec as one line: `<concern>: resolved in <module>; never seen by <modules>`.
