@@ -33,11 +33,12 @@ writing to that flow.md. `flow:` stays `feature`, so the run stays one record; t
 only resumes its own flow, another `flow:` stops) don't apply to it.
 
 - Gate 2 is open, or `phase:` is still before `execute`: stop and offer `/build-feature <slug>`.
-- `phase:` is `finish` or `done`: say so and stop.
+- `phase:` is `finish` or `done`: say so and stop; at `finish`, offer `/build-feature <slug>`, which resumes it.
 - Otherwise resume it as **Resume** below says, then go straight to Phase 3 with the run's plan.md: no Read, no
   Confirm, no new gate. The method is Gate 2's `execution:`; ask only when it is missing, and record it on that line.
-  Write `phase: execute`, then `finish`. Its `now:` says that `/build-feature <slug>` or `/implement <slug>` resumes
-  it; a bare /implement doesn't.
+  That plan.md is the run's own, so Decide's added task and the split of a BLOCKED task go into it as in
+  /build-feature. Write `phase: execute`, then `finish`. Its `now:` says that `/build-feature <slug>` or
+  `/implement <slug>` resumes it; a bare /implement doesn't.
 
 [step: state]
 
@@ -55,11 +56,11 @@ Write the grounding under **Grounding** in flow.md: where the work lands (`file:
 
 **A ticket** goes ahead only when it says what behaviour changes, how you'd know it's done, and leaves no design
 decision open (the approach, where it lives, a new interface), and when it is one task's work. Write its **Files**
-list from the grounding, for the gate. A gap or a ticket too big for one task: stop, name it, and offer
-`/build-feature`.
+list from the grounding under **Grounding**, where the gate and one-task's files check find it. A gap or a ticket too
+big for one task: stop, name it, and offer `/build-feature`.
 
 **A plan** goes ahead when glance accepts it and every task has **Does**, **Depends on**, **Adds**, **Size** and a
-**Files** list. It is a plan the run was given, so glance runs on it only with `--check` (the second paragraph
+**Files** list. It is a plan the run was given, so glance runs on it only with `--check` (the `--check` paragraph
 below), never in its writing mode:
 
 [step: plan-check]
@@ -69,15 +70,19 @@ and run /implement again.
 
 Anything else (a spec, open questions): say it isn't a ticket or a plan and offer `/build-feature`.
 
+Each stop in this phase leaves the run at `phase: read`: the stop message says that `/implement <slug>` continues it
+once the ticket or plan is fixed, and otherwise offers to set `phase: done` with a note.
+
 ## Phase 2: Confirm
 
 <!-- runs: the gate · output: the approved ticket or plan -->
 
 - **A ticket** becomes one task: the gate shows the ticket, its **Files** list and its acceptance criteria, as
   `- Gate 1, ticket approved: <date>`. No plan.md is written and no execution method is asked.
-- **A plan:** the gate shows glance's block, the plan's **Global Constraints** and **Test seams**, and each task's
-  **Files** list (the deviation contract). A change the user asks for stops the run: name it, so the user can change
-  the plan and run /implement again; offer `/build-feature` only when the user wants the design reopened.
+- **A plan:** the gate shows glance's block, the plan's **Global Constraints** and **Test seams** (or that it has
+  none), and each task's **Files** list (the deviation contract). A change the user asks for stops the run: name it,
+  so the user can change the plan and run /implement again; offer `/build-feature` only when the user wants the design
+  reopened.
 
 Neither is copyedited, since the run changes neither: for a plan, the gate message says so as the gate rules below
 give it; for a ticket, `not copyedited: a given ticket is not changed`.
@@ -98,7 +103,8 @@ The builder brief below pastes this in:
 
 [step: deviations]
 
-A given plan stays as it is during the build: a deviation's decision goes under **Deviations**, never into the plan.
+A plan given by path stays as it is during the build: a deviation's decision goes under **Deviations**, never into
+the plan.
 
 A ticket is built as one task:
 
@@ -115,6 +121,8 @@ A plan is built by the method its gate picked:
 /review-code and /learn run inline, by this rule:
 
 [step: call-conductor]
+
+On the ticket path no per-task review ran: tell /review-code that execution ran natively.
 
 [step: finish]
 
