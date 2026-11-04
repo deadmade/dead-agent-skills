@@ -39,8 +39,12 @@ build-feature
 └ web-mcp: fetch, search
 
 fix
-├ pstack-picks: blast-radius, how, why
-├ superpowers: systematic-debugging, test-driven-development
+├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
+├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
+├ claude-security@claude-plugins-official: claude-security (claude-code)
+├ flows: writing
+├ pstack-picks: blast-radius, how, interrogate, why
+├ superpowers: finishing-a-development-branch, systematic-debugging, test-driven-development, using-git-worktrees
 └ web-mcp: fetch, search
 
 implement

@@ -56,6 +56,7 @@ const FIX: List = &[
     ("ground", None),
     ("cause", Some(1)),
     ("fix", None),
+    ("prove", None),
     ("finish", None),
 ];
 /// upgrade/SKILL.md.
