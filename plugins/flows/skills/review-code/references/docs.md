@@ -57,7 +57,8 @@ In the scoped docs, check what can be checked by running something:
 
 Under `pr`, the local tree is not the PR's: paths, links, scripts and manifests are checked at the head sha
 (`git show <head sha>:<path>`, `git ls-tree <head sha>`), no command from the PR runs, and without a fetched head the
-checks that need its files are recorded as not checked.
+checks that need its files are recorded as not checked. A URL the PR adds or changes is never fetched: it is recorded
+as not checked.
 
 ## Prose
 
