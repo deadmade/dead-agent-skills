@@ -183,10 +183,17 @@ export function composeFlows(pluginDir: string, tokens: HostTokens): Composed {
     const flowKeys: Keys = skill && existsSync(skill) ? frontmatter(read(skill).split('\n')).keys : new Map();
     const conductor = flowKeys.get('disable-model-invocation')?.value === 'true' ? flow : undefined;
     const fileUses: Uses[] = [];
+    const resolve = (line: string, file: string, at: number) =>
+      line.replace(TOKEN, (_, key: string) => {
+        const token = tokens[key];
+        if (!token) throw new ComposeError(file, at, `unknown token {{${key}}}`);
+        if (token.uses) fileUses.push(token.uses);
+        return token.text.replaceAll('\r\n', '\n');
+      });
 
     const dropped = new Set([keys.get('uses')?.line, keys.get('template')?.line].flatMap((n) => (n ? [n - 1] : [])));
     const usesPhases = lines.slice(end).includes('[step: phases]');
-    const phases: { n: string; name: string; runs: string; output: string; gate: boolean }[] = [];
+    const phases: { n: string; name: string; runs: string; output: string; gate: boolean; at: number }[] = [];
     let current: (typeof phases)[number] | undefined;
     for (let i = end; i < lines.length; i++) {
       const heading = PHASE.exec(lines[i]);
@@ -198,30 +205,33 @@ export function composeFlows(pluginDir: string, tokens: HostTokens): Composed {
         const row = ROW.exec(lines[j] ?? '');
         // The blank lines between the heading and its comment go with the comment.
         if (row) for (let k = i + 1; k <= j; k++) dropped.add(k);
-        current = { n: heading[1], name: heading[2], runs: row?.[1] ?? '', output: row?.[2] ?? '', gate: false };
+        current = {
+          n: heading[1],
+          name: heading[2],
+          runs: row?.[1] ?? '',
+          output: row?.[2] ?? '',
+          gate: false,
+          at: j + 1,
+        };
         phases.push(current);
       } else if (lines[i].startsWith('## ')) current = undefined;
       else if (lines[i] === '[step: gate]' && current) current.gate = true;
     }
     let gates = 0;
-    const table = [
-      '| Phase | Runs | Output |',
-      '| --- | --- | --- |',
-      ...phases.map((p) => {
-        const output = [p.output, p.gate && `**Gate ${++gates}**`].filter(Boolean).join('. ');
-        return `| ${p.n} ${p.name} | ${p.runs} | ${output} |`;
-      }),
-      '',
-      `phases: ${[...phases.map((p) => p.name.toLowerCase()), 'done'].join(' | ')}`,
-    ];
+    // Only a file holding [step: phases] ships the table, so only its comments' tokens resolve and count as uses.
+    const table = usesPhases
+      ? [
+          '| Phase | Runs | Output |',
+          '| --- | --- | --- |',
+          ...phases.map((p) => {
+            const output = [p.output, p.gate && `**Gate ${++gates}**`].filter(Boolean).join('. ');
+            return resolve(`| ${p.n} ${p.name} | ${p.runs} | ${output} |`, rel, p.at);
+          }),
+          '',
+          `phases: ${[...phases.map((p) => p.name.toLowerCase()), 'done'].join(' | ')}`,
+        ]
+      : [];
 
-    const resolve = (line: string, file: string, at: number) =>
-      line.replace(TOKEN, (_, key: string) => {
-        const token = tokens[key];
-        if (!token) throw new ComposeError(file, at, `unknown token {{${key}}}`);
-        if (token.uses) fileUses.push(token.uses);
-        return token.text.replaceAll('\r\n', '\n');
-      });
     const used = new Map<string, number>();
     const out: string[] = [];
     lines.forEach((line, i) => {

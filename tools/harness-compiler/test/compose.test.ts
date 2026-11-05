@@ -165,6 +165,22 @@ test('draws the phase table', () => {
   assert.equal(compose(unconverted).files.get('skills/g/SKILL.md'), unconverted['skills/g/SKILL.md']);
 });
 
+test("resolves a token in a phase's runs/output comment, records its uses, and refuses an unknown one", () => {
+  const conductor = (comment: string) => ({
+    'skills/f/SKILL.md': `---\nname: f\ndisable-model-invocation: true\n---\n[step: phases]\n\n## Phase 1: Read\n\n${comment}\n`,
+  });
+  const tokens = { ...TOKENS, explore: { text: 'Explore agents', uses: { 'claude-code': ['Explore'] } } };
+  const { files, uses } = compose(conductor('<!-- runs: {{explore}} · output: {{ask-user}} -->'), tokens);
+  assert.match(files.get('skills/f/SKILL.md') ?? '', /^\| 1 Read \| Explore agents \| ask the user \|$/m);
+  assert.deepEqual(uses.f, { 'claude-code': ['Explore'] });
+  refuses(
+    conductor('<!-- runs: {{ask user}} · output: b -->'),
+    'skills/f/SKILL.md',
+    9,
+    /unknown token \{\{ask user\}\}/,
+  );
+});
+
 test('inlines the adapter', () => {
   const { files } = compose({ 'skills/f/SKILL.md': 'A\n[step: host]\nB\n' });
   assert.equal(files.get('skills/f/SKILL.md'), 'A\nHost adapter.\nB\n');
