@@ -266,7 +266,7 @@ fn audit_closes_when_every_pick_is_fixed() {
 fn shipped_audit_template_reads_as_an_empty_audit() {
     let path = repo_root().join("plugins/flows/skills/review-code/references/audit-template.md");
     let audit = parse_audit(&fs::read_to_string(&path).unwrap());
-    assert!(audit.findings.is_empty());
+    assert_eq!(audit.findings.len(), 0);
     assert_eq!((audit.picks, audit.fixed, audit.open), (None, vec![], None));
 }
 
