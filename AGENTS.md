@@ -276,7 +276,7 @@ plugins of ours that the manifest no longer lists.
   except the three timing ones its `checkFlags` skip. The views tests (jsdom, after `npm ci`):
   `node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/extensions/tests/*.test.ts'`, then
   `npx tsc -p crates/flow-cockpit/app/shell` and `npx tsc -p crates/flow-cockpit/extensions`. They run only there and in
-  `flow-cockpit.yml`, never in `npm test` or the pre-commit hook.
+  `crates.yml`'s cockpit job, never in `npm test` or the pre-commit hook.
 - ado-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/ado-mcp`. CI uses the latest stable
   Rust, which can carry lints the pinned `rust-version` (1.97) lacks. A test that times concurrency makes one fast call
   first and bounds the slow one against it (`view_concurrent` in `tests/pr.rs`, `tests/wi.rs`): under the full
@@ -300,13 +300,14 @@ plugins of ours that the manifest no longer lists.
   `nix develop` runs in that worktree. treefmt's hook fails on any file it changes: run `treefmt` on the files you
   changed (never a folder: it reformats files you didn't touch), then `npm run build:harnesses`, then stage.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
-- `npm run scan-skills` (needs `pipx`): Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`;
-  it fails on a high or critical finding. A finding judged benign gets a scoped suppression with its reason in
-  `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.
+- `npm run scan-skills` (needs `pipx`): Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`
+  and the composed flows conductors in `.claude-plugin/flows/skills/`; it fails on a high or critical finding. A
+  finding judged benign gets a scoped suppression with its reason in `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.
 
 CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests and the headroom-trim server tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `crates.yml` (clippy and tests,
-plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches; `flow-cockpit.yml` on PRs touching the
-flow cockpit's crate, plugin, the flake or the npm manifests (core tests and clippy on Linux and Windows, the app's Windows build, the
+plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches, and its cockpit job on PRs touching the
+flow cockpit's crate, plugin, the built flows skills (`.claude-plugin/flows/skills/`), the build, flow, research or audit
+templates, the flake or the npm manifests (core tests and clippy on Linux and Windows, the app's Windows build, the
 views tests and both `tsc -p` checks; on Linux `nix build .#flow-cockpit`; with `CI=true` the core's relative-worktree
 test fails instead of skipping on a git older than 2.48); `crates-build.yml` (both binaries) and
 `crates-build.yml` (the Windows app's release build and zip, also on PRs touching its crate) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per source registry entry (new upstream
@@ -334,8 +335,9 @@ dependencies and targets. UI mods (TypeScript against Claude's UI engine) stay i
 
 `tools/harness-compiler/` is the one tool that turns these sources into `.agents/plugins/` (Codex) and
 `.claude-plugin/` plus both marketplaces: `schema/` validates, `load.ts` builds the plugin list, `targets/<id>.ts`
-is one emitter per harness (event and tool maps, manifest, MCP, LSP, theme, marketplace), `transforms/` rewrites shipped
-Markdown per target (`rules.ts` holds the per-file edits for vendored text), `templates/` holds all harness-specific
+is one emitter per harness (event and tool maps, manifest, MCP, LSP, theme, marketplace, and on Codex the
+per-conductor invocation policy: `agents/openai.yaml` with `allow_implicit_invocation: false`, written from
+`disable-model-invocation: true`), `transforms/` rewrites shipped Markdown per target (`rules.ts` holds the per-file edits for vendored text), `templates/` holds all harness-specific
 prose, `runtime/` is the shared hook runner copied into packages. Adding a harness is one new `targets/` file.
 Commands: `npm run build:harnesses` (`harness-compiler build`), `npm run check:harnesses` (`check`, no rewriting),
 `harness-compiler validate` and `lint` (fails when `plugins/` carries harness-specific files or wording outside

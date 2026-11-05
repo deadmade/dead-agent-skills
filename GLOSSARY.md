@@ -173,7 +173,7 @@ capture. It can also start and host Claude sessions itself.
 _Avoid_: dashboard, board
 
 **Flow run**:
-One conductor run, recorded in a `docs/features/<slug>/flow.md`, from its start to `phase: done`.
+One run of a build or research conductor, recorded in a `docs/features/<slug>/flow.md`, from its start to `phase: done`.
 _Avoid_: run (alone; a web-mcp run is something else), flow (alone; that's the conductor), ticket
 
 **Audit**:

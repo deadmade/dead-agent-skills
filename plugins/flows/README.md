@@ -1,7 +1,8 @@
 # flows
 
-Conductor skills: each one runs the skills the rest of this marketplace ships, in order, stops at approval gates, and
-keeps a state file so the next session can resume. Claude proposes and recommends; you decide.
+Conductor skills: each one runs the skills the rest of this marketplace ships, in order, and stops at approval gates.
+Build and research flows keep a flow.md to resume from; /review-code keeps an audit file. Claude proposes and
+recommends; you decide.
 
 | Command                                          | Job                                                             | Runs                                                                                                                                                                                                                                                                        | Ends in                                           |
 | ------------------------------------------------ | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
@@ -190,8 +191,9 @@ Pick it in the installer (see the [main README](../../README.md)), which also in
 ## Supported agents
 
 The same conductors and flow-state documents work in every supported coding agent. Each distribution carries all pack
-resources; only conductor skills are discovered automatically. The host-specific tool mapping is written into each
-built conductor (`tools/harness-compiler/src/templates/hosts/`), and cross-package lookups are described in
+resources; only conductor skills are discovered automatically. A conductor runs only when called by name: the build
+writes each host's form of that policy from the conductor's `disable-model-invocation: true`. The host-specific tool
+mapping is written into each built conductor (`tools/harness-compiler/src/templates/hosts/`), and cross-package lookups are described in
 `references/resource-index.md`.
 If a session cannot launch subagents, the main session does the delegated work (searching, exploring) itself, and
 independent checks (reviewers, source checks, the copyedit) are skipped and recorded as not checked. Keep approval gates.
