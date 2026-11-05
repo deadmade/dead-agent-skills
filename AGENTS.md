@@ -344,6 +344,8 @@ Commands: `npm run build:harnesses` (`harness-compiler build`), `npm run check:h
 `src/lint-allowlist.json`). Author → build → review generated changes → commit sources and outputs together.
 Shared handlers must not learn native event or manifest shapes. Required unsupported hooks fail the build; optional ones
 are reported and omitted. Never edit `.claude-plugin/` or `.agents/plugins/` by hand.
+Don't `import` a JSON file in `tools/harness-compiler/src` (compose reads `steps/step.schema.json` with `readFileSync`):
+the installer's catalog test compiles the compiler with `tsc --outDir`, which emits the JSON there and breaks the test.
 `tools/installer/core/agents.ts` holds host metadata for the installer; `tools/installer/steps/codex.ts` uses Codex's
 native plugin and MCP commands, respecting CODEX_HOME.
 Keep Claude marketplace IDs and the legacy executable alias stable. The GitHub repository still has its old name.

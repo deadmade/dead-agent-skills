@@ -5,7 +5,7 @@ Three independent reviewers (opus) read the conductors; raw reports in [eval-raw
 - Claims: 76; confirmed 42, partly 32, refuted 2. Critic added 19.
 - Live findings: 93; high 3, medium 34, low 56.
 - Composable (a step defined once and composed into every flow removes it by construction): 37; not composable (design, pack conflicts, host gaps, missing steps nobody has): 56.
-- Checked 2026-11-05 against the built trees: 93 fixed (89 at first check; #39, #46, #47 and #63 closed in Task 19). A `fixed in` path is under `.claude-plugin/flows/` unless it starts with `plugins/`.
+- Checked 2026-11-05 against the built trees: 93 fixed (89 at first check; #39, #46, #47 and #63 closed in Task 19), with one half of #46 parked: a Requirements probe that is itself a subagent can't dispatch the checkers spec-compliance.md starts (flow.md Parking lot). A `fixed in` path is under `.claude-plugin/flows/` unless it starts with `plugins/`.
 
 `#` numbers are for picking. Kinds: drift (copies differ), pack-conflict (a vendored skill says the opposite, no override), contradiction, missing-step, dead-ref, readability, design.
 
