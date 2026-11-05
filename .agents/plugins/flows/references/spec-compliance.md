@@ -1,6 +1,7 @@
 # Portable spec-compliance procedure
 
-Inputs: target code path, optional spec path, and the requirement limit the caller agreed with the user. Follow the
+Inputs: target code path, optional spec path, the requirement limit the caller agreed with the user, and any
+untrusted-data line the caller gives, which goes into every checker, reviewer and refuter prompt below. Follow the
 reporting and evidence rules in `<flow-root>/packs/tob-picks/skills/spec-to-code-compliance/SKILL.md`, except its
 Workflow invocation: use this procedure instead. No host-specific JavaScript workflow runtime is required.
 

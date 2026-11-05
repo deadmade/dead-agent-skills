@@ -40,8 +40,9 @@ on the user's yes:
 
 Its inputs are the scope's code as the target path, the doc as the spec, and the requirement limit agreed at the
 offer. The offer states its cost: one checker per requirement and one reviewer of uncovered behaviour, on
-{{model:standard}}, plus one refuter per claimed divergence, on {{model:strongest}}. Its findings come back to the main
-session and are sorted as **Claims** says.
+{{model:standard}}, plus one refuter per claimed divergence, on {{model:strongest}}. Under `pr`, the main session
+hands spec-compliance.md the untrusted-data line from the SKILL.md rules, for every checker, reviewer and refuter
+prompt. Its findings come back to the main session and are sorted as **Claims** says.
 
 ## Mechanics
 
