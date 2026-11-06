@@ -44,13 +44,25 @@ last search in this session got results for another query, its next search types
 already open in that tab, as a person would (Google, Bing, DuckDuckGo, Brave and Scholar; not Semantic Scholar). Every
 other search loads the result URL: a tab's first, one after a search that got no results or used `since`, any `since`,
 a repeated query, one with odd spacing, or a typing that doesn't land on this query's page; a typing that runs out of
-time skips the engine as timed out. Engines still run in parallel. If you close the window, the next call opens a new
-one; if the browser crashes, it is restarted. On Windows the browser also goes when web-mcp is killed.
+time skips the engine as timed out. Engines still run in parallel, except that typing takes turns (below). If you close
+the window, the next call opens a new one; if the browser crashes, it is restarted. On Windows the browser also goes
+when web-mcp is killed.
+
+A browser window delivers `click` and `press` only to its front tab, and reports them done when the tab is behind
+another. So before `click`, `press` and a typed follow-up search, web-mcp brings that session's tab to the front with a
+request to the browser's local debug port (it ignores any proxy in the environment). You will see the window's front
+tab change while Claude works, and a window in the background may take the focus from what you are doing (not
+measured). Only one tab can be in front, so engines type one at a time: a typed follow-up search takes about the sum of
+its engines' typing, not the longest. An engine that has waited 5 s for its turn brings its own tab forward and types
+anyway, which takes the front from the engine typing then: either may lose its keys, and its search loads the result
+URL instead. With four engines that starts at a typing time of about 1.7 s each. How long one engine's typing takes was
+not measured, and a long query may not fit in the time an engine has, which skips it as timed out.
 
 Google's result links are redirects on its own site, with no address in the page. web-mcp reads each one's target with
 a plain request of its own, not through the browser: one request per result, in rank order, with the `web-mcp/<version>`
-user agent and no cookies. Google answers only the first 2 to 4 of them, so Google contributes its first few results,
-and a search that follows another closely may get none and skip Google.
+user agent and no cookies. In our measurements Google answered only the first 2 to 4 of them, so Google contributes its
+first few results, and a search may get none and skip Google. The next search asks again: nothing rests Google for
+this, because a refused redirect is neither a CAPTCHA nor a second consent page.
 
 The window doesn't announce automation: it launches with `--disable-blink-features=AutomationControlled`, so
 `navigator.webdriver` reads `false`, and it sets no user agent of its own, so every tab sends the browser's real one.

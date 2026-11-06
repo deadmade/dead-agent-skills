@@ -131,7 +131,8 @@ impl Filter {
 ///
 /// # Errors
 /// Why the engine is skipped: resting, busy, a first consent page, blocked (it then rests), an unrecognised page,
-/// the browser's error, the deadline or, for Google, result links that did not resolve.
+/// the browser's error, the deadline or, for Google, result links that did not resolve or that sit on a private
+/// address.
 pub async fn run_engine(
     ctx: &Ctx,
     e: Engine,
@@ -199,9 +200,15 @@ pub async fn run_engine(
             if since.is_none() {
                 *last = Some(query.to_owned());
             }
-            // Google's rows are opaque redirects: read each one's target before ranking.
+            // Google's rows are opaque redirects: read each one's target before ranking. They are asked for on the
+            // page's own host, which is private only when something other than Google served the page: that gets no
+            // request, as web-mcp's public fetches keep off private addresses.
             return if e == Engine::Google {
-                resolve_goto(&ctx.http_public, &ctx.limits, &landed, found, deadline).await
+                if crate::archive::is_private(&landed) {
+                    Err("its result links are on a private address".into())
+                } else {
+                    resolve_goto(&ctx.http_public, &ctx.limits, &landed, found, deadline).await
+                }
             } else {
                 Ok(found)
             };
@@ -233,12 +240,15 @@ pub async fn run_engine(
 /// `Location`, answers `404` or leads to a page of the search host itself is dropped and the walk goes on.
 ///
 /// Google redirects only the first few links of a fresh page (2 to 4 measured on 2026-11-06, fewest right after a
-/// burst) and then answers `200` with a delay page that grows with every further request; for about 30 s after a
-/// burst every request gets it. So a search that follows another closely may resolve no link and skip Google. The
+/// burst) and then answers `200` with a delay page that grows with every further request. After a burst of parallel
+/// requests every request got it for about 30 s (one test); this walk is one request at a time and ends at its first
+/// such answer, and in one live run of six searches Google gave rows to every search after the first. How soon after
+/// another search Google resolves again was not measured, so a search may resolve no link and skip Google, and the
+/// next search asks again: nothing rests the engine for it, not even a `/sorry` redirect. The
 /// first answer that is neither a redirect nor a `404` (that `200`, a `429`, a `5xx`), a redirect to Google's
 /// `/sorry` page (`flagged`), a failed request or the deadline (the wait for the host's slot included) ends the
-/// walk: the rows after it stay unresolved and are dropped, and Google is asked for nothing more. When rows were
-/// there and none resolved, that is an error, not an empty answer.
+/// walk: the rows after it stay unresolved and are dropped, and this search asks Google for nothing more. When rows
+/// were there and none resolved, that is an error, not an empty answer.
 ///
 /// The Google parser keeps only rows on another host and `/goto` rows, so a row on the search host is a `/goto` link.
 async fn resolve_goto(

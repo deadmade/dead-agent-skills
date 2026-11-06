@@ -225,6 +225,34 @@ fn click_and_press_raise_the_tab_first() {
     assert_eq!(chrome.hits(&target), 2);
 }
 
+/// Chrome's debug port is on this machine: a proxy in the environment (a corporate laptop's `HTTP_PROXY`, with no
+/// loopback in `NO_PROXY`) would take the activation to its own loopback, and the click would be lost as before.
+#[test]
+fn the_raise_ignores_a_proxy_in_the_environment() {
+    let log = tempdir().join("calls.jsonl");
+    // Nothing listens on port 9: a request that goes through the proxy is refused.
+    let proxy = "http://127.0.0.1:9".to_owned();
+    let mut mcp = Mcp::start_with(
+        tempdir(),
+        &[
+            ("WEB_MCP_AGENT_BROWSER", FAKE.to_owned()),
+            ("FAKE_AB_LOG", log.display().to_string()),
+            ("HTTP_PROXY", proxy.clone()),
+            ("http_proxy", proxy.clone()),
+            ("ALL_PROXY", proxy.clone()),
+            ("all_proxy", proxy),
+        ],
+    );
+    let target = format!("/json/activate/T-t-web-mcp-{}-g1-s", mcp.pid());
+    let chrome = chrome_stub(&mcp, &target);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "click", "session": "s", "ref": "@e1"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(chrome.hits(&target), 1);
+}
+
 /// A gone tab has nothing to raise: the click fails as `tab_gone`, the new tab is bound, and the retry raises it.
 #[test]
 fn a_rebound_tab_is_raised_before_the_retry() {

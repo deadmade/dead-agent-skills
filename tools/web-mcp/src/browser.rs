@@ -155,18 +155,38 @@ fn isolate(cmd: &mut Command, via: Via<'_>, env: impl IntoIterator<Item = (OsStr
 }
 
 /// Whether `command` is input, which agent-browser reports as done while delivering nothing to a hidden tab
-/// (agent-browser#2146); `fill`, `type`, `scroll`, `eval` and every read work in one.
+/// (agent-browser#2146). Measured 2026-11-06, in a hidden tab: in the replay that found it, `click` and `press`
+/// delivered 0 of 3 each, while `fill`, `type` and `scroll` did their work there. The reads and `eval` were not
+/// measured in a hidden tab. One machine, one browser.
 fn is_input(command: &str) -> bool {
     matches!(command, "click" | "press")
 }
 
 /// How long input waits for the front tab before it goes on without the lock. A step holds it for a `tab list`, one
-/// request to Chrome (at most `RAISE_TIMEOUT`) and the input batch. How long one step takes was not measured (a whole
-/// follow-up search over four engines took 6 to 8 s), so 5 s is a guess: long enough for a step to finish, short
-/// enough that a hung holder costs the others little of their 10 s deadline.
+/// request to Chrome (at most `RAISE_TIMEOUT`) and the input batch, and only one tab can be in front, so engines type
+/// one at a time while the waits last: a typed follow-up search takes about the sum of its engines' typing, not the
+/// longest. A waiter that has waited `FRONT_WAIT` raises its own tab and types anyway, which takes the front from the
+/// session typing then, so either may lose its keys (the search falls back to loading the URL, or the engine times
+/// out); with four engines that starts at about 1.7 s a batch, because the fourth waits through three (the fake showed
+/// two batches overlapping at 2 s a batch). How long one step takes was not measured: the
+/// four-engine follow-ups of one live run finished in 6.1 to 8.3 s in all, which says nothing of the longest batch.
+/// In the test fake, engines timed out at 3 s a step. The 5 s is a guess: it lets a step finish, and a hung holder
+/// costs each waiter up to 5 s of the 8 s the engines have for typing (`slow_typing_times_out_without_a_second_load`).
 const FRONT_WAIT: Duration = Duration::from_secs(5);
-/// How long Chrome's activate request may take; it answers from the browser process in milliseconds.
+/// How long Chrome's activate request may take. The 2 s is a guess, not a measured latency: the request goes to the
+/// browser process on this machine, and a hung one costs each input this much before it goes on.
 const RAISE_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// The client for Chrome's debug port: no redirects, and no proxy from the environment, because the port is on this
+/// machine and a proxy would take the request to its own loopback (a refused activation, the click lost as before).
+/// `None` when reqwest can't build a client (no TLS provider); the raise is then skipped.
+fn loopback_client() -> Option<reqwest::Client> {
+    reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .ok()
+}
 /// How long a `close` may take.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 /// What a search batch keeps back from the daemon's wait for everything else: web-mcp-search/findings.md measured ~1 s
@@ -581,7 +601,9 @@ impl Browser {
 
     /// Runs `input` once `session`'s tab is the window's front one, and before any other session raises its own. A
     /// holder that hangs must not stall the rest: after `FRONT_WAIT` a waiter goes on without the lock, as it would
-    /// have before the lock (its input may then be lost to another session's raise).
+    /// have before the lock. Its raise then takes the front from the session that is typing, so either may lose its
+    /// input; the alternative, to skip the raise then, would lose the late session's input instead and let a hung
+    /// holder cost every other session its typing.
     async fn with_front<T>(
         &self,
         session: &str,
@@ -601,8 +623,9 @@ impl Browser {
     /// stderr and never fails the call.
     ///
     /// shortcut: this leans on agent-browser 0.41.1's `tab list` marking a session's own tab `active`, and on Chrome
-    /// answering `/json/activate/<targetId>` on the debug port. Input reached the page in 5 of 5 runs once the tab
-    /// was in front and in 0 of 3 before. Test input in a hidden tab again whenever the agent-browser pin moves.
+    /// answering `/json/activate/<targetId>` on the debug port. Measured 2026-11-06 (Helium 0.18, one machine): a
+    /// click reached the page 3 of 3 times through this code, 2 of 2 through a hand-made activation, and 0 of 3 before.
+    /// Test input in a hidden tab again whenever the agent-browser pin moves.
     async fn raise(&self, session: &str, via: Via<'_>) {
         let Via::Tab { cdp, .. } = via else {
             return;
@@ -630,7 +653,7 @@ impl Browser {
         let (Some(host), Some(port)) = (cdp.host_str(), cdp.port()) else {
             return;
         };
-        let Some(http) = self.http.get_or_init(|| crate::fetch::client(false).ok()) else {
+        let Some(http) = self.http.get_or_init(loopback_client) else {
             return;
         };
         let activated = http
@@ -1256,7 +1279,7 @@ mod tests {
         assert!(dir.join(format!("{session}.typed")).exists());
     }
 
-    /// Engines type in parallel, and raising one tab hides the others: a session's raise and its input are one step,
+    /// Engines start typing together, and raising one tab hides the others: a session's raise and its input are one step,
     /// so another session's raise cannot land before the input is done. With every typing batch taking `DELAY`, two
     /// sessions typing together take twice that if the lock is held through the input, and about once if it is
     /// let go after the raise (the sleeps add up either way, so a slow machine cannot fail the lower bound).
@@ -1277,6 +1300,7 @@ mod tests {
         let t0 = std::time::Instant::now();
         let until = t0 + Duration::from_secs(5);
         let cmds = typing();
+        let before = calls(&dir).len();
         let (x, y) = tokio::join!(
             b.batch_once("search-bing", &cmds, until),
             b.batch_once("search-brave", &cmds, until)
@@ -1284,6 +1308,28 @@ mod tests {
         x.unwrap();
         y.unwrap();
         assert!(t0.elapsed() >= 2 * DELAY, "{:?}", t0.elapsed());
+        // The raise is inside the turn: a session's `tab list` (its raise) is followed by its own batch before the
+        // other session's raise. With the raise before the lock, both `tab list`s would come first.
+        let c = calls(&dir);
+        let steps: Vec<(String, &str)> = c[before..]
+            .iter()
+            .map(args)
+            .filter_map(|a| {
+                let kind = if a.ends_with(&["tab", "list"]) {
+                    "list"
+                } else if a.ends_with(&["batch", "--json", "--bail"]) {
+                    "batch"
+                } else {
+                    return None;
+                };
+                let at = a.iter().position(|x| *x == "--session")?;
+                Some((a[at + 1].to_owned(), kind))
+            })
+            .collect();
+        let kinds: Vec<_> = steps.iter().map(|s| s.1).collect();
+        assert_eq!(kinds, ["list", "batch", "list", "batch"], "{steps:?}");
+        assert_eq!(steps[0].0, steps[1].0, "{steps:?}");
+        assert_eq!(steps[2].0, steps[3].0, "{steps:?}");
     }
 
     #[tokio::test]

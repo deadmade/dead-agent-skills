@@ -739,7 +739,8 @@ fn google_rows_are_replaced_by_their_redirects_until_google_stops() {
             ("Zebra two".to_owned(), two.to_owned())
         ]
     );
-    // The third row met the delay page; the walk ended there and Google was asked for nothing more.
+    // The third row met the delay page and was asked once. It is the last row, so this does not show that the walk
+    // stops there: the unit tests `resolve_goto_stops_when_google_throttles` and `…_refuses` in `src/search.rs` do.
     assert_eq!(fx.hits("/goto?url=three"), 1);
 }
 
@@ -761,6 +762,33 @@ fn google_without_a_resolved_link_is_skipped_without_rest() {
     assert!(!any_rest(&mcp));
     assert_eq!(fx.hits("/goto?url=one"), 1);
     assert_eq!(fx.hits("/goto?url=two"), 0);
+}
+
+/// A page that landed on a private address (an intercepting proxy or a captive portal serving a Google-shaped page)
+/// is not asked for its `/goto` links: like web-mcp's public fetches, these keep off private addresses.
+#[cfg(debug_assertions)]
+#[test]
+fn google_links_on_a_private_address_are_not_asked() {
+    let (_public, pages) = setup();
+    // Only `PUBLIC` counts as public in the tests: loopback itself is private.
+    let private = Fixture::start("127.0.0.1");
+    goto_google(
+        &private,
+        &pages,
+        [Some("http://127.0.0.2:9/one"), None, None],
+    );
+    let mut mcp = start(&pages, &[]);
+    let r = search(&mut mcp, json!({"query": "zebra"}));
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        first_line(t).starts_with(
+            "Source: bing, duckduckgo, brave (skipped: google: its result links are on a private address) (searched "
+        ),
+        "{t}"
+    );
+    assert!(!any_rest(&mcp));
+    assert_eq!(private.hits("/goto?url=one"), 0);
 }
 
 /// A search whose links did not resolve still got Google's results page, so a consent page met before is over.
