@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 text = '''
 - The run keeps `docs/features/<slug>/flow.md`, copied from the template this conductor names, with every
   placeholder the template names filled in; none stays literal (a `phase: <first phase>` left as written gives the

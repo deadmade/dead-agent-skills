@@ -1,27 +1,8 @@
 name: crates
 
-# One workspace: validate combined features and each package independently.
+# Check affected packages together and independently; shared inputs select the whole workspace.
 on:
   pull_request:
-    paths:
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'scripts/check_cargo_workspace*'
-      - 'tools/tui-review/**'
-      - 'plugins/shared/tui-review/**'
-      - 'tools/web-mcp/**'
-      - 'plugins/shared/web-mcp/**'
-      - 'tools/ado-mcp/**'
-      - 'plugins/opt-in/mcp/mcp-azure/**'
-      - 'tools/flow-cockpit/**'
-      - 'plugins/opt-in/flow-cockpit/**'
-      - 'plugins/flows/**'
-      - 'tools/harness-compiler/src/**'
-      - 'flake.nix'
-      - 'flake.lock'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/crates.yml'
   workflow_dispatch:
 
 permissions:
@@ -29,12 +10,19 @@ permissions:
   pull-requests: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   test:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      PACKAGES: ${{ needs.changes.outputs.packages }}
     defaults:
       run:
         shell: bash
@@ -46,7 +34,7 @@ jobs:
           node-version: 26
 
       - name: WebKitGTK
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && contains(fromJSON(needs.changes.outputs.packages), 'flow-cockpit')
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev
 
       - name: Rust toolchain
@@ -57,6 +45,7 @@ jobs:
           workspaces: .
 
       - name: Native distributions
+        if: contains(fromJSON(needs.changes.outputs.packages), 'flow-cockpit')
         run: |
           npm ci
           npm run build:harnesses
@@ -65,65 +54,36 @@ jobs:
         run: |
           python -m unittest discover -s scripts -p 'check_cargo_workspace_test.py'
           python scripts/check_cargo_workspace.py
-          cargo fmt --all -- --check
+          packages=$(node -e 'console.log(JSON.parse(process.env.PACKAGES).map(p => "-p " + p).join(" "))')
+          cargo fmt $packages -- --check
 
       - name: Clippy
         shell: pwsh
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        run: |
+          $packages = @($env:PACKAGES | ConvertFrom-Json)
+          $selection = @($packages | ForEach-Object { '-p'; $_ })
+          cargo clippy @selection --all-targets --locked -- -D warnings
 
       # The fake is needed by unit tests, which cannot use CARGO_BIN_EXE.
       - name: Rust tests
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          cargo build --locked -p web-mcp --bin fake-agent-browser
-          cargo test --workspace --locked
+          $packages = @($env:PACKAGES | ConvertFrom-Json)
+          $selection = @($packages | ForEach-Object { '-p'; $_ })
+          if ($packages -contains 'web-mcp') { cargo build --locked -p web-mcp --bin fake-agent-browser }
+          cargo test @selection --locked
 
       - name: Individual package tests
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          foreach ($package in @('tui-review', 'web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit')) {
+          foreach ($package in ($env:PACKAGES | ConvertFrom-Json)) {
             cargo test --locked -p $package
           }
 
-      - name: Speed and memory budgets
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          cargo test --locked -p tui-review --release --test perf -- --ignored --nocapture 2>&1 | Tee-Object "$env:RUNNER_TEMP/tui-review-budgets.txt"
-
-      - name: Benchmarks
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          cargo bench --locked -p tui-review --bench format --bench review -- --sample-count 50 | Tee-Object "$env:RUNNER_TEMP/tui-review-bench.txt"
-
-      - name: Mod fixture from tui-review gen
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          cargo run --locked -p tui-review --release -- gen --out "$env:RUNNER_TEMP/tui-review-fixture" > $null
-          node plugins/shared/tui-review/tests/make-fixture.mjs "$env:RUNNER_TEMP/tui-review-fixture"
-
-      - name: Mod tests and speed budgets
-        # The Claude package is generated from plugins/, which holds the sources and tests, so test it with them.
-        run: |
-          npm install -g @anthropic-ai/claude-code
-          cp -r plugins/shared/tui-review/tests .claude-plugin/tui-review/tests
-          cd .claude-plugin/tui-review
-          claude plugin validate .
-          claude plugin test .
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: tui-review-bench-${{ matrix.os }}
-          path: |
-            ${{ runner.temp }}/tui-review-bench.txt
-            ${{ runner.temp }}/tui-review-budgets.txt
-
       - name: Views tests and type checks
+        if: contains(fromJSON(needs.changes.outputs.packages), 'flow-cockpit')
         run: |
           node --test 'tools/flow-cockpit/app/shell/*.test.mjs' 'tools/flow-cockpit/extensions/tests/*.test.ts'
           npx tsc -p tools/flow-cockpit/app/shell
@@ -131,15 +91,17 @@ jobs:
 
   # Validate each independently installed Linux package, including cockpit's default extensions.
   nix:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     strategy:
       fail-fast: false
       matrix:
-        package: [tui-review, web-mcp, ado-mcp, flow-cockpit]
+        package: ${{ fromJSON(needs.changes.outputs.binaries) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
 
       - name: Nix package
         run: |
@@ -150,6 +112,8 @@ jobs:
           fi
 
   msrv:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -159,9 +123,15 @@ jobs:
           rustup toolchain install "$version" --profile minimal
           rustup override set "$version"
       - name: WebKitGTK
+        if: contains(fromJSON(needs.changes.outputs.packages), 'flow-cockpit')
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: .
           key: msrv
-      - run: cargo check --workspace --all-targets --locked
+      - name: Check selected packages
+        env:
+          PACKAGES: ${{ needs.changes.outputs.packages }}
+        run: |
+          packages=$(node -e 'console.log(JSON.parse(process.env.PACKAGES).map(p => "-p " + p).join(" "))')
+          cargo check $packages --all-targets --locked

@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 needs = "subagents"
 writes = ["Skipped"]
 

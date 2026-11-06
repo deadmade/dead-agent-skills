@@ -1,4 +1,9 @@
-uses = ["mattpocock-picks:codebase-design", "pstack-picks:principle-redesign-from-first-principles", "pstack-picks:principle-boundary-discipline"]
+#:schema ./step.schema.json
+uses = [
+  "mattpocock-picks:codebase-design",
+  "pstack-picks:principle-redesign-from-first-principles",
+  "pstack-picks:principle-boundary-discipline",
+]
 
 text = '''
 

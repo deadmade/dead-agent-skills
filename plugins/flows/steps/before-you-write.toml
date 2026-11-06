@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 text = '''
 **Before you write.** Read the task and the code it touches. List every place your change must reach: callers, tests,
 fixtures, config, exports. Check what your change could break for users: data it would destroy or expose, callers that

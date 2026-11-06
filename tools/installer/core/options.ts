@@ -67,7 +67,7 @@ export const CATEGORIES: Page[] = [
     id: 'tools',
     title: 'Tools',
     blurb: 'Plugins that bring their own binary, pane or window.',
-    keys: ['graphify', 'tui-review', 'web-mcp', 'headroom-trim', 'web-builtins-off', 'md-pane', 'flow-cockpit'],
+    keys: ['graphify', 'web-mcp', 'headroom-trim', 'web-builtins-off', 'md-pane', 'flow-cockpit'],
   },
   {
     id: 'system',

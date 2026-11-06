@@ -25,7 +25,7 @@
     in
       pkgs.writeShellApplication {
         name = "treefmt";
-        runtimeInputs = [pkgs.treefmt pkgs.alejandra pkgs.prettier pkgs.rustfmt];
+        runtimeInputs = [pkgs.treefmt pkgs.alejandra pkgs.prettier pkgs.rustfmt pkgs.taplo];
         text = ''exec treefmt "$@"'';
       };
 
@@ -94,14 +94,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(plugins/|tools/harness-compiler/|tools/(ado-mcp|flow-cockpit|tui-review|web-mcp)/|scripts/check-repo\\.mjs$|Cargo\\.(toml|lock)$|package\\.json$)";
+            files = "^(plugins/|tools/harness-compiler/|tools/(ado-mcp|flow-cockpit|web-mcp)/|scripts/check-repo\\.mjs$|Cargo\\.(toml|lock)$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|flow-cockpit|tui-review|web-mcp)/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|package\\.json$)";
+            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|flow-cockpit|web-mcp)/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|package\\.json$)";
             pass_filenames = false;
           };
         };
@@ -109,7 +109,6 @@
   in {
     checks = forAllSystems (system: {pre-commit = preCommit system;});
 
-    # The tui-review plugin's Rust binary: `nix build .#tui-review`, or `nix run .#tui-review -- gen`. Its tests run in the build.
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
       # Cargo resolves the whole workspace even for a single package. Keep every member in the source,
@@ -121,28 +120,13 @@
         in
           builtins.baseNameOf path
           != "target"
-          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["tui-review" "web-mcp" "ado-mcp" "flow-cockpit"]);
+          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["web-mcp" "ado-mcp" "flow-cockpit"]);
       };
-      manifest = (pkgs.lib.importTOML ./tools/tui-review/Cargo.toml).package;
       webMcp = (pkgs.lib.importTOML ./tools/web-mcp/Cargo.toml).package;
       workspace = (pkgs.lib.importTOML ./Cargo.toml).workspace.package;
       cockpitApp = (pkgs.lib.importTOML ./tools/flow-cockpit/app/Cargo.toml).package;
       adoMcp = (pkgs.lib.importTOML ./tools/ado-mcp/Cargo.toml).package;
     in {
-      tui-review = pkgs.rustPlatform.buildRustPackage {
-        pname = manifest.name;
-        inherit (workspace) version;
-        src = workspaceSource;
-        cargoLock.lockFile = ./Cargo.lock;
-        cargoBuildFlags = ["-p" "tui-review" "--bin" "tui-review"];
-        cargoTestFlags = ["-p" "tui-review"];
-        # tests/review.rs builds its fixture repositories with git.
-        nativeCheckInputs = [pkgs.git];
-        meta = {
-          inherit (manifest) description;
-          mainProgram = "tui-review";
-        };
-      };
       # web-mcp, the web-mcp plugin's MCP server: `nix build .#web-mcp`.
       web-mcp = pkgs.rustPlatform.buildRustPackage {
         pname = webMcp.name;

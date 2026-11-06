@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 text = '''
 Say which plugin provides it, then use the fallback. Only the rows for plugins this flow uses matter.
 

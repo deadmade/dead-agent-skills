@@ -1,4 +1,4 @@
-// The binaries the installer downloads or points plugins at: tui-review, web-mcp, the flow cockpit and agent-browser.
+// The binaries the installer downloads or points plugins at: web-mcp, ado-mcp, the flow cockpit and agent-browser.
 import { createHash } from 'node:crypto';
 import { posix, win32 } from 'node:path';
 import { BUNDLE } from './plugins.ts';
@@ -57,7 +57,6 @@ export interface BinPlugin {
   folder?: boolean;
 }
 export const BIN_PLUGINS: Record<string, BinPlugin> = {
-  'tui-review': { name: 'tui-review', key: 'binPath' },
   'web-mcp': { name: 'web-mcp', key: 'binPath' },
   'mcp-azure': { name: 'ado-mcp', key: 'binPath' },
   // It links the system's GTK and WebKit on Linux, so Linux runs it from the flake, pinned to this release.

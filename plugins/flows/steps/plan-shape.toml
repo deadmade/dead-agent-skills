@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 uses = ["superpowers:writing-plans"]
 requires = ["plan-check", "before-you-write"]
 
