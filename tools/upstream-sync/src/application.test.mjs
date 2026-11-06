@@ -331,11 +331,11 @@ test('release adapter vendors a local stable tag, carries no manifest and report
   assert.equal(readFileSync(join(target.repo, dest, 'hooks/session-start'), 'utf8'), 'hook\n');
 });
 
-test('native distributions rebuild before validation and are included in sync paths', (t) => {
+test('native distributions rebuild before validation and stay out of sync paths', (t) => {
   const f = fixture(t);
   f.write('plugins/catalog.json', '[]');
   const spec = source(f.repo, 'rust-skills');
-  for (const path of ['.claude-plugin', '.agents/plugins']) assert.ok(spec.paths.includes(path), path);
+  for (const path of ['.claude-plugin', '.agents/plugins']) assert.ok(!spec.paths.includes(path), path);
   const order = [];
   const result = sync(
     f.repo,

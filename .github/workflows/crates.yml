@@ -13,7 +13,8 @@ on:
       - 'plugins/opt-in/mcp/mcp-azure/**'
       - 'crates/flow-cockpit/**'
       - 'plugins/opt-in/flow-cockpit/**'
-      - '.claude-plugin/flows/skills/**'
+      - 'plugins/flows/**'
+      - 'tools/harness-compiler/src/**'
       - 'plugins/flows/references/build-template.md'
       - 'plugins/flows/skills/*/references/*-template.md'
       - 'flake.nix'
@@ -57,7 +58,8 @@ jobs:
             cockpit:
               - 'crates/flow-cockpit/**'
               - 'plugins/opt-in/flow-cockpit/**'
-              - '.claude-plugin/flows/skills/**'
+              - 'plugins/flows/**'
+              - 'tools/harness-compiler/src/**'
               - 'plugins/flows/references/build-template.md'
               - 'plugins/flows/skills/*/references/*-template.md'
               - 'flake.nix'
@@ -123,6 +125,7 @@ jobs:
         # The Claude package is generated from plugins/, which holds the sources and tests, so test it with them.
         run: |
           npm install -g @anthropic-ai/claude-code
+          (cd ../.. && npm ci && npm run build:harnesses)
           cp -r ../../plugins/shared/tui-review/tests ../../.claude-plugin/tui-review/tests
           cd ../../.claude-plugin/tui-review
           claude plugin validate .
@@ -170,6 +173,12 @@ jobs:
         working-directory: crates/flow-cockpit
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # The core's phase-table test reads the built flows skills (.claude-plugin/flows/skills, gitignored).
+      - name: Native distributions
+        run: |
+          npm ci
+          npm run build:harnesses
+
       # CI=true makes the relative-worktree test fail, not skip, when the runner's git is older than 2.48.
       - name: Core tests
         working-directory: crates/flow-cockpit
@@ -184,7 +193,6 @@ jobs:
 
       - name: Views tests and type checks
         run: |
-          npm ci
           node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/extensions/tests/*.test.ts'
           npx tsc -p crates/flow-cockpit/app/shell
           npx tsc -p crates/flow-cockpit/extensions

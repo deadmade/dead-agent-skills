@@ -36,10 +36,9 @@ jobs:
 
       - run: npm ci
 
-      - name: Native distribution freshness and shared runtime tests
-        run: |
-          npm run check:harnesses
-          npm test
+      # check-repo, the first test, builds the native distributions (gitignored) that the later steps read.
+      - name: Repo checks and tests
+        run: npm test
 
       - name: Installer and upstream-sync typecheck
         run: |
@@ -93,6 +92,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+
+      # The composed flows skills exist only once built (the compiler imports smol-toml).
+      - name: Native distributions
+        run: |
+          npm ci
+          npm run build:harnesses
 
       - name: Skill scan
         run: npm run scan-skills

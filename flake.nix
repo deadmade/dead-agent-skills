@@ -17,7 +17,7 @@
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
     # Upstream files copied by tools/upstream-sync/src/adapters/*.ts: fixing them here would churn every sync PR.
-    vendored = ["^\\.claude-plugin/" "^\\.agents/plugins/" "^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/review-code/(LICENSE|UPSTREAM)$" "^crates/flow-cockpit/bindings/" "^crates/flow-cockpit/app/shell/vendor/" "^crates/flow-cockpit/core/tests/fixtures/"];
+    vendored = ["^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/review-code/(LICENSE|UPSTREAM)$" "^crates/flow-cockpit/bindings/" "^crates/flow-cockpit/app/shell/vendor/" "^crates/flow-cockpit/core/tests/fixtures/"];
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let
@@ -60,7 +60,9 @@
       installer-test = pkgs.writeShellApplication {
         name = "installer-test";
         runtimeInputs = [pkgs.nodejs];
+        # The installer tests read the built distributions, and hook order isn't guaranteed: build them first.
         text = ''
+          node tools/harness-compiler/src/cli.ts build
           node --test --experimental-test-coverage --test-coverage-include='tools/installer/**' \
             --test-coverage-exclude='tools/installer/**/*.test.ts' --test-coverage-lines=79 'tools/installer/**/*.test.ts'
           node --test 'tools/upstream-sync/src/**/*.test.ts' 'tools/upstream-sync/src/**/*.test.mjs'
@@ -92,14 +94,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(\\.claude-plugin/|plugins/|tools/harness-compiler/|crates/|scripts/check-repo\\.mjs$|package\\.json$)";
+            files = "^(plugins/|tools/harness-compiler/|crates/|scripts/check-repo\\.mjs$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/catalog\\.json$|\\.claude-plugin/|\\.agents/plugins/|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|package\\.json$)";
             pass_filenames = false;
           };
         };

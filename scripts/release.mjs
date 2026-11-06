@@ -76,14 +76,15 @@ function main() {
       [`${dir}/Cargo.lock`, new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm')],
     ]),
   ];
-  const files = [...new Set([...bumps.map(([f]) => f), '.claude-plugin', '.agents/plugins'])];
+  const files = bumps.map(([f]) => f);
   for (const [f, version] of bumps) {
     const text = readFileSync(f, 'utf8');
     if (!version.test(text)) die(`${f} has no version to bump`);
     writeFileSync(f, text.replace(version, `$1"${next}"`));
   }
 
-  if (!run(process.execPath, ['tools/harness-compiler/src/cli.ts', 'build']) || !run('npm', ['test'])) {
+  // npm test builds the native distributions from the bumped versions (check-repo); they stay out of the commit.
+  if (!run('npm', ['test'])) {
     git('checkout', '--', ...files);
     die('checks failed, versions reverted');
   }

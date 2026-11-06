@@ -1,7 +1,8 @@
 # dead-agent-skills
 
 Personal skills, flows and MCP integrations for Claude Code and Codex. The native marketplaces
-(`.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`) sit beside the checked-in packages they load (`.claude-plugin/<name>/` and `.agents/plugins/<name>/`);
+(`.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`) sit beside the generated packages they load (`.claude-plugin/<name>/` and `.agents/plugins/<name>/`),
+gitignored on `main` and committed only on the `release` branch (ADR 0010);
 authored plugins live under `plugins/`, grouped by install layer. The optional npx installer in `tools/installer/` sets up a machine from them. README.md is the user-facing description;
 keep it, plugin READMEs and plugin/marketplace `description`s true to what the code does.
 
@@ -20,7 +21,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   shim needs cmd.exe. Node runs the `.ts` files as they are
   (type stripping; Node 26+, `engines`), so only erasable syntax: no `enum`, `namespace` or parameter properties
   (`erasableSyntaxOnly`), and imports name the `.ts` file. Node won't strip types under `node_modules`, so npx can't run them: `release.yml` packs the installer
-  (`npm pack`, whose `prepack` checks native distribution freshness and runs `tsc` and writes `tools/installer/**/*.js`, gitignored) as `installer.tgz` on the release, and
+  (`npm pack`, whose `prepack` builds the native distributions and runs `tsc` and writes `tools/installer/**/*.js`, gitignored) as `installer.tgz` on the release, and
   users run `npx --allow-remote=root <release>/latest/download/installer.tgz` (npm 12 refuses tarball URLs without the
   flag). npx caches by URL and keeps running the first installer it fetched (`--prefer-online` too), so each run reads
   the tag `latest/` redirects to and, when it is newer, hands over to that release's versioned URL (`newerInstaller`).
@@ -65,7 +66,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
   plugin) live once in `plugins/flows/steps/*.toml`, composed into each conductor at build time (ADR 0009), so a
   SKILL.md says what it runs and names its steps (`[step: <name>]`). Compose (`tools/harness-compiler/src/flows/compose.ts`)
-  stops the build on a broken step and fails `check:harnesses` on built text that doesn't hold; host wording comes from
+  stops the build on a broken step and fails the build (and check-repo) on built text that doesn't hold; host wording comes from
   `src/templates/hosts/<target>.ts`, and `harness-compiler lint`'s flows phrase list (`CLAUDE_ONLY`) keeps Claude-only
   names out of steps, skills and references. run-rules' **Agents** paragraph asks for few agents, combined where it
   makes sense, each on a model that fits its job (ADR 0005). The installer's only part is
@@ -242,8 +243,8 @@ Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps Gi
 
 ## Versions and releases
 
-Everything ships as one version: `package.json` and `package-lock.json`, the marketplace's `metadata.version`, every
-plugin's `.claude-plugin/plugin.json`, every crate's `Cargo.toml`/`Cargo.lock` and the installer URL in README.md.
+Everything ships as one version: `package.json` and `package-lock.json`, every crate's `Cargo.toml`/`Cargo.lock` and
+the installer URL in README.md; the build stamps it into the marketplaces and every generated `plugin.json`.
 `check-repo.mjs` fails on drift. Never bump by hand. Every merge to `main` that touches more than `docs/` or the root
 `*.md` files releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
 bump off `main` and tags it, so `main`'s `package.json` lags behind the tags and the next version counts from the
@@ -253,7 +254,9 @@ highest `vX.Y.Z` tag (`nextVersion` in `scripts/release.mjs`; fetch tags before 
     git push --follow-tags origin main
 
 Either way the merge's run packs the installer (`installer.tgz`), builds tui-review, web-mcp and the flow cockpit's Windows app from the tag and
-publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back).
+publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back):
+the tag plus one `Distribution vX.Y.Z` commit holding the native distributions that `publish` built (the job that holds
+the write token runs no `npm ci`, so it gets them as the `native` artifact). Tags carry sources only.
 The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so Claude Code's
 marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
@@ -339,9 +342,9 @@ is one emitter per harness (event and tool maps, manifest, MCP, LSP, theme, mark
 per-conductor invocation policy: `agents/openai.yaml` with `allow_implicit_invocation: false`, written from
 `disable-model-invocation: true`), `transforms/` rewrites shipped Markdown per target (`rules.ts` holds the per-file edits for vendored text), `templates/` holds all harness-specific
 prose, `runtime/` is the shared hook runner copied into packages. Adding a harness is one new `targets/` file.
-Commands: `npm run build:harnesses` (`harness-compiler build`), `npm run check:harnesses` (`check`, no rewriting),
+Commands: `npm run build:harnesses` (`harness-compiler build`, which exits 1 on a built-text problem after writing),
 `harness-compiler validate` and `lint` (fails when `plugins/` carries harness-specific files or wording outside
-`src/lint-allowlist.json`). Author → build → review generated changes → commit sources and outputs together.
+`src/lint-allowlist.json`). Author → build → review generated output → commit the sources only.
 Shared handlers must not learn native event or manifest shapes. Required unsupported hooks fail the build; optional ones
 are reported and omitted. Never edit `.claude-plugin/` or `.agents/plugins/` by hand.
 Don't `import` a JSON file in `tools/harness-compiler/src` (compose reads `steps/step.schema.json` with `readFileSync`):
@@ -354,7 +357,10 @@ Flow behavior is shared; each built conductor carries its host's wording through
 Without subagents the main session does delegated work (searching, exploring) itself; independent checks are skipped and
 recorded as not checked, never replaced by a review in the main session or claimed as passed.
 
-Both native marketplaces must work directly from a fresh clone, without the installer or a build.
-`.agents/plugins/` and `.claude-plugin/` contain generated, checked-in packages; change sources and regenerate it rather than editing
-those copies. Repository checks compare the committed distribution with a fresh build. Sync PRs include the
-regenerated distribution, and releases regenerate it after bumping source versions.
+`.agents/plugins/` and `.claude-plugin/` are gitignored build output (ADR 0010): change sources and rebuild rather
+than editing them. Both native marketplaces work directly from the `release` branch (`@release`, `--ref release`),
+without the installer or a build; a `main` checkout has them only after a build. check-repo builds them first, so
+`npm test` and the pre-commit hook always read a fresh tree; run `npm run build:harnesses` yourself before a single
+test file that reads them (the installer's `core/*.test.ts`, the flow cockpit core's phase-table test), before
+`node tools/installer/install.ts`, and after checking out an older commit that still tracked them (git deletes them
+on the way back). Sync PRs and release commits carry sources only.

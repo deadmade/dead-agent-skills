@@ -20,12 +20,8 @@ export function source(root: string, name: string): Source {
   const all = sources(root);
   const found = all.find((s) => s.name === name);
   if (!found) throw new Error(`unknown source ${name}; one of ${all.map((s) => s.name).join(', ')}`);
-  if (!existsSync(join(root, 'plugins/catalog.json'))) return found;
-  // Generated distributions travel with every upstream change, including previews and sync PRs.
-  return {
-    ...found,
-    paths: [...found.paths, '.claude-plugin', '.agents/plugins'],
-  };
+  // The generated distributions are gitignored (only the release branch commits them), so a sync PR carries sources only.
+  return found;
 }
 export function artifactDirectory(name: string): string {
   if (!/^[a-z0-9-]+$/.test(name)) throw new Error('invalid source name');

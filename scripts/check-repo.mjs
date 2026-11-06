@@ -1,10 +1,10 @@
-// Repo checks for the pre-commit hook: the neutral plugin definitions validate and compile, the generated
-// distributions are current, and everything carries package.json's version. Skips `claude plugin validate` when claude
+// Repo checks for the pre-commit hook: the neutral plugin definitions validate and compile into the generated
+// distributions (built here, gitignored, so later tests read a fresh tree), and everything carries package.json's version. Skips `claude plugin validate` when claude
 // isn't on PATH (nix flake check sandbox, CI).
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { check } from '../tools/harness-compiler/src/emit/commands.ts';
+import { build } from '../tools/harness-compiler/src/emit/commands.ts';
 import { composeFlows } from '../tools/harness-compiler/src/flows/compose.ts';
 import { loadPlugins, selectTarget } from '../tools/harness-compiler/src/load.ts';
 import { TARGETS } from '../tools/harness-compiler/src/targets/index.ts';
@@ -38,11 +38,11 @@ try {
 } catch (error) {
   problems.push(`harness-compiler validate: ${error.message}`);
 }
-// --- generated distributions and marketplaces are current ---
+// --- build the generated distributions and marketplaces; what the built-text checks find fails the run ---
 try {
-  problems.push(...check('.').map((p) => (p.startsWith('flows: ') ? p : `${p} (run npm run build:harnesses)`)));
+  problems.push(...build('.').problems.map((p) => `flows: ${p}`));
 } catch (error) {
-  problems.push(`harness-compiler check: ${error.message}`);
+  problems.push(`harness-compiler build: ${error.message}`);
 }
 // Hook point: also run `harness-compiler lint` once that subcommand exists.
 if (
@@ -107,8 +107,8 @@ const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8').replace(/\r\n/g, 
 if (uses && withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
   problems.push(`${FLOWS}/README.md: uses tree is stale: ${regen}`);
 
-// --- one version: package.json and its lock, the marketplace metadata.version and each Rust crate
-// (scripts/release.mjs). Plugin manifests take the version when they are generated. ---
+// --- one version: package.json and its lock and each Rust crate (scripts/release.mjs). The marketplaces and plugin
+// manifests take the version when they are generated. ---
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
 for (const [where, v] of [
@@ -116,8 +116,6 @@ for (const [where, v] of [
   ['packages[""].version', lock.packages?.['']?.version],
 ])
   if (v !== version) problems.push(`package-lock.json: ${where} is ${v}, package.json has ${version}`);
-if (market.metadata?.version !== version)
-  problems.push(`${MARKETPLACE}: metadata.version is ${market.metadata?.version}, package.json has ${version}`);
 const CRATES = [
   { cargo: 'crates/tui-review/Cargo.toml', lock: 'crates/tui-review/Cargo.lock', name: 'tui-review' },
   { cargo: 'crates/web-mcp/Cargo.toml', lock: 'crates/web-mcp/Cargo.lock', name: 'web-mcp' },

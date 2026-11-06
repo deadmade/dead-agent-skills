@@ -1,11 +1,12 @@
 name: Release
 
-# One release for the whole repo: scripts/release.mjs bumps package.json, the marketplace and every plugin to the
-# same version and tags vX.Y.Z. Only a push to main releases, and main only takes merged PRs (admins aside), so a tag
+# One release for the whole repo: scripts/release.mjs bumps package.json and every crate to the same version and tags
+# vX.Y.Z (the generated marketplaces and plugin manifests take it when built). Only a push to main releases, and main only takes merged PRs (admins aside), so a tag
 # pushed any other way publishes nothing. Each merge cuts a patch here (stamped on a commit off main, so main is never
 # pushed to); a release you choose is `npm run release -- minor` pushed to main with its tag, which this run then
-# releases. The run checks the repo, builds tui-review, web-mcp, ado-mcp and the flow cockpit's Windows app from the tag and
-# publishes the release. Docs-only merges don't release.
+# releases. The run checks the repo, builds tui-review, web-mcp, ado-mcp and the flow cockpit's Windows app from the tag,
+# publishes the release, and commits the native distributions (gitignored on main) onto the release branch. Docs-only
+# merges don't release.
 on:
   push:
     branches: [main]
@@ -80,10 +81,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Native distribution freshness and tests
-        run: |
-          npm run check:harnesses
-          npm test
+      - name: Tests
+        run: npm test
 
   binaries:
     needs: version
@@ -115,19 +114,30 @@ jobs:
         with:
           node-version: 26
 
-      # The installer as npx runs it: prepack compiles tools/installer/**/*.ts to JS, package.json's files picks what ships.
+      # The installer as npx runs it: prepack builds the native distributions and compiles tools/installer/**/*.ts to JS,
+      # package.json's files picks what ships.
       - name: Pack the installer
         run: |
           npm ci
           npm pack --pack-destination dist
           mv dist/dead-agent-skills-*.tgz dist/installer.tgz
 
+      # The same distributions for the release branch; a tar keeps their file modes.
+      - name: Native distributions
+        run: tar -cf "$RUNNER_TEMP/native.tar" .claude-plugin .agents/plugins
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native
+          path: ${{ runner.temp }}/native.tar
+          retention-days: 1
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$TAG" dist/* --title "$TAG" --generate-notes \
-            --notes "Install or update with \`npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/download/$TAG/installer.tgz\`, which points the marketplace at the release branch (Claude Code then updates the plugins on its own) and installs this release's binaries, or with \`/plugin update\` if you added the marketplace by hand.
+            --notes "Install or update with \`npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/download/$TAG/installer.tgz\`, which points the marketplace at the release branch (Claude Code then updates the plugins on its own) and installs this release's binaries, or with \`/plugin update\` if you added the marketplace by hand from its release branch (\`deadmade/dead-claude-skills@release\`).
 
           installer.tgz: the installer, built to JS.
 
@@ -152,6 +162,14 @@ jobs:
         with:
           ref: ${{ env.TAG }}
 
+      # Built by publish (this job runs no npm ci), the trees the installer tarball ships.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native
+          path: ${{ runner.temp }}
+
+      # The release branch is the tag plus one commit holding the native distributions, which main ignores: Claude
+      # Code's marketplace (and a Codex marketplace added with --ref release) reads them from there.
       - name: Move the release branch
         run: |
           if git fetch --depth=1 origin release 2>/dev/null; then
@@ -162,4 +180,9 @@ jobs:
               exit 0
             fi
           fi
+          tar -xf "$RUNNER_TEMP/native.tar"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
+          git add -f .claude-plugin .agents/plugins
+          git commit -q -m "Distribution $TAG"
           git push --force origin HEAD:refs/heads/release

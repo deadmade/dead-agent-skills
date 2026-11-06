@@ -40,4 +40,4 @@ solely because this tool moved.
 The workspace shares the root npm lockfile and development dependencies. It has no runtime
 npm dependencies or compilation step and is excluded from the installer package.
 
-Upstream changes regenerate both native distributions before validation. Apply and preview include `.claude-plugin/`, `.agents/plugins/` and the generated Claude theme; sync PRs carry these outputs with their source changes.
+Upstream changes regenerate both native distributions before validation, since the checks read them. They are gitignored (only the release branch commits them), so apply, preview and sync PRs carry source changes only.

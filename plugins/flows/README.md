@@ -202,5 +202,5 @@ tui-review is a separate optional tool for reading a diff.
 Install instructions are generated with each distribution and listed in the repository README.
 
 Author conductors here; `node scripts/flows-uses.mjs` regenerates dependencies, the tree and native packages.
-`npm run build:harnesses` refreshes all outputs, and `npm run check:harnesses` verifies freshness without writes.
+`npm run build:harnesses` refreshes all outputs (gitignored; only the release branch commits them).
 Independent checks skipped for want of subagents are never claimed successful.

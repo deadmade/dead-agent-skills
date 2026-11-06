@@ -1,5 +1,0 @@
-/review-code vendors one file from anthropics/claude-plugins-official (see UPSTREAM for the synced commit):
-plugins/pr-review-toolkit/agents/pr-test-analyzer.md, here flows' agents/pr-test-analyzer.md. Copyright Anthropic,
-PBC. Licensed under the Apache License, Version 2.0 (see LICENSE). The sync (tools/upstream-sync, adapter
-`self-review`) rewrites the agent's `description:` frontmatter and adds a source comment under its frontmatter;
-nothing else is changed.
