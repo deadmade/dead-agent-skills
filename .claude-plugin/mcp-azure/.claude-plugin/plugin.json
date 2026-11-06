@@ -1,0 +1,31 @@
+{
+  "name": "mcp-azure",
+  "version": "0.6.25",
+  "description": "Azure DevOps Server tools through the ado-mcp release binary: pull requests, work items, pipelines, search, wikis and repository files. Self-hosted, PAT authentication; opt-in.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "userConfig": {
+    "ado_org_url": {
+      "type": "string",
+      "title": "Azure DevOps Server collection URL",
+      "description": "e.g. https://tfs.company/tfs/DefaultCollection",
+      "required": true
+    },
+    "ado_pat": {
+      "type": "string",
+      "title": "Azure DevOps personal access token",
+      "description": "PAT with Code (Read & Write), Work Items (Read & Write), Build (Read & Execute), Project and Team (Read), Wiki (Read), Test Management (Read).",
+      "sensitive": true,
+      "required": true
+    },
+    "binPath": {
+      "type": "string",
+      "title": "ado-mcp binary",
+      "description": "Path to the ado-mcp binary. Default: ado-mcp on PATH.",
+      "default": "ado-mcp"
+    }
+  }
+}

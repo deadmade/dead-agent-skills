@@ -1,0 +1,10 @@
+{
+  "name": "csharp-skills",
+  "version": "0.6.25",
+  "description": "Microsoft's .NET skills (dotnet/skills) behind six C#-only router skills. Vendored from dotnet/skills, synced weekly.",
+  "interface": {
+    "displayName": "csharp-skills",
+    "shortDescription": "Microsoft's .NET skills (dotnet/skills) behind six C#-only router skills. Vendored from dotnet/skill"
+  },
+  "skills": "./skills/"
+}
