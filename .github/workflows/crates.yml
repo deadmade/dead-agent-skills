@@ -7,8 +7,6 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'scripts/check_cargo_workspace*'
-      - 'tools/tui-review/**'
-      - 'plugins/shared/tui-review/**'
       - 'tools/web-mcp/**'
       - 'plugins/shared/web-mcp/**'
       - 'tools/ado-mcp/**'
@@ -83,45 +81,9 @@ jobs:
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          foreach ($package in @('tui-review', 'web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit')) {
+          foreach ($package in @('web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit')) {
             cargo test --locked -p $package
           }
-
-      - name: Speed and memory budgets
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          cargo test --locked -p tui-review --release --test perf -- --ignored --nocapture 2>&1 | Tee-Object "$env:RUNNER_TEMP/tui-review-budgets.txt"
-
-      - name: Benchmarks
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          cargo bench --locked -p tui-review --bench format --bench review -- --sample-count 50 | Tee-Object "$env:RUNNER_TEMP/tui-review-bench.txt"
-
-      - name: Mod fixture from tui-review gen
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          cargo run --locked -p tui-review --release -- gen --out "$env:RUNNER_TEMP/tui-review-fixture" > $null
-          node plugins/shared/tui-review/tests/make-fixture.mjs "$env:RUNNER_TEMP/tui-review-fixture"
-
-      - name: Mod tests and speed budgets
-        # The Claude package is generated from plugins/, which holds the sources and tests, so test it with them.
-        run: |
-          npm install -g @anthropic-ai/claude-code
-          cp -r plugins/shared/tui-review/tests .claude-plugin/tui-review/tests
-          cd .claude-plugin/tui-review
-          claude plugin validate .
-          claude plugin test .
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: tui-review-bench-${{ matrix.os }}
-          path: |
-            ${{ runner.temp }}/tui-review-bench.txt
-            ${{ runner.temp }}/tui-review-budgets.txt
 
       - name: Views tests and type checks
         run: |
@@ -134,12 +96,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [tui-review, web-mcp, ado-mcp, flow-cockpit]
+        package: [web-mcp, ado-mcp, flow-cockpit]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
 
       - name: Nix package
         run: |

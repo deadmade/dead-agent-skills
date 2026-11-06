@@ -1,4 +1,4 @@
-# Repo checks, installer tests, the mods' tests and the skill scan on every PR and push to main; tui-review has its own workflow.
+# Repo checks, installer tests, the mods' tests and the skill scan on every PR and push to main; the Rust crates have their own workflow.
 name: test
 
 on:
