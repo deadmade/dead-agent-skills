@@ -7,7 +7,7 @@ plugins/default/hooks/** text eol=lf
 tools/harness-compiler/src/runtime/** text eol=lf
 plugins/default/themes/*.json text eol=lf
 # Generated TypeScript types: the bindings_are_current test compares them ignoring line endings.
-crates/flow-cockpit/bindings/** text eol=lf
+tools/flow-cockpit/bindings/** text eol=lf
 
 # The views' libraries, copied unchanged from their npm releases.
-crates/flow-cockpit/app/shell/vendor/** text eol=lf
+tools/flow-cockpit/app/shell/vendor/** text eol=lf

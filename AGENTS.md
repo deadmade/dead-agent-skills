@@ -32,10 +32,12 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; tui-review and web-mcp
   are also offered on their own but live in `shared/`. Moving a folder doesn't touch installs (they key on the
   plugin `name`); renaming a plugin does.
-- `crates/`: the four Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`), `web-mcp` (web-mcp's server), `ado-mcp` (mcp-azure’s server), and
-  `flow-cockpit` (the flow cockpit window, a workspace of `core` and `app`). Each keeps its own
-  `Cargo.lock`; nothing in the plugins reaches into them at runtime.
-- `crates/ado-mcp/`: the mcp-azure server. Its library (`lib.rs`) also backs `timetrack` (`src/bin/timetrack/`), a
+- The four Rust crates live in `tools/` beside the TypeScript tools (they used to be in `crates/`): `tools/tui-review/`
+  (the tui-review plugin's binary, formerly `brv`), `tools/web-mcp/` (web-mcp's server), `tools/ado-mcp/` (mcp-azure’s
+  server), and `tools/flow-cockpit/` (the flow cockpit window, a workspace of `core` and `app`). Each keeps its own
+  `Cargo.lock`, and there is no Cargo workspace over them; nothing in the plugins reaches into them at runtime. The CI
+  workflows that build them keep their names, `crates.yml` and `crates-build.yml`.
+- `tools/ado-mcp/`: the mcp-azure server. Its library (`lib.rs`) also backs `timetrack` (`src/bin/timetrack/`), a
   personal TUI (Windows) that times work items: `ADO_ORG_URL`/`ADO_PAT` from the environment, `ado_mcp::mine` lists the
   open items assigned to me across the collection. It also clocks the workday in and out; `TIMETRACK_TARGET` (`h:mm`,
   default 8:00) is the weekday target for the overtime balance, which counts only days with a shift. The log lives in
@@ -43,7 +45,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   for the clock. `claude.rs` reads Claude Code's session logs (`projects/**/*.jsonl` under `CLAUDE_CONFIG_DIR` or
   `~/.claude`, an undocumented format, so unknown lines are skipped) for a lane under the timeline and Claude time per
   ticket: a branch naming a known ticket id, else the ticket timed then. Not released or installed;
-  `cargo install --path crates/ado-mcp --bin timetrack`.
+  `cargo install --path tools/ado-mcp --bin timetrack`.
 - `plugins/default/`: the dead-skills bundle. Its `dependencies` are the core plugins; itself it carries the global rules
   (`rules.md`, a SessionStart hook), Context7 (`.mcp.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
   their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id
@@ -89,10 +91,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
   `plugins/flows/skills/writing/tests/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
   our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
-- `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
-  share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
+- `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`tools/tui-review/`). The two
+  share a binary cache format (`tools/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
-- `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `crates/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
+- `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
   x64 only, like tui-review's binary (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
@@ -101,7 +103,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
   pin); either way it sets `agentBrowserPath` to the one in use (`upstreamPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
-  `search` reads Google, Bing, DuckDuckGo and Brave (papers: Google Scholar and Semantic Scholar too) as tabs of one browser window per server (ADR 0007, `window.rs`): an owner session `web-mcp-<pid>-window` launches it on the first call that needs a browser and keeps it until exit; every engine, `browser` session and fetch fallback attaches as a tab (`--cdp <owner's cdp url> --pin-tab`, `attach.json`, idle 3600 s). Attached session names carry a generation `g<n>`, bumped when the owner reports a new cdp url (it relaunches a dead Chrome itself); a window closed by hand comes back through `tab_gone` → `tab new`. Browser first found of `WEB_MCP_CHROME`, Chrome for Testing from `agent-browser install`, `helium`, `chromium`; never branded Chrome. The window launches with `--disable-blink-features=AutomationControlled` and no user agent override (ADR 0009). Under `WEB_MCP_SEARCH_DIR` (default the data dir, no temp fallback) each server holds the first free profile slot `profiles/<n>/` (its consent marks too); rests stay machine-wide. agent-browser's attach behaviour (`tab_gone`, `close` without a daemon, a dead Chrome's error) is recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in `docs/features/web-mcp-search/findings.md`; tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`, so `cargo build --bins` before the unit tests), which changes with any agent-browser answer web-mcp reads. I still don't care about cookies (downloaded on first use, not vendored; THIRD_PARTY.md) loads for every engine, Bing included. On Windows web-mcp puts itself in a kill-on-close job, so Chrome dies with it. `browser` and the fetch fallback need what search needs; the installer warns when the window can't open (no usable browser, or Linux without a display and Xvfb) and then counts web-mcp unhealthy. A blocked engine rests 30 min. No passage index: ranking is BM25 over each search's own pages. Engine parsers test against captured result pages in `crates/web-mcp/tests/fixtures/engines/`; Semantic Scholar's isn't captured yet, so its tests are `#[ignore]`d until it is. Google's (`google.html`) is, but every row links to an opaque `/goto?url=…` redirect, so the parser drops every row: a live Google search answers "unrecognised page" and so doesn't type today (only results are remembered); `google_parses_fixture` stays `#[ignore]`d until a follow-up resolves the links, `google_no_results_is_empty` until a no-results page is captured (`docs/features/web-mcp-google-block/findings.md`). When an engine's last search in this process got results without `since` for another query, its next search without `since` types into the result page its tab holds, if the engine has a box and the query is plain (`types` and `typed_page` in `search.rs`: one `batch --bail` that types, then a read that waits for a new document); a failed typing, or a page that is neither a block nor for this query, loads the URL instead while time is left, else the engine answers "timed out". What that relies on (a batch without `open` acting on the tab's page, `press` against `keyboard inserttext`, a missing box failing at once) is in that findings file's spikes; the fake mirrors it: a session's tab keeps the URL its last batch opened, and typing rewrites that URL's `q`.
+  `search` reads Google, Bing, DuckDuckGo and Brave (papers: Google Scholar and Semantic Scholar too) as tabs of one browser window per server (ADR 0007, `window.rs`): an owner session `web-mcp-<pid>-window` launches it on the first call that needs a browser and keeps it until exit; every engine, `browser` session and fetch fallback attaches as a tab (`--cdp <owner's cdp url> --pin-tab`, `attach.json`, idle 3600 s). Attached session names carry a generation `g<n>`, bumped when the owner reports a new cdp url (it relaunches a dead Chrome itself); a window closed by hand comes back through `tab_gone` → `tab new`. Browser first found of `WEB_MCP_CHROME`, Chrome for Testing from `agent-browser install`, `helium`, `chromium`; never branded Chrome. The window launches with `--disable-blink-features=AutomationControlled` and no user agent override (ADR 0009). Under `WEB_MCP_SEARCH_DIR` (default the data dir, no temp fallback) each server holds the first free profile slot `profiles/<n>/` (its consent marks too); rests stay machine-wide. agent-browser's attach behaviour (`tab_gone`, `close` without a daemon, a dead Chrome's error) is recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in `docs/features/web-mcp-search/findings.md`; tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`, so `cargo build --bins` before the unit tests), which changes with any agent-browser answer web-mcp reads. I still don't care about cookies (downloaded on first use, not vendored; THIRD_PARTY.md) loads for every engine, Bing included. On Windows web-mcp puts itself in a kill-on-close job, so Chrome dies with it. `browser` and the fetch fallback need what search needs; the installer warns when the window can't open (no usable browser, or Linux without a display and Xvfb) and then counts web-mcp unhealthy. A blocked engine rests 30 min. No passage index: ranking is BM25 over each search's own pages. Engine parsers test against captured result pages in `tools/web-mcp/tests/fixtures/engines/`; Semantic Scholar's isn't captured yet, so its tests are `#[ignore]`d until it is. Google's (`google.html`) is, but every row links to an opaque `/goto?url=…` redirect, so the parser drops every row: a live Google search answers "unrecognised page" and so doesn't type today (only results are remembered); `google_parses_fixture` stays `#[ignore]`d until a follow-up resolves the links, `google_no_results_is_empty` until a no-results page is captured (`docs/features/web-mcp-google-block/findings.md`). When an engine's last search in this process got results without `since` for another query, its next search without `since` types into the result page its tab holds, if the engine has a box and the query is plain (`types` and `typed_page` in `search.rs`: one `batch --bail` that types, then a read that waits for a new document); a failed typing, or a page that is neither a block nor for this query, loads the URL instead while time is left, else the engine answers "timed out". What that relies on (a batch without `open` acting on the tab's page, `press` against `keyboard inserttext`, a missing box failing at once) is in that findings file's spikes; the fake mirrors it: a session's tab keeps the URL its last batch opened, and typing rewrites that URL's `q`.
 - `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
   `tools/upstream-sync/src/adapters/*.ts`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
   plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
@@ -124,7 +126,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `run-hook.cmd` and `session-start` stay LF via `.gitattributes`). Other hosts' adapters are left out. The sync PR
   carries upstream's release notes, and the sync fails on a `plugin.json` component or default folder it doesn't know.
 
-- `plugins/opt-in/mcp/mcp-azure/`: `.mcp.json` and settings for `ado-mcp` (Rust, `crates/ado-mcp/`), a stdio MCP server
+- `plugins/opt-in/mcp/mcp-azure/`: `.mcp.json` and settings for `ado-mcp` (Rust, `tools/ado-mcp/`), a stdio MCP server
   for one Azure DevOps Server collection and PAT: `pr_*`, `wi_*`, `pipeline_*`, `repo_list` and `project_list` (both
   in `pipeline.rs`; no default project: outside an Azure DevOps clone the model passes `project`, but `search`
   without one searches the whole collection), `search` (`search.rs`), `repo_file` (`file.rs`) and `wiki`
@@ -178,7 +180,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   and fetches tiktoken's vocabulary (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0008-python-through-installer-uv.md`. Dependabot's `uv`
   entry keeps `uv.lock` current.
 - The flow cockpit (`docs/features/flow-observability/`): a Tauri window over flow runs, audits and Claude sessions, in
-  `crates/flow-cockpit/`, that can also start, resume and host real `claude` sessions in terminals of its own
+  `tools/flow-cockpit/`, that can also start, resume and host real `claude` sessions in terminals of its own
   (`docs/features/cockpit-harness/`; Linux only so far, the Windows build offers neither Start nor Resume), plus the `plugins/opt-in/flow-cockpit/` plugin, which carries only the `views` skill (Claude
   writes extensions into the user's extensions folder, running the app from its `appPath` userConfig) and the capture
   hooks. The installer offers it on Linux x64 and Windows x64 (`BIN_PLUGINS` in `core/binaries.ts`): on Linux it only
@@ -199,7 +201,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   per crate writes them; `bindings_are_current` fails when they are stale). Linux gets the app from the flake's
   `flow-cockpit` package, since it links the system's GTK and WebKit; it installs every `extensions/` folder but
   `tests/` at `share/flow-cockpit/extensions/` and checks that tree, and that copies of the defaults type-check against
-  `--print-types`. The app finds the defaults at `$FLOW_COCKPIT_EXTENSIONS` (a dev override: point it at `crates/flow-cockpit/extensions` to see edits live), else
+  `--print-types`. The app finds the defaults at `$FLOW_COCKPIT_EXTENSIONS` (a dev override: point it at `tools/flow-cockpit/extensions` to see edits live), else
   `<exe dir>/../share/flow-cockpit/extensions`, else `<exe dir>/extensions`. Our code writes nothing (the webview
   engine keeps its own small folder, `~/.local/share/dev.deadmade.flow-cockpit/`, `%LOCALAPPDATA%` on Windows), and it
   reads the user's extensions and `config.toml` (`disabled`, `hidden`, `trusted`) from `~/.config/flow-cockpit/` (`%APPDATA%\flow-cockpit\` on Windows).
@@ -233,13 +235,13 @@ These are copied from upstream by `tools/upstream-sync/src/adapters/*.ts` (the w
 sync: `plugins/shared/agent-review/skills/`, `plugins/shared/agent-review/LICENSE` and `UPSTREAM`, `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0; pstack-picks' `.claude-plugin/plugin.json` is hand-written), `plugins/flows/agents/`,
 `plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
 `plugins/flows/skills/review-code/LICENSE` and `UPSTREAM` (the self-review adapter's), and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
-`crates/flow-cockpit/app/shell/vendor/` (marked, DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync script: it is copied unchanged from
+`tools/flow-cockpit/app/shell/vendor/` (marked, DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync script: it is copied unchanged from
 the npm tarballs THIRD_PARTY.md names, so a new version replaces the files rather than editing them.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Dependency updates
 
-Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the `Cargo.lock` and pins of all four crates and the headroom-trim `uv.lock` current. ado-mcp's entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the JS vendored in `crates/flow-cockpit/app/shell/vendor/` (see above) and the `cisco-ai-skill-scanner` pin in the `scan-skills` script. The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
+Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the `Cargo.lock` and pins of all four crates and the headroom-trim `uv.lock` current. ado-mcp's entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the JS vendored in `tools/flow-cockpit/app/shell/vendor/` (see above) and the `cisco-ai-skill-scanner` pin in the `scan-skills` script. The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
 
 ## Versions and releases
 
@@ -270,21 +272,21 @@ plugins of ours that the manifest no longer lists.
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
 - `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `tools/installer/` (sources and tests, strict).
-- tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
-- web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
+- tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `tools/tui-review`.
+- web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `tools/web-mcp`.
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
   linking fails.
-- flow-cockpit: `cargo test` and `cargo clippy --workspace --all-targets -- -D warnings` in `crates/flow-cockpit` (the
+- flow-cockpit: `cargo test` and `cargo clippy --workspace --all-targets -- -D warnings` in `tools/flow-cockpit` (the
   app needs the dev shell's GTK and WebKit); `nix build .#flow-cockpit` builds the package and runs the app's tests
   except the three timing ones its `checkFlags` skip. The views tests (jsdom, after `npm ci`):
-  `node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/extensions/tests/*.test.ts'`, then
-  `npx tsc -p crates/flow-cockpit/app/shell` and `npx tsc -p crates/flow-cockpit/extensions`. They run only there and in
+  `node --test 'tools/flow-cockpit/app/shell/*.test.mjs' 'tools/flow-cockpit/extensions/tests/*.test.ts'`, then
+  `npx tsc -p tools/flow-cockpit/app/shell` and `npx tsc -p tools/flow-cockpit/extensions`. They run only there and in
   `crates.yml`'s cockpit job, never in `npm test` or the pre-commit hook.
-- ado-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/ado-mcp`. CI uses the latest stable
+- ado-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `tools/ado-mcp`. CI uses the latest stable
   Rust, which can carry lints the pinned `rust-version` (1.97) lacks. A test that times concurrency makes one fast call
   first and bounds the slow one against it (`view_concurrent` in `tests/pr.rs`, `tests/wi.rs`): under the full
   parallel run on Windows, process start and git subprocesses outweigh a fixed wall-clock bound.
-- tui-review mod tests need a generated fixture first, from `crates/tui-review`:
+- tui-review mod tests need a generated fixture first, from `tools/tui-review`:
   `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/shared/tui-review`.
 - headroom-trim server: `uv run --locked python -m unittest discover -s tests` in `plugins/opt-in/headroom-trim/server`,

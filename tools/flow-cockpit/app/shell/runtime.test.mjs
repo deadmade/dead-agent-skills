@@ -1,5 +1,5 @@
 // The view runtime and the shared blocks, in jsdom. Runs in flow-cockpit.yml after `npm ci`, not in `npm test`:
-//   node --test crates/flow-cockpit/app/shell/runtime.test.mjs
+//   node --test tools/flow-cockpit/app/shell/runtime.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveObjectURL } from 'node:buffer';

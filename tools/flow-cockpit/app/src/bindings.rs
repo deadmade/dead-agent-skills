@@ -1,4 +1,4 @@
-//! The TypeScript types for the views: the core's and the app's own, all in `crates/flow-cockpit/bindings/`.
+//! The TypeScript types for the views: the core's and the app's own, all in `tools/flow-cockpit/bindings/`.
 //! The core's `export_bindings` (ignored) writes the core's files, this crate's writes the core's and its own; this
 //! crate's `bindings_are_current` checks the whole folder, so a file no type produces any more is caught here.
 
@@ -60,7 +60,7 @@ fn read_dir(dir: &Path) -> io::Result<Vec<(String, String)>> {
 }
 
 #[test]
-#[ignore = "writes crates/flow-cockpit/bindings/; run: cargo test -p flow-cockpit export_bindings -- --ignored"]
+#[ignore = "writes tools/flow-cockpit/bindings/; run: cargo test -p flow-cockpit export_bindings -- --ignored"]
 fn export_bindings() {
     let dir = committed_dir();
     fs::create_dir_all(&dir).unwrap();

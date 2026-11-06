@@ -1,5 +1,5 @@
 // The terminal pane, in jsdom with the real xterm.js. Runs in flow-cockpit.yml after `npm ci`, not in `npm test`:
-//   node --test crates/flow-cockpit/app/shell/session-pane.test.mjs
+//   node --test tools/flow-cockpit/app/shell/session-pane.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
@@ -54,7 +54,7 @@ const { mountSessionPane } = await import('./session-pane.js');
 const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Waits until `ok()` holds, up to `ms`: xterm draws asynchronously, and a fixed pause is too short on a loaded runner. */
 const until = async (ok, ms = 2000) => {
-  for (const end = Date.now() + ms; !ok() && Date.now() < end; ) await settle(10);
+  for (const end = Date.now() + ms; !ok() && Date.now() < end;) await settle(10);
 };
 const bytes = (text) => [...new TextEncoder().encode(text)];
 /** What the pane has drawn, from xterm's own DOM renderer. */

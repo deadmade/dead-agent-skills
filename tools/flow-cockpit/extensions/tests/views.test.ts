@@ -1,7 +1,7 @@
 // The default extensions' views in jsdom, against the data the core gives for the fixture home (fixtures/*.json, written by
 // `cargo test -p flow-cockpit-core --test dump_view_fixtures -- --ignored`). Runs in flow-cockpit.yml after `npm ci`,
 // not in `npm test`:
-//   node --test crates/flow-cockpit/extensions/tests/views.test.ts
+//   node --test tools/flow-cockpit/extensions/tests/views.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

@@ -17,7 +17,7 @@
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
     # Upstream files copied by tools/upstream-sync/src/adapters/*.ts: fixing them here would churn every sync PR.
-    vendored = ["^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/review-code/(LICENSE|UPSTREAM)$" "^crates/flow-cockpit/bindings/" "^crates/flow-cockpit/app/shell/vendor/" "^crates/flow-cockpit/core/tests/fixtures/"];
+    vendored = ["^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/review-code/(LICENSE|UPSTREAM)$" "^tools/flow-cockpit/bindings/" "^tools/flow-cockpit/app/shell/vendor/" "^tools/flow-cockpit/core/tests/fixtures/" "^tools/ado-mcp/tests/fixtures/" "^tools/web-mcp/tests/fixtures/"];
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let
@@ -94,14 +94,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(plugins/|tools/harness-compiler/|crates/|scripts/check-repo\\.mjs$|package\\.json$)";
+            files = "^(plugins/|tools/harness-compiler/|tools/(ado-mcp|flow-cockpit|tui-review|web-mcp)/|scripts/check-repo\\.mjs$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|package\\.json$)";
+            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|flow-cockpit|tui-review|web-mcp)/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|package\\.json$)";
             pass_filenames = false;
           };
         };
@@ -112,17 +112,17 @@
     # The tui-review plugin's Rust binary: `nix build .#tui-review`, or `nix run .#tui-review -- gen`. Its tests run in the build.
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      manifest = (pkgs.lib.importTOML ./crates/tui-review/Cargo.toml).package;
-      webMcp = (pkgs.lib.importTOML ./crates/web-mcp/Cargo.toml).package;
-      cockpit = (pkgs.lib.importTOML ./crates/flow-cockpit/Cargo.toml).workspace.package;
-      cockpitApp = (pkgs.lib.importTOML ./crates/flow-cockpit/app/Cargo.toml).package;
-      adoMcp = (pkgs.lib.importTOML ./crates/ado-mcp/Cargo.toml).package;
+      manifest = (pkgs.lib.importTOML ./tools/tui-review/Cargo.toml).package;
+      webMcp = (pkgs.lib.importTOML ./tools/web-mcp/Cargo.toml).package;
+      cockpit = (pkgs.lib.importTOML ./tools/flow-cockpit/Cargo.toml).workspace.package;
+      cockpitApp = (pkgs.lib.importTOML ./tools/flow-cockpit/app/Cargo.toml).package;
+      adoMcp = (pkgs.lib.importTOML ./tools/ado-mcp/Cargo.toml).package;
     in {
       tui-review = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
         inherit (manifest) version;
-        src = ./crates/tui-review;
-        cargoLock.lockFile = ./crates/tui-review/Cargo.lock;
+        src = ./tools/tui-review;
+        cargoLock.lockFile = ./tools/tui-review/Cargo.lock;
         # tests/review.rs builds its fixture repositories with git.
         nativeCheckInputs = [pkgs.git];
         meta = {
@@ -134,8 +134,8 @@
       web-mcp = pkgs.rustPlatform.buildRustPackage {
         pname = webMcp.name;
         inherit (webMcp) version;
-        src = ./crates/web-mcp;
-        cargoLock.lockFile = ./crates/web-mcp/Cargo.lock;
+        src = ./tools/web-mcp;
+        cargoLock.lockFile = ./tools/web-mcp/Cargo.lock;
         # Debug checks: the fetch tests' WEB_MCP_TEST_PUBLIC_IP hook exists only in debug builds or the `test-hooks` feature.
         checkType = "debug";
         meta = {
@@ -143,13 +143,13 @@
           mainProgram = "web-mcp";
         };
       };
-      # The flow cockpit window (Tauri, crates/flow-cockpit/app): `nix run .#flow-cockpit`, or the package in a system
+      # The flow cockpit window (Tauri, tools/flow-cockpit/app): `nix run .#flow-cockpit`, or the package in a system
       # config. It links the system's GTK and WebKit, so Linux gets it from here, not as a release download.
       flow-cockpit = pkgs.rustPlatform.buildRustPackage {
         pname = cockpitApp.name;
         inherit (cockpit) version;
-        src = ./crates/flow-cockpit;
-        cargoLock.lockFile = ./crates/flow-cockpit/Cargo.lock;
+        src = ./tools/flow-cockpit;
+        cargoLock.lockFile = ./tools/flow-cockpit/Cargo.lock;
         buildAndTestSubdir = "app";
         nativeBuildInputs = with pkgs; [pkg-config wrapGAppsHook3];
         buildInputs = with pkgs; [webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
@@ -198,8 +198,8 @@
       ado-mcp = pkgs.rustPlatform.buildRustPackage {
         pname = adoMcp.name;
         inherit (adoMcp) version;
-        src = ./crates/ado-mcp;
-        cargoLock.lockFile = ./crates/ado-mcp/Cargo.lock;
+        src = ./tools/ado-mcp;
+        cargoLock.lockFile = ./tools/ado-mcp/Cargo.lock;
         # The tests read git remotes and build reqwest clients, whose platform verifier needs CA certificates (cacert's
         # setup hook sets SSL_CERT_FILE in the sandbox); debug checks keep the ADO_TIMEOUT_MS hook, debug builds only.
         nativeCheckInputs = [pkgs.git pkgs.cacert];

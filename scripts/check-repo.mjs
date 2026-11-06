@@ -117,12 +117,12 @@ for (const [where, v] of [
 ])
   if (v !== version) problems.push(`package-lock.json: ${where} is ${v}, package.json has ${version}`);
 const CRATES = [
-  { cargo: 'crates/tui-review/Cargo.toml', lock: 'crates/tui-review/Cargo.lock', name: 'tui-review' },
-  { cargo: 'crates/web-mcp/Cargo.toml', lock: 'crates/web-mcp/Cargo.lock', name: 'web-mcp' },
+  { cargo: 'tools/tui-review/Cargo.toml', lock: 'tools/tui-review/Cargo.lock', name: 'tui-review' },
+  { cargo: 'tools/web-mcp/Cargo.toml', lock: 'tools/web-mcp/Cargo.lock', name: 'web-mcp' },
   // A workspace: [workspace.package] carries the version; the lock lists each member.
-  { cargo: 'crates/flow-cockpit/Cargo.toml', lock: 'crates/flow-cockpit/Cargo.lock', name: 'flow-cockpit-core' },
-  { cargo: 'crates/flow-cockpit/Cargo.toml', lock: 'crates/flow-cockpit/Cargo.lock', name: 'flow-cockpit' },
-  { cargo: 'crates/ado-mcp/Cargo.toml', lock: 'crates/ado-mcp/Cargo.lock', name: 'ado-mcp' },
+  { cargo: 'tools/flow-cockpit/Cargo.toml', lock: 'tools/flow-cockpit/Cargo.lock', name: 'flow-cockpit-core' },
+  { cargo: 'tools/flow-cockpit/Cargo.toml', lock: 'tools/flow-cockpit/Cargo.lock', name: 'flow-cockpit' },
+  { cargo: 'tools/ado-mcp/Cargo.toml', lock: 'tools/ado-mcp/Cargo.lock', name: 'ado-mcp' },
 ];
 for (const { cargo, lock, name } of CRATES) {
   const crate = /^version = "(.*)"/m.exec(readFileSync(cargo, 'utf8'))?.[1];

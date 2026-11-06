@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Draws a plan's task graph and task table as plain text between `<!-- glance -->` markers at the top of plan.md.
 // With `--check` it prints the block and writes nothing, for a plan the run was given and must not change.
-// Fields are read the way flow-cockpit's plan parser reads them (crates/flow-cockpit/core/src/doc/plan.rs), so both
+// Fields are read the way flow-cockpit's plan parser reads them (tools/flow-cockpit/core/src/doc/plan.rs), so both
 // draw the same graph from the same plan.
 // Keep the two in step: a change to plan.rs's field or Depends rules belongs here too.
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';

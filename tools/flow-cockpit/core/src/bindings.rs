@@ -1,5 +1,5 @@
 //! The TypeScript types for the views, generated from the Rust types (no `#[ts(export)]`).
-//! `export_bindings` (ignored) writes them to `crates/flow-cockpit/bindings/`; `bindings_are_current`
+//! `export_bindings` (ignored) writes them to `tools/flow-cockpit/bindings/`; `bindings_are_current`
 //! fails when the committed files differ from what the types now produce. The folder also holds the app's types, so
 //! both look only at the core's own files; the app crate's `bindings_are_current` checks the whole folder.
 
@@ -46,7 +46,7 @@ fn read_dir(dir: &Path) -> io::Result<Vec<(String, String)>> {
 }
 
 #[test]
-#[ignore = "writes crates/flow-cockpit/bindings/; run: cargo test -p flow-cockpit-core export_bindings -- --ignored"]
+#[ignore = "writes tools/flow-cockpit/bindings/; run: cargo test -p flow-cockpit-core export_bindings -- --ignored"]
 fn export_bindings() {
     let dir = committed_dir();
     fs::create_dir_all(&dir).unwrap();

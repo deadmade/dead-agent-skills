@@ -102,7 +102,7 @@ export function binAdvice(pluginName: string) {
   const { name, folder } = BIN_PLUGINS[pluginName];
   return folder
     ? `close ${name} if it is open and run the installer again`
-    : `build it with \`cargo build --release\` in crates/${name} and set its path with /plugin configure ${pluginName}`;
+    : `build it with \`cargo build --release\` in tools/${name} and set its path with /plugin configure ${pluginName}`;
 }
 
 // The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.

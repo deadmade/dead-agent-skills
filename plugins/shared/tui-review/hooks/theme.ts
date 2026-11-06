@@ -1,4 +1,4 @@
-// Colours, 0xRRGGBB, or DEFAULT for the terminal's own. Style ids follow crates/tui-review/src/styles.rs; keep the order.
+// Colours, 0xRRGGBB, or DEFAULT for the terminal's own. Style ids follow tools/tui-review/src/styles.rs; keep the order.
 
 export const DEFAULT = 0x01000000;
 

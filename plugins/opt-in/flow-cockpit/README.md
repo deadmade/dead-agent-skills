@@ -68,7 +68,7 @@ The window shows a run as waiting on you while one of its sessions has a questio
   only on that project's pages, above your own. A path trusts that checkout and the worktrees git links to it, not
   other clones of the repository; the main checkout's folder wins over a worktree's.
 - `FLOW_COCKPIT_EXTENSIONS=<folder>` loads the defaults from another folder, such as a checkout's
-  `crates/flow-cockpit/extensions`, so edits to them show without a rebuild.
+  `tools/flow-cockpit/extensions`, so edits to them show without a rebuild.
 - On Linux the app turns WebKitGTK's DMA-BUF renderer off, because it crashes the window on NVIDIA under Wayland;
   `WEBKIT_DISABLE_DMABUF_RENDERER=0` turns it back on.
 - A view that breaks shows its error in its own place; the rest of the window keeps working.

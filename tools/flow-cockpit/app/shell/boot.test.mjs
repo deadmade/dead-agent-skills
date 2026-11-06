@@ -1,5 +1,5 @@
 // The window's boot script, in jsdom. Runs in flow-cockpit.yml after `npm ci`, not in `npm test`:
-//   node --test crates/flow-cockpit/app/shell/boot.test.mjs
+//   node --test tools/flow-cockpit/app/shell/boot.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM, VirtualConsole } from 'jsdom';
