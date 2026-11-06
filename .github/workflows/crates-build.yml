@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [tui-review, web-mcp, ado-mcp, flow-cockpit]
+        crate: [web-mcp, ado-mcp, flow-cockpit]
         platform:
           - { os: windows-latest, target: x86_64-pc-windows-msvc, archive: zip }
           - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, archive: tar.gz }

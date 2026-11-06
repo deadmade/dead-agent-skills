@@ -136,7 +136,7 @@ test('secret returns the typed text and never echoes it', async () => {
 });
 
 test('progress turns a throw into failed', async () => {
-  const r = await progress('Downloading tui-review', async () => {
+  const r = await progress('Downloading web-mcp', async () => {
     throw new Error('boom');
   });
   assert.deepEqual(r, { ok: false, err: 'boom' });

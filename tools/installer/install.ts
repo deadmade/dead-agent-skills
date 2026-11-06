@@ -56,7 +56,7 @@ import {
 } from './context.ts';
 import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
 import { HEADROOM_TRIM, installGraphify, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
-import { MCP_AZURE, FLOW_COCKPIT, TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
+import { MCP_AZURE, FLOW_COCKPIT, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
 import { applyDcg } from './steps/dcg.ts';
@@ -283,7 +283,6 @@ await applyPlugins({
   removedBefore: removed.dupes.length > 0 || removed.foreign.length > 0,
   packs,
 });
-if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
 if (selected.includes(MCP_AZURE))
   await applyBin('mcp-azure', MCP_AZURE, process.platform, process.arch, selfValues[MCP_AZURE]);

@@ -15,7 +15,7 @@ test('host selection is explicit, validated and deduplicated', () => {
 });
 test('portable flow dependencies exclude Claude UI and maintenance plugins', () => {
   assert.deepEqual(portableSelection(definitions, ['flows']), ['dead-skills', 'flows', 'graphify', 'web-mcp']);
-  assert.throws(() => portableSelection(definitions, ['tui-review']));
+  assert.throws(() => portableSelection(definitions, ['md-pane']));
 });
 test('Codex discovery rejects unknown formats and excludes other marketplaces', () => {
   assert.deepEqual(

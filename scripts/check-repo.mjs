@@ -119,7 +119,7 @@ for (const [where, v] of [
 const cargo = /^version = "(.*)"/m.exec(readFileSync('Cargo.toml', 'utf8'))?.[1];
 if (cargo !== version) problems.push(`Cargo.toml: workspace version is ${cargo}, package.json has ${version}`);
 const cargoLock = readFileSync('Cargo.lock', 'utf8');
-for (const name of ['tui-review', 'web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit']) {
+for (const name of ['web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit']) {
   const locked = new RegExp(`^name = "${name}"\\r?\\nversion = "(.*)"`, 'm').exec(cargoLock)?.[1];
   if (locked !== version) problems.push(`Cargo.lock: ${name} is ${locked}, package.json has ${version}`);
 }

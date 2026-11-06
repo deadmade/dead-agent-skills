@@ -19,8 +19,8 @@ Night City, Context7 and the notifications were plugins of their own (night-city
 <img src="assets/mascot-512.png" width="192" align="right" alt="Onibi: a hooded netrunner in a respirator, her chrome cybereye a glowing eight-point spark">
 
 A toned-down synthwave Claude Code theme, "Night City": a dusk-indigo background, lavender text, dusty-pink Claude,
-peach inline code and permission prompts, soft teal suggestions and bash, muted violet instead of grey for dim text. It is the house look: tui-review's pane,
-the notifications and the installer's screens use the same palette. Pick it in `/theme` (Claude Code does not let a plugin
+peach inline code and permission prompts, soft teal suggestions and bash, muted violet instead of grey for dim text. It is the house look: the notifications
+and the installer's screens use the same palette. Pick it in `/theme` (Claude Code does not let a plugin
 select a custom theme).
 
 Claude-only additions beyond the theme:
