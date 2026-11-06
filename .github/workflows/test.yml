@@ -1,4 +1,4 @@
-# Repo checks, installer tests, the mods' tests and the skill scan on every PR and push to main; tui-review has its own workflow.
+# Run Node/plugin checks and skill scanning when their inputs change.
 name: test
 
 on:
@@ -11,7 +11,13 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   test:
+    needs: changes
+    # Keep both required matrix check names even when no Node checks are needed.
+    if: always()
     strategy:
       fail-fast: false
       matrix:
@@ -21,32 +27,43 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Change detection succeeded
+        if: needs.changes.result != 'success'
+        run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.changes.outputs.node == 'true'
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: needs.changes.outputs.node == 'true'
         with:
           node-version: 26
 
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        if: needs.changes.outputs.node == 'true'
         with:
           enable-cache: true
 
       - name: Claude Code, for plugin validate and plugin test
+        if: needs.changes.outputs.node == 'true'
         run: npm install -g @anthropic-ai/claude-code@2.1.316
 
       - run: npm ci
+        if: needs.changes.outputs.node == 'true'
 
       # check-repo, the first test, builds the native distributions (gitignored) that the later steps read.
       - name: Repo checks and tests
+        if: needs.changes.outputs.node == 'true'
         run: npm test
 
       - name: Installer and upstream-sync typecheck
+        if: needs.changes.outputs.node == 'true'
         run: |
           npm run typecheck
 
       # The installer as npx gets it: built, packed with its assets and without tests, and run through npx without a
       # terminal, which it refuses only after every module has loaded.
       - name: Installer package
+        if: needs.changes.outputs.node == 'true'
         run: |
           npm pack
           tar -tzf dead-agent-skills-*.tgz > packed.txt
@@ -69,18 +86,21 @@ jobs:
       # The Claude packages are generated from plugins/, which holds the sources and their tests, so each is tested with
       # its tests copied in.
       - name: dead-skills mod tests
+        if: needs.changes.outputs.node == 'true'
         run: |
           cp plugins/default/hooks/*.test.* .claude-plugin/dead-skills/hooks/
           cd .claude-plugin/dead-skills
           claude plugin test .
 
       - name: md-pane mod tests
+        if: needs.changes.outputs.node == 'true'
         run: |
           cp plugins/opt-in/md-pane/hooks/*.test.* .claude-plugin/md-pane/hooks/
           cd .claude-plugin/md-pane
           claude plugin test .
 
       - name: headroom-trim server tests
+        if: needs.changes.outputs.node == 'true'
         working-directory: plugins/opt-in/headroom-trim/server
         env:
           UV_PROJECT_ENVIRONMENT: ${{ runner.temp }}/trim-venv
@@ -89,6 +109,8 @@ jobs:
   # Cisco's skill-scanner over every skill under plugins/ and the composed flows skills in .claude-plugin/flows/skills/
   # (policy: .github/skill-scanner.yaml); fails on high or critical.
   skills:
+    needs: changes
+    if: needs.changes.outputs.skills == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
