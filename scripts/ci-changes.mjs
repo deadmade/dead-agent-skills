@@ -28,7 +28,8 @@ export function selectChecks(paths, all = false) {
       if (path.startsWith('plugins/')) skills = true;
       continue;
     }
-    if (path.startsWith('docs/')) continue;
+    // Graphify's generated session nudges are analysis artifacts, not build inputs (PR #122).
+    if (path.startsWith('docs/') || /^graphify-out\/cache\/hook_sessions\/[^/]+\.nudges$/.test(path)) continue;
     if (
       /^(Cargo\.(toml|lock)|flake\.(nix|lock)|package(-lock)?\.json)$/.test(path) ||
       path.startsWith('.cargo/') ||

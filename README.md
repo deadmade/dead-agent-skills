@@ -98,7 +98,8 @@ it always denies Claude reading `.env` files and credential dirs and keeps sessi
 lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own) and
 compacts the context at 350K tokens (`autoCompactWindow`, unless you set your own; it only matters on 1M-context models). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
-Everything ships as one version. Every merge to main releases a patch; a bigger step is `npm run release -- minor`
+Everything ships as one version. Merges to main that change plugins, tools or shared build inputs release a patch;
+CI, root documentation and analysis artifacts alone do not. A bigger step is `npm run release -- minor`
 and `git push --follow-tags origin main`. The tag builds the installer and the binaries and publishes the GitHub
 release they're downloaded from, then commits the native distributions onto the `release` branch. From a checkout,
 `npm ci` and `npm run build:harnesses` once, then `node tools/installer/install.ts` runs the installer (Node 26 or newer)
