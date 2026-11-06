@@ -263,6 +263,14 @@ fn audit_closes_when_every_pick_is_fixed() {
 }
 
 #[test]
+fn shipped_audit_template_reads_as_an_empty_audit() {
+    let path = repo_root().join("plugins/flows/skills/review-code/references/audit-template.md");
+    let audit = parse_audit(&fs::read_to_string(&path).unwrap());
+    assert_eq!(audit.findings.len(), 0);
+    assert_eq!((audit.picks, audit.fixed, audit.open), (None, vec![], None));
+}
+
+#[test]
 fn audit_without_picks_is_unknown() {
     let audit = parse_audit(&fixture("audit-no-picks.md"));
     assert_eq!(
@@ -334,23 +342,55 @@ fn headings(doc: &FlowDoc) -> Vec<&str> {
     doc.sections.iter().map(|s| s.heading.as_str()).collect()
 }
 
+/// The sections every build flow's template has, one name for what the same steps write; research runs build
+/// nothing, so they have no Tasks, Rulings or Deviations.
+const BUILD_PARTS: [&str; 15] = [
+    "Request",
+    "Gates",
+    "Skipped",
+    "Grounding",
+    "Findings",
+    "Options",
+    "Plan review",
+    "Tasks",
+    "Rulings",
+    "Parking lot",
+    "Deviations",
+    "Walkthrough",
+    "Review",
+    "Learned",
+    "Run verdict",
+];
+const RESEARCH_PARTS: [&str; 7] = [
+    "Request",
+    "Gates",
+    "Evidence",
+    "Options",
+    "Parking lot",
+    "Learned",
+    "Run verdict",
+];
+
 #[test]
 fn templates_parse_with_every_part() {
-    for (path, flow, gates) in [
+    for (path, flow, gates, parts) in [
         (
-            "plugins/flows/skills/feature-flow/references/flow-template.md",
+            "plugins/flows/skills/build-feature/references/flow-template.md",
             "feature",
             2,
+            &BUILD_PARTS[..],
         ),
         (
-            "plugins/flows/skills/research-flow/references/research-template.md",
+            "plugins/flows/skills/research-feature/references/research-template.md",
             "research",
-            2,
+            1,
+            &RESEARCH_PARTS[..],
         ),
         (
             "plugins/flows/references/build-template.md",
-            "implement | fix | upgrade",
+            "implement | fix | upgrade | refactor",
             0,
+            &BUILD_PARTS[..],
         ),
     ] {
         let doc = parse_flow(&template_body(path));
@@ -365,16 +405,8 @@ fn templates_parse_with_every_part() {
             "{path}: gates open"
         );
         let h = headings(&doc);
-        for part in [
-            "Request",
-            "Gates",
-            "Options",
-            "Tasks",
-            "Rulings",
-            "Deviations",
-            "Run verdict",
-        ] {
-            assert!(h.contains(&part), "{path}: no ## {part}");
+        for part in parts {
+            assert!(h.contains(part), "{path}: no ## {part}");
         }
         assert!(doc.title.is_some(), "{path}: title");
         // Comments are stripped: the example lines in them are not gates, decisions or deviations.
@@ -387,16 +419,18 @@ fn templates_parse_with_every_part() {
 
 #[test]
 fn filled_templates_parse_with_every_part() {
-    for (name, template) in [
+    for (name, template, gates) in [
         (
             "feature",
-            "plugins/flows/skills/feature-flow/references/flow-template.md",
+            "plugins/flows/skills/build-feature/references/flow-template.md",
+            2,
         ),
         (
             "research",
-            "plugins/flows/skills/research-flow/references/research-template.md",
+            "plugins/flows/skills/research-feature/references/research-template.md",
+            1,
         ),
-        ("build", "plugins/flows/references/build-template.md"),
+        ("build", "plugins/flows/references/build-template.md", 2),
     ] {
         let doc = parse_flow(&fixture(&format!("{name}.flow.md")));
         let template = parse_flow(&template_body(template));
@@ -405,11 +439,20 @@ fn filled_templates_parse_with_every_part() {
             doc.flow.is_some() && doc.phase.is_some() && doc.now.is_some(),
             "{name}"
         );
-        assert_eq!(doc.gates.len(), 2, "{name}: gates");
+        assert_eq!(doc.gates.len(), gates, "{name}: gates");
         assert!(
             !doc.decisions.is_empty() && doc.decisions.iter().all(|d| d.picked.is_some()),
             "{name}: decisions"
         );
+        // The template comments left in the fixture are not content.
+        assert!(
+            doc.sections.iter().all(|s| !s.markdown.contains("<!--")),
+            "{name}: comments"
+        );
+        if name == "research" {
+            assert!(doc.deviations.is_empty(), "research builds nothing");
+            continue;
+        }
         let statuses: Vec<_> = doc.deviations.iter().map(|d| &d.status).collect();
         assert!(
             statuses.contains(&&DeviationStatus::Open),
@@ -421,22 +464,11 @@ fn filled_templates_parse_with_every_part() {
                 .any(|s| matches!(s, DeviationStatus::Decided { date: Some(_), .. })),
             "{name}: decided deviation"
         );
-        // The template comments left in the fixture are not content.
-        assert!(
-            doc.sections.iter().all(|s| !s.markdown.contains("<!--")),
-            "{name}: comments"
-        );
     }
     let research = parse_flow(&fixture("research.flow.md"));
-    assert_eq!(research.gates[1].approved.as_deref(), Some("2026-10-22"));
-    assert!(research.gates[1].raw.contains("execution: subagent-driven"));
-    assert_eq!(
-        research.deviations[0].status,
-        DeviationStatus::Decided {
-            date: Some("2026-10-23".into()),
-            what: "use the 200-query subset".into()
-        }
-    );
+    assert_eq!(research.phase.as_deref(), Some("report"));
+    assert_eq!(research.gates[0].approved.as_deref(), Some("2026-10-22"));
+    assert!(research.gates[0].raw.contains("report approved"));
 }
 
 #[test]

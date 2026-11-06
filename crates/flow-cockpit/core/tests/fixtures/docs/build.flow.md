@@ -30,9 +30,15 @@ reopening is appended as `Reopened <date>: <why>`. A plan gate adds `, execution
 
 None.
 
+## Grounding
+
+<!-- What the code looks like where this lands: modules, entry points, conventions, file:line. -->
+
+Config loading is `config.rs:30-60`.
+
 ## Findings
 
-<!-- What grounding found: file:line, root cause, breaking changes. -->
+<!-- /fix's reproduction and its output, and /upgrade's breaking changes, each with its source. -->
 
 `config.rs:41` unwraps the first line.
 
@@ -44,6 +50,8 @@ offered and the recommendation. -->
 ### Fix
 
 Picked: return the default config
+
+## Plan review
 
 ## Tasks
 
@@ -58,6 +66,8 @@ Task 1: base abc1234, untracked at start: none, files clean
 
 - 2026-10-25, Task 1: an empty file and a missing file both give the default.
 
+## Parking lot
+
 ## Deviations
 
 <!-- Decisions that go to the user, one per `### <deviation>` heading, then `Status: open` or
@@ -71,9 +81,15 @@ Status: open
 
 Status: decided 2026-10-25: write the file by hand in the test
 
-## Verify
+## Walkthrough
 
-<!-- /verify's verdict and what it fixed. -->
+| goal                   | plan task | file:line    | test           |
+| ---------------------- | --------- | ------------ | -------------- |
+| empty config, no crash | Task 1    | config.rs:41 | config_test.rs |
+
+## Review
+
+<!-- /review-code's verdict and what it fixed. -->
 
 Verdict: clean.
 

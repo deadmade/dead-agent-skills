@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkUses, readUses } from '../../../../../scripts/flows-uses.mjs';
 
 const ROOT = join(import.meta.dirname, '../../../../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
@@ -28,19 +27,14 @@ test('the writing skill is model-invocable and states the rule', () => {
 test('the copyedit procedure and its script sit in the writing skill', () => {
   assert.match(read('plugins/flows/skills/writing/SKILL.md'), /\(references\/copyedit\.md\)/);
   const procedure = read('plugins/flows/skills/writing/references/copyedit.md');
-  assert.match(procedure, /\$\{CLAUDE_SKILL_DIR\}\/\.\.\/writing\/scripts\/compare\.mjs/);
-  assert.ok(!('writing' in readUses(ROOT)), 'writing is not a conductor');
-  const marketplace = JSON.parse(read('.claude-plugin/marketplace.json'));
-  assert.deepEqual(
-    checkUses(ROOT, marketplace).filter((p) => p.includes('writing')),
-    [],
-  );
+  assert.ok(procedure.includes('node "<flow-root>/skills/writing/scripts/compare.mjs"'));
 });
 
-test('flow-rules runs the copyedit before gates', () => {
-  const rules = read('plugins/flows/references/flow-rules.md');
-  assert.match(rules, /<flow-root>\/skills\/writing\/references\/copyedit\.md/);
-  assert.match(rules, /flows:writing/);
+test('the copyedit step runs the copyedit before gates', () => {
+  const step = read('plugins/flows/steps/copyedit.toml');
+  assert.ok(step.includes('read `<flow-root>/skills/writing/references/copyedit.md` and follow it'));
+  assert.ok(step.includes('`node "<flow-root>/skills/writing/scripts/compare.mjs"'));
+  assert.match(step, /flows:writing/);
 });
 
 test('SKILL.md links every lesson reference, and every link resolves', () => {

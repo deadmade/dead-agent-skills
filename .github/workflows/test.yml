@@ -87,7 +87,8 @@ jobs:
           UV_PROJECT_ENVIRONMENT: ${{ runner.temp }}/trim-venv
         run: uv run --locked python -m unittest discover -s tests
 
-  # Cisco's skill-scanner over every skill under plugins/ (policy: .github/skill-scanner.yaml); fails on high or critical.
+  # Cisco's skill-scanner over every skill under plugins/ and the composed flows skills in .claude-plugin/flows/skills/
+  # (policy: .github/skill-scanner.yaml); fails on high or critical.
   skills:
     runs-on: ubuntu-latest
     steps:

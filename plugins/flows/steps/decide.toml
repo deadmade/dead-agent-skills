@@ -1,0 +1,49 @@
+writes = ["Skipped", "Run verdict"]
+
+text = '''
+### Decide
+
+Without a flow.md, the audit file stands in for it below.
+
+The verdict, one row each, with the evidence:
+
+| Part            | State                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------- |
+| Checks          | green: the commands of the last run, its commit, and that the tree since is unchanged |
+| Review          | findings fixed, findings the user left, and why                                       |
+| Decisions       | every item below, confirmed or reopened by the user                                   |
+| Skipped: <what> | one row per skipped check or step: why, and whether the user accepted it              |
+| Not checked     | the footer line every report ends with                                                |
+
+A skipped check never counts as passed. The Skipped rows come from **Skipped** in flow.md and from this run's own
+skips (no subagents, a phase the user skipped); write any that is missing under **Skipped**.
+
+**Decisions** are what the run decided without the user, lettered so the user can reopen one by its letter:
+
+- each line under **Rulings**;
+- each entry under **Deviations**, with the decision it got;
+- each line under **Parking lot**, /learn's included: do now, a follow-up, or drop;
+- each new `shortcut:` line the branch adds: `git diff <merge-base> | rg '^\+.*shortcut:'`, plus `rg 'shortcut:'` on
+  the untracked files.
+
+**Gate:** the user confirms or reopens each decision (`all`, or the letters to reopen) and accepts or refuses each
+Skipped row. A reopened decision is handled as a deviation and goes back to the phase that built the code, with
+`phase:` set to that phase's key where the run keeps one. It goes as the next free task number in plan.md or, when the
+run has no plan.md, as the next numbered line under **Tasks** (in an audit file, the next free `Fix` number above its
+findings' numbers). Then the checks re-run and Decide starts again.
+
+**Ready** means every row is green or the user accepted it in so many words; a Skipped row is never green. If the tree
+changed since the last run (a fix, /learn's files), re-run the checks first; committing the same files doesn't change
+it.
+
+Once Ready, write the gate's outcome into flow.md, so the commits carry it: after each decision's line, `confirmed` or
+`reopened <date>: <why>`; each Parking-lot line's pick (do now, a follow-up, or drop); each Skipped row's acceptance
+under **Skipped**; and `now:` set to Close's waiting line (`Waiting for you: pick how the branch ends.`). Then ask in
+one question:
+
+- the **Run verdict**, recorded under **Run verdict** before any commit is made: worked as a whole, yes or no; clean,
+  yes or no;
+- the commits for everything uncommitted (`git status --short`: the code, flow.md, the audit file, what /learn wrote),
+  each shown with its message and files, made as the run rules say on the user's yes. Nothing is merged, pushed or
+  kept before they are made.
+'''

@@ -1,6 +1,6 @@
 //! The conductors' phase lists: which phases each flow.md-writing conductor has, in order, the `phase:` key each writes,
 //! and the gate that follows it. Taken from each conductor's SKILL.md phase table (`phase_lists_match_skill_tables`
-//! fails when one drifts). `/integrate` and the audits write no flow.md of their own and have no list.
+//! fails when one drifts). `/review-code` writes no flow.md of its own and has no list.
 
 use std::cmp::Ordering;
 
@@ -26,7 +26,7 @@ pub enum PhaseState {
 /// `(key, gate that follows)`, in order.
 type List = &'static [(&'static str, Option<u8>)];
 
-/// feature-flow/SKILL.md.
+/// build-feature/SKILL.md.
 const FEATURE: List = &[
     ("ground", None),
     ("brainstorm", None),
@@ -36,30 +36,27 @@ const FEATURE: List = &[
     ("execute", None),
     ("finish", None),
 ];
-/// research-flow/SKILL.md.
+/// research-feature/SKILL.md.
 const RESEARCH: List = &[
-    ("ground", None),
-    ("brainstorm", None),
-    ("grill", Some(1)),
-    ("plan", None),
-    ("evaluate", Some(2)),
-    ("execute", None),
-    ("validate", None),
-    ("finish", None),
+    ("frame", None),
+    ("search", None),
+    ("weigh", None),
+    ("report", Some(1)),
 ];
 /// implement/SKILL.md.
 const IMPLEMENT: List = &[
     ("read", None),
-    ("plan", Some(1)),
+    ("confirm", Some(1)),
     ("execute", None),
     ("finish", None),
 ];
-/// fix-flow/SKILL.md.
+/// fix/SKILL.md.
 const FIX: List = &[
     ("reproduce", None),
     ("ground", None),
     ("cause", Some(1)),
     ("fix", None),
+    ("prove", None),
     ("finish", None),
 ];
 /// upgrade/SKILL.md.
@@ -67,6 +64,14 @@ const UPGRADE: List = &[
     ("research", None),
     ("impact", Some(1)),
     ("bump", None),
+    ("finish", None),
+];
+/// refactor/SKILL.md.
+const REFACTOR: List = &[
+    ("ground", None),
+    ("shape", None),
+    ("gate", Some(1)),
+    ("build", None),
     ("finish", None),
 ];
 
@@ -78,6 +83,7 @@ fn list(flow: &str) -> Option<List> {
         "implement" => Some(IMPLEMENT),
         "fix" => Some(FIX),
         "upgrade" => Some(UPGRADE),
+        "refactor" => Some(REFACTOR),
         _ => None,
     }
 }
@@ -131,11 +137,11 @@ mod tests {
     use super::*;
     use std::path::Path;
 
-    /// The phase table of a conductor's SKILL.md: `(key, gate)` for each `| <n> <Name> | ... |` row, the gate being the
+    /// The phase table of a conductor's built SKILL.md: `(key, gate)` for each `| <n> <Name> | ... |` row, the gate being the
     /// number in a `**Gate**` / `**Gate <n>**` mark in the last cell (a bare `**Gate**` is gate 1).
     fn table(skill: &str) -> Vec<(String, Option<u8>)> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../plugins/flows/skills")
+            .join("../../../.claude-plugin/flows/skills")
             .join(skill)
             .join("SKILL.md");
         let text = std::fs::read_to_string(&path)
@@ -168,11 +174,12 @@ mod tests {
     #[test]
     fn phase_lists_match_skill_tables() {
         for (skill, flow) in [
-            ("feature-flow", "feature"),
-            ("research-flow", "research"),
+            ("build-feature", "feature"),
+            ("research-feature", "research"),
             ("implement", "implement"),
-            ("fix-flow", "fix"),
+            ("fix", "fix"),
             ("upgrade", "upgrade"),
+            ("refactor", "refactor"),
         ] {
             let ours: Vec<(String, Option<u8>)> = list(flow)
                 .unwrap()

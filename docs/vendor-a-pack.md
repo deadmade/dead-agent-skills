@@ -17,8 +17,8 @@ A checklist of the places a new vendored source touches. Tick each or say why no
       with a marketplace entry and `plugin.json`.
 - [ ] A pack under `packs/` still carries its `.claude-plugin/plugin.json`: check-repo's version loop reads it, and
       release versioning reads it. The installer ships the neutral `catalog/plugins.json` and generated packages.
-- [ ] A pack skill is read by path (`<packs>/<pack>/skills/<name>/SKILL.md`), so name the pack in `flow-rules.md`'s
-      **Loading skills** list.
+- [ ] A pack skill is read by path (`<packs>/<pack>/skills/<name>/SKILL.md`), so add the pack to the **Packs** list in
+      `plugins/flows/steps/run-rules.toml` (**Loading skills**).
 
 ## Docs and config
 
@@ -33,7 +33,7 @@ A checklist of the places a new vendored source touches. Tick each or say why no
 - [ ] Where a conductor overrides or pastes a pack sentence, quote it with a marker,
       `<!-- overrides <pack>/<path inside the pack>: "<sentence>" -->`. `checkOverrides` in `scripts/flows-uses.mjs`
       fails when the pack no longer holds the sentence.
-- [ ] Each conductor's `uses.json` lists the pack skills it runs; then `node scripts/flows-uses.mjs` regenerates
+- [ ] Each conductor's `uses:` frontmatter (or a step's `uses`) lists the pack skills it runs; then `node scripts/flows-uses.mjs` regenerates
       flows' `dependencies`, README tree and both native distributions.
 - [ ] READMEs (root, flows, the plugin's) and the plugin/marketplace `description`s say what the code now does.
 - [ ] `npm test`.

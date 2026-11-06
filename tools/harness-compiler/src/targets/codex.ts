@@ -1,10 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { copy, json, text } from '../emit/fs.ts';
 import { renderCodexTheme } from '../transforms/themes.ts';
 import { INTEGRATIONS, READMES, packageReadme, setupSkill } from '../templates/codex.ts';
 import { codexThemeSetup, projectRulesSkill } from '../templates/skills.ts';
-import { hostReference } from '../templates/hosts.ts';
 import { nativeHooks } from './hooks.ts';
 import type { Target } from './target.ts';
 
@@ -65,7 +64,15 @@ export const codex: Target = {
     if (INTEGRATIONS.includes(plugin.name))
       text(join(dest, 'skills', `setup-${plugin.name}`, 'SKILL.md'), setupSkill(plugin.name));
     if (READMES.includes(plugin.name)) text(join(dest, 'README.md'), packageReadme(plugin.name));
-    if (plugin.name === 'flows') text(join(dest, 'references/host.md'), hostReference('codex'));
+    if (plugin.name === 'flows') {
+      // A conductor runs only when the user calls it, the form the packs' own openai.yaml files ship.
+      for (const skill of readdirSync(join(plugin.dir!, 'skills'))) {
+        const file = join(plugin.dir!, 'skills', skill, 'SKILL.md');
+        const head = existsSync(file) ? (readFileSync(file, 'utf8').split(/^---\s*$/m)[1] ?? '') : '';
+        if (/^disable-model-invocation: true\s*$/m.test(head))
+          text(join(dest, 'skills', skill, 'agents/openai.yaml'), 'policy:\n  allow_implicit_invocation: false\n');
+      }
+    }
     const events = nativeHooks(hooks, codex, ROOT);
     if (Object.keys(events).length) json(join(dest, m?.hooks ?? 'hooks/hooks.json'), { hooks: events });
     json(join(dest, this.manifestFile), {

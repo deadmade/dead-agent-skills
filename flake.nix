@@ -17,7 +17,7 @@
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
     # Upstream files copied by tools/upstream-sync/src/adapters/*.ts: fixing them here would churn every sync PR.
-    vendored = ["^\\.claude-plugin/" "^\\.agents/plugins/" "^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/self-review/(LICENSE|references/upstream/)" "^crates/flow-cockpit/bindings/" "^crates/flow-cockpit/app/shell/vendor/" "^crates/flow-cockpit/core/tests/fixtures/"];
+    vendored = ["^\\.claude-plugin/" "^\\.agents/plugins/" "^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/review-code/(LICENSE|UPSTREAM)$" "^crates/flow-cockpit/bindings/" "^crates/flow-cockpit/app/shell/vendor/" "^crates/flow-cockpit/core/tests/fixtures/"];
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let
@@ -31,6 +31,25 @@
 
     preCommit = system: let
       pkgs = nixpkgs.legacyPackages.${system};
+      inherit (pkgs) lib;
+
+      # What package-lock.json pins (the compiler's smol-toml among it), for the sandboxed check, which has no `npm ci`:
+      # check-repo and the compiler tests import it. Built from the manifests alone, so only they rebuild it.
+      workspaces = (lib.importJSON ./package.json).workspaces;
+      npmRoot = lib.fileset.toSource {
+        root = ./.;
+        fileset = lib.fileset.unions ([./package.json ./package-lock.json] ++ map (ws: ./. + "/${ws}/package.json") workspaces);
+      };
+      nodeModules = pkgs.importNpmLock.buildNodeModules {
+        inherit npmRoot;
+        inherit (pkgs) nodejs;
+        derivationArgs = {
+          # npm ci installs a workspace's dependencies only when its package.json is there.
+          postPatch = lib.concatMapStrings (ws: "mkdir -p ${ws} && cp ${npmRoot}/${ws}/package.json ${ws}/\n") workspaces;
+          # The links to the workspaces would dangle here; the checked tree has the workspaces themselves.
+          postInstall = "rm -r $out/node_modules/@dead-claude-skills";
+        };
+      };
 
       check-repo = pkgs.writeShellApplication {
         name = "check-repo";
@@ -46,12 +65,18 @@
             --test-coverage-exclude='tools/installer/**/*.test.ts' --test-coverage-lines=79 'tools/installer/**/*.test.ts'
           node --test 'tools/upstream-sync/src/**/*.test.ts' 'tools/upstream-sync/src/**/*.test.mjs'
           node --test 'tools/harness-compiler/test/**/*.test.ts' 'tools/harness-compiler/test/**/*.test.mjs'
-          exec node --test 'scripts/*.test.mjs' 'plugins/flows/skills/writing/tests/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs' 'plugins/opt-in/headroom-trim/hooks/*.test.mjs' 'plugins/opt-in/flow-cockpit/hooks/*.test.mjs'
+          exec node --test 'scripts/*.test.mjs' 'plugins/flows/skills/writing/tests/*.test.mjs' 'plugins/flows/skills/build-feature/tests/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs' 'plugins/opt-in/headroom-trim/hooks/*.test.mjs' 'plugins/opt-in/flow-cockpit/hooks/*.test.mjs'
         '';
       };
     in
       git-hooks.lib.${system}.run {
         src = ./.;
+        # The checked tree, with node_modules beside package.json as `npm ci` would leave it (git ignores the link).
+        rootSrc = lib.mkForce (pkgs.runCommand "source-with-node-modules" {} ''
+          cp -r ${./.} $out
+          chmod u+w $out
+          ln -s ${nodeModules}/node_modules $out/node_modules
+        '');
         hooks = {
           treefmt = {
             enable = true;

@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "flows step",
+  "description": "A flows step: optional keys, then the Markdown every flow that names the step copies in byte for byte. compose.ts reads its keys, types and values from here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["text"],
+  "properties": {
+    "in": {
+      "description": "Every converted conductor (a SKILL.md holding [step: phases]) must use this step.",
+      "enum": ["every-conductor"]
+    },
+    "uses": {
+      "description": "The skills, agents and tools the text runs.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[^:]+:.+$", "description": "plugin:name" }
+    },
+    "requires": {
+      "description": "Steps that must also be in any flow using this one.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "writes": {
+      "description": "flow.md sections the text writes, checked against the flow's templates.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "needs": {
+      "description": "The text dispatches subagents, so it holds a line starting \"Without subagents:\".",
+      "enum": ["subagents"]
+    },
+    "repeat": { "description": "The step may appear more than once in a file.", "type": "boolean" },
+    "text": {
+      "description": "The step's Markdown, in a multi-line literal string whose opener stands alone on its line: text = '''",
+      "type": "string"
+    }
+  }
+}

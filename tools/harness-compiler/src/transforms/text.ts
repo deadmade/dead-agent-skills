@@ -10,7 +10,8 @@ export function portableText(text: string, file: string, root: string): string {
   return (
     text
       .replaceAll('${CLAUDE_PLUGIN_ROOT}', rel)
-      .replaceAll('${CLAUDE_SKILL_DIR}', '.')
+      // Only vendored packs say ${CLAUDE_SKILL_DIR}; the plugin's own text writes <flow-root> instead.
+      .replaceAll('${CLAUDE_SKILL_DIR}', parts[0] === 'packs' ? '.' : '${CLAUDE_SKILL_DIR}')
       // Shared instructions may intentionally name both files. Adapt single-host lines only.
       .split('\n')
       .map((line) => (line.includes('AGENTS.md') ? line : line.replaceAll('CLAUDE.md', 'AGENTS.md')))

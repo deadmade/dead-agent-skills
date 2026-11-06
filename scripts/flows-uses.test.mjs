@@ -3,130 +3,115 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { composeFlows } from '../tools/harness-compiler/src/flows/compose.ts';
+import { TOKENS as CLAUDE_CODE } from '../tools/harness-compiler/src/templates/hosts/claude-code.ts';
+import { TOKENS as CODEX } from '../tools/harness-compiler/src/templates/hosts/codex.ts';
 import {
+  FLOWS,
   checkOverrides,
   checkPackPaths,
   checkTemplates,
-  checkUses,
+  checkUseNames,
   currentDeps,
   expectedDeps,
   packs,
-  readUses,
   renderTree,
   withTree,
 } from './flows-uses.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
 
-// A conductor's SKILL.md: only skills with `disable-model-invocation: true` are conductors.
-const conductor = (body) => `---\nname: fix\ndisable-model-invocation: true\n---\n${body}`;
+// A conductor's SKILL.md using `uses` (`plugin:name, …`): only skills with `disable-model-invocation: true` are conductors.
+const conductor = (uses, body = '') => `---\nname: fix\ndisable-model-invocation: true\nuses: ${uses}\n---\n${body}`;
 
-// A repo with one conductor `fix` using `uses`, local plugins picks (a skill, an agent, an MCP server) and web (an
+// A repo with one conductor `fix` (`skillText`), local plugins picks (a skill, an agent, an MCP server) and web (an
 // MCP server), and the pack superpowers (a skill, no marketplace entry). `files` adds more ({ path: text }).
-function repo(uses, skillText = conductor('how reviewer docs search general-purpose deep'), files = {}) {
+function repo(skillText, files = {}) {
   const fx = mkdtempSync(join(tmpdir(), 'fu-'));
   const put = (p, s) => (mkdirSync(dirname(join(fx, p)), { recursive: true }), writeFileSync(join(fx, p), s));
   put('plugins/flows/skills/fix/SKILL.md', skillText);
   for (const [p, s] of Object.entries(files)) put(p, s);
-  if (uses !== undefined) put('plugins/flows/skills/fix/uses.json', JSON.stringify(uses));
   put('plugins/picks/skills/how/SKILL.md', '');
   put('plugins/picks/agents/reviewer.md', '');
   put('plugins/picks/plugin.json', JSON.stringify({ mcpServers: { docs: { url: 'https://x.invalid' } } }));
   put('plugins/web/plugin.json', '{}');
   put('plugins/flows/packs/superpowers/skills/writing-plans/SKILL.md', '');
-  return fx;
-}
-
-function fixture(uses, skillText, files) {
-  const marketplace = {
-    plugins: [
+  put(
+    'plugins/catalog.json',
+    JSON.stringify([
       { name: 'picks', source: './plugins/picks' },
       { name: 'web', source: './plugins/web' },
       { name: 'remote', source: { source: 'url', url: 'https://example.invalid/remote.git' } },
-    ],
-  };
-  const fx = repo(uses, skillText, files);
-  mkdirSync(join(fx, 'plugins'), { recursive: true });
-  writeFileSync(join(fx, 'plugins/catalog.json'), JSON.stringify(marketplace.plugins));
-  return checkUses(fx, {
-    plugins: marketplace.plugins.map((p) => ({
-      ...p,
-      source: typeof p.source === 'string' ? './.claude-plugin/' + p.name : p.source,
-    })),
-  });
+    ]),
+  );
+  return fx;
+}
+
+// checkUseNames on a repo whose conductor uses `uses`, fed the uses composed for Claude Code.
+function fixture(uses, files) {
+  const fx = repo(conductor(uses), files);
+  return checkUseNames(fx, composeFlows(join(fx, FLOWS), CLAUDE_CODE).uses);
 }
 
 test('a valid map has no problems: local skill and agent, MCP tool, url plugin, official, builtin', () => {
-  const uses = {
-    picks: ['how', 'reviewer'],
-    web: ['search'],
-    remote: ['deep'],
-    'claude-security@claude-plugins-official': ['deep'],
-    'claude-code': ['general-purpose'],
-  };
+  const uses =
+    'picks:how, picks:reviewer, web:search, remote:deep, claude-security@claude-plugins-official:deep, claude-code:general-purpose';
   assert.deepEqual(fixture(uses), []);
 });
 
 test('a pack resolves to its folder under plugins/flows/packs, with no marketplace entry', () => {
-  assert.deepEqual(fixture({ superpowers: ['writing-plans'] }, conductor('writing-plans')), []);
-  assert.deepEqual(fixture({ superpowers: ['nope'] }, conductor('nope')), [
-    'plugins/flows/skills/fix/uses.json: superpowers has no skill, agent or workflow nope',
+  assert.deepEqual(fixture('superpowers:writing-plans'), []);
+  assert.deepEqual(fixture('superpowers:nope'), [
+    'plugins/flows/skills/fix/SKILL.md: superpowers has no skill, agent or workflow nope',
   ]);
 });
 
 test("an MCP server of a plugin that also has skills counts as that plugin's", () => {
-  assert.deepEqual(fixture({ picks: ['how', 'docs'] }), []);
+  assert.deepEqual(fixture('picks:how, picks:docs'), []);
 });
 
 test('each kind of problem is reported', () => {
-  assert.match(fixture(undefined)[0], /missing, or not/);
-  assert.match(fixture({ picks: 'how' })[0], /missing, or not/);
-  assert.match(fixture({ picks: [] })[0], /missing, or not/);
-  assert.match(fixture({ nope: ['how'] })[0], /nope is not a plugin/);
-  assert.match(fixture({ flows: ['fix'] })[0], /fix is a conductor/);
-  assert.match(fixture({ picks: ['gone'] }, conductor('gone'))[0], /picks has no skill, agent or workflow gone/);
-  assert.match(fixture({ picks: ['how'] }, conductor('nothing here'))[0], /how isn't mentioned in fix\/SKILL.md/);
+  assert.match(fixture('nope:how')[0], /nope is not a plugin/);
+  assert.match(fixture('flows:fix')[0], /fix is a conductor/);
+  assert.match(fixture('picks:gone')[0], /picks has no skill, agent or workflow gone/);
 });
 
-test('a model-invocable skill is not a conductor', () => {
+test("uses may list flows' non-conductor skills", () => {
   // The plain skill's frontmatter is CRLF, as a Windows checkout writes it.
-  const plain = '---\r\nname: writing\r\ndescription: x\r\n---\r\nbody\r\n';
-  const fx = repo({ picks: ['how'] }, conductor('how'), { 'plugins/flows/skills/writing/SKILL.md': plain });
-  const all = readUses(fx);
-  assert.deepEqual(Object.keys(all), ['fix']);
-  assert.doesNotMatch(renderTree(all), /writing/);
-  // A conductor's own frontmatter in CRLF still counts.
-  const crlf = repo({ picks: ['how'] }, conductor('how').replaceAll('\n', '\r\n'));
-  assert.deepEqual(Object.keys(readUses(crlf)), ['fix']);
-});
-
-test("uses.json may list flows' non-conductor skills", () => {
-  const files = { 'plugins/flows/skills/writing/SKILL.md': '---\nname: writing\n---\n' };
-  assert.deepEqual(fixture({ flows: ['writing'] }, conductor('writing'), files), []);
-  assert.match(fixture({ flows: ['fix'] }, conductor('fix'), files)[0], /fix is a conductor/);
-  assert.match(fixture({ flows: ['nope'] }, conductor('nope'), files)[0], /flows has no skill nope/);
-  assert.ok(!expectedDeps({ fix: { flows: ['writing'], picks: ['how'] } }, []).includes('flows'));
-  assert.match(fixture({ flows: ['writing'] }, conductor('nothing here'), files)[0], /writing isn't mentioned/);
-});
-
-test('a uses.json beside a skill that is not a conductor is reported', () => {
   const files = {
-    'plugins/flows/skills/writing/SKILL.md': '---\r\nname: writing\r\n---\r\n',
-    'plugins/flows/skills/writing/uses.json': '{"picks":["how"]}',
+    'plugins/flows/skills/writing/SKILL.md': '---\r\nname: writing\r\ndescription: x\r\n---\r\nbody\r\n',
   };
-  assert.deepEqual(fixture({ picks: ['how'] }, conductor('how'), files), [
-    "plugins/flows/skills/writing/uses.json: writing isn't a conductor (no disable-model-invocation: true)",
+  assert.deepEqual(fixture('flows:writing', files), []);
+  assert.match(fixture('flows:fix', files)[0], /fix is a conductor/);
+  assert.match(fixture('flows:nope', files)[0], /flows has no skill nope/);
+  assert.ok(!expectedDeps({ fix: { flows: ['writing'], picks: ['how'] } }, []).includes('flows'));
+});
+
+test('a conductor that still has a uses.json is reported', () => {
+  assert.deepEqual(fixture('picks:how', { 'plugins/flows/skills/fix/uses.json': '{"picks":["how"]}' }), [
+    "plugins/flows/skills/fix/uses.json: move it into SKILL.md's uses: frontmatter",
   ]);
 });
 
 test('a skill folder without SKILL.md is reported', () => {
-  const files = { 'plugins/flows/skills/gone/uses.json': '{"picks":["how"]}' };
-  assert.deepEqual(fixture({ picks: ['how'] }, conductor('how'), files), ['plugins/flows/skills/gone: no SKILL.md']);
+  const files = { 'plugins/flows/skills/gone/references/x.md': '' };
+  assert.deepEqual(fixture('picks:how', files), ['plugins/flows/skills/gone: no SKILL.md']);
 });
 
 test('expectedDeps: every plugin once, sorted, builtins and packs left out', () => {
   const all = { a: { z: ['x'], 'claude-code': ['y'], superpowers: ['p'] }, b: { m: ['x'], z: ['q'] } };
   assert.deepEqual(expectedDeps(all, ['superpowers']), ['m', 'z']);
+});
+
+test("expectedDeps takes Claude Code's composed uses, host text included", () => {
+  const fx = repo(conductor('picks:how', 'Ask how.\n[step: host]\n'));
+  const claude = composeFlows(join(fx, FLOWS), CLAUDE_CODE).uses;
+  assert.deepEqual(expectedDeps(claude, []), [
+    'claude-md-management@claude-plugins-official',
+    'claude-security@claude-plugins-official',
+    'picks',
+  ]);
+  assert.deepEqual(expectedDeps(composeFlows(join(fx, FLOWS), CODEX).uses, []), ['picks']);
 });
 
 test('packs lists the folders under plugins/flows/packs', () => {
@@ -137,11 +122,22 @@ test('packs lists the folders under plugins/flows/packs', () => {
   assert.deepEqual(packs(fx), ['a', 'b']);
 });
 
-test('renderTree draws one block per conductor', () => {
-  const tree = renderTree({ fix: { picks: ['how', 'why'], web: ['search'] }, learn: { picks: ['recall'] } });
+test('renderTree draws one block per conductor from every harness, marking what only one host uses', () => {
+  const codex = { fix: { picks: ['how', 'why'], web: ['search'] }, learn: { picks: ['recall'] } };
+  const claude = { ...codex, fix: { 'claude-code': ['Monitor'], picks: ['how', 'why'], web: ['WebSearch', 'search'] } };
   assert.equal(
-    tree,
-    ['```text', 'fix', '├ picks: how, why', '└ web: search', '', 'learn', '└ picks: recall', '```'].join('\n'),
+    renderTree({ 'claude-code': claude, codex }),
+    [
+      '```text',
+      'fix',
+      '├ claude-code: Monitor (claude-code)',
+      '├ picks: how, why',
+      '└ web: WebSearch (claude-code), search',
+      '',
+      'learn',
+      '└ picks: recall',
+      '```',
+    ].join('\n'),
   );
 });
 
@@ -151,20 +147,20 @@ test('withTree replaces only the marked block, and refuses a README without one'
   assert.equal(withTree('no markers', 'NEW'), undefined);
 });
 
-test('the real conductors pass, and flows depends on exactly what they use', () => {
-  const marketplace = JSON.parse(readFileSync(join(ROOT, '.claude-plugin/marketplace.json'), 'utf8'));
-  assert.deepEqual(checkUses(ROOT, marketplace), []);
-  assert.deepEqual(currentDeps(ROOT), expectedDeps(readUses(ROOT), packs(ROOT)));
+test('the real conductors pass, and flows depends on exactly what they use on Claude Code', () => {
+  const uses = composeFlows(join(ROOT, FLOWS), CLAUDE_CODE).uses;
+  assert.deepEqual(checkUseNames(ROOT, uses), []);
+  assert.deepEqual(currentDeps(ROOT), expectedDeps(uses, packs(ROOT)));
   assert.deepEqual(checkOverrides(ROOT), []);
   assert.deepEqual(checkPackPaths(ROOT), []);
 });
 
-// A repo whose conductor quotes `quote` from a pack file that reads `pack`.
-function overrides(quote, pack = 'Always **write the\nplan** first.\n') {
+// A repo whose conductor (or `file`) quotes `quote` from a pack file that reads `pack`.
+function overrides(quote, pack = 'Always **write the\nplan** first.\n', file = 'plugins/flows/skills/fix/SKILL.md') {
   const fx = mkdtempSync(join(tmpdir(), 'ov-'));
   const put = (f, s) => (mkdirSync(dirname(join(fx, f)), { recursive: true }), writeFileSync(join(fx, f), s));
   put('plugins/flows/packs/p/skills/s/SKILL.md', pack);
-  put('plugins/flows/skills/fix/SKILL.md', `intro\n<!-- overrides p/skills/s/SKILL.md: "${quote}" -->\n`);
+  put(file, `intro\n<!-- overrides p/skills/s/SKILL.md: "${quote}" -->\n`);
   return checkOverrides(fx);
 }
 
@@ -175,6 +171,12 @@ test('checkOverrides: a found sentence passes, also across a wrap and bold in th
 test('checkOverrides: a changed sentence fails, naming file and line', () => {
   assert.deepEqual(overrides('Never write the plan.'), [
     'plugins/flows/skills/fix/SKILL.md:2: p/skills/s/SKILL.md no longer contains "Never write the plan."',
+  ]);
+});
+
+test('checkOverrides: a changed sentence in a steps/*.toml fails', () => {
+  assert.deepEqual(overrides('Never write the plan.', undefined, 'plugins/flows/steps/x.toml'), [
+    'plugins/flows/steps/x.toml:2: p/skills/s/SKILL.md no longer contains "Never write the plan."',
   ]);
 });
 
@@ -197,13 +199,14 @@ test('checkOverrides: a missing pack file fails', () => {
   assert.equal(checkOverrides(fx).length, 1);
 });
 
-// A repo whose conductor reads `text`, with one pack file p/skills/s/SKILL.md; packs/ and agents/ name a missing path.
-function packPaths(text) {
+// A repo whose conductor (or `file`) reads `text`, with one pack file p/skills/s/SKILL.md; packs/ and agents/ name a
+// missing path.
+function packPaths(text, file = 'plugins/flows/skills/fix/SKILL.md') {
   const fx = mkdtempSync(join(tmpdir(), 'pp-'));
   const put = (f, s) => (mkdirSync(dirname(join(fx, f)), { recursive: true }), writeFileSync(join(fx, f), s));
   put('plugins/flows/packs/p/skills/s/SKILL.md', '`<packs>/p/gone.md`');
   put('plugins/flows/agents/a.md', '`${CLAUDE_PLUGIN_ROOT}/packs/p/gone.md`');
-  put('plugins/flows/skills/fix/SKILL.md', text);
+  put(file, text);
   return checkPackPaths(fx);
 }
 
@@ -221,21 +224,27 @@ test('checkPackPaths: a missing path fails, naming file and line', () => {
   ]);
 });
 
+test('checkPackPaths: a missing path in a steps/*.toml fails', () => {
+  assert.deepEqual(packPaths("text = '''\nRead `<packs>/p/gone.md`.\n'''\n", 'plugins/flows/steps/x.toml'), [
+    'plugins/flows/steps/x.toml:2: <packs>/p/gone.md does not exist',
+  ]);
+});
+
 // checkTemplates: the parts the flow cockpit reads must stay in the templates and the conductor text.
 const TEMPLATES = [
-  'plugins/flows/skills/feature-flow/references/flow-template.md',
-  'plugins/flows/skills/research-flow/references/research-template.md',
+  'plugins/flows/skills/build-feature/references/flow-template.md',
+  'plugins/flows/skills/research-feature/references/research-template.md',
   'plugins/flows/references/build-template.md',
 ];
-const RULES = 'plugins/flows/references/flow-rules.md';
-const PLANNERS = ['feature-flow', 'implement', 'upgrade'].map((n) => `plugins/flows/skills/${n}/SKILL.md`);
+const AUDIT = 'plugins/flows/skills/review-code/references/audit-template.md';
+const STEPS = 'plugins/flows/steps';
 
 // A copy of the real files with `needle` taken out of `file`.
 function without(file, needle) {
   const fx = mkdtempSync(join(tmpdir(), 'ct-'));
-  for (const f of [...TEMPLATES, RULES, ...PLANNERS]) {
+  for (const f of [...TEMPLATES, AUDIT, STEPS]) {
     mkdirSync(dirname(join(fx, f)), { recursive: true });
-    cpSync(join(ROOT, f), join(fx, f));
+    cpSync(join(ROOT, f), join(fx, f), { recursive: true });
   }
   const text = readFileSync(join(fx, file), 'utf8');
   assert.ok(text.includes(needle), `${file} has ${needle}`);
@@ -248,11 +257,13 @@ test('checkTemplates on the real repo returns []', () => {
 });
 
 for (const t of TEMPLATES) {
+  // A research run builds nothing, so its template has no Deviations and no `Status:`.
+  const research = t.includes('research');
   for (const [what, needle] of [
     ['now:', 'now: <'],
     ['the Gates line shape', '- Gate <n>, <what>:'],
     ['Picked:', 'Picked:'],
-    ['Status:', 'Status: open'],
+    ...(research ? [] : [['Status:', 'Status: open']]),
   ]) {
     test(`checkTemplates names ${t} without ${what}`, () => {
       const problems = without(t, needle);
@@ -262,23 +273,17 @@ for (const t of TEMPLATES) {
   }
 }
 
-for (const [what, needle] of [
-  ['the Waiting for you rule', 'Waiting for you'],
-  ['Picks:', 'Picks:'],
-  ['Fixed', 'Fixed <date>'],
+for (const [file, what, needle] of [
+  [`${STEPS}/deviations.toml`, 'the Waiting for you rule', 'Waiting for you'],
+  [`${STEPS}/deviations.toml`, 'Status: decided', 'Status: decided'],
+  [`${STEPS}/gate.toml`, 'the gate line shape', '- Gate <n>, <what>:'],
+  [`${STEPS}/plan-shape.toml`, '**Does:**', '**Does:**'],
+  [`${STEPS}/plan-shape.toml`, '**Depends on:**', '**Depends on:**'],
+  [AUDIT, 'Picks:', 'Picks:'],
+  [AUDIT, 'Fixed', 'Fixed <date>'],
 ]) {
-  test(`checkTemplates names flow-rules without ${what}`, () => {
-    const problems = without(RULES, needle);
-    assert.ok(problems.length >= 1 && problems.every((p) => p.startsWith(RULES)), problems.join('\n'));
+  test(`checkTemplates names ${file} without ${what}`, () => {
+    const problems = without(file, needle);
+    assert.ok(problems.length >= 1 && problems.every((p) => p.startsWith(file)), problems.join('\n'));
   });
-}
-
-for (const f of PLANNERS) {
-  for (const needle of ['**Does:**', '**Depends on:**']) {
-    test(`checkTemplates names ${f} without ${needle}`, () => {
-      const problems = without(f, needle);
-      assert.equal(problems.length, 1, problems.join('\n'));
-      assert.ok(problems[0].startsWith(f) && problems[0].includes(needle), problems[0]);
-    });
-  }
 }

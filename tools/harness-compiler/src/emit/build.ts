@@ -1,10 +1,13 @@
 // Compiles the neutral sources into one output tree plus the two repository marketplaces.
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { checkBuilt, composeFlows } from '../flows/compose.ts';
 import { loadPlugins, selectTarget } from '../load.ts';
 import type { Diagnostic, Hook } from '../model.ts';
 import { selectHooks } from '../targets/hooks.ts';
 import { TARGETS } from '../targets/index.ts';
+import { TOKENS as CLAUDE_CODE_TOKENS } from '../templates/hosts/claude-code.ts';
+import { TOKENS as CODEX_TOKENS } from '../templates/hosts/codex.ts';
 import { transformMarkdown } from '../transforms/text.ts';
 import type { Palette } from '../transforms/themes.ts';
 import { renderClaudeTheme, renderCodexTheme } from '../transforms/themes.ts';
@@ -12,15 +15,21 @@ import { copy, json } from './fs.ts';
 
 const RUNTIME = join(import.meta.dirname, '../runtime');
 const RUNTIME_FILES = ['common.mjs', 'claude-code.mjs', 'codex.mjs', 'run.mjs'];
+const TOKENS = { 'claude-code': CLAUDE_CODE_TOKENS, codex: CODEX_TOKENS };
 
 export interface Build {
   diagnostics: Diagnostic[];
+  // What checkBuilt finds in the built flows, as `[target] file:line: what`.
+  problems: string[];
+  // Each flows conductor's rules-plus-Start tokens, keyed `<target>/<conductor>`.
+  estimates: Record<string, number>;
 }
 // Writes the generated trees of both targets and the repository marketplaces into <output>, laid out like the repository.
 export function buildTree(root: string, output: string): Build {
   const plugins = loadPlugins(root);
   const version: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
-  const diagnostics: Diagnostic[] = [];
+  const built: Build = { diagnostics: [], problems: [], estimates: {} };
+  const { diagnostics } = built;
   const palettes = new Map<string, Palette>();
   for (const plugin of plugins)
     for (const theme of plugin.manifest?.themes ?? []) {
@@ -83,11 +92,19 @@ export function buildTree(root: string, output: string): Build {
         hooks,
         palettes,
       });
+      const composed = plugin.name === 'flows' && plugin.dir ? composeFlows(plugin.dir, TOKENS[target.id]) : undefined;
+      for (const [file, text] of composed?.files ?? []) writeFileSync(join(dest, file), text);
       for (const file of readdirSync(dest, { recursive: true, encoding: 'utf8' }))
         if (file.endsWith('.md')) {
           const path = join(dest, file);
           writeFileSync(path, transformMarkdown(target.id, readFileSync(path, 'utf8'), path, dest));
         }
+      if (composed) {
+        const found = checkBuilt(dest, target.id, composed);
+        built.problems.push(...found.problems);
+        for (const [conductor, tokens] of Object.entries(found.estimates))
+          built.estimates[`${target.id}/${conductor}`] = tokens;
+      }
     }
     json(
       join(output, target.marketplaceFile),
@@ -106,5 +123,5 @@ export function buildTree(root: string, output: string): Build {
       if (!text.includes('\0') && Buffer.from(text).equals(bytes) && text.includes('\r\n'))
         writeFileSync(path, text.replaceAll('\r\n', '\n'));
     }
-  return { diagnostics };
+  return built;
 }

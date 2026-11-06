@@ -1,0 +1,14 @@
+writes = ["Findings", "Deviations", "Rulings"]
+
+text = '''
+**Calling another conductor:** read its SKILL.md (`<flow-root>/skills/<name>/SKILL.md`) and run it inline, inside this
+run:
+
+- It skips its start and resume step: the caller hands it the input, and it creates no flow.md of its own.
+- It keeps its gates; they continue the caller's numbering and name the callee.
+- It stops before its own Finish or Decide and returns to the caller, which goes on right after the call. The
+  caller's Decide covers both.
+- It writes into the outermost run's flow.md, also when it was itself called by a callee: its `now:`, and its
+  **Findings**, **Deviations** and **Rulings** under the sections of those names. It leaves that run's `phase:` as it
+  is. When no run in the chain has a flow.md, they go into the audit file, under the same headings.
+'''

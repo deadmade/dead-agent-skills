@@ -72,6 +72,24 @@ A plugin's own number, which moves only when that plugin changes. Vendored plugi
 carry upstream's number.
 _Avoid_: release version
 
+## Flows
+
+**Conductor**:
+A flows skill the user starts by name that runs other skills in order and keeps a record of the run: a flow.md for the
+build and research flows; /review-code, /understand and /learn keep their own (an audit file, a scratch file, the
+chat).
+_Avoid_: workflow, flow (alone; a flow run is one execution)
+
+**Flow step**:
+A piece of conductor text written once, in `plugins/flows/steps/<name>.toml`, and copied word for word into every
+conductor that names it. It reads the same in each.
+_Avoid_: step (alone; a pipeline step is something else), partial, include, snippet
+
+**Host token**:
+A placeholder in flows text that the build replaces with the wording one harness needs, such as its question tool or
+its model names.
+_Avoid_: variable, placeholder (alone)
+
 ## web-mcp
 
 **Archive**:
@@ -136,9 +154,10 @@ new text, with no model call. `FLOWS_PROSE_CHECK=off` turns it off.
 _Avoid_: linter, lint, model check
 
 **Copyedit pass**:
-A run of the `writing` skill's copyedit (`references/copyedit.md`) on a spec, plan or audit report before its gate: a fresh Opus editor revises it for a reader who
-wasn't in the conversation, by the `writing` skill (Williams and Bizup's _Style_), and code checks that nothing
-was lost. A refused edit leaves the document as it was, and the gate says so.
+The copyedit step (`plugins/flows/steps/copyedit.toml`), which runs the `writing` skill's copyedit
+(`references/copyedit.md`) on a spec, plan, research report or audit report before its gate: a fresh editor revises it
+for a reader who wasn't in the conversation, by the `writing` skill (Williams and Bizup's _Style_), and code checks that
+nothing was lost. A refused edit leaves the document as it was, and the gate says so.
 _Avoid_: review, rewrite, polish
 
 ## headroom-trim
@@ -164,11 +183,11 @@ capture. It can also start and host Claude sessions itself.
 _Avoid_: dashboard, board
 
 **Flow run**:
-One conductor run, recorded in a `docs/features/<slug>/flow.md`, from its start to `phase: done`.
+One run of a build or research conductor, recorded in a `docs/features/<slug>/flow.md`, from its start to `phase: done`.
 _Avoid_: run (alone; a web-mcp run is something else), flow (alone; that's the conductor), ticket
 
 **Audit**:
-One `docs/audits/<date>-<flow>-<scope>.md` report written by `/test-audit`, `/doc-audit` or `/harden`.
+One `docs/audits/<date>-review-<scope>.md` report written by `/review-code` (older ones by `/test-audit`, `/doc-audit` or `/harden`, which it replaced).
 _Avoid_: audit run, report (alone)
 
 **Claude session**:

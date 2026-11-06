@@ -1,9 +1,12 @@
 import { execFileSync } from 'node:child_process';
-// Each flows conductor lists the skills, agents and tools it runs in its uses.json ({ plugin: [names] }).
-// From those lists come flows' dependencies (catalog and plugin.json) and the tree in its README; check-repo fails on drift.
-// Run directly to rewrite both.
+// Each flows conductor's uses, per harness, come from composeFlows: its SKILL.md's `uses:`, its steps' and its host
+// tokens'. From them come flows' dependencies (catalog and plugin.json) and the tree in its README; check-repo fails on
+// drift. Run directly to rewrite both.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { composeFlows } from '../tools/harness-compiler/src/flows/compose.ts';
+import { TOKENS as CLAUDE_CODE } from '../tools/harness-compiler/src/templates/hosts/claude-code.ts';
+import { TOKENS as CODEX } from '../tools/harness-compiler/src/templates/hosts/codex.ts';
 
 export const FLOWS = 'plugins/flows';
 // The skill packs flows carries, one synced folder each: no marketplace entry, read by path, never loaded on their own.
@@ -28,18 +31,6 @@ const flowsSkills = (root) => {
     });
 };
 
-export function readUses(root) {
-  const dir = join(root, FLOWS, 'skills');
-  return Object.fromEntries(
-    flowsSkills(root)
-      .filter((s) => s.conductor)
-      .map(({ name }) => {
-        const file = join(dir, name, 'uses.json');
-        return [name, existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined];
-      }),
-  );
-}
-
 // The pack names: the folders under PACKS.
 export const packs = (root) =>
   existsSync(join(root, PACKS))
@@ -49,39 +40,29 @@ export const packs = (root) =>
         .sort()
     : [];
 
-// marketplace: the parsed marketplace.json. Returns problems as strings.
-export function checkUses(root, marketplace) {
+// uses: composeFlows(…).uses, { conductor: { plugin: [names] } }. Returns problems as strings; whether the text names
+// each use is check 7 in the build (checkBuilt).
+export function checkUseNames(root, uses) {
   const problems = [];
   const definitions = JSON.parse(readFileSync(join(root, 'plugins/catalog.json'), 'utf8'));
   const packNames = packs(root);
   const skills = flowsSkills(root);
   const dir = join(root, FLOWS, 'skills');
-  for (const d of readdirSync(dir, { withFileTypes: true }))
-    if (d.isDirectory() && !d.name.startsWith('.') && !existsSync(join(dir, d.name, 'SKILL.md')))
-      problems.push(`${FLOWS}/skills/${d.name}: no SKILL.md`);
-  for (const { name, conductor } of skills)
-    if (!conductor && existsSync(join(root, FLOWS, 'skills', name, 'uses.json')))
-      problems.push(`${FLOWS}/skills/${name}/uses.json: ${name} isn't a conductor (no disable-model-invocation: true)`);
-  for (const [conductor, uses] of Object.entries(readUses(root))) {
-    const at = `${FLOWS}/skills/${conductor}/uses.json`;
-    const valid =
-      uses &&
-      typeof uses === 'object' &&
-      !Array.isArray(uses) &&
-      Object.values(uses).every((v) => Array.isArray(v) && v.length && v.every((n) => typeof n === 'string'));
-    if (!valid) {
-      problems.push(`${at}: missing, or not { plugin: [names] }`);
-      continue;
-    }
-    const skill = readFileSync(join(root, FLOWS, 'skills', conductor, 'SKILL.md'), 'utf8');
-    for (const [plugin, names] of Object.entries(uses)) {
+  for (const d of readdirSync(dir, { withFileTypes: true })) {
+    if (!d.isDirectory() || d.name.startsWith('.')) continue;
+    if (!existsSync(join(dir, d.name, 'SKILL.md'))) problems.push(`${FLOWS}/skills/${d.name}: no SKILL.md`);
+    if (existsSync(join(dir, d.name, 'uses.json')))
+      problems.push(`${FLOWS}/skills/${d.name}/uses.json: move it into SKILL.md's uses: frontmatter`);
+  }
+  for (const [conductor, used] of Object.entries(uses)) {
+    const at = `${FLOWS}/skills/${conductor}/SKILL.md`;
+    for (const [plugin, names] of Object.entries(used)) {
       // flows' own non-conductor skills (writing) are listed under flows; other conductors aren't listed at all.
       if (plugin === 'flows') {
         for (const name of names) {
           const own = skills.find((s) => s.name === name);
           if (!own) problems.push(`${at}: flows has no skill ${name}`);
           else if (own.conductor) problems.push(`${at}: ${name} is a conductor; other conductors aren't listed`);
-          else if (!skill.includes(name)) problems.push(`${at}: ${name} isn't mentioned in ${conductor}/SKILL.md`);
         }
         continue;
       }
@@ -110,7 +91,6 @@ export function checkUses(root, marketplace) {
             existsSync(join(dir ?? '', f)),
           );
         if (checkable && !found) problems.push(`${at}: ${plugin} has no skill, agent or workflow ${name}`);
-        if (!skill.includes(name)) problems.push(`${at}: ${name} isn't mentioned in ${conductor}/SKILL.md`);
       }
     }
   }
@@ -122,12 +102,12 @@ export function checkUses(root, marketplace) {
 // Bold marks and line wraps in the pack don't matter; the vendored packs/ and agents/ are not scanned.
 const MARKER = /<!--\s*overrides\s+(\S+?):\s*"(.*)"\s*-->/;
 const flat = (t) => t.replace(/[*_]/g, '').replace(/\s+/g, ' ');
-// flows' own .md files, the vendored packs/ and agents/ left out.
+// flows' own .md files and steps/*.toml, the vendored packs/ and agents/ left out.
 const conductorDocs = (root, dir = FLOWS) =>
   readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) => {
     const rel = `${dir}/${e.name}`;
     if (e.isDirectory()) return rel === PACKS || rel === `${FLOWS}/agents` ? [] : conductorDocs(root, rel);
-    return e.name.endsWith('.md') ? [rel] : [];
+    return e.name.endsWith('.md') || (dir === `${FLOWS}/steps` && e.name.endsWith('.toml')) ? [rel] : [];
   });
 export function checkOverrides(root) {
   const problems = [];
@@ -151,12 +131,14 @@ export function checkOverrides(root) {
 // The parts of flow.md, plans and audit reports the flow cockpit reads: each must stay in the templates and the
 // conductor text that make a run write them.
 const TEMPLATE_FILES = [
-  `${FLOWS}/skills/feature-flow/references/flow-template.md`,
-  `${FLOWS}/skills/research-flow/references/research-template.md`,
+  `${FLOWS}/skills/build-feature/references/flow-template.md`,
+  `${FLOWS}/skills/research-feature/references/research-template.md`,
   `${FLOWS}/references/build-template.md`,
 ];
-const RULES_FILE = `${FLOWS}/references/flow-rules.md`;
-const PLAN_FILES = ['feature-flow', 'implement', 'upgrade'].map((n) => `${FLOWS}/skills/${n}/SKILL.md`);
+const AUDIT_FILE = `${FLOWS}/skills/review-code/references/audit-template.md`;
+const GATE_STEP = `${FLOWS}/steps/gate.toml`;
+const DEVIATIONS_STEP = `${FLOWS}/steps/deviations.toml`;
+const PLAN_STEP = `${FLOWS}/steps/plan-shape.toml`;
 const GATE_LINE = '- Gate <n>, <what>:';
 export function checkTemplates(root) {
   const problems = [];
@@ -170,20 +152,22 @@ export function checkTemplates(root) {
       ['`now:` after `phase:` in the frontmatter', /\nphase: [^\n]*\nnow: /],
       [`the gate line shape \`${GATE_LINE}\``, GATE_LINE],
       ['`Picked:`', 'Picked:'],
-      ['`Status:`', 'Status: open'],
+      // A research run builds nothing, so its template has no Deviations.
+      ...(file.includes('research') ? [] : [['`Status:`', 'Status: open']]),
     ]);
-  need(RULES_FILE, [
+  need(DEVIATIONS_STEP, [
     ['the `Waiting for you` rule', 'Waiting for you'],
-    [`the gate line shape \`${GATE_LINE}\``, GATE_LINE],
     ['`Status: decided`', 'Status: decided'],
+  ]);
+  need(GATE_STEP, [[`the gate line shape \`${GATE_LINE}\``, GATE_LINE]]);
+  need(PLAN_STEP, [
+    ['`**Does:**`', '**Does:**'],
+    ['`**Depends on:**`', '**Depends on:**'],
+  ]);
+  need(AUDIT_FILE, [
     ['`Picks:`', 'Picks:'],
     ['`Fixed <date>`', 'Fixed <date>'],
   ]);
-  for (const file of PLAN_FILES)
-    need(file, [
-      ['`**Does:**`', '**Does:**'],
-      ['`**Depends on:**`', '**Depends on:**'],
-    ]);
   return problems;
 }
 
@@ -234,18 +218,29 @@ export function writeDeps(root, expected) {
   writeFileSync(catalogPath, JSON.stringify(catalog, null, 2) + '\n');
 }
 
+// all: Claude Code's composeFlows(…).uses, the harness whose plugin.json and catalog carry the dependencies.
 // packNames: packs(root); flows carries those and its own skills, so they are never a dependency.
 export const expectedDeps = (all, packNames) =>
   [...new Set(Object.values(all).flatMap((uses) => Object.keys(uses ?? {})))]
     .filter((p) => p !== BUILTIN && p !== 'flows' && !packNames.includes(p))
     .sort();
 
-export function renderTree(all) {
-  const blocks = Object.entries(all).map(([conductor, uses]) => {
-    const rows = Object.entries(uses ?? {});
+// byHost: { harness: composeFlows(…).uses }. Draws every harness's uses at once; a name only some harnesses use is
+// followed by those harnesses, as `Monitor (claude-code)`.
+export function renderTree(byHost) {
+  const hosts = Object.entries(byHost);
+  const union = (pick) => [...new Set(hosts.flatMap(([, all]) => pick(all) ?? []))];
+  const blocks = union(Object.keys).map((conductor) => {
+    const rows = union((all) => Object.keys(all[conductor] ?? {}));
     return [
       conductor,
-      ...rows.map(([p, names], i) => `${i === rows.length - 1 ? '└' : '├'} ${p}: ${names.join(', ')}`),
+      ...rows.map((p, i) => {
+        const names = union((all) => all[conductor]?.[p]).map((n) => {
+          const by = hosts.filter(([, all]) => all[conductor]?.[p]?.includes(n)).map(([host]) => host);
+          return by.length < hosts.length ? `${n} (${by.join(', ')})` : n;
+        });
+        return `${i === rows.length - 1 ? '└' : '├'} ${p}: ${names.join(', ')}`;
+      }),
     ];
   });
   return [
@@ -268,10 +263,13 @@ export function withTree(readme, tree) {
 
 if (import.meta.main ?? process.argv[1] === import.meta.filename) {
   const root = join(import.meta.dirname, '..');
-  const all = readUses(root);
-  writeDeps(root, expectedDeps(all, packs(root)));
+  const byHost = {
+    'claude-code': composeFlows(join(root, FLOWS), CLAUDE_CODE).uses,
+    codex: composeFlows(join(root, FLOWS), CODEX).uses,
+  };
+  writeDeps(root, expectedDeps(byHost['claude-code'], packs(root)));
   const readmePath = join(root, FLOWS, 'README.md');
-  const readme = withTree(readFileSync(readmePath, 'utf8'), renderTree(all));
+  const readme = withTree(readFileSync(readmePath, 'utf8'), renderTree(byHost));
   if (!readme) throw new Error(`${readmePath}: no ${START} … ${END} block`);
   writeFileSync(readmePath, readme);
   execFileSync(process.execPath, [join(root, 'tools/harness-compiler/src/cli.ts'), 'build'], { stdio: 'inherit' });

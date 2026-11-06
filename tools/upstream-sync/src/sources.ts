@@ -276,34 +276,24 @@ export function sources(ROOT: string): Source[] {
     {
       name: 'self-review',
       adapter: self_review,
-      paths: ['plugins/flows/skills/self-review', 'plugins/flows/agents'],
+      paths: ['plugins/flows/skills/review-code', 'plugins/flows/agents'],
       check: () => {
-        const s = 'plugins/flows/skills/self-review';
+        const s = 'plugins/flows/skills/review-code';
         json('plugins/flows/plugin.json');
         const ours = readdirSync(join(ROOT, 'plugins/flows/agents')).filter(
           (f) => f.endsWith('.md') && read(`plugins/flows/agents/${f}`).includes('by scripts/sync-self-review.mjs.'),
         );
-        count('self-review agents', ours.length, 5);
-        exists(`${s}/references/upstream/code-review.md`);
-        exists(`${s}/references/upstream/spec-standards-review.md`);
-        const shas = Object.fromEntries(
-          upstream(`${s}/UPSTREAM`)
-            .split('\n')
-            .map((l) => l.split(/\s+/)),
-        );
-        const official = shas['anthropics/claude-plugins-official'];
-        const matt = shas['mattpocock/skills'];
-        assert(official && matt, `${s}/UPSTREAM lacks a commit`);
-        return { official, matt };
+        count('review-code agents', ours.length, 1);
+        exists(`${s}/LICENSE`);
+        const official = upstream(`${s}/UPSTREAM`);
+        assert(official, `${s}/UPSTREAM lacks a commit`);
+        return { official };
       },
-      commitMessage: ({ official, matt }) =>
-        `Sync self-review to claude-plugins-official ${official} and mattpocock/skills ${matt}`,
-      title: () => 'Sync self-review upstreams',
-      body: ({ official, matt }) =>
-        'Automated sync of the review passes /self-review runs, vendored in plugins/flows:\n' +
-        `- https://github.com/anthropics/claude-plugins-official/commit/${official}\n` +
-        '  (code-review command, pr-review-toolkit agents)\n' +
-        `- https://github.com/mattpocock/skills/commit/${matt} (engineering/code-review)\n` +
+      commitMessage: ({ official }) => `Sync review-code's agent to claude-plugins-official ${official}`,
+      title: () => "Sync review-code's agent",
+      body: ({ official }) =>
+        'Automated sync of the pr-review-toolkit agent /review-code runs, vendored in plugins/flows/agents:\n' +
+        `- https://github.com/anthropics/claude-plugins-official/commit/${official} (pr-test-analyzer)\n` +
         CC,
     },
     {
@@ -323,7 +313,7 @@ export function sources(ROOT: string): Source[] {
         source: (skill) => `https://github.com/trailofbits/skills/tree/main/plugins/${skill}`,
         script: 'tools/upstream-sync/src/adapters/tob.ts',
         include: (skill) => `add \`${skill}\` to \`SKILLS\` (its agents and workflows to \`AGENTS\`/\`WORKFLOWS\`)`,
-        overlap: 'self-review, superpowers and the other picks',
+        overlap: 'review-code, superpowers and the other picks',
       },
     },
     {

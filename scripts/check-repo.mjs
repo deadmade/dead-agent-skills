@@ -5,18 +5,20 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { check } from '../tools/harness-compiler/src/emit/commands.ts';
+import { composeFlows } from '../tools/harness-compiler/src/flows/compose.ts';
 import { loadPlugins, selectTarget } from '../tools/harness-compiler/src/load.ts';
 import { TARGETS } from '../tools/harness-compiler/src/targets/index.ts';
+import { TOKENS as CLAUDE_CODE } from '../tools/harness-compiler/src/templates/hosts/claude-code.ts';
+import { TOKENS as CODEX } from '../tools/harness-compiler/src/templates/hosts/codex.ts';
 import {
   checkOverrides,
   checkPackPaths,
   checkTemplates,
-  checkUses,
+  checkUseNames,
   currentDeps,
   expectedDeps,
   FLOWS,
   packs,
-  readUses,
   renderTree,
   withTree,
 } from './flows-uses.mjs';
@@ -38,7 +40,7 @@ try {
 }
 // --- generated distributions and marketplaces are current ---
 try {
-  problems.push(...check('.').map((p) => `${p} (run npm run build:harnesses)`));
+  problems.push(...check('.').map((p) => (p.startsWith('flows: ') ? p : `${p} (run npm run build:harnesses)`)));
 } catch (error) {
   problems.push(`harness-compiler check: ${error.message}`);
 }
@@ -82,22 +84,27 @@ for (const plugin of plugins.filter((p) => p.targets.includes('claude-code')))
 for (const dir of pluginDirs)
   if (!plugins.some((p) => p.source === dir)) problems.push(`${dir} is not listed in plugins/catalog.json`);
 
-// --- flows: each conductor's uses.json, and what is generated from them (scripts/flows-uses.mjs) ---
+// --- flows: each conductor's composed uses per harness, and what is generated from them (scripts/flows-uses.mjs) ---
+let uses;
+try {
+  uses = { 'claude-code': composeFlows(FLOWS, CLAUDE_CODE).uses, codex: composeFlows(FLOWS, CODEX).uses };
+} catch (error) {
+  problems.push(`flows compose: ${error.message}`);
+}
 problems.push(
-  ...checkUses('.', { plugins: market }),
+  ...new Set(Object.values(uses ?? {}).flatMap((all) => checkUseNames('.', all))),
   ...checkOverrides('.'),
   ...checkPackPaths('.'),
   ...checkTemplates('.'),
 );
-const uses = readUses('.');
 const regen = 'run node scripts/flows-uses.mjs';
-if (JSON.stringify(currentDeps('.')) !== JSON.stringify(expectedDeps(uses, packs('.'))))
+if (uses && JSON.stringify(currentDeps('.')) !== JSON.stringify(expectedDeps(uses['claude-code'], packs('.'))))
   problems.push(
-    `${FLOWS}/plugin.json and plugins/catalog.json: flows dependencies differ from the conductors' uses.json: ${regen}`,
+    `${FLOWS}/plugin.json and plugins/catalog.json: flows dependencies differ from the conductors' uses: ${regen}`,
   );
 // A Windows checkout has CRLF; the generated tree is LF.
 const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8').replace(/\r\n/g, '\n');
-if (withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
+if (uses && withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
   problems.push(`${FLOWS}/README.md: uses tree is stale: ${regen}`);
 
 // --- one version: package.json and its lock, the marketplace metadata.version and each Rust crate

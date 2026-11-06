@@ -33,6 +33,7 @@ const ENTRIES = {
     run('rename-all', 'implement', 'build'),
     run('flaky-test', 'fix', 'diagnose'),
     run('bump-deps', 'upgrade', 'build'),
+    run('refactor-session-store', 'refactor', 'shape'),
     run('mystery', 'invented', 'build'),
     { kind: 'Loose', id: 's1', first_prompt: 'hello' },
   ],
@@ -129,15 +130,16 @@ test('continue_prefills_the_flow_command_with_the_skill_name', async () => {
   await open(host);
   const slugs = [...field(host, 'run').options].map((o) => o.textContent);
   // Only unfinished runs of a known conductor: not the done run, the loose session or the unknown conductor.
-  assert.equal(slugs.length, 1 + 5);
+  assert.equal(slugs.length, 1 + 6);
   assert.ok(!slugs.some((s) => s.includes('old-thing') || s.includes('hello') || s.includes('mystery')));
 
   const picks = {
-    'web-mcp-search': '/flows:feature-flow web-mcp-search',
-    'cockpit-study': '/flows:research-flow cockpit-study',
+    'web-mcp-search': '/flows:build-feature web-mcp-search',
+    'cockpit-study': '/flows:research-feature cockpit-study',
     'rename-all': '/flows:implement rename-all',
-    'flaky-test': '/flows:fix-flow flaky-test',
+    'flaky-test': '/flows:fix flaky-test',
     'bump-deps': '/flows:upgrade bump-deps',
+    'refactor-session-store': '/flows:refactor refactor-session-store',
   };
   for (const [slug, prompt] of Object.entries(picks)) {
     const option = [...field(host, 'run').options].find((o) => o.textContent.includes(slug));

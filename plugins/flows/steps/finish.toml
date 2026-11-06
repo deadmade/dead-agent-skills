@@ -1,0 +1,21 @@
+uses = ["pstack-picks:interrogate"]
+requires = ["decide", "close"]
+writes = ["Walkthrough", "Review", "Learned"]
+
+text = '''
+In this order:
+
+1. **Walkthrough.** Fill the **Walkthrough** table in flow.md, one row per goal (a spec goal, a ticket criterion, or
+   the fixed cause) → plan task → `file:line` → test. A goal with no code, or code with no goal, is a deviation:
+   report it.
+2. **Review.** Run `/review-code branch` inline (read `<flow-root>/skills/review-code/SKILL.md`) and stop it after its
+   Phase 6: its Decide doesn't run, since this run's Decide comes after /learn. Its intent is what flow.md's
+   **Artifacts** link (the spec, the plan, the ticket or the input) plus each `Picked:` line under **Options**. Hand
+   it this run's latest full-suite run (commands, commit, `git status --short`), and tell it whether execution ran
+   natively (no per-task reviews): it then also offers pstack `interrogate`. Record its
+   report's Verdict line, its audit file and what it fixed under **Review**.
+3. **Learn.** Run `/learn` (`<flow-root>/skills/learn/SKILL.md`) on this flow. Record what it kept, and where, under
+   **Learned**. The Parking-lot lines it adds are decided at Decide.
+
+Decide, then Close, follow: nothing is committed, merged or pushed before /learn has written.
+'''

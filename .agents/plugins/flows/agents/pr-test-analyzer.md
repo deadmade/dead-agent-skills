@@ -1,6 +1,6 @@
 ---
 name: pr-test-analyzer
-description: "Used by /self-review: Use this agent when you need to review a pull request for test coverage quality and completeness."
+description: "Used by /review-code: Use this agent when you need to review a pull request for test coverage quality and completeness."
 model: inherit
 color: cyan
 ---

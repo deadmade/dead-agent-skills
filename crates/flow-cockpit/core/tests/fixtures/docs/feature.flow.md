@@ -45,6 +45,8 @@ The settings page is `settings.ts:12`; colours come from `palette()`.
 
 Most apps follow the system setting and allow an override.
 
+## Findings
+
 ## Options
 
 <!-- One `### <decision>` heading per decision, then `Picked: <the choice in plain words>`; below it, the options
@@ -79,6 +81,10 @@ Task 1: base abc1234, untracked at start: none, files clean
 
 - 2026-10-27, Task 1: used the existing palette helper.
 
+## Parking lot
+
+- `crates/x/src/lib.rs`: the old parser could share the new tokenizer.
+
 ## Deviations
 
 <!-- Decisions that go to the user, one per `### <deviation>` heading, then `Status: open` or
@@ -98,9 +104,17 @@ The old path no longer exists.
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test      |
+| goal      | plan task | file:line | test      |
 | --------- | --------- | --------- | --------- |
 | dark mode | Task 1    | a.ts:1    | a.test.ts |
+
+## Review
+
+Verdict: ready.
+
+## Learned
+
+The palette helper is the one place colours come from.
 
 ## Run verdict
 

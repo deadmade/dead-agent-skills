@@ -1,0 +1,84 @@
+requires = ["before-you-write", "deviations"]
+
+text = '''
+### Builder brief
+
+Paste the text below into every builder brief: each implementer and task-review prompt, and each fix brief (the fix
+loop, a fix wave, a fix made after review). The final review's single fix subagent gets it with the union of the
+plan's **Files** lists as its list. When the main session writes the code itself, it follows the same text.
+
+- **The brief clause**, verbatim: the deviation classes (the numbered list that opens **Deviations**), that a deviation
+  is reported as `NEEDS_CONTEXT` and not decided, the task's **Files** list, the plan's **Global Constraints** (the seam
+  lines included), and this line, ours, after pstack's `principle-laziness-protocol` (an earlier version; upstream has
+  since dropped it): "If a task asks you to pass a new signal through types, schemas, pipelines, or similar layers, stop
+  and look for a more direct path." A task that seems to need one value threaded through many modules is a deviation.
+  The task reviewer reports a deviation it finds as one, not as a quality note. The task reviewer's prompt also gets the
+  task's `**Adds:**` and `**Size:**` lines, when it has them: anything new in the diff that `Adds:` doesn't name is a
+  deviation.
+- **Before you write**, as its step gives it.
+- **The smallest complete change**, **Never cut** and **Tests**, verbatim as below. The copy is frozen: it leaves out
+  ponytail's line on one small test or an assert-based self-check, which **Tests** replaces.
+- The stack's skill from `<flow-root>/references/stack-packs.md`, by name, for the builder to load with the host's
+  skill tool; never a whole library.
+
+**The smallest complete change.** Take the first option that fully works:
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "The smallest complete change Take the first option that fully works:" -->
+
+1. Does it need to exist? Skip features, options and flexibility nobody asked for, and name them in one line. A vague
+   request ("build me X") gets the smallest version that does the core job.
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "Does it need to exist?" -->
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "Skip features, options and flexibility nobody asked for, and name them in one line." -->
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "A vague request ("build me X") gets the smallest version that does the core job." -->
+2. Already in this codebase (a helper, component, service, pattern)? Use it the way the surrounding code does.
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "Already in this codebase (a helper, component, service, pattern)?" -->
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "Use it the way the surrounding code does." -->
+3. Standard library or a platform feature? Use it, unless the project has its own. A house component beats a native
+   widget.
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "Standard library or a platform feature?" -->
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "Use it, unless the project has its own." -->
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "A house component beats a native widget." -->
+4. An installed dependency? Use it. Never add a dependency for a few lines.
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "An installed dependency? Use it." -->
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "Never add a dependency for a few lines." -->
+5. Can it be one line a reader gets at a glance? One line.
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "Can it be one line a reader gets at a glance? One line." -->
+6. Otherwise: the minimum code that works.
+   <!-- overrides ponytail/skills/ponytail/SKILL.md: "Otherwise: the minimum code that works." -->
+
+- Be lazy about the solution, never about the change itself: finish every part the task needs, including the
+  callers, tests and fixtures your change breaks.
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "Be lazy about the solution, never about the change itself: finish every part the task needs, including the callers, tests and fixtures your change breaks." -->
+- No abstraction, wrapper, type conversion, option, config, boilerplate or "for later" code nobody asked for. Keep
+  values in the form the platform already gives you. Deletion beats addition. Keep the structure the codebase already
+  has: its layers, interfaces and conventions.
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "No abstraction, wrapper, type conversion, option, config, boilerplate or "for later" code nobody asked for." -->
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "Keep values in the form the platform already gives you." -->
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "Deletion beats addition." -->
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "Keep the structure the codebase already has: its layers, interfaces and conventions." -->
+- The shortest working diff wins, once you know everything it must touch. A one-liner that needs decoding is not
+  short.
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "The shortest working diff wins, once you know everything it must touch." -->
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "A one-liner that needs decoding is not short." -->
+- Comment only the why the code cannot show, in one line.
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "Comment only the why the code cannot show, in one line." -->
+- Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared
+  code.
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared code." -->
+- Code you move or merge keeps its error handling and validation.
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "Code you move or merge keeps its error handling and validation." -->
+- Between options of equal size, take the one that is correct on edge cases.
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "Between options of equal size, take the one that is correct on edge cases." -->
+- A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`.
+  <!-- overrides ponytail/skills/ponytail/SKILL.md: "A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`." -->
+
+Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the
+calibration real hardware needs, anything the user asked for.
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for." -->
+
+**Tests.** A behaviour change gets its failing test first; a rename, a move, config, generated code and prose get
+none. Tests go only through the plan's **Test seams** (without a plan, the code path the change is on), one test per
+behaviour the spec states; no tests of private helpers, of the framework or of the language. The plan's Review Focus
+tests count towards that, not on top of it.
+<!-- overrides superpowers/skills/test-driven-development/SKILL.md: "NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST" -->
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none." -->
+'''

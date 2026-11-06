@@ -1,6 +1,7 @@
 // plugins/ is the neutral source: no file or phrase in it may belong to one agent, except vendored upstream text.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { CLAUDE_ONLY, OVERRIDE } from './flows/compose.ts';
 
 export interface Allowed {
   // Path prefix or exact path, relative to the repository root, `/`-separated.
@@ -25,6 +26,8 @@ const PHRASES: [RegExp, string][] = [
   [/\bCODEX_HOME\b/, 'CODEX_HOME'],
   [/CLAUDE_CONFIG_DIR/, 'CLAUDE_CONFIG_DIR'],
 ];
+// The files flows' compose reads, whose Claude-only phrases would reach Codex; README.md's uses tree names them.
+const FLOWS_TEXT = /^plugins\/flows\/(steps\/|(skills|references)\/.*\.md$)/;
 const NATIVE_FILE = /(^|\/)(\.mcp\.json|\.lsp\.json)$|(^|\/)(claude-[^/]*|codex)\.[^/]+$|\.claude\.[^/]+$/;
 const NATIVE_EVENTS =
   /"(SessionStart|SessionEnd|UserPromptSubmit|PreToolUse|PostToolUse|PostToolUseFailure|Stop|SubagentStart|SubagentStop|Notification|PermissionRequest)"/;
@@ -64,6 +67,11 @@ export function lintPlugins(root: string, allowlist: Allowed[], catalogSources: 
     text.split('\n').forEach((line, i) => {
       for (const [re, name] of PHRASES)
         if (re.test(line)) problems.push({ file, line: i + 1, message: `mentions ${name}` });
+      if (FLOWS_TEXT.test(file) && !OVERRIDE.test(line))
+        for (const re of CLAUDE_ONLY) {
+          const found = re.exec(line)?.[0];
+          if (found) problems.push({ file, line: i + 1, message: `mentions ${found}` });
+        }
     });
   }
   for (const source of catalogSources)

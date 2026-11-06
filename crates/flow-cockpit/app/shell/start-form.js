@@ -17,11 +17,12 @@
 
 /** A flow's `flow:` value (what `FlowRunSummary.conductor` holds) to the skill that conducts it. */
 const FLOW_SKILL = Object.freeze({
-  feature: 'feature-flow',
-  research: 'research-flow',
+  feature: 'build-feature',
+  research: 'research-feature',
   implement: 'implement',
-  fix: 'fix-flow',
+  fix: 'fix',
   upgrade: 'upgrade',
+  refactor: 'refactor',
 });
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 /** The terminal pane isn't there yet to measure: its fit sends the real size as soon as it mounts. */

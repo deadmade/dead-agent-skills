@@ -5,7 +5,6 @@ import { copy, json, text } from '../emit/fs.ts';
 import { internalDependencies } from '../load.ts';
 import { renderClaudeTheme } from '../transforms/themes.ts';
 import { claudeThemeSetup } from '../templates/skills.ts';
-import { hostReference } from '../templates/hosts.ts';
 import { nativeHooks } from './hooks.ts';
 import type { EmitContext, Target } from './target.ts';
 
@@ -97,7 +96,6 @@ export const claudeCode: Target = {
     const mods = m.extensions.filter((e) => this.supportsUiMod(e));
     for (const mod of mods)
       for (const sub of [...mod.copy, ...(mod.types ? [mod.types] : [])]) copy(join(plugin.dir!, sub), join(dest, sub));
-    if (plugin.name === 'flows') text(join(dest, 'references/host.md'), hostReference('claude-code'));
     const events = nativeHooks(hooks, claudeCode, ROOT);
     const hooksFile = m.hooks ?? 'hooks/hooks.json';
     const modules = mods.map((mod) => './' + posix.relative(dirname(hooksFile), mod.entry));

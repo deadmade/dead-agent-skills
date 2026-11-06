@@ -49,9 +49,9 @@ need agent-browser. The setup skill and package README describe these prerequisi
 allowlist. Atlassian uses native Codex OAuth login. Credentials are not embedded in the marketplace.
 
 Shared startup rules and desktop notifications have packaged adapters for both harnesses. Night City supplies
-both native themes. tui-review, md-pane, status lines, LSP plugins and Claude UI mods remain Claude-only extensions. Flows share phases, approval gates and saved state through host adapters. When a
-session has no subagents, those steps are skipped and reported as not checked. tui-review is optional and is no
-longer a flow dependency.
+both native themes. tui-review, md-pane, status lines, LSP plugins and Claude UI mods remain Claude-only extensions. Flows share phases, approval gates and saved state through host adapters. Without
+subagents the main session does delegated work (searching, exploring) itself; independent checks are skipped and
+recorded as not checked. tui-review is optional and is no longer a flow dependency.
 
 For automated machine setup, the optional installer manages either or both agents and handles binaries, native MCP
 registration and safe migration from existing managed global rules. It accepts `--agents=codex`, `--agents=claude-code`, or both separated by a
@@ -75,14 +75,14 @@ over your flow runs, audits and Claude sessions (on Linux the app comes from the
 `%USERPROFILE%\.claude\bin\flow-cockpit\`). It also installs hooks that record questions, permission
 prompts and agent starts and stops per session into a local capture folder, which only the window reads.
 
-The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
-`/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
-with approval gates and a state file to resume from. They keep the number of agents small, ultracode included, and run
-each on a model suited to its job rather than the one you picked. Picking flows installs every plugin its conductors use.
+The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/build-feature`,
+`/fix`, `/review-code`, `/learn` and more) that run the other plugins' skills in order,
+with approval gates. Build and research flows keep a flow.md to resume from; /review-code keeps an audit file.
+They keep the number of agents small, ultracode included, and run each on a model suited to its job rather than the one you picked. Picking flows installs every plugin its conductors use.
 flows also sets the house standard for prose. A `writing` skill states Williams and Bizup's _Style_ in our own words.
 A code-only check on each Write or Edit of a Markdown file flags conversation shorthand such as `Q11` or `round 2`
-(`FLOWS_PROSE_CHECK=off` turns it off). Before a gate, an Opus editor copyedits the spec, plan or report by the skill;
-when code finds something lost, the gate shows the unedited document and what was lost.
+(`FLOWS_PROSE_CHECK=off` turns it off). Before a gate, a fresh editor agent on the strongest model the host
+offers copyedits the spec, plan or report by the skill; when code finds something lost, the gate shows the unedited document and what was lost.
 flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup,
 Cloudflare's security-audit and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
 their skills, hooks and ponytail's band stay out of your sessions outside the conductors, and the installer removes
