@@ -41,12 +41,16 @@ Each web-mcp server (one per Claude Code session) opens one visible browser wind
 call or fetch fallback, and closes it when it exits. Everything runs as a tab of that window: one tab per engine, kept
 and reused by later searches, one per `browser` session, and one per fetch fallback, closed after it. When an engine's
 last search in this session got results for another query, its next search types the query into the result page
-already open in that tab, as a person would (Bing, DuckDuckGo, Brave and Scholar; not Semantic Scholar, and not Google
-yet: its result links don't parse, so it gets no results today). Every other search loads the result URL: a tab's
-first, one after a search that got no results or used `since`, any `since`, a repeated query, one with odd spacing,
-or a typing that doesn't land on this query's page; a typing that runs out of time skips the engine as timed out.
-Engines still run in parallel. If you close the window, the next call opens a new one; if the browser crashes, it is
-restarted. On Windows the browser also goes when web-mcp is killed.
+already open in that tab, as a person would (Google, Bing, DuckDuckGo, Brave and Scholar; not Semantic Scholar). Every
+other search loads the result URL: a tab's first, one after a search that got no results or used `since`, any `since`,
+a repeated query, one with odd spacing, or a typing that doesn't land on this query's page; a typing that runs out of
+time skips the engine as timed out. Engines still run in parallel. If you close the window, the next call opens a new
+one; if the browser crashes, it is restarted. On Windows the browser also goes when web-mcp is killed.
+
+Google's result links are redirects on its own site, with no address in the page. web-mcp reads each one's target with
+a plain request of its own, not through the browser: one request per result, in rank order, with the `web-mcp/<version>`
+user agent and no cookies. Google answers only the first 2 to 4 of them, so Google contributes its first few results,
+and a search that follows another closely may get none and skip Google.
 
 The window doesn't announce automation: it launches with `--disable-blink-features=AutomationControlled`, so
 `navigator.webdriver` reads `false`, and it sets no user agent of its own, so every tab sends the browser's real one.

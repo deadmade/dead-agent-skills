@@ -116,43 +116,8 @@ pub(crate) async fn send(
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Read, Write};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Mutex};
-
     use super::*;
-    use crate::fetch::tests::test_ctx;
-
-    type Seen = Arc<Mutex<Vec<String>>>;
-
-    /// Serves `replies` (raw HTTP) in order, the last repeating, each after `delay`; returns the URL and the requests seen.
-    fn stub(replies: Vec<String>, delay: Duration) -> (Url, Seen) {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let url = Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
-        let seen = Seen::default();
-        let log = Arc::clone(&seen);
-        let n = AtomicUsize::new(0);
-        std::thread::spawn(move || {
-            for mut c in listener.incoming().flatten() {
-                let mut buf = [0; 8192];
-                let len = c.read(&mut buf).unwrap_or(0);
-                log.lock()
-                    .unwrap()
-                    .push(String::from_utf8_lossy(&buf[..len]).into_owned());
-                std::thread::sleep(delay);
-                let i = n.fetch_add(1, Ordering::SeqCst).min(replies.len() - 1);
-                let _ = c.write_all(replies[i].as_bytes());
-            }
-        });
-        (url, seen)
-    }
-
-    fn reply(status: &str, headers: &str, body: &str) -> String {
-        format!(
-            "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n{headers}\r\n{body}",
-            body.len()
-        )
-    }
+    use crate::fetch::tests::{reply, stub, test_ctx};
 
     const D: Duration = Duration::from_secs(5);
 

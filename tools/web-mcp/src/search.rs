@@ -17,6 +17,7 @@ use crate::browser::{BrowserError, READ_MARGIN, SearchRun};
 use crate::engines::{Block, Engine, Found, Parsed};
 use crate::fetch::{self, GetOpts, slash};
 use crate::fuse::{final_order, fuse, normalise};
+use crate::limits::HostLimits;
 use crate::profile::{ENGINE_DEADLINE, REST};
 use crate::rank::{Hit, MemIndex, PassageDoc};
 
@@ -130,7 +131,7 @@ impl Filter {
 ///
 /// # Errors
 /// Why the engine is skipped: resting, busy, a first consent page, blocked (it then rests), an unrecognised page,
-/// the browser's error or the deadline.
+/// the browser's error, the deadline or, for Google, result links that did not resolve.
 pub async fn run_engine(
     ctx: &Ctx,
     e: Engine,
@@ -192,11 +193,18 @@ pub async fn run_engine(
     };
     let what = match parsed {
         Parsed::Results(found) => {
+            // The engine's page was read: a consent page is over and the tab holds this query, whatever comes of
+            // its links.
             profiles.set_consent_seen(e, false);
             if since.is_none() {
                 *last = Some(query.to_owned());
             }
-            return Ok(found);
+            // Google's rows are opaque redirects: read each one's target before ranking.
+            return if e == Engine::Google {
+                resolve_goto(&ctx.http_public, &ctx.limits, &landed, found, deadline).await
+            } else {
+                Ok(found)
+            };
         }
         Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e) => {
             profiles.set_consent_seen(e, true);
@@ -218,6 +226,90 @@ pub async fn run_engine(
         "{what} ({})",
         keep_page(ctx, url, landed, html).await
     ))
+}
+
+/// Replaces each Google `/goto` row's URL with the address its redirect points to: one GET per row in rank order,
+/// redirects not followed, so the `302`'s `Location` is the target. A row whose redirect isn't http(s), has no
+/// `Location`, answers `404` or leads to a page of the search host itself is dropped and the walk goes on.
+///
+/// Google redirects only the first few links of a fresh page (2 to 4 measured on 2026-11-06, fewest right after a
+/// burst) and then answers `200` with a delay page that grows with every further request; for about 30 s after a
+/// burst every request gets it. So a search that follows another closely may resolve no link and skip Google. The
+/// first answer that is neither a redirect nor a `404` (that `200`, a `429`, a `5xx`), a redirect to Google's
+/// `/sorry` page (`flagged`), a failed request or the deadline (the wait for the host's slot included) ends the
+/// walk: the rows after it stay unresolved and are dropped, and Google is asked for nothing more. When rows were
+/// there and none resolved, that is an error, not an empty answer.
+///
+/// The Google parser keeps only rows on another host and `/goto` rows, so a row on the search host is a `/goto` link.
+async fn resolve_goto(
+    client: &reqwest::Client,
+    limits: &HostLimits,
+    page: &Url,
+    found: Vec<Found>,
+    deadline: Instant,
+) -> Result<Vec<Found>, String> {
+    let had = found.len();
+    let mut resolved = Vec::with_capacity(had);
+    let mut walking = true;
+    for f in found {
+        if f.url.host() != page.host() {
+            resolved.push(f);
+            continue;
+        }
+        if !walking {
+            continue;
+        }
+        // The wait for the host's slot is part of the step the deadline bounds.
+        let step = async {
+            let _slot = limits.acquire(&f.url).await;
+            client.get(f.url.clone()).send().await
+        };
+        let Ok(Ok(resp)) = tokio::time::timeout_at(deadline.into(), step).await else {
+            walking = false;
+            continue;
+        };
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            continue;
+        }
+        if !resp.status().is_redirection() {
+            walking = false;
+            continue;
+        }
+        let Some(target) = fetch::location(&resp, &f.url) else {
+            continue;
+        };
+        if flagged(&target, page) {
+            walking = false;
+        } else if target.host() != page.host() && matches!(target.scheme(), "http" | "https") {
+            resolved.push(Found { url: target, ..f });
+        }
+    }
+    if resolved.is_empty() && had > 0 {
+        return Err("its result links did not resolve".into());
+    }
+    Ok(resolved)
+}
+
+/// Whether a redirect's `target` is the search site's `/sorry` page (`/sorry` or `/sorry/…`), on the search host or
+/// another host of its site (`ipv4.google.com/sorry/…` for `www.google.com`; not seen in this run): Google flagging
+/// the client, so no result and no reason to ask again. Any other page of the site is no flag: another host of it
+/// (`support.google.com`) is a result and the search host's own pages are dropped.
+fn flagged(target: &Url, page: &Url) -> bool {
+    let sorry = target.path() == "/sorry" || target.path().starts_with("/sorry/");
+    sorry && same_site(target, page)
+}
+
+/// Whether `url` is on the search page's own site: its host, or a subdomain of the host without its `www.`
+/// (`ipv4.google.com` for `www.google.com`).
+fn same_site(url: &Url, page: &Url) -> bool {
+    let (Some(host), Some(page)) = (url.host_str(), page.host_str()) else {
+        return false;
+    };
+    let site = page.strip_prefix("www.").unwrap_or(page);
+    host == site
+        || host
+            .strip_suffix(site)
+            .is_some_and(|rest| rest.ends_with('.'))
 }
 
 /// The page that typing `query` into the engine's result page already open in `session` lands on, parsed; `None`
@@ -554,6 +646,275 @@ fn passages_of(page: &fetch::Fetched, url: &Url, path: &str) -> Vec<PassageDoc> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fetch::tests::{Seen, paths, reply, stub};
+
+    /// A `302` to `to`, as Google answers a `/goto` link it resolves.
+    fn redirect(to: &str) -> String {
+        reply("302 Found", &format!("Location: {to}\r\n"), "")
+    }
+
+    /// A stub for `/goto` links that answers `replies` in order, the last repeating.
+    fn goto_stub(replies: Vec<String>) -> (Url, Seen) {
+        stub(replies, Duration::ZERO)
+    }
+
+    /// The `/goto?url=<name>` link on `stub`'s host.
+    fn goto(stub: &Url, name: &str) -> String {
+        stub.join(&format!("goto?url={name}")).unwrap().into()
+    }
+
+    /// The names a stub was asked for, in order.
+    fn asked(seen: &Seen) -> Vec<String> {
+        paths(seen)
+            .iter()
+            .filter_map(|p| p.strip_prefix("/goto?url="))
+            .map(str::to_owned)
+            .collect()
+    }
+
+    fn row(url: &str, title: &str) -> Found {
+        Found {
+            url: Url::parse(url).unwrap(),
+            title: title.to_owned(),
+            snippet: String::new(),
+        }
+    }
+
+    /// `resolve_goto` for rows on `stub`'s host, which is also the search page's host.
+    async fn resolve_by(
+        stub: &Url,
+        rows: Vec<Found>,
+        deadline: Instant,
+    ) -> Result<Vec<Found>, String> {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let client = fetch::client(false).unwrap();
+        let page = stub.join("search?q=x").unwrap();
+        resolve_goto(&client, &HostLimits::default(), &page, rows, deadline).await
+    }
+
+    async fn resolve(stub: &Url, rows: Vec<Found>) -> Result<Vec<Found>, String> {
+        resolve_by(stub, rows, Instant::now() + Duration::from_secs(10)).await
+    }
+
+    fn titles(found: &[Found]) -> Vec<&str> {
+        found.iter().map(|f| f.title.as_str()).collect()
+    }
+
+    #[tokio::test]
+    async fn resolve_goto_replaces_each_redirect_with_its_target() {
+        // Rows: a redirect, a dead link (404), an FTP target, a plain row, a second redirect.
+        let (stub, seen) = goto_stub(vec![
+            redirect("https://example.org/one"),
+            reply("404 Not Found", "", ""),
+            redirect("ftp://example.org/file"),
+            redirect("https://example.org/two"),
+        ]);
+        let rows = vec![
+            row(&goto(&stub, "ok1"), "One"),
+            row(&goto(&stub, "gone"), "Gone"),
+            row(&goto(&stub, "ftp"), "Ftp"),
+            row("https://other.example/x", "Plain"),
+            row(&goto(&stub, "ok2"), "Two"),
+        ];
+        let found = resolve(&stub, rows).await.unwrap();
+        let got: Vec<_> = found
+            .iter()
+            .map(|f| (f.title.as_str(), f.url.as_str()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                ("One", "https://example.org/one"),
+                ("Plain", "https://other.example/x"),
+                ("Two", "https://example.org/two"),
+            ]
+        );
+        assert_eq!(asked(&seen), ["ok1", "gone", "ftp", "ok2"]);
+    }
+
+    /// Google redirects a fresh page's first few links and then answers `200` with an interstitial, whose delay grows
+    /// with every further request (measured 2026-11-06: 2 to 4 links, fewest after a burst).
+    /// The rows before it resolve; none after is asked for, and a plain row after it stays.
+    #[tokio::test]
+    async fn resolve_goto_stops_when_google_throttles() {
+        let (stub, seen) = goto_stub(vec![
+            redirect("https://example.org/one"),
+            reply("200 OK", "", ""),
+        ]);
+        let rows = vec![
+            row(&goto(&stub, "ok1"), "One"),
+            row(&goto(&stub, "throttled"), "Throttled"),
+            row(&goto(&stub, "ok2"), "Two"),
+            row("https://other.example/x", "Plain"),
+        ];
+        let found = resolve(&stub, rows).await.unwrap();
+        assert_eq!(titles(&found), ["One", "Plain"]);
+        assert_eq!(asked(&seen), ["ok1", "throttled"]);
+    }
+
+    /// Any answer that is not a redirect or a dead link (`404`) is Google refusing, not a bad row: the walk stops
+    /// there, so a client Google has flagged is not asked about every remaining row.
+    #[tokio::test]
+    async fn resolve_goto_stops_when_google_refuses() {
+        for status in [
+            "429 Too Many Requests",
+            "503 Service Unavailable",
+            "403 Forbidden",
+        ] {
+            let (stub, seen) = goto_stub(vec![
+                redirect("https://example.org/one"),
+                reply(status, "", ""),
+                redirect("https://example.org/two"),
+            ]);
+            let rows = vec![
+                row(&goto(&stub, "ok1"), "One"),
+                row(&goto(&stub, "refused"), "Refused"),
+                row(&goto(&stub, "ok2"), "Two"),
+            ];
+            let found = resolve(&stub, rows).await.unwrap();
+            assert_eq!(titles(&found), ["One"], "{status}");
+            assert_eq!(asked(&seen), ["ok1", "refused"], "{status}");
+        }
+    }
+
+    /// A redirect back to Google (its `/sorry` page, on the search host or a sibling such as `ipv4.google.com`) is
+    /// Google flagging the client: it is no result, and the walk stops.
+    #[tokio::test]
+    async fn resolve_goto_stops_at_a_redirect_back_to_the_search_site() {
+        let (stub, seen) = goto_stub(vec![
+            redirect("https://example.org/one"),
+            redirect("/sorry/index"),
+            redirect("https://example.org/two"),
+        ]);
+        let rows = vec![
+            row(&goto(&stub, "ok1"), "One"),
+            row(&goto(&stub, "back"), "Back"),
+            row(&goto(&stub, "ok2"), "Two"),
+        ];
+        let found = resolve(&stub, rows).await.unwrap();
+        assert_eq!(titles(&found), ["One"]);
+        assert_eq!(asked(&seen), ["ok1", "back"]);
+    }
+
+    /// Google sends a flagged client to a sibling host too (`ipv4.google.com/sorry/…` for `www.google.com`); it must
+    /// not be ranked as a result, and the walk stops. The page is `localhost`, whose sibling is `ipv4.localhost`.
+    #[tokio::test]
+    async fn resolve_goto_stops_at_a_redirect_to_a_sibling_host() {
+        let (stub, seen) = goto_stub(vec![
+            redirect("https://example.org/one"),
+            redirect("https://ipv4.localhost/sorry/index"),
+            redirect("https://example.org/two"),
+        ]);
+        let site = Url::parse(&format!("http://localhost:{}/", stub.port().unwrap())).unwrap();
+        let rows = vec![
+            row(&goto(&site, "ok1"), "One"),
+            row(&goto(&site, "sorry"), "Sorry"),
+            row(&goto(&site, "ok2"), "Two"),
+        ];
+        let found = resolve(&site, rows).await.unwrap();
+        assert_eq!(titles(&found), ["One"]);
+        assert_eq!(asked(&seen), ["ok1", "sorry"]);
+    }
+
+    /// A result on another host of the search site (`support.google.com` for `www.google.com`) is a result, not Google
+    /// flagging the client: it is kept and the walk goes on.
+    #[tokio::test]
+    async fn resolve_goto_keeps_a_result_on_a_sibling_host() {
+        let (stub, seen) = goto_stub(vec![
+            redirect("https://support.localhost/answer"),
+            redirect("https://example.org/two"),
+        ]);
+        let site = Url::parse(&format!("http://localhost:{}/", stub.port().unwrap())).unwrap();
+        let rows = vec![
+            row(&goto(&site, "help"), "Help"),
+            row(&goto(&site, "ok2"), "Two"),
+        ];
+        let found = resolve(&site, rows).await.unwrap();
+        assert_eq!(titles(&found), ["Help", "Two"]);
+        assert_eq!(found[0].url.as_str(), "https://support.localhost/answer");
+        assert_eq!(asked(&seen), ["help", "ok2"]);
+    }
+
+    /// Only Google's `/sorry` page (`/sorry` or `/sorry/…`) on a host of the search site flags the client. A page
+    /// of the search host itself is no result and its row is dropped, but the walk goes on; another site that merely
+    /// ends in the search host's name (`notlocalhost`) and a path that merely starts with `/sorry` are results.
+    #[tokio::test]
+    async fn resolve_goto_flags_only_the_sites_sorry_page() {
+        let (stub, seen) = goto_stub(vec![
+            redirect("https://notlocalhost/sorry/index"),
+            redirect("/chrome/"),
+            redirect("https://support.localhost/sorry-moved"),
+            redirect("https://example.org/last"),
+        ]);
+        let site = Url::parse(&format!("http://localhost:{}/", stub.port().unwrap())).unwrap();
+        let rows = vec![
+            row(&goto(&site, "other"), "Other"),
+            row(&goto(&site, "own"), "Own"),
+            row(&goto(&site, "moved"), "Moved"),
+            row(&goto(&site, "last"), "Last"),
+        ];
+        let found = resolve(&site, rows).await.unwrap();
+        assert_eq!(titles(&found), ["Other", "Moved", "Last"]);
+        assert_eq!(asked(&seen), ["other", "own", "moved", "last"]);
+    }
+
+    /// With every slot of the host taken, waiting for one counts against the deadline too.
+    #[tokio::test]
+    async fn resolve_goto_gives_up_waiting_for_a_slot() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let (server, seen) = goto_stub(vec![redirect("https://example.org/one")]);
+        let link = goto(&server, "waiting");
+        let limits = HostLimits::default();
+        let mut held = Vec::new();
+        for _ in 0..4 {
+            held.push(limits.acquire(&Url::parse(&link).unwrap()).await);
+        }
+        let client = fetch::client(false).unwrap();
+        let page = server.join("search?q=x").unwrap();
+        let deadline = Instant::now() + Duration::from_millis(300);
+        let rows = vec![row(&link, "Waiting")];
+        let run = resolve_goto(&client, &limits, &page, rows, deadline);
+        let done = tokio::time::timeout(Duration::from_secs(2), run).await;
+        assert!(matches!(done, Ok(Err(_))), "{done:?}");
+        assert_eq!(paths(&seen), Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn resolve_goto_fails_when_no_link_resolves_but_not_on_an_empty_page() {
+        let (stub, _) = goto_stub(vec![reply("404 Not Found", "", "")]);
+        let rows = vec![
+            row(&goto(&stub, "gone1"), "Gone"),
+            row(&goto(&stub, "gone2"), "Gone"),
+        ];
+        assert!(resolve(&stub, rows).await.is_err());
+        assert_eq!(resolve(&stub, Vec::new()).await, Ok(Vec::new()));
+    }
+
+    /// A request that fails (here: the connection closes without an answer) ends the walk like a throttle does.
+    #[tokio::test]
+    async fn resolve_goto_stops_when_a_request_fails() {
+        let (stub, seen) = goto_stub(vec![String::new(), redirect("https://example.org/two")]);
+        let rows = vec![
+            row(&goto(&stub, "broken"), "Broken"),
+            row(&goto(&stub, "ok2"), "Two"),
+        ];
+        assert!(resolve(&stub, rows).await.is_err());
+        assert_eq!(asked(&seen), ["broken"]);
+    }
+
+    /// A Google that accepts the request and never answers costs the search its deadline, not more.
+    #[tokio::test]
+    async fn resolve_goto_gives_up_at_the_deadline() {
+        let (server, _) = stub(
+            vec![redirect("https://example.org/one")],
+            Duration::from_secs(3),
+        );
+        let rows = vec![row(&goto(&server, "slow"), "Slow")];
+        let t = Instant::now();
+        let deadline = t + Duration::from_millis(300);
+        assert!(resolve_by(&server, rows, deadline).await.is_err());
+        assert!(t.elapsed() < Duration::from_secs(2), "{:?}", t.elapsed());
+    }
 
     #[test]
     fn filter_names_the_modes_engines() {

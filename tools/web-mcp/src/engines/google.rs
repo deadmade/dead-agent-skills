@@ -1,7 +1,8 @@
 //! Google: a result is an `a` holding an `h3`, inside `#rso`/`#search`. The captured result page
 //! (`google.html`, web-mcp-google-block/findings.md) confirms the rows, but each row's link is an opaque
-//! `/goto?url=…` redirect with no target in the page, so the parser drops them all; the block and consent markers
-//! are checked against fixtures.
+//! `/goto?url=…` redirect on Google's own host with no target in the page. The parser keeps those rows as they are
+//! and `search::resolve_goto` reads each one's target (a plain GET answers `302`); Google's other own links (ads,
+//! AI Mode) are dropped. The block and consent markers are checked against fixtures.
 
 use dom_query::Document;
 use url::Url;
@@ -50,6 +51,11 @@ fn unwrap_redirect(page: &Url, href: &str) -> String {
     target.unwrap_or_else(|| href.to_owned())
 }
 
+/// A result's opaque redirect: `/goto?url=…` on the page's own host, whose `Location` holds the real address.
+pub(super) fn is_goto(url: &Url, page: &Url) -> bool {
+    url.host() == page.host() && url.path() == "/goto" && url.query_pairs().any(|(k, _)| k == "url")
+}
+
 pub(super) fn parse(doc: &Document, page: &Url) -> Parsed {
     let found = doc
         .select("#rso .MjjYud, #rso .g, #search .MjjYud, #search .g")
@@ -64,7 +70,7 @@ pub(super) fn parse(doc: &Document, page: &Url) -> Parsed {
                 snippet,
             )
         })
-        .filter(|f: &Found| f.url.host() != page.host())
+        .filter(|f: &Found| f.url.host() != page.host() || is_goto(&f.url, page))
         .collect();
     let block = if page.host_str() == Some("consent.google.com")
         || doc.select("form[action*=\"consent.google.com\"]").exists()
@@ -100,12 +106,16 @@ mod tests {
         std::fs::read_to_string(path).unwrap()
     }
 
+    /// Every organic row links to an opaque `/goto?url=…` redirect on Google's own host; the parser keeps those for
+    /// `search::resolve_goto` to read.
     #[test]
-    #[ignore = "Google's rows link to opaque /goto redirects; resolving them is a follow-up (web-mcp-google-block/flow.md)"]
     fn google_parses_fixture() {
-        assert_results(
-            Engine::Google.parse(&fixture("google.html"), &page()),
-            Some("www.google.com"),
+        let found = assert_results(Engine::Google.parse(&fixture("google.html"), &page()), None);
+        assert!(
+            found
+                .iter()
+                .all(|f| f.url.host_str() == Some("www.google.com") && f.url.path() == "/goto"),
+            "{found:?}"
         );
     }
 

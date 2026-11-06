@@ -3,7 +3,7 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use common::{
-    Fixture, Mcp, PUBLIC, argv, attached, command_of, images, is_error, logged, session_of,
+    Fixture, Mcp, PUBLIC, Resp, argv, attached, command_of, images, is_error, logged, session_of,
     tempdir, text,
 };
 use serde_json::{Value, json};
@@ -181,6 +181,75 @@ fn gone_tab_is_rebound_once() {
             (session, open, true)
         ]
     );
+}
+
+/// Chrome's debug-port HTTP endpoint as a fixture that activates the tab at `activate`, counting its hits. The fake
+/// agent-browser reports its port as the window's and binds 127.0.0.1, so it must run before the window starts.
+fn chrome_stub(mcp: &Mcp, activate: &str) -> Fixture {
+    let fx = Fixture::start("127.0.0.1");
+    fx.route(
+        activate,
+        vec![Resp::new(200, "text/plain", "Target activated")],
+    );
+    std::fs::write(mcp.state.join("cdp-port"), fx.addr.port().to_string()).unwrap();
+    fx
+}
+
+/// Input reaches only the window's front tab (agent-browser#2146): a `click` and a `press` bring the session's own tab
+/// forward first, found with `tab list` and activated through Chrome's endpoint; the actions that work in a hidden
+/// tab don't. agent-browser's own `tab <id>` is never sent: it makes the daemon forget its refs, and the next click
+/// by ref answers `Unknown ref`.
+#[test]
+fn click_and_press_raise_the_tab_first() {
+    let (mut mcp, log) = start(FAKE);
+    let target = format!("/json/activate/T-t-web-mcp-{}-g1-s", mcp.pid());
+    let chrome = chrome_stub(&mcp, &target);
+    for call in [
+        json!({"action": "snapshot", "session": "s"}),
+        json!({"action": "click", "session": "s", "ref": "@e1"}),
+        json!({"action": "press", "session": "s", "key": "Enter"}),
+        json!({"action": "fill", "session": "s", "ref": "@e2", "text": "x"}),
+        json!({"action": "scroll", "session": "s"}),
+        json!({"action": "eval", "session": "s", "js": "1"}),
+    ] {
+        let r = mcp.call("browser", call);
+        assert!(!is_error(&r), "{r}");
+    }
+    let cmds: Vec<String> = tab_calls(&mcp, &log).iter().map(command_of).collect();
+    for input in ["click @e1", "press Enter"] {
+        let at = cmds.iter().position(|c| c == input).unwrap();
+        assert_eq!(cmds[at - 1], "tab list", "{cmds:?}");
+    }
+    let tabs: Vec<_> = cmds.iter().filter(|c| c.starts_with("tab ")).collect();
+    assert_eq!(tabs, ["tab list", "tab list"], "{cmds:?}");
+    assert_eq!(chrome.hits(&target), 2);
+}
+
+/// A gone tab has nothing to raise: the click fails as `tab_gone`, the new tab is bound, and the retry raises it.
+#[test]
+fn a_rebound_tab_is_raised_before_the_retry() {
+    let (mut mcp, log) = start(FAKE);
+    let session = format!("web-mcp-{}-g1-s", mcp.pid());
+    let target = format!("/json/activate/T-t-{session}");
+    let chrome = chrome_stub(&mcp, &target);
+    std::fs::write(mcp.state.join(format!("{session}.gone")), "").unwrap();
+    let r = mcp.call(
+        "browser",
+        json!({"action": "click", "session": "s", "ref": "@e1"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let cmds: Vec<String> = tab_calls(&mcp, &log).iter().map(command_of).collect();
+    assert_eq!(
+        cmds,
+        [
+            "tab list".to_owned(),
+            "click @e1".to_owned(),
+            "tab new".to_owned(),
+            "tab list".to_owned(),
+            "click @e1".to_owned(),
+        ]
+    );
+    assert_eq!(chrome.hits(&target), 1);
 }
 
 #[test]
