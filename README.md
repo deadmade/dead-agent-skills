@@ -110,7 +110,8 @@ binary with `cargo build --release --locked -p web-mcp --bin web-mcp`. Before te
 `cargo build --locked -p web-mcp --bin fake-agent-browser`, then `cargo test --workspace --locked` and
 `cargo clippy --workspace --all-targets --locked -- -D warnings`. The full workspace needs cockpit's GTK/WebKit
 libraries on Linux; `nix develop` supplies them. CI also tests each package separately and checks the declared
-minimum Rust version. Add dependencies to `[workspace.dependencies]` and inherit them in member manifests.
+minimum Rust version. PR checks select the affected components; shared dependency changes run all checks, and
+releases still build every binary. Add dependencies to `[workspace.dependencies]` and inherit them in member manifests.
 
 Author plugins in `plugins/catalog.json` and their source resources under `plugins/`. The catalog declares shared
 resources, dependencies, targets and native overlays; hooks use neutral events in each plugin's `hooks/hooks.json`.

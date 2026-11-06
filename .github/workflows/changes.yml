@@ -1,0 +1,43 @@
+name: CI change detection
+
+on:
+  workflow_call:
+    inputs:
+      full:
+        type: boolean
+        default: false
+    outputs:
+      node:
+        value: ${{ jobs.changes.outputs.node }}
+      skills:
+        value: ${{ jobs.changes.outputs.skills }}
+      rust:
+        value: ${{ jobs.changes.outputs.rust }}
+      binaries:
+        value: ${{ jobs.changes.outputs.binaries }}
+      packages:
+        value: ${{ jobs.changes.outputs.packages }}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      node: ${{ steps.select.outputs.node }}
+      skills: ${{ steps.select.outputs.skills }}
+      rust: ${{ steps.select.outputs.rust }}
+      binaries: ${{ steps.select.outputs.binaries }}
+      packages: ${{ steps.select.outputs.packages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - id: select
+        env:
+          CI_FULL: ${{ inputs.full }}
+        run: node scripts/ci-changes.mjs

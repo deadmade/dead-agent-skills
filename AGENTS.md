@@ -309,11 +309,15 @@ plugins of ours that the manifest no longer lists.
   and the composed flows conductors in `.claude-plugin/flows/skills/`; it fails on a high or critical finding. A
   finding judged benign gets a scoped suppression with its reason in `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.
 
-CI: `test.yml` runs repository, installer, mod and skill checks on every PR and push to main.
-`crates.yml` checks the whole workspace and each member independently on Linux and Windows for Rust/build changes,
-including root Cargo files. It also runs cockpit's app and frontend
-checks, all three Nix packages, and a minimum-Rust workspace check. `crates-build.yml` builds the release matrix
-with explicit package/binary selection and packages from the root `target/`.
+CI: `changes.yml` uses `scripts/ci-changes.mjs` to route checks from the complete Git diff (PR merge base or push
+range, including deleted and renamed paths). `test.yml` runs Node/plugin checks and skill scanning when their inputs
+change; its two OS matrix jobs retain their required check names even when their steps skip. A detection failure fails
+those jobs. `crates.yml` tests and lints selected Rust packages together and independently on Linux and Windows,
+checks their minimum Rust version and Nix packages, and runs cockpit's frontend checks only when selected. Flow
+templates and compiler changes also select cockpit, whose tests read their output.
+Root Cargo, Nix and npm dependencies, CI changes and unknown paths select all checks; docs/ changes select none.
+Manual runs select everything. `crates-build.yml` builds only selected binaries on PRs, but release calls always build
+the complete matrix because each version ships all binaries. Keep routing and its tests current when adding consumers.
 
 The repo's rulesets live in its GitHub settings (Settings → Rules), not in the repo: main takes squash or rebase PRs
 once `test.yml`'s three jobs pass (admins bypass it, which `npm run release` pushed to main needs), and only admins move
