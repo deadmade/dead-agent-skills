@@ -1,4 +1,4 @@
-// tui-review, web-mcp and the flow cockpit, the binaries of their plugins: one on PATH is used as is; otherwise the
+// web-mcp, ado-mcp and the flow cockpit, the binaries of their plugins: one on PATH is used as is; otherwise the
 // release for this version goes to ~/.claude/bin (the flow cockpit to a folder of its own there, its default extensions
 // beside it) and the plugin's userConfig key points at it. Linux gets the flow cockpit from the flake instead.
 import { spawnSync } from 'node:child_process';
@@ -11,7 +11,6 @@ import { downloadBin } from '../system/net.ts';
 import { claude, onPath } from '../system/proc.ts';
 import { progress } from '../ui/ui.ts';
 
-export const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
 export const WEB_MCP = `web-mcp@${MARKETPLACE}`;
 export const MCP_AZURE = `mcp-azure@${MARKETPLACE}`;
 export const FLOW_COCKPIT = `flow-cockpit@${MARKETPLACE}`;

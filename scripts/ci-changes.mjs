@@ -3,9 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-const crates = ['tui-review', 'web-mcp', 'ado-mcp', 'flow-cockpit'];
+const crates = ['web-mcp', 'ado-mcp', 'flow-cockpit'];
 const roots = {
-  'tui-review': ['tools/tui-review/', 'plugins/shared/tui-review/'],
   'web-mcp': ['tools/web-mcp/', 'plugins/shared/web-mcp/'],
   'ado-mcp': ['tools/ado-mcp/', 'plugins/opt-in/mcp/mcp-azure/'],
   'flow-cockpit': ['tools/flow-cockpit/', 'plugins/opt-in/flow-cockpit/'],

@@ -29,10 +29,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `flows` (the conductors), both plain plugins at the top, then `shared/` (what flows pulls in) and `opt-in/` (extras
   nothing else depends on; `opt-in/mcp/` holds the MCP configs, `opt-in/implementation/` the language, database and LSP
   plugins). `shared`, `opt-in` and its two subfolders are `GROUPS` folders (`scripts/plugin-dirs.mjs`, which nests them):
-  each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; tui-review and web-mcp
-  are also offered on their own but live in `shared/`. Moving a folder doesn't touch installs (they key on the
+  each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; web-mcp
+  is also offered on its own but lives in `shared/`. Moving a folder doesn't touch installs (they key on the
   plugin `name`); renaming a plugin does.
-- `tools/`: five Rust packages in one root Cargo workspace: `tui-review` (formerly `brv`), `web-mcp`,
+- `tools/`: four Rust packages in one root Cargo workspace: `web-mcp`,
   `ado-mcp`, and flow-cockpit's `core` and `app`. The root `Cargo.toml` owns all dependency versions,
   package metadata, Clippy settings and the release profile; members inherit them and select their own features.
   There is one root `Cargo.lock` and `target/`. Use `-p <package>` to build or test one member. Nothing in the
@@ -53,7 +53,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id
   (`custom:dead-skills:night-city`: a plugin theme's id carries the plugin name).
 - Night City (`plugins/default/`): a theme (`themes/night-city.json`) plus a mod (`hooks/`). It is the house
-  look: tui-review's `hooks/theme.ts`, notify's wording and the installer's `paint` (`ui/view.ts`) use its palette, with no
+  look: notify's wording and the installer's `paint` (`ui/view.ts`) use its palette, with no
   stock fallback. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
   highlighting off. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
   Code otherwise draws in 256 colours and the theme's indigos turn grey.
@@ -93,11 +93,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
   `plugins/flows/skills/writing/tests/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
   our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
-- `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`tools/tui-review/`). The two
-  share a binary cache format (`tools/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
-  together.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
-  x64 only, like tui-review's binary (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
+  x64 only (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
   release binaries' sha256 in `tools/installer/assets/agent-browser.json` (bumped by `npm run sync -- apply agent-browser`, which imports
@@ -248,7 +245,7 @@ Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps Gi
 ## Versions and releases
 
 Everything ships as one version: `package.json` and `package-lock.json`, the root `Cargo.toml` workspace version
-and all five local package entries in `Cargo.lock`, and the installer URL in README.md. The build stamps this version
+and all four local package entries in `Cargo.lock`, and the installer URL in README.md. The build stamps this version
 into the marketplaces and generated plugin manifests.
 `check-repo.mjs` fails on drift. Never bump by hand. Every merge to `main` that touches more than `docs/` or the root
 `*.md` files releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
@@ -258,7 +255,7 @@ highest `vX.Y.Z` tag (`nextVersion` in `scripts/release.mjs`; fetch tags before 
     npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-Either way the merge's run packs the installer (`installer.tgz`), builds tui-review, web-mcp and the flow cockpit's Windows app from the tag and
+Either way the merge's run packs the installer (`installer.tgz`), builds web-mcp, ado-mcp and the flow cockpit's Windows app from the tag and
 publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back):
 the tag plus one `Distribution vX.Y.Z` commit holding the native distributions that `publish` built (the job that holds
 the write token runs no `npm ci`, so it gets them as the `native` artifact). Tags carry sources only.
@@ -277,7 +274,7 @@ plugins of ours that the manifest no longer lists.
 - `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `tools/installer/` (sources and tests, strict).
 - Rust, from the root: `cargo build --locked -p web-mcp --bin fake-agent-browser`, then
   `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
-  `cargo fmt --all -- --check`. Use `-p tui-review`, `-p web-mcp`, or another member instead of `--workspace`
+  `cargo fmt --all -- --check`. Use `-p web-mcp` or another member instead of `--workspace`
   for independent checks. Run `python3 scripts/check_cargo_workspace.py` and
   `python3 -m unittest discover -s scripts -p 'check_cargo_workspace_test.py'` for the workspace policy.
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
@@ -291,9 +288,6 @@ plugins of ours that the manifest no longer lists.
   the workspace with its declared `rust-version` (1.97). A test that times concurrency makes one fast call
   first and bounds the slow one against it (`view_concurrent` in `tests/pr.rs`, `tests/wi.rs`): under the full
   parallel run on Windows, process start and git subprocesses outweigh a fixed wall-clock bound.
-- tui-review mod tests need a generated fixture first, from the root:
-  `cargo run --locked -p tui-review --release -- gen --out <dir> && node plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
-  `plugins/shared/tui-review`.
 - headroom-trim server: `uv run --locked python -m unittest discover -s tests` in `plugins/opt-in/headroom-trim/server`,
   with `UV_PROJECT_ENVIRONMENT` set to a folder outside the repo (the default `.venv` lands in the tree). One test fills a
   tiktoken cache over the network.
@@ -319,8 +313,8 @@ CI: `changes.yml` uses `scripts/ci-changes.mjs` to route checks from the complet
 range, including deleted and renamed paths). `test.yml` runs Node/plugin checks and skill scanning when their inputs
 change; its two OS matrix jobs retain their required check names even when their steps skip. A detection failure fails
 those jobs. `crates.yml` tests and lints selected Rust packages together and independently on Linux and Windows,
-checks their minimum Rust version and Nix packages, and runs tui-review's budgets/mod tests and cockpit's frontend
-checks only when selected. Flow templates and compiler changes also select cockpit, whose tests read their output.
+checks their minimum Rust version and Nix packages, and runs cockpit's frontend checks only when selected. Flow
+templates and compiler changes also select cockpit, whose tests read their output.
 Root Cargo, Nix and npm dependencies, CI changes and unknown paths select all checks; docs/ changes select none.
 Manual runs select everything. `crates-build.yml` builds only selected binaries on PRs, but release calls always build
 the complete matrix because each version ships all binaries. Keep routing and its tests current when adding consumers.

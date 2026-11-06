@@ -38,23 +38,23 @@ test('missing binaries per OS', () => {
   );
 });
 
-test('tui-review downloads the release archive built for this machine', () => {
-  const win = binAsset('tui-review', 'win32', 'x64', '1.2.3')!;
+test('web-mcp downloads the release archive built for this machine', () => {
+  const win = binAsset('web-mcp', 'win32', 'x64', '1.2.3')!;
   assert.equal(
     win.url,
-    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/tui-review-x86_64-pc-windows-msvc.zip',
+    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/web-mcp-x86_64-pc-windows-msvc.zip',
   );
   assert.equal(win.sha256, `${win.url}.sha256`);
-  assert.equal(win.exe, 'tui-review.exe');
-  assert.equal(binAsset('tui-review', 'linux', 'x64', '1.0.0')!.file, 'tui-review-x86_64-unknown-linux-musl.tar.gz');
+  assert.equal(win.exe, 'web-mcp.exe');
+  assert.equal(binAsset('web-mcp', 'linux', 'x64', '1.0.0')!.file, 'web-mcp-x86_64-unknown-linux-musl.tar.gz');
   for (const [platform, arch] of [
     ['linux', 'arm64'],
     ['darwin', 'arm64'],
     ['darwin', 'x64'],
     ['win32', 'arm64'],
   ])
-    assert.equal(binAsset('tui-review', platform, arch, '1.0.0'), undefined, `no build for ${platform}-${arch}`);
-  assert.equal(binAsset('tui-review', 'freebsd', 'x64', '1.0.0'), undefined);
+    assert.equal(binAsset('web-mcp', platform, arch, '1.0.0'), undefined, `no build for ${platform}-${arch}`);
+  assert.equal(binAsset('web-mcp', 'freebsd', 'x64', '1.0.0'), undefined);
 });
 
 test('web-mcp downloads its own archive, and each plugin is configured under its own key', () => {
@@ -64,17 +64,15 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   };
   for (const [k, target] of Object.entries(t)) {
     const [platform, arch] = k.split('-');
-    for (const name of ['tui-review', 'web-mcp']) {
+    for (const name of ['web-mcp', 'ado-mcp']) {
       const a = binAsset(name, platform, arch, '1.2.3')!;
       assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
       assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
     }
   }
   assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
-  assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'tui-review', key: 'binPath' });
   assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
   const dirs: Record<string, string> = {
-    'tui-review': '.claude-plugin/tui-review',
     'web-mcp': '.claude-plugin/web-mcp',
     'mcp-azure': '.claude-plugin/mcp-azure',
     'flow-cockpit': '.claude-plugin/flow-cockpit',
@@ -96,7 +94,7 @@ test('binAsset gives the Windows zip for flow-cockpit', () => {
   assert.equal(win.exe, 'flow-cockpit.exe');
   // The zip holds the exe and its default extensions, so it goes into a folder of its own.
   assert.equal(win.folder, true);
-  assert.equal(binAsset('tui-review', 'win32', 'x64', '1.2.3')!.folder, false);
+  assert.equal(binAsset('web-mcp', 'win32', 'x64', '1.2.3')!.folder, false);
   assert.equal(BIN_PLUGINS['flow-cockpit'].key, 'appPath');
 });
 
@@ -109,7 +107,7 @@ test('binAsset has no linux asset for flow-cockpit', () => {
 test('flow-cockpit has a pinned linux hint', () => {
   const hint = BIN_PLUGINS['flow-cockpit'].linuxHint!('1.2.3');
   assert.match(hint, /nix run github:deadmade\/dead-claude-skills\/v1\.2\.3#flow-cockpit/);
-  assert.equal(BIN_PLUGINS['tui-review'].linuxHint, undefined);
+  assert.equal(BIN_PLUGINS['web-mcp'].linuxHint, undefined);
 });
 
 // The hint names the flake's package: the output the installer points Linux users at must exist.
@@ -132,7 +130,7 @@ test('binPath: the flow cockpit in a folder of its own, the others loose in bin'
   const win = 'C:\\Users\\u\\.claude\\bin';
   assert.equal(binPath(win, 'flow-cockpit', 'win32'), 'C:\\Users\\u\\.claude\\bin\\flow-cockpit\\flow-cockpit.exe');
   assert.equal(binPath(win, 'web-mcp', 'win32'), 'C:\\Users\\u\\.claude\\bin\\web-mcp.exe');
-  assert.equal(binPath('/h/.claude/bin', 'tui-review', 'linux'), '/h/.claude/bin/tui-review');
+  assert.equal(binPath('/h/.claude/bin', 'web-mcp', 'linux'), '/h/.claude/bin/web-mcp');
 });
 
 // A flow cockpit install that fails is most likely its open window holding the folder; building it by hand doesn't
@@ -143,14 +141,14 @@ test('binAdvice: rerun for the flow cockpit, build for the others', () => {
   assert.match(binAdvice('web-mcp'), /cargo build --release --locked -p web-mcp --bin web-mcp/);
 });
 
-test('tui-review versions match the release the installer fetches', () => {
+test('the binaries report the release version the installer fetches', () => {
   const cargo = readFileSync(new URL('../../../Cargo.toml', import.meta.url), 'utf8');
   assert.equal(/^version = "(.+)"/m.exec(cargo)![1], json('package.json').version);
 });
 
-test('tui-review checksum lines and what to do about tui-review', () => {
+test('checksum lines and what to do about a binary', () => {
   const hex = 'AB'.repeat(32);
-  assert.equal(sha256Of(`${hex}  tui-review-x.tar.gz\n`), hex.toLowerCase());
+  assert.equal(sha256Of(`${hex}  web-mcp-x.tar.gz\n`), hex.toLowerCase());
   assert.equal(sha256Of(`${hex}`), hex.toLowerCase());
   assert.equal(sha256Of('Not Found'), undefined);
   assert.equal(sha256Of(`${hex}ff  x`), undefined);

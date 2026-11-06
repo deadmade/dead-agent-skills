@@ -6,7 +6,12 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { changedPaths, selectChecks } from './ci-changes.mjs';
 
-const all = ['tui-review', 'web-mcp', 'ado-mcp', 'flow-cockpit'];
+const all = ['web-mcp', 'ado-mcp', 'flow-cockpit'];
+
+test('full runs select exactly the remaining binaries and workspace packages', () => {
+  assert.deepEqual(selectChecks([], true).binaries, all);
+  assert.deepEqual(selectChecks([], true).packages, ['web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit']);
+});
 
 test('an ado implementation change selects only ado checks', () => {
   assert.deepEqual(selectChecks(['tools/ado-mcp/src/wi.rs']), {
@@ -28,7 +33,6 @@ test('each crate selects its checks, including both cockpit packages', () => {
 
 test('plugin changes select their native integration and Node checks', () => {
   for (const [path, crate] of [
-    ['plugins/shared/tui-review/hooks/chunks.ts', 'tui-review'],
     ['plugins/shared/web-mcp/.mcp.json', 'web-mcp'],
     ['plugins/opt-in/mcp/mcp-azure/.mcp.json', 'ado-mcp'],
     ['plugins/opt-in/flow-cockpit/hooks/lib.mjs', 'flow-cockpit'],

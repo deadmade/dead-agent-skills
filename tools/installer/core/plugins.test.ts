@@ -51,7 +51,6 @@ test('opt-ins from the real manifests', () => {
         'nix-lsp',
         'postgres',
         'rust-skills',
-        'tui-review',
         'web-mcp',
       ].map((n) => `${n}@${M}`),
       ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),

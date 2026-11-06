@@ -43,7 +43,7 @@ const SKIPPED = [
   'patching-bugs', // ideas in /fix
   'post-patch-validation',
   'regression-hunt', // ideas in /review-code
-  'review-walkthrough', // tui-review covers it
+  'review-walkthrough', // tui-review covered it; removed
   'rust-review',
   'second-opinion',
   'semgrep-rule-creator',

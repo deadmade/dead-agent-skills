@@ -61,15 +61,15 @@ test('categorize keeps bulk:false on danger', () => {
 
 test('options hidden per platform', () => {
   assert.ok(unavailable(`nix-lsp@${M}`, 'win32', 'x64', '1.0.0'));
-  assert.equal(unavailable(`tui-review@${M}`, 'win32', 'x64', '1.0.0'), undefined);
-  assert.ok(unavailable(`tui-review@${M}`, 'win32', 'arm64', '1.0.0'));
-  assert.ok(unavailable(`tui-review@${M}`, 'darwin', 'arm64', '1.0.0'));
-  assert.ok(unavailable(`tui-review@${M}`, 'linux', 'arm64', '1.0.0'));
+  assert.equal(unavailable(`web-mcp@${M}`, 'win32', 'x64', '1.0.0'), undefined);
+  assert.ok(unavailable(`web-mcp@${M}`, 'win32', 'arm64', '1.0.0'));
+  assert.ok(unavailable(`web-mcp@${M}`, 'darwin', 'arm64', '1.0.0'));
+  assert.ok(unavailable(`web-mcp@${M}`, 'linux', 'arm64', '1.0.0'));
   for (const k of [`nix-lsp@${M}`, 'dcg']) {
     assert.equal(unavailable(k, 'linux', 'x64', '1.0.0'), undefined);
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }
-  assert.equal(unavailable(`tui-review@${M}`, 'linux', 'x64', '1.0.0'), undefined);
+  assert.equal(unavailable(`web-mcp@${M}`, 'linux', 'x64', '1.0.0'), undefined);
   assert.ok(unavailable(`headroom-trim@${M}`, 'darwin', 'arm64', '1.0.0'));
   assert.equal(unavailable(`headroom-trim@${M}`, 'win32', 'x64', '1.0.0'), undefined);
   assert.equal(unavailable(`headroom-trim@${M}`, 'linux', 'x64', '1.0.0'), undefined);
