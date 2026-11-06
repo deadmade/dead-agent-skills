@@ -2,15 +2,19 @@
 //! `$FAKE_AB_LOG` (unset: to `calls.jsonl` beside its `--config`, if any) and prints canned `--json` answers.
 //! An `open` of a URL containing "fail" fails; a batch's `wait` fails for a URL containing "wait-fail", and for
 //! one containing "wait-slow" only after its `--timeout` ms. A batch opening a search engine's host answers from
-//! `$FAKE_AB_PAGES` when that is set (see `engine_page`). A batch with an `open` stores its URL in
+//! `$FAKE_AB_PAGES` when that is set (see `engine_page`); a file `<engine>.landed` there holds the URL its `get url`
+//! answers (`engine_landed`), else it answers the opened one. A batch with an `open` stores its URL in
 //! `<state>/<session>.url`: the session's tab keeps that page, so a batch without an `open` answers for the stored
 //! URL (its `engine_page`, its `get url`, the host lookups and `wait` failures keyed on the URL), and `tab new`
-//! removes it (a blank tab). `get cdp-url` answers a url ending in the contents of
-//! `<state>/chrome` (a changed one: Chrome relaunched); with `$FAKE_AB_OWNER_DELAY_MS`, an owner's (`*-window`)
+//! removes it (a blank tab). `get cdp-url` answers `ws://127.0.0.1:<port>/devtools/browser/<chrome>`, `<chrome>` being
+//! the contents of `<state>/chrome` (a changed one: Chrome relaunched, default 1) and `<port>` those of
+//! `<state>/cdp-port` (default 9222, where nothing listens); with `$FAKE_AB_OWNER_DELAY_MS`, an owner's (`*-window`)
 //! `open` sleeps that long first. `<state>` is `$FAKE_AB_STATE`, else `--config`'s folder. On a `--cdp` call,
 //! `<state>/dead-g<n>` makes a `-g<n>-` session answer agent-browser's dead-Chrome connect error, and
 //! `<state>/<session>.gone` makes a call other than `tab …` (in a batch: its first command) answer `tab_gone`,
-//! until a `tab new` removes it. With `--bail`, a batch's entries stop after its first failed one.
+//! until a `tab new` removes it. With `--bail`, a batch's entries stop after its first failed one. A `tab list`
+//! answers the owner's blank tab and, unless the session's tab is gone, the session's own tab as `active` with the
+//! tab id `t-<session>` and the target id `T-t-<session>` (`tab_list`).
 //!
 //! A typing batch (no `open`, a `click`) reads no page. Its `eval` answers `{"result": 1}`; its `click` fails when
 //! the session has no stored URL or `$FAKE_AB_PAGES/<engine>.nobox` exists (the engine of the stored URL's host, as
@@ -18,7 +22,8 @@
 //! commands, and at `press Enter` writes it to `<state>/<session>.typed` and sets the stored URL's `q` to it, other
 //! parameters kept; with `<engine>.nonav` the URL stays, `<state>/<session>.stuck` marks it, and the session's next
 //! read (a batch with no `open` and no `click`, on a tab not gone) runs out its `wait`s' `--timeout`, fails them and
-//! removes the mark; `tab new` leaves it. With `<engine>.slowtype` the typing batch sleeps 60 s first.
+//! removes the mark; `tab new` leaves it. With `<engine>.slowtype` the typing batch sleeps 60 s first; a file
+//! `<state>/typedelay` holding a number makes every typing batch sleep that many ms first.
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -76,6 +81,9 @@ fn main() {
             let _ = std::fs::remove_file(stored_url(&state, session));
             json!({"success": true, "data": {"tabId": "t9", "url": "about:blank"}})
         }
+        Some("tab") if rest.get(1).is_some_and(|a| a == "list") => {
+            tab_list(&state, session, tab_gone)
+        }
         Some("batch") => {
             let bail = rest.iter().any(|a| a == "--bail");
             batch(&stdin, &state, session, tab_gone, bail)
@@ -99,6 +107,22 @@ fn main() {
         cmd => json!({"success": true, "data": {"command": cmd, "session": session}}),
     };
     println!("{out}");
+}
+
+/// `tab list` as agent-browser 0.41.1 answers it from a session attached to the window: the owner's blank tab, and
+/// the session's own tab marked `"active": true` (tab id `t-<session>`), unless that tab is gone.
+fn tab_list(state: &Path, session: &str, gone: bool) -> Value {
+    let tab = |active: bool, id: String, url: String| {
+        json!({"active": active, "label": null, "tabId": id, "targetId": format!("T-{id}"),
+               "title": url, "type": "page", "url": url})
+    };
+    let mut tabs = vec![tab(false, "t1".into(), "about:blank".into())];
+    if !gone {
+        let url = std::fs::read_to_string(stored_url(state, session))
+            .unwrap_or_else(|_| "about:blank".into());
+        tabs.push(tab(true, format!("t-{session}"), url));
+    }
+    json!({"success": true, "data": {"lifecycle": {"reused": true}, "tabs": tabs}})
 }
 
 /// The file holding the URL `session`'s tab was last opened to.
@@ -142,6 +166,7 @@ fn batch(stdin: &str, state: &Path, session: &str, tab_gone: bool, bail: bool) -
     } else {
         url
     };
+    let landed = engine_landed(url).unwrap_or_else(|| landed.to_owned());
     let mut entries = Vec::new();
     for (i, c) in cmds.iter().enumerate() {
         let entry = if tab_gone && i == 0 {
@@ -202,6 +227,12 @@ fn typing(
     };
     if marked("slowtype") {
         std::thread::sleep(Duration::from_mins(1)); // past any deadline; the server kills the call
+    }
+    if let Some(ms) = std::fs::read_to_string(state.join("typedelay"))
+        .ok()
+        .and_then(|ms| ms.trim().parse().ok())
+    {
+        std::thread::sleep(Duration::from_millis(ms));
     }
     let mut typed = String::new();
     let mut entries = Vec::new();
@@ -333,11 +364,15 @@ fn attached_failure(state: &Path, session: &str, rest: &[String]) {
     }
 }
 
-/// The window's cdp url, for the Chrome named in `<state>/chrome`, else 1.
+/// The window's cdp url, for the Chrome named in `<state>/chrome`, else 1, on the port in `<state>/cdp-port`, else
+/// 9222 (where nothing listens: a test that wants Chrome's HTTP endpoint starts a stub and writes its port).
 fn cdp_url(state: &Path) -> Value {
-    let chrome = std::fs::read_to_string(state.join("chrome"))
-        .map_or_else(|_| "1".to_owned(), |c| c.trim().to_owned());
-    json!({"success": true, "data": {"cdpUrl": format!("ws://127.0.0.1:9222/devtools/browser/{chrome}")}})
+    let read = |name: &str, default: &str| {
+        std::fs::read_to_string(state.join(name))
+            .map_or_else(|_| default.to_owned(), |c| c.trim().to_owned())
+    };
+    let (chrome, port) = (read("chrome", "1"), read("cdp-port", "9222"));
+    json!({"success": true, "data": {"cdpUrl": format!("ws://127.0.0.1:{port}/devtools/browser/{chrome}")}})
 }
 
 /// Any page as a browser would render it.
@@ -377,6 +412,14 @@ fn engine_of(url: &str) -> Option<&'static str> {
     .into_iter()
     .find(|(d, _)| host == *d || host.ends_with(&format!(".{d}")))
     .map(|(_, e)| e)
+}
+
+/// Where the engine's result page landed, when `<engine>.landed` in `$FAKE_AB_PAGES` names the URL: the page's own
+/// relative links are then on that address, as when a test serves the engine's links from its stub.
+fn engine_landed(url: &str) -> Option<String> {
+    let name = format!("{}.landed", engine_of(url)?);
+    let url = std::fs::read_to_string(pages_dir()?.join(name)).ok()?;
+    Some(url.trim().to_owned())
 }
 
 /// `$FAKE_AB_PAGES`.

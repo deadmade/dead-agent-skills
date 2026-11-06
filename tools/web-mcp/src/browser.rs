@@ -1,5 +1,6 @@
 //! agent-browser, driven as a child process: one `--json` call per action. Every session but the window's owner is
-//! a tab of web-mcp's one browser window (`window.rs`), attached with `--cdp <url> --pin-tab`.
+//! a tab of web-mcp's one browser window (`window.rs`), attached with `--cdp <url> --pin-tab`. Before a `click` or
+//! `press` the tab is raised: `tab list` names it and one HTTP GET to the window's debug port activates it (`raise`).
 
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
@@ -86,6 +87,14 @@ pub struct Browser {
     ran: Mutex<BTreeMap<String, u32>>,
     /// The owner's config, from its first call; shutdown closes the owner under it.
     owner_config: Mutex<Option<PathBuf>>,
+    /// Held from raising a tab until its input is sent: only the front tab takes input, so another session raising
+    /// its own tab in between would hide this one again. It orders web-mcp's own raises against each other and nothing
+    /// else: web-mcp's `tab new` (a rebind after `tab_gone`), a fresh session's first tab (agent-browser's own) and a
+    /// person bringing another tab forward all run outside it, and may take the front from a session that is typing
+    /// (unmeasured).
+    front: tokio::sync::Mutex<()>,
+    /// The client that activates a tab through Chrome's debug port, built on the first raise.
+    http: std::sync::OnceLock<Option<reqwest::Client>>,
     /// Where agent-browser keeps its sessions' `.pid` and `.sock` files; `None` where that isn't known.
     pub socket_dir: Option<PathBuf>,
 }
@@ -145,6 +154,39 @@ fn isolate(cmd: &mut Command, via: Via<'_>, env: impl IntoIterator<Item = (OsStr
     }
 }
 
+/// Whether `command` is input, which agent-browser reports as done while delivering nothing to a hidden tab
+/// (agent-browser#2146). Measured 2026-11-06, in a hidden tab: in the replay that found it, `click` and `press`
+/// delivered 0 of 3 each, while `fill`, `type` and `scroll` did their work there. The reads and `eval` were not
+/// measured in a hidden tab. One machine, one browser.
+fn is_input(command: &str) -> bool {
+    matches!(command, "click" | "press")
+}
+
+/// How long input waits for the front tab before it goes on without the lock. A step holds it for a `tab list`, one
+/// request to Chrome (at most `RAISE_TIMEOUT`) and the input batch, and only one tab can be in front, so engines type
+/// one at a time while the waits last: a typed follow-up search takes about the sum of its engines' typing, not the
+/// longest. A waiter that has waited `FRONT_WAIT` raises its own tab and types anyway, which takes the front from the
+/// session typing then, so either may lose its keys (the search falls back to loading the URL, or the engine times
+/// out); with four engines that starts at about 1.7 s a batch, because the fourth waits through three (the fake showed
+/// two batches overlapping at 2 s a batch). How long one step takes was not measured: the
+/// four-engine follow-ups of one live run finished in 6.1 to 8.3 s in all, which says nothing of the longest batch.
+/// In the test fake, engines timed out at 3 s a step. The 5 s is a guess: it lets a step finish, and a hung holder
+/// costs each waiter up to 5 s of the 8 s the engines have for typing (`slow_typing_times_out_without_a_second_load`).
+const FRONT_WAIT: Duration = Duration::from_secs(5);
+/// How long Chrome's activate request may take. The 2 s is a guess, not a measured latency: the request goes to the
+/// browser process on this machine, and a hung one costs each input this much before it goes on.
+const RAISE_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// The client for Chrome's debug port: no redirects, and no proxy from the environment, because the port is on this
+/// machine and a proxy would take the request to its own loopback (a refused activation, the click lost as before).
+/// `None` when reqwest can't build a client (no TLS provider); the raise is then skipped.
+fn loopback_client() -> Option<reqwest::Client> {
+    reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .ok()
+}
 /// How long a `close` may take.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 /// What a search batch keeps back from the daemon's wait for everything else: web-mcp-search/findings.md measured ~1 s
@@ -240,6 +282,8 @@ impl Browser {
             live: Mutex::default(),
             ran: Mutex::default(),
             owner_config: Mutex::default(),
+            front: tokio::sync::Mutex::default(),
+            http: std::sync::OnceLock::new(),
             // The default dir: every call drops `AGENT_BROWSER_SOCKET_DIR` with the rest of `AGENT_BROWSER_*`.
             socket_dir: std::env::var_os("XDG_RUNTIME_DIR")
                 .filter(|d| !cfg!(windows) && !d.is_empty())
@@ -335,8 +379,9 @@ impl Browser {
         s
     }
 
-    /// Runs `op` in `key`'s tab of the window. A gone tab gets one `tab new` and one retry; any other failure asks
-    /// the owner again, and a new generation (Chrome came back) gets one retry under its new name.
+    /// Runs `op` in `key`'s tab of the window. A `click` or `press` first raises the tab (`with_front`: `tab list` and
+    /// one request to Chrome's debug port). A gone tab gets one `tab new` and one retry; any other failure asks the
+    /// owner again, and a new generation (Chrome came back) gets one retry under its new name.
     async fn attached(&self, key: &str, op: Op<'_>) -> Result<Value, BrowserError> {
         let mut live = self.live(false).await?;
         let config = self.window.attach_config().map_err(BrowserError::Failed)?;
@@ -348,6 +393,10 @@ impl Browser {
                 cdp: &live.url,
             };
             let answer = match op {
+                Op::Run(args) if args.first().is_some_and(|c| is_input(c)) => {
+                    let input = self.run_with(&session, args, None, true, via);
+                    self.with_front(&session, via, input).await
+                }
                 Op::Run(args) => self.run_with(&session, args, None, true, via).await,
                 Op::Batch(cmds, limits, may_fail) => self
                     .batch_with(&session, cmds, limits, via, may_fail, false)
@@ -535,12 +584,94 @@ impl Browser {
             .map(|c| c.iter().map(String::as_str).collect())
             .collect();
         let left = until.saturating_duration_since(std::time::Instant::now());
-        tokio::time::timeout_at(
-            until.into(),
-            self.batch_with(&session, &cmds, false, via, None, true),
-        )
+        let input = commands
+            .iter()
+            .any(|c| c.first().is_some_and(|c| is_input(c)));
+        let batch = self.batch_with(&session, &cmds, false, via, None, true);
+        tokio::time::timeout_at(until.into(), async {
+            if input {
+                self.with_front(&session, via, batch).await
+            } else {
+                batch.await
+            }
+        })
         .await
         .unwrap_or(Err(BrowserError::Timeout(left)))
+    }
+
+    /// Runs `input` once `session`'s tab is the window's front one, and before any other session raises its own. A
+    /// holder that hangs must not stall the rest: after `FRONT_WAIT` a waiter goes on without the lock, as it would
+    /// have before the lock. Its raise then takes the front from the session that is typing, so either may lose its
+    /// input; the alternative, to skip the raise then, would lose the late session's input instead and let a hung
+    /// holder cost every other session its typing.
+    async fn with_front<T>(
+        &self,
+        session: &str,
+        via: Via<'_>,
+        input: impl std::future::Future<Output = T>,
+    ) -> T {
+        let _front = tokio::time::timeout(FRONT_WAIT, self.front.lock()).await;
+        self.raise(session, via).await;
+        input.await
+    }
+
+    /// Brings `session`'s own tab to the front: `tab list` names it (the `active` row's `targetId`), and the
+    /// window's debug port activates it with `/json/activate/<targetId>`. Never agent-browser's own `tab <id>`: that
+    /// also raises the tab, but makes the daemon forget its refs, so the next `click @e1` answers `Unknown ref`
+    /// (measured). Best effort: a failed call, or no active row (the tab is gone: the input then fails as `tab_gone`,
+    /// and `attached` binds a new one), leaves the input to run as it is; a refused or failed activation is written to
+    /// stderr and never fails the call.
+    ///
+    /// shortcut: this leans on agent-browser 0.41.1's `tab list` marking a session's own tab `active`, and on Chrome
+    /// answering `/json/activate/<targetId>` on the debug port. Measured 2026-11-06 (Helium 0.18, one machine): a
+    /// click reached the page 3 of 3 times through this code, 2 of 2 through a hand-made activation, and 0 of 3 before.
+    /// Test input in a hidden tab again whenever the agent-browser pin moves.
+    async fn raise(&self, session: &str, via: Via<'_>) {
+        let Via::Tab { cdp, .. } = via else {
+            return;
+        };
+        let list = ["tab".to_owned(), "list".to_owned()];
+        let Ok(listing) = self.run_with(session, &list, None, false, via).await else {
+            return;
+        };
+        let target = listing["tabs"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|t| t["active"] == true)
+            .and_then(|t| t["targetId"].as_str())
+            // The id is pasted into a URL path: Chrome's are hex, nothing else gets through.
+            .filter(|id| {
+                !id.is_empty()
+                    && id
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            });
+        let (Some(target), Ok(cdp)) = (target, Url::parse(cdp)) else {
+            return;
+        };
+        let (Some(host), Some(port)) = (cdp.host_str(), cdp.port()) else {
+            return;
+        };
+        let Some(http) = self.http.get_or_init(loopback_client) else {
+            return;
+        };
+        let activated = http
+            .get(format!("http://{host}:{port}/json/activate/{target}"))
+            .timeout(RAISE_TIMEOUT)
+            .send()
+            .await;
+        match activated {
+            Ok(r) if r.status().is_success() => {}
+            Ok(r) => eprintln!(
+                "web-mcp: Chrome did not raise {session}'s tab: HTTP {}",
+                r.status()
+            ),
+            Err(e) => eprintln!(
+                "web-mcp: Chrome did not raise {session}'s tab: {}",
+                e.without_url()
+            ),
+        }
     }
 
     /// `may_fail`: the index of a command whose failure doesn't fail the batch; `bail`: agent-browser stops at the
@@ -723,6 +854,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
+    use crate::fetch::tests::{Seen, paths, reply, stub};
     use crate::profile::Profiles;
 
     #[test]
@@ -1075,6 +1207,129 @@ mod tests {
         );
         assert_eq!(count(&dir, &["tab", "new"]), 0);
         assert_eq!(count(&owner, &["get", "cdp-url"]), before.1);
+    }
+
+    fn typing() -> [Vec<String>; 2] {
+        [
+            vec!["click".to_owned(), "#q".to_owned()],
+            vec!["press".to_owned(), "Enter".to_owned()],
+        ]
+    }
+
+    /// Chrome's debug-port HTTP endpoint as the shared stub, answering every request with `status`; the fake
+    /// agent-browser reports its port as the window's, so call it before `warm`.
+    fn chrome_stub(dir: &Path, status: &str) -> Seen {
+        let (url, seen) = stub(vec![reply(status, "", "")], Duration::ZERO);
+        // The window's cdp url comes from the owner's call, whose state is its slot's folder.
+        let slot = dir.join("profiles/1");
+        std::fs::create_dir_all(&slot).unwrap();
+        std::fs::write(slot.join("cdp-port"), url.port().unwrap().to_string()).unwrap();
+        seen
+    }
+
+    /// Input reaches only the front tab (agent-browser#2146): a batch with a `click` or `press` raises the session's
+    /// own tab first (found with `tab list`, activated through Chrome's endpoint, never with agent-browser's own
+    /// `tab <id>`, which makes it forget its refs); a batch that only reads does not.
+    #[tokio::test]
+    async fn batch_once_raises_the_tab_only_for_input() {
+        let (dir, b) = fake("raise-once");
+        let activated = chrome_stub(&dir, "200 OK");
+        b.warm().await.unwrap();
+        let session = name("search-bing", 1);
+        std::fs::write(
+            dir.join(format!("{session}.url")),
+            "https://www.bing.com/search?q=a",
+        )
+        .unwrap();
+        let until = || std::time::Instant::now() + Duration::from_secs(5);
+        let before = calls(&dir).len();
+        let read = [vec!["eval".to_owned(), "1".to_owned()]];
+        b.batch_once("search-bing", &read, until()).await.unwrap();
+        let after_read = calls(&dir).len();
+        assert_eq!(after_read, before + 1, "a read raises nothing");
+        b.batch_once("search-bing", &typing(), until())
+            .await
+            .unwrap();
+        let c = calls(&dir);
+        let tail: Vec<_> = c[after_read..].iter().map(args).collect();
+        assert_eq!(tail.len(), 2, "{tail:?}");
+        assert!(tail[0].ends_with(&["tab", "list"]), "{tail:?}");
+        assert!(
+            tail[1].ends_with(&["batch", "--json", "--bail"]),
+            "{tail:?}"
+        );
+        assert_eq!(paths(&activated), [format!("/json/activate/T-t-{session}")]);
+    }
+
+    /// Chrome refusing to activate the tab (here a `404`) leaves the input to run as it is.
+    #[tokio::test]
+    async fn a_refused_raise_does_not_fail_the_input() {
+        let (dir, b) = fake("raise-refused");
+        let activated = chrome_stub(&dir, "404 Not Found");
+        b.warm().await.unwrap();
+        let session = name("search-bing", 1);
+        std::fs::write(
+            dir.join(format!("{session}.url")),
+            "https://www.bing.com/search?q=a",
+        )
+        .unwrap();
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        b.batch_once("search-bing", &typing(), until).await.unwrap();
+        assert_eq!(paths(&activated).len(), 1);
+        assert!(dir.join(format!("{session}.typed")).exists());
+    }
+
+    /// Engines start typing together, and raising one tab hides the others: a session's raise and its input are one step,
+    /// so another session's raise cannot land before the input is done. With every typing batch taking `DELAY`, two
+    /// sessions typing together take twice that if the lock is held through the input, and about once if it is
+    /// let go after the raise (the sleeps add up either way, so a slow machine cannot fail the lower bound).
+    #[tokio::test]
+    async fn input_takes_the_front_tab_one_session_at_a_time() {
+        const DELAY: Duration = Duration::from_millis(400);
+        let (dir, b) = fake("front");
+        let _activated = chrome_stub(&dir, "200 OK");
+        b.warm().await.unwrap();
+        for key in ["search-bing", "search-brave"] {
+            std::fs::write(
+                dir.join(format!("{}.url", name(key, 1))),
+                "https://example.com/search?q=a",
+            )
+            .unwrap();
+        }
+        std::fs::write(dir.join("typedelay"), DELAY.as_millis().to_string()).unwrap();
+        let t0 = std::time::Instant::now();
+        let until = t0 + Duration::from_secs(5);
+        let cmds = typing();
+        let before = calls(&dir).len();
+        let (x, y) = tokio::join!(
+            b.batch_once("search-bing", &cmds, until),
+            b.batch_once("search-brave", &cmds, until)
+        );
+        x.unwrap();
+        y.unwrap();
+        assert!(t0.elapsed() >= 2 * DELAY, "{:?}", t0.elapsed());
+        // The raise is inside the turn: a session's `tab list` (its raise) is followed by its own batch before the
+        // other session's raise. With the raise before the lock, both `tab list`s would come first.
+        let c = calls(&dir);
+        let steps: Vec<(String, &str)> = c[before..]
+            .iter()
+            .map(args)
+            .filter_map(|a| {
+                let kind = if a.ends_with(&["tab", "list"]) {
+                    "list"
+                } else if a.ends_with(&["batch", "--json", "--bail"]) {
+                    "batch"
+                } else {
+                    return None;
+                };
+                let at = a.iter().position(|x| *x == "--session")?;
+                Some((a[at + 1].to_owned(), kind))
+            })
+            .collect();
+        let kinds: Vec<_> = steps.iter().map(|s| s.1).collect();
+        assert_eq!(kinds, ["list", "batch", "list", "batch"], "{steps:?}");
+        assert_eq!(steps[0].0, steps[1].0, "{steps:?}");
+        assert_eq!(steps[2].0, steps[3].0, "{steps:?}");
     }
 
     #[tokio::test]

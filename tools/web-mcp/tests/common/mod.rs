@@ -224,6 +224,20 @@ impl Mcp {
             .find(|(k, _)| *k == "FAKE_AB_STATE")
             .map_or_else(tempdir, |(_, v)| PathBuf::from(v));
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_web-mcp"));
+        // The machine's proxy settings never reach a test, unless the test names them in `envs` (a `NO_PROXY` that
+        // lists loopback would hide a request that wrongly goes through a proxy).
+        for k in [
+            "http_proxy",
+            "https_proxy",
+            "all_proxy",
+            "no_proxy",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "NO_PROXY",
+        ] {
+            cmd.env_remove(k);
+        }
         cmd.env("WEB_MCP_SEARCH_DIR", &search)
             .env("FAKE_AB_STATE", &state)
             .env("WEB_MCP_CHROME", search.join("chrome"))
@@ -236,16 +250,6 @@ impl Mcp {
             .env("WEB_MCP_TEST_PUBLIC_IP", PUBLIC)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped());
-        for k in [
-            "http_proxy",
-            "https_proxy",
-            "all_proxy",
-            "HTTP_PROXY",
-            "HTTPS_PROXY",
-            "ALL_PROXY",
-        ] {
-            cmd.env_remove(k);
-        }
         let mut child = cmd.spawn().unwrap();
         let stdin = child.stdin.take().unwrap();
         let out = BufReader::new(child.stdout.take().unwrap());

@@ -681,6 +681,138 @@ fn second_consent_counts_as_blocked() {
     assert!(!mcp.search.join("profiles/1/google/consent-seen").exists());
 }
 
+/// Google's result page as it is now: every row an opaque `/goto?url=…` link on the page's own host, which the fake
+/// says is the stub. A row's `/goto` answers with the redirect to its target, or, for `None`, with the delay page
+/// Google gives past its limit.
+fn goto_google(fx: &Fixture, pages: &Path, targets: [Option<&str>; 3]) {
+    let mut rows = String::new();
+    for (name, target) in ["one", "two", "three"].into_iter().zip(targets) {
+        let _ = write!(
+            rows,
+            r#"<div class="MjjYud"><div class="g"><a href="/goto?url={name}"><h3>Zebra {name}</h3></a><div class="VwiC3b">About the zebra {name}.</div></div></div>"#
+        );
+        let answer = target.map_or_else(
+            || Resp::html("<html><body>One moment…</body></html>"),
+            Resp::redirect,
+        );
+        fx.route(&format!("/goto?url={name}"), vec![answer]);
+    }
+    let page = format!(
+        r#"<html><head><title>zebra - Google Search</title></head><body><div id="search"><div id="rso">{rows}</div></div></body></html>"#
+    );
+    std::fs::write(pages.join("google.html"), page).unwrap();
+    std::fs::write(pages.join("google.landed"), fx.url("/search?q=zebra")).unwrap();
+}
+
+/// The saved record of `mcp`'s one search.
+fn only_record(mcp: &Mcp) -> Value {
+    let mut records = std::fs::read_dir(mcp.run_dir().join("searches"))
+        .unwrap()
+        .flatten();
+    let record = records.next().expect("a record");
+    assert!(records.next().is_none());
+    serde_json::from_str(&std::fs::read_to_string(record.path()).unwrap()).unwrap()
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn google_rows_are_replaced_by_their_redirects_until_google_stops() {
+    let (fx, pages) = setup();
+    // Targets on the user's own network: never fetched, but kept in the record.
+    let (one, two) = ("http://127.0.0.1:9/one", "http://127.0.0.1:9/two");
+    goto_google(&fx, &pages, [Some(one), Some(two), None]);
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    let google: Vec<(String, String)> = only_record(&mcp)["engines"]["google"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| {
+            let get = |k: &str| f[k].as_str().unwrap().to_owned();
+            (get("title"), get("url"))
+        })
+        .collect();
+    assert_eq!(
+        google,
+        [
+            ("Zebra one".to_owned(), one.to_owned()),
+            ("Zebra two".to_owned(), two.to_owned())
+        ]
+    );
+    // The third row met the delay page and was asked once. It is the last row, so this does not show that the walk
+    // stops there: the unit tests `resolve_goto_stops_when_google_throttles` and `…_refuses` in `src/search.rs` do.
+    assert_eq!(fx.hits("/goto?url=three"), 1);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn google_without_a_resolved_link_is_skipped_without_rest() {
+    let (fx, pages) = setup();
+    goto_google(&fx, &pages, [None, None, None]);
+    let mut mcp = start(&pages, &[]);
+    let r = search(&mut mcp, json!({"query": "zebra"}));
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        first_line(t).starts_with(
+            "Source: bing, duckduckgo, brave (skipped: google: its result links did not resolve) (searched "
+        ),
+        "{t}"
+    );
+    assert!(!any_rest(&mcp));
+    assert_eq!(fx.hits("/goto?url=one"), 1);
+    assert_eq!(fx.hits("/goto?url=two"), 0);
+}
+
+/// A page that landed on a private address (an intercepting proxy or a captive portal serving a Google-shaped page)
+/// is not asked for its `/goto` links: like web-mcp's public fetches, these keep off private addresses.
+#[cfg(debug_assertions)]
+#[test]
+fn google_links_on_a_private_address_are_not_asked() {
+    let (_public, pages) = setup();
+    // Only `PUBLIC` counts as public in the tests: loopback itself is private.
+    let private = Fixture::start("127.0.0.1");
+    goto_google(
+        &private,
+        &pages,
+        [Some("http://127.0.0.2:9/one"), None, None],
+    );
+    let mut mcp = start(&pages, &[]);
+    let r = search(&mut mcp, json!({"query": "zebra"}));
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        first_line(t).starts_with(
+            "Source: bing, duckduckgo, brave (skipped: google: its result links are on a private address) (searched "
+        ),
+        "{t}"
+    );
+    assert!(!any_rest(&mcp));
+    assert_eq!(private.hits("/goto?url=one"), 0);
+}
+
+/// A search whose links did not resolve still got Google's results page, so a consent page met before is over.
+#[cfg(debug_assertions)]
+#[test]
+fn unresolved_links_clear_the_consent_mark() {
+    let (fx, pages) = setup();
+    mark(&pages, "google.consent-once");
+    let mut mcp = start(&pages, &[]);
+    let seen = mcp.search.join("profiles/1/google/consent-seen");
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(t.contains("google: consent (clearing)"), "{t}");
+    assert!(seen.exists());
+
+    goto_google(&fx, &pages, [None, None, None]);
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(
+        t.contains("google: its result links did not resolve"),
+        "{t}"
+    );
+    assert!(!seen.exists());
+    assert!(!any_rest(&mcp));
+}
+
 #[cfg(debug_assertions)]
 #[test]
 fn slow_consent_page_keeps_the_deadline() {

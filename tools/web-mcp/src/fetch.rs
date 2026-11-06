@@ -489,19 +489,23 @@ async fn send(
             return Err(FetchError::Blocked(url.to_string()));
         }
         private |= hop_private;
-        let next = resp
-            .status()
-            .is_redirection()
-            .then(|| resp.headers().get(reqwest::header::LOCATION))
-            .flatten()
-            .and_then(|l| l.to_str().ok())
-            .and_then(|l| url.join(l).ok());
-        match next {
+        match location(&resp, &url) {
             Some(n) => url = n,
             None => return Ok((resp, url, private, permit)),
         }
     }
     Err(net(format!("more than {MAX_REDIRECTS} redirects")))
+}
+
+/// Where `resp`, the answer to a request for `url`, redirects to: its `Location`, resolved against `url`. `None` for
+/// any other answer, and for a redirect without a usable `Location`.
+pub(crate) fn location(resp: &reqwest::Response, url: &Url) -> Option<Url> {
+    resp.status()
+        .is_redirection()
+        .then(|| resp.headers().get(reqwest::header::LOCATION))
+        .flatten()
+        .and_then(|l| l.to_str().ok())
+        .and_then(|l| url.join(l).ok())
 }
 
 /// A proxy in the environment (any case), which makes the connected peer the proxy, not the server.
@@ -735,6 +739,51 @@ pub(crate) mod tests {
 
     pub(crate) fn test_ctx() -> Arc<Ctx> {
         test_ctx_with("agent-browser")
+    }
+
+    /// The raw requests a `stub` was sent, in order.
+    pub(crate) type Seen = Arc<std::sync::Mutex<Vec<String>>>;
+
+    /// Serves `replies` (raw HTTP) in order, the last repeating, each after `delay`; returns the URL and the requests
+    /// seen.
+    pub(crate) fn stub(replies: Vec<String>, delay: std::time::Duration) -> (Url, Seen) {
+        use std::io::{Read, Write};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        let seen = Seen::default();
+        let log = Arc::clone(&seen);
+        let n = AtomicUsize::new(0);
+        std::thread::spawn(move || {
+            for mut c in listener.incoming().flatten() {
+                let mut buf = [0; 8192];
+                let len = c.read(&mut buf).unwrap_or(0);
+                log.lock()
+                    .unwrap()
+                    .push(String::from_utf8_lossy(&buf[..len]).into_owned());
+                std::thread::sleep(delay);
+                let i = n.fetch_add(1, Ordering::SeqCst).min(replies.len() - 1);
+                let _ = c.write_all(replies[i].as_bytes());
+            }
+        });
+        (url, seen)
+    }
+
+    /// A raw HTTP reply for `stub`.
+    pub(crate) fn reply(status: &str, headers: &str, body: &str) -> String {
+        format!(
+            "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n{headers}\r\n{body}",
+            body.len()
+        )
+    }
+
+    /// The request paths of `seen`, in order.
+    pub(crate) fn paths(seen: &Seen) -> Vec<String> {
+        seen.lock()
+            .unwrap()
+            .iter()
+            .map(|r| r.split_whitespace().nth(1).unwrap_or("").to_owned())
+            .collect()
     }
 
     /// A context whose browser runs `agent_browser`, over a temp search dir with the extension unpacked and a dummy
