@@ -216,7 +216,7 @@ source. It supports migration checks; installation alone is not hook trust or co
 
 **Owned generated output**:
 Both native distributions (`.agents/plugins/` and `.claude-plugin/`), both root marketplaces and the Claude theme rendered from the shared
-palette. Author sources, rebuild, review and commit outputs together; freshness checks do not rewrite them.
+palette. Author sources, rebuild and review the outputs; they are gitignored, and only the release branch commits them.
 **View**:
 One screen or tab of the flow cockpit: a TypeScript file that `export default`s a `View`, drawn by the window.
 _Avoid_: page, panel, widget

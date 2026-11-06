@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { buildTree } from '../src/emit/build.ts';
-import { check } from '../src/emit/commands.ts';
 
 const put = (root: string, path: string, value: string | object) => {
   mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -83,18 +82,6 @@ test('one neutral source compiles to two native distributions', () => {
     './.agents/plugins/a',
   );
 });
-test('check reports stale, missing and extra files and passes after a build', () => {
-  const root = fixture();
-  buildTree(root, join(root, 'built'));
-  cpSync(join(root, 'built/.agents'), join(root, '.agents'), { recursive: true });
-  cpSync(join(root, 'built/.claude-plugin'), join(root, '.claude-plugin'), { recursive: true });
-  assert.deepEqual(check(root), []);
-  writeFileSync(join(root, '.agents/plugins/a/README.md'), 'x');
-  writeFileSync(join(root, '.claude-plugin/a/.mcp.json'), '{}');
-  const problems = check(root);
-  assert.ok(problems.includes('extra: .agents/plugins/a/README.md'));
-  assert.ok(problems.includes('stale: .claude-plugin/a/.mcp.json'));
-});
 test('a plugin without plugin.json or with a missing resource is rejected before output', () => {
   const root = fixture();
   put(root, 'plugins/catalog.json', [
@@ -140,25 +127,23 @@ test('flows compose per harness, and Codex conductors get an implicit-invocation
   assert.equal(existsSync(join(out, '.claude-plugin/flows/skills/f/agents')), false);
   assert.throws(() => buildTree(flows('[step: nope]\n'), join(root, 'again')), /unknown step nope/);
 });
+// The built-text problems a build reports (check-repo and the CLI fail on them).
 const checked = (conductor: string) => {
   const root = flows(conductor);
-  buildTree(root, join(root, 'built'));
-  cpSync(join(root, 'built/.agents'), join(root, '.agents'), { recursive: true });
-  cpSync(join(root, 'built/.claude-plugin'), join(root, '.claude-plugin'), { recursive: true });
-  return check(root);
+  return buildTree(root, join(root, 'built')).problems;
 };
-test('check fails on a conductor over budget', () => {
+test('a build reports a conductor over budget', () => {
   const over = checked(`${CONDUCTOR}${'x'.repeat(20000)}\n## Phase 1: Read\n`);
   assert.equal(over.length, 2);
   assert.ok(
-    over.every((p) => /^flows: .*skills\/f\/SKILL\.md:\d+: /.test(p)),
+    over.every((p) => /^.*skills\/f\/SKILL\.md:\d+: /.test(p)),
     over.join('\n'),
   );
 });
-test('an unresolved node path makes check() return a problem', () => {
+test('a build reports an unresolved node path', () => {
   const problems = checked(`${CONDUCTOR}Run node "<flow-root>/missing.mjs".\n`);
   assert.deepEqual(
-    problems.map((p) => p.split(': ')[1]),
+    problems.map((p) => p.split(': ')[0]),
     ['[claude-code] skills/f/SKILL.md:6', '[codex] skills/f/SKILL.md:6'],
     problems.join('\n'),
   );
@@ -167,8 +152,8 @@ test('an unresolved node path makes check() return a problem', () => {
     problems.join('\n'),
   );
 });
-test('Codex text naming a Claude-only phrase makes check() return a problem', () => {
+test('a build reports Codex text naming a Claude-only phrase', () => {
   const problems = checked(`${CONDUCTOR}Search with WebSearch.\n`);
   assert.equal(problems.length, 1, problems.join('\n'));
-  assert.match(problems[0], /^flows: \[codex\] skills\/f\/SKILL\.md:6: .*WebSearch/);
+  assert.match(problems[0], /^\[codex\] skills\/f\/SKILL\.md:6: .*WebSearch/);
 });

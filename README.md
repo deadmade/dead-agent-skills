@@ -5,13 +5,14 @@
 My personal skills, flows and MCP integrations for **Claude Code and Codex**, so every machine (Linux, Windows) gets the same setup. It's
 built for me; use it if it fits, but expect it to change without notice.
 
-Both native marketplaces ship in this repository. **The installer is optional.** No build or npm setup is needed to
-add either marketplace or install its skills.
+Both native marketplaces ship on this repository's `release` branch, which every release moves forward. **The
+installer is optional.** No build or npm setup is needed to add either marketplace or install its skills; `main`
+holds only the sources, so name the branch.
 
 **Claude Code** — add the marketplace, then pick plugins:
 
 ```text
-/plugin marketplace add deadmade/dead-claude-skills
+/plugin marketplace add deadmade/dead-claude-skills@release
 /plugin install dead-skills@dead-claude-skills
 /plugin install flows@dead-claude-skills
 ```
@@ -19,18 +20,18 @@ add either marketplace or install its skills.
 **Codex** — add the same repository using Codex's native marketplace commands:
 
 ```sh
-codex plugin marketplace add deadmade/dead-claude-skills
+codex plugin marketplace add deadmade/dead-claude-skills --ref release
 codex plugin add flows@dead-agent-skills
 codex plugin add dead-skills@dead-agent-skills
 codex plugin add graphify@dead-agent-skills
 codex plugin add web-mcp@dead-agent-skills
 ```
 
-The Claude catalog is `.claude-plugin/marketplace.json`; the Codex catalog is `.agents/plugins/marketplace.json`.
+On that branch the Claude catalog is `.claude-plugin/marketplace.json`; the Codex catalog is `.agents/plugins/marketplace.json`.
 They have separate plugin selections and host-specific packages. The repository still has its original GitHub name;
 Claude's marketplace/plugin identifiers remain stable for existing users.
 
-Native packages are checked in under `.agents/plugins/` (Codex) and `.claude-plugin/` (Claude Code), including skill packs, reviewer briefs, C# libraries and licenses.
+The native packages live under `.agents/plugins/` (Codex) and `.claude-plugin/` (Claude Code), including skill packs, reviewer briefs, C# libraries and licenses.
 They install directly from the Git marketplace. Codex does not apply Claude's plugin dependency declarations, so
 install the companion plugins shown above for flows. Flows also document fallbacks when an integration is missing.
 Standalone options include hallmark, Rust, C# and Postgres skills, plus MCP setup plugins for GitHub, Azure and
@@ -99,16 +100,16 @@ compacts the context at 350K tokens (`autoCompactWindow`, unless you set your ow
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
 Everything ships as one version. Every merge to main releases a patch; a bigger step is `npm run release -- minor`
 and `git push --follow-tags origin main`. The tag builds the installer and the binaries and publishes the GitHub
-release they're downloaded from. From a checkout,
-`npm ci` once, then `node tools/installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.
+release they're downloaded from, then commits the native distributions onto the `release` branch. From a checkout,
+`npm ci` and `npm run build:harnesses` once, then `node tools/installer/install.ts` runs the installer (Node 26 or newer)
+and `npm run typecheck` checks it.
 
 Author plugins in `plugins/catalog.json` and their source resources under `plugins/`. The catalog declares shared
 resources, dependencies, targets and native overlays; hooks use neutral events in each plugin's `hooks/hooks.json`.
-Run `npm run build:harnesses`, review both native distributions and root catalog changes, then include them in the
-same commit as the source. Never edit `.claude-plugin/` or `.agents/plugins/` by hand.
-`npm run check:harnesses` rebuilds in a temporary directory and detects missing, changed and extra outputs without
-rewriting your checkout. Vendoring and release scripts
-regenerate both targets; CI checks freshness. `npm pack` checks freshness and compiles the optional installer.
+`npm run build:harnesses` writes both native distributions and their catalogs to `.claude-plugin/` and
+`.agents/plugins/`; review them, but don't commit them: `main` ignores both, and only the `release` branch carries them.
+Never edit them by hand. `npm test` (its repo checks), `npm pack` and the vendoring scripts build them first; a
+problem the build finds in the composed flows text fails the build.
 
 Required unsupported capabilities fail generation; optional unsupported events have diagnostics and are omitted.
 Native extensions such as Claude engine modules never enter Codex packages. A future harness needs a catalog target,

@@ -6,5 +6,5 @@ Claude Code keeps its existing marketplace/plugin identifiers, Night City theme,
 Claude engine modules stay in Claude packages. Codex receives shared hooks and a native Night City theme through
 its adapters; it must not load Claude engine modules.
 
-Author under `plugins/` (agent-neutral; UI mods are declared in `plugin.json` and warned about for harnesses that cannot run them); `tools/harness-compiler/` generates every harness file, so `plugins/` never holds Claude or Codex specifics (`harness-compiler lint` enforces it). Run `npm run build:harnesses`, review both generated distributions/catalogs,
-and include them with source changes. `npm run check:harnesses` checks freshness without rewriting the checkout.
+Author under `plugins/` (agent-neutral; UI mods are declared in `plugin.json` and warned about for harnesses that cannot run them); `tools/harness-compiler/` generates every harness file, so `plugins/` never holds Claude or Codex specifics (`harness-compiler lint` enforces it). Run `npm run build:harnesses` and review both generated distributions/catalogs;
+they are gitignored and never committed on `main` (release.yml commits them on the `release` branch only).

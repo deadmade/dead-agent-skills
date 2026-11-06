@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// harness-compiler build | check | validate
+// harness-compiler build | validate | lint
 import { join } from 'node:path';
-import { build, check, formatDiagnostic } from './emit/commands.ts';
+import { build, formatDiagnostic } from './emit/commands.ts';
 import { lintPlugins, loadAllowlist } from './lint.ts';
 import { loadPlugins, selectTarget } from './load.ts';
 import { TARGETS } from './targets/index.ts';
@@ -16,14 +16,8 @@ try {
       console.log(`${conductor}: ~${tokens} tokens of rules plus Start`);
     for (const p of built.problems) console.error(`problem: ${p}`);
     console.log('Updated both native distributions and repository marketplaces.');
-  } else if (command === 'check') {
-    const problems = check(root);
-    if (problems.length) {
-      console.error(
-        problems.map((p) => (p.startsWith('flows: ') ? p : `${p} (run npm run build:harnesses)`)).join('\n'),
-      );
-      process.exitCode = 1;
-    } else console.log('Native distributions and marketplaces are current.');
+    // The trees are written either way; a built-text problem still fails the run (prepack, release.yml).
+    if (built.problems.length) process.exitCode = 1;
   } else if (command === 'validate') {
     const plugins = loadPlugins(root);
     for (const t of TARGETS) selectTarget(plugins, t.id);
@@ -35,7 +29,7 @@ try {
       console.error(problems.map((p) => `${p.file}${p.line ? ':' + p.line : ''}: ${p.message}`).join('\n'));
       process.exitCode = 1;
     } else console.log('plugins/ is agent-neutral.');
-  } else throw new Error(`Unknown command "${command}". Use build, check, validate or lint.`);
+  } else throw new Error(`Unknown command "${command}". Use build, validate or lint.`);
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;

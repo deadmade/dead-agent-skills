@@ -38,5 +38,5 @@ A checklist of the places a new vendored source touches. Tick each or say why no
 - [ ] READMEs (root, flows, the plugin's) and the plugin/marketplace `description`s say what the code now does.
 - [ ] `npm test`.
 
-- [ ] Run `npm run build:harnesses`, review both generated trees and root catalogs, include them with source changes;
-      run `npm run check:harnesses` before the PR. Never edit generated packages.
+- [ ] Run `npm run build:harnesses` and review both generated trees and root catalogs (gitignored, so they stay out of
+      the PR). Never edit generated packages.
