@@ -50,9 +50,9 @@ need agent-browser. The setup skill and package README describe these prerequisi
 allowlist. Atlassian uses native Codex OAuth login. Credentials are not embedded in the marketplace.
 
 Shared startup rules and desktop notifications have packaged adapters for both harnesses. Night City supplies
-both native themes. tui-review, md-pane, status lines, LSP plugins and Claude UI mods remain Claude-only extensions. Flows share phases, approval gates and saved state through host adapters. Without
+both native themes. md-pane, status lines, LSP plugins and Claude UI mods remain Claude-only extensions. Flows share phases, approval gates and saved state through host adapters. Without
 subagents the main session does delegated work (searching, exploring) itself; independent checks are skipped and
-recorded as not checked. tui-review is optional and is no longer a flow dependency.
+recorded as not checked.
 
 For automated machine setup, the optional installer manages either or both agents and handles binaries, native MCP
 registration and safe migration from existing managed global rules. It accepts `--agents=codex`, `--agents=claude-code`, or both separated by a
@@ -65,7 +65,7 @@ toned-down synthwave theme that everything else here is painted in), desktop not
 waits for you, and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, [Azure DevOps Server](plugins/opt-in/mcp/mcp-azure/README.md), Atlassian on Codex), skill packs
 like hallmark and graphify, and tools such as
-[tui-review](plugins/shared/tui-review/README.md), [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
+[md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
 Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search read in one browser window of its own, page fetching,
 passive lookups and a browser with an archive of everything it pulled, and
 [headroom-trim](plugins/opt-in/headroom-trim/README.md), which shrinks every tool result with headroom's offline compression before Claude reads it.
@@ -93,7 +93,7 @@ old installs of them.
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It points the marketplace at the `release` branch, which follows the newest
-release, so Claude Code updates the plugins on its own (rerun the installer for new tui-review and web-mcp binaries and the flow cockpit's Windows app), and
+release, so Claude Code updates the plugins on its own (rerun the installer for new web-mcp binaries and the flow cockpit's Windows app), and
 it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). It
 lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own) and
 compacts the context at 350K tokens (`autoCompactWindow`, unless you set your own; it only matters on 1M-context models). Optional toggles add ccstatusline

@@ -197,7 +197,6 @@ mapping is written into each built conductor (`tools/harness-compiler/src/templa
 `references/resource-index.md`.
 If a session cannot launch subagents, the main session does the delegated work (searching, exploring) itself, and
 independent checks (reviewers, source checks, the copyedit) are skipped and recorded as not checked. Keep approval gates.
-tui-review is a separate optional tool for reading a diff.
 
 Install instructions are generated with each distribution and listed in the repository README.
 

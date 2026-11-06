@@ -4,7 +4,7 @@ name: Release
 # vX.Y.Z (the generated marketplaces and plugin manifests take it when built). Only a push to main releases, and main only takes merged PRs (admins aside), so a tag
 # pushed any other way publishes nothing. Each merge cuts a patch here (stamped on a commit off main, so main is never
 # pushed to); a release you choose is `npm run release -- minor` pushed to main with its tag, which this run then
-# releases. The run checks the repo, builds tui-review, web-mcp, ado-mcp and the flow cockpit's Windows app from the tag,
+# releases. The run checks the repo, builds web-mcp, ado-mcp and the flow cockpit's Windows app from the tag,
 # publishes the release, and commits the native distributions (gitignored on main) onto the release branch. Docs-only
 # merges don't release.
 on:
@@ -104,7 +104,7 @@ jobs:
           ref: ${{ env.TAG }}
           persist-credentials: false
 
-      # Every artifact of this run: the tui-review, web-mcp, ado-mcp and flow cockpit archives, each with its .sha256.
+      # Every artifact of this run: the web-mcp, ado-mcp and flow cockpit archives, each with its .sha256.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
@@ -141,7 +141,6 @@ jobs:
 
           installer.tgz: the installer, built to JS.
 
-          tui-review-*: the binary behind tui-review, for each platform; the installer downloads yours.
           web-mcp-*: the binary behind the web-mcp plugin, for Windows and Linux x64; the installer downloads yours.
           ado-mcp-*: the mcp-azure server for Windows and Linux x64; the installer downloads it.
           flow-cockpit-*: the flow cockpit window for Windows x64, with its default extensions; the installer downloads it. Linux runs it from the flake: \`nix run github:deadmade/dead-claude-skills/$TAG#flow-cockpit\`."
