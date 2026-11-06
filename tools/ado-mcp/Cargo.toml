@@ -1,34 +1,29 @@
 [package]
 name = "ado-mcp"
-version = "0.6.0"
-edition = "2024"
-rust-version = "1.97"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = "Stdio MCP server for the mcp-azure plugin: Azure DevOps Server pull request, work item, pipeline, search, wiki and repo file tools. Also builds timetrack, a TUI that times work items."
-license = "MIT"
-publish = false
+license.workspace = true
+publish.workspace = true
 
 [dependencies]
-rmcp = { version = "=3.8.0", features = ["server", "transport-io", "macros"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "sync", "time"] }
-url = "2"
-anyhow = "1"
-base64 = "0.23"
-reqwest = { version = "=0.13.5", default-features = false, features = ["rustls-no-provider", "json"] }
-rustls = { version = "0.23", default-features = false, features = ["std"] }
-azure_devops_rust_api = { version = "=0.39.1", default-features = false, features = ["git", "build", "pipelines", "policy", "wit", "core", "ims", "search", "wiki", "test"] }
-azure_core = "=1.1.0"
+rmcp = { workspace = true, features = ["server", "transport-io", "macros"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-std", "sync", "time"] }
+url = { workspace = true }
+anyhow = { workspace = true }
+base64 = { workspace = true }
+reqwest = { workspace = true, features = ["rustls-no-provider", "json"] }
+rustls = { workspace = true, features = ["std"] }
+azure_devops_rust_api = { workspace = true, features = ["git", "build", "pipelines", "policy", "wit", "core", "ims", "search", "wiki", "test"] }
+azure_core = { workspace = true }
 # Already in the tree through azure_core; implementing its `Policy` needs the macro.
-async-trait = "0.1"
+async-trait = { workspace = true }
 # timetrack only.
-ratatui = "0.30"
-jiff = { version = "0.2", features = ["serde"] }
+ratatui = { workspace = true }
+jiff = { workspace = true, features = ["serde"] }
 
-[lints.clippy]
-pedantic = { level = "warn", priority = -1 }
-
-[profile.release]
-lto = "thin"
-codegen-units = 1
-strip = true
+[lints]
+workspace = true

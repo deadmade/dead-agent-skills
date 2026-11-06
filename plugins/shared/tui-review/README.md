@@ -13,7 +13,7 @@ into its `bin` folder and sets the plugin's `binPath`, unless a `tui-review` is 
 archive for your platform from the [releases](https://github.com/deadmade/dead-claude-skills/releases), or build it,
 and put it on PATH or set its path with `/plugin configure tui-review`:
 
-    cargo build --release --manifest-path tools/tui-review/Cargo.toml   # or: nix build .#tui-review
+    cargo build --release --locked -p tui-review --bin tui-review   # or: nix build .#tui-review
 
 ## Use
 
@@ -96,7 +96,7 @@ Plugin tests have no file system, so `tests/make-fixture.mjs` turns `tui-review 
 (not committed). The tests read the real Rust output, so they also hold the TypeScript reader to the Rust writer.
 The cache layout is documented in `tools/tui-review/src/format.rs`.
 
-tui-review ships with the repo's releases (see the main README): `npm run release` bumps `tools/tui-review/Cargo.toml`, `Cargo.lock` and
+tui-review ships with the repo's releases (see the main README): `npm run release` bumps the root workspace version in `Cargo.toml`, its package entries in `Cargo.lock`, and
 the plugin manifest with everything else (a test checks they match), and the tag's `release.yml` runs
 `.github/workflows/crates-build.yml`, which builds Windows and Linux (static), x64 only. Run
 `crates-build.yml` by hand to build without releasing.

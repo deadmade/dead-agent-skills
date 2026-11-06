@@ -17,18 +17,9 @@ updates:
     groups:
       npm:
         patterns: ['*']
+  # One workspace and lockfile. Azure's reqwest and azure_core must move together.
   - package-ecosystem: cargo
-    directories: ['/tools/tui-review', '/tools/web-mcp', '/tools/flow-cockpit']
-    schedule:
-      interval: weekly
-      day: monday
-    groups:
-      cargo:
-        patterns: ['*']
-  # ado-mcp's reqwest must stay the one azure_core uses (AGENTS.md: `cargo tree -d -i reqwest` shows one), and
-  # azure_devops_rust_api (archived upstream) pins azure_core, so neither moves on its own.
-  - package-ecosystem: cargo
-    directory: /tools/ado-mcp
+    directory: /
     schedule:
       interval: weekly
       day: monday

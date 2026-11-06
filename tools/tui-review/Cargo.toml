@@ -1,49 +1,41 @@
 [package]
 name = "tui-review"
-version = "0.6.0"
-edition = "2024"
-rust-version = "1.97"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = "Computes a branch's review diff and writes the cache the tui-review mod paints from."
-license = "MIT"
-publish = false
+license.workspace = true
+publish.workspace = true
 
 [dependencies]
-anyhow = "1.0.104"
-gix = { version = "0.90", default-features = false, features = ["revision", "blob-diff", "max-performance", "sha1"] }
-imara-diff = "0.2"
-rayon = "1.12"
-tree-sitter = "0.27"
-tree-sitter-bash = "0.25.1"
-tree-sitter-c-sharp = "0.23.5"
-tree-sitter-highlight = "0.27"
-tree-sitter-javascript = "0.25.0"
-tree-sitter-json = "0.24.8"
-tree-sitter-nix = "0.3.0"
-tree-sitter-python = "0.25.0"
-tree-sitter-rust = "0.24.2"
-tree-sitter-toml-ng = "0.7.0"
-tree-sitter-typescript = "0.23.2"
-tree-sitter-yaml = "0.7.2"
-unicode-width = "0.2.2"
-zerocopy = { version = "0.8.62", features = ["derive"] }
+anyhow = { workspace = true }
+gix = { workspace = true, features = ["revision", "blob-diff", "max-performance", "sha1"] }
+imara-diff = { workspace = true }
+rayon = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-bash = { workspace = true }
+tree-sitter-c-sharp = { workspace = true }
+tree-sitter-highlight = { workspace = true }
+tree-sitter-javascript = { workspace = true }
+tree-sitter-json = { workspace = true }
+tree-sitter-nix = { workspace = true }
+tree-sitter-python = { workspace = true }
+tree-sitter-rust = { workspace = true }
+tree-sitter-toml-ng = { workspace = true }
+tree-sitter-typescript = { workspace = true }
+tree-sitter-yaml = { workspace = true }
+unicode-width = { workspace = true }
+zerocopy = { workspace = true, features = ["derive"] }
 
 # musl's malloc is slow under threads: colouring took 2.7x as long in the static Linux build. mimalloc serves both
 # Rust and tree-sitter's C code there.
 [target.'cfg(target_env = "musl")'.dependencies]
-libmimalloc-sys = { version = "0.1.49", features = ["extended"] }
-mimalloc = "0.1.52"
+libmimalloc-sys = { workspace = true, features = ["extended"] }
+mimalloc = { workspace = true }
 
 [dev-dependencies]
-divan = "0.1.21"
-tempfile = "3.27.0"
-
-[lints.clippy]
-pedantic = { level = "warn", priority = -1 }
-
-[profile.release]
-lto = "thin"
-codegen-units = 1
-strip = true
+divan = { workspace = true }
+tempfile = { workspace = true }
 
 [[bench]]
 name = "format"
@@ -52,3 +44,6 @@ harness = false
 [[bench]]
 name = "review"
 harness = false
+
+[lints]
+workspace = true
