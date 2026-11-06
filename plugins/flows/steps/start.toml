@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 text = '''
 A run's folder is `docs/features/<slug>/`, found in the repository root or a worktree under `.worktrees/*/`,
 `worktrees/*/` or `.claude/worktrees/*/`. Where several copies of a flow.md exist, the newest is the run's. Never

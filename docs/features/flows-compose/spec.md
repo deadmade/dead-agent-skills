@@ -116,8 +116,8 @@ validate than just text"). Every key but `text` is optional:
 
 `smol-toml` parses the files. Compose loads only `steps/<name>.toml` files whose name is a step name
 (`[a-z][a-z-]*`), and takes the key list, types and allowed values from `steps/step.schema.json`, so the schema is the
-one source. `.taplo.toml` at the repository root points editors at the schema, so completion and squiggles work while
-writing. Nothing formats the step files: taplo would never touch the text inside `'''`.
+one source. Each step's `#:schema ./step.schema.json` directive points editors at the schema, so completion and squiggles work while
+writing. Treefmt runs Taplo on the step files; the text inside `'''` is preserved.
 
 In steps (inside `text`) as in flows, override markers sit next to the sentences they override, and they are stripped from the built
 output.

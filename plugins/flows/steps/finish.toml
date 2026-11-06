@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 uses = ["pstack-picks:interrogate"]
 requires = ["decide", "close"]
 writes = ["Walkthrough", "Review", "Learned"]

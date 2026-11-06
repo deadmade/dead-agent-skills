@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 uses = ["flows:writing"]
 needs = "subagents"
 

@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 writes = ["Skipped", "Run verdict"]
 
 text = '''

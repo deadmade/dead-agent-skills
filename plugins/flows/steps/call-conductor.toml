@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 writes = ["Findings", "Deviations", "Rulings"]
 
 text = '''

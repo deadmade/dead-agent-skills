@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 requires = ["builder-brief", "deviations"]
 writes = ["Tasks"]
 

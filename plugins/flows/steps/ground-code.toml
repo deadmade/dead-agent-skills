@@ -1,4 +1,10 @@
-uses = ["pstack-picks:how", "pstack-picks:why", "graphify:graphify", "mattpocock-picks:setup-matt-pocock-skills"]
+#:schema ./step.schema.json
+uses = [
+  "pstack-picks:how",
+  "pstack-picks:why",
+  "graphify:graphify",
+  "mattpocock-picks:setup-matt-pocock-skills",
+]
 
 text = '''
 

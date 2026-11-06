@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 writes = ["Tasks", "Rulings", "Parking lot", "Deviations"]
 
 text = '''

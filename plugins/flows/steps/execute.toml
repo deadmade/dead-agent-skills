@@ -1,4 +1,8 @@
-uses = ["superpowers:subagent-driven-development", "superpowers:executing-plans"]
+#:schema ./step.schema.json
+uses = [
+  "superpowers:subagent-driven-development",
+  "superpowers:executing-plans",
+]
 requires = ["worktree", "builder-brief", "deviations"]
 writes = ["Skipped"]
 needs = "subagents"
