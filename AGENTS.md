@@ -247,10 +247,12 @@ Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps Gi
 Everything ships as one version: `package.json` and `package-lock.json`, the root `Cargo.toml` workspace version
 and all four local package entries in `Cargo.lock`, and the installer URL in README.md. The build stamps this version
 into the marketplaces and generated plugin manifests.
-`check-repo.mjs` fails on drift. Never bump by hand. Every merge to `main` that touches more than `docs/` or the root
-`*.md` files releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
+`check-repo.mjs` fails on drift. Never bump by hand. A merge to `main` that touches `plugins/`, `tools/` or shared
+build inputs (the allowlist in `release.yml`) releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
 bump off `main` and tags it, so `main`'s `package.json` lags behind the tags and the next version counts from the
-highest `vX.Y.Z` tag (`nextVersion` in `scripts/release.mjs`; fetch tags before a local release). A release you choose:
+highest `vX.Y.Z` tag (`nextVersion` in `scripts/release.mjs`; fetch tags before a local release). CI, root docs,
+audit notes and analysis artifacts alone do not release; Markdown inside plugins still counts as shipped content.
+A release you choose:
 
     npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
