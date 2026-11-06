@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -143,4 +143,21 @@ test('real git diff includes both sides of a rename and excludes base-only chang
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// Captured from PR #122 at 0b9dca7: web-mcp changes plus docs and generated session nudges.
+test('PR 122 selects only web-mcp even with graphify session cache files', () => {
+  const paths = JSON.parse(readFileSync(new URL('./fixtures/ci-pr122-paths.json', import.meta.url), 'utf8'));
+  assert.deepEqual(selectChecks(paths), {
+    node: true,
+    skills: true,
+    rust: true,
+    binaries: ['web-mcp'],
+    packages: ['web-mcp'],
+  });
+});
+
+test('generated graphify session nudges select no checks; unknown graphify files still select all', () => {
+  assert.deepEqual(selectChecks(['graphify-out/cache/hook_sessions/session.nudges']), selectChecks([]));
+  assert.deepEqual(selectChecks(['graphify-out/new-input.json']), selectChecks([], true));
 });
