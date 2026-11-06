@@ -85,7 +85,7 @@ deleted, so it grows; delete it by hand if you like.
 Pick it in the installer (see the [main README](../../../README.md)).
 
 The installer downloads the `web-mcp` binary from the release and sets `binPath`. By hand, build it with
-`cargo build --release --manifest-path tools/web-mcp/Cargo.toml` (or `nix build .#web-mcp`) and put it on PATH
+`cargo build --release --locked -p web-mcp --bin web-mcp` (or `nix build .#web-mcp`) and put it on PATH
 or set its path with `/plugin configure web-mcp`.
 
 - **A browser**: found as described above; the installer needs no Docker. If you accept the `web-builtins-off`

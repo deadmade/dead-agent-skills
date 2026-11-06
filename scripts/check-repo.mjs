@@ -116,19 +116,12 @@ for (const [where, v] of [
   ['packages[""].version', lock.packages?.['']?.version],
 ])
   if (v !== version) problems.push(`package-lock.json: ${where} is ${v}, package.json has ${version}`);
-const CRATES = [
-  { cargo: 'tools/tui-review/Cargo.toml', lock: 'tools/tui-review/Cargo.lock', name: 'tui-review' },
-  { cargo: 'tools/web-mcp/Cargo.toml', lock: 'tools/web-mcp/Cargo.lock', name: 'web-mcp' },
-  // A workspace: [workspace.package] carries the version; the lock lists each member.
-  { cargo: 'tools/flow-cockpit/Cargo.toml', lock: 'tools/flow-cockpit/Cargo.lock', name: 'flow-cockpit-core' },
-  { cargo: 'tools/flow-cockpit/Cargo.toml', lock: 'tools/flow-cockpit/Cargo.lock', name: 'flow-cockpit' },
-  { cargo: 'tools/ado-mcp/Cargo.toml', lock: 'tools/ado-mcp/Cargo.lock', name: 'ado-mcp' },
-];
-for (const { cargo, lock, name } of CRATES) {
-  const crate = /^version = "(.*)"/m.exec(readFileSync(cargo, 'utf8'))?.[1];
-  if (crate !== version) problems.push(`${cargo}: version is ${crate}, package.json has ${version}`);
-  const locked = new RegExp(`^name = "${name}"\\r?\\nversion = "(.*)"`, 'm').exec(readFileSync(lock, 'utf8'))?.[1];
-  if (locked !== version) problems.push(`${lock}: ${name} is ${locked}, package.json has ${version}`);
+const cargo = /^version = "(.*)"/m.exec(readFileSync('Cargo.toml', 'utf8'))?.[1];
+if (cargo !== version) problems.push(`Cargo.toml: workspace version is ${cargo}, package.json has ${version}`);
+const cargoLock = readFileSync('Cargo.lock', 'utf8');
+for (const name of ['tui-review', 'web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit']) {
+  const locked = new RegExp(`^name = "${name}"\\r?\\nversion = "(.*)"`, 'm').exec(cargoLock)?.[1];
+  if (locked !== version) problems.push(`Cargo.lock: ${name} is ${locked}, package.json has ${version}`);
 }
 
 if (problems.length) {
