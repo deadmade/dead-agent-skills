@@ -22,6 +22,8 @@ excludes = [
   "crates/flow-cockpit/app/shell/vendor/**",
   # Test fixtures are real documents and templates, read as written.
   "crates/flow-cockpit/core/tests/fixtures/**",
+  # Written by graphify and committed as written: a formatter would rewrite every rebuild's diff.
+  "graphify-out/**",
   "plugins/shared/agent-review/skills/**",
   "plugins/shared/agent-review/LICENSE",
   "plugins/shared/agent-review/UPSTREAM",

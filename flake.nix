@@ -16,8 +16,8 @@
   }: let
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
-    # Upstream files copied by tools/upstream-sync/src/adapters/*.ts: fixing them here would churn every sync PR.
-    vendored = ["^\\.claude-plugin/" "^\\.agents/plugins/" "^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/self-review/(LICENSE|references/upstream/)" "^crates/flow-cockpit/bindings/" "^crates/flow-cockpit/app/shell/vendor/" "^crates/flow-cockpit/core/tests/fixtures/"];
+    # Upstream files copied by tools/upstream-sync/src/adapters/*.ts, and graphify's committed output: fixing them here would churn every sync PR or graph rebuild.
+    vendored = ["^\\.claude-plugin/" "^\\.agents/plugins/" "^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/self-review/(LICENSE|references/upstream/)" "^crates/flow-cockpit/bindings/" "^crates/flow-cockpit/app/shell/vendor/" "^crates/flow-cockpit/core/tests/fixtures/" "^graphify-out/"];
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let

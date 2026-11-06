@@ -295,6 +295,10 @@ plugins of ours that the manifest no longer lists.
   started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or
   `plugins/flows/agents/` needs `nix develop` re-entered once to pick up their excludes.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
+- `graphify-out/` (the graphify knowledge graph) is committed so a second machine skips the ~5M-token extraction: `graph.json`, `GRAPH_REPORT.md`,
+  `manifest.json`, the labels and `cache/semantic/`. Machine-local and free-to-regenerate parts are in `.gitignore`. graphify writes it, so treefmt and
+  end-of-file-fixer exclude it (reformatting turns `graph.json` into 449k lines). Run `graphify hook install` once per clone: hooks and the merge
+  driver live in `.git/`. The post-commit hook rebuilds code changes only and leaves `graph.json` modified; docs need `/graphify --update`.
 - `npm run scan-skills` (needs `pipx`): Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`;
   it fails on a high or critical finding. A finding judged benign gets a scoped suppression with its reason in
   `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.
