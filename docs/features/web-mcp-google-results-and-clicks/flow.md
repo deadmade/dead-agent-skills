@@ -1,7 +1,7 @@
 ---
 flow: fix
-phase: finish
-now: Waiting for you: pick how the branch ends.
+phase: done
+now: Done: PR handed over for worktree-web-mcp-google-results-and-clicks.
 ---
 
 # web-mcp Google results and page input: flow
