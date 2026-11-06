@@ -315,7 +315,8 @@ change; its two OS matrix jobs retain their required check names even when their
 those jobs. `crates.yml` tests and lints selected Rust packages together and independently on Linux and Windows,
 checks their minimum Rust version and Nix packages, and runs cockpit's frontend checks only when selected. Flow
 templates and compiler changes also select cockpit, whose tests read their output.
-Root Cargo, Nix and npm dependencies, CI changes and unknown paths select all checks; docs/ changes select none.
+Root Cargo, Nix and npm dependencies, CI changes and unknown paths select all checks; docs/ and generated
+`graphify-out/cache/hook_sessions/*.nudges` changes select none.
 Manual runs select everything. `crates-build.yml` builds only selected binaries on PRs, but release calls always build
 the complete matrix because each version ships all binaries. Keep routing and its tests current when adding consumers.
 
