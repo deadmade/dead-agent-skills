@@ -1,6 +1,6 @@
 {
   "name": "dead-skills",
-  "version": "0.6.0",
+  "version": "0.6.19",
   "description": "Shared coding conventions, desktop notifications and Context7 setup for Codex.",
   "interface": {
     "displayName": "dead-skills",

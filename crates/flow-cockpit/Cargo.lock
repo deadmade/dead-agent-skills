@@ -875,7 +875,7 @@ dependencies = [
 
 [[package]]
 name = "flow-cockpit"
-version = "0.6.0"
+version = "0.6.19"
 dependencies = [
  "flow-cockpit-core",
  "include_dir",
@@ -897,7 +897,7 @@ dependencies = [
 
 [[package]]
 name = "flow-cockpit-core"
-version = "0.6.0"
+version = "0.6.19"
 dependencies = [
  "jiff",
  "serde",
