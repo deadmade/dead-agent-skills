@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 uses = ["superpowers:using-git-worktrees"]
 writes = ["Findings"]
 

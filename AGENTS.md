@@ -303,7 +303,8 @@ plugins of ours that the manifest no longer lists.
   A new worktree has no `.pre-commit-config.yaml` (it is generated and untracked), so its first commit fails until
   `nix develop` runs in that worktree. treefmt's hook fails on any file it changes: run `treefmt` on the files you
   changed (never a folder: it reformats files you didn't touch), then `npm run build:harnesses`, then stage.
-- `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
+- `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt, taplo for TOML).
+  Formatter options live in `treefmt.toml`; flow steps use `#:schema ./step.schema.json` for editor validation.
 - `npm run scan-skills` (needs `pipx`): Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`
   and the composed flows conductors in `.claude-plugin/flows/skills/`; it fails on a high or critical finding. A
   finding judged benign gets a scoped suppression with its reason in `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.

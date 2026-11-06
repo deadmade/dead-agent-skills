@@ -25,7 +25,7 @@
     in
       pkgs.writeShellApplication {
         name = "treefmt";
-        runtimeInputs = [pkgs.treefmt pkgs.alejandra pkgs.prettier pkgs.rustfmt];
+        runtimeInputs = [pkgs.treefmt pkgs.alejandra pkgs.prettier pkgs.rustfmt pkgs.taplo];
         text = ''exec treefmt "$@"'';
       };
 

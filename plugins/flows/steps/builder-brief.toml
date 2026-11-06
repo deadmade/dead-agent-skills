@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 requires = ["before-you-write", "deviations"]
 
 text = '''

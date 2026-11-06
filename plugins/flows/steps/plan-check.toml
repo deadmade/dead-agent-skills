@@ -1,3 +1,4 @@
+#:schema ./step.schema.json
 text = '''
 Run `node "<flow-root>/skills/build-feature/scripts/glance.mjs" "<plan.md>"` after every edit to the plan and again
 after its copyedit, so the block a gate shows matches the plan below it. It writes the plan's task graph and table at

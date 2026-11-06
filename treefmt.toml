@@ -37,10 +37,24 @@ includes = ["*.nix"]
 
 [formatter.prettier]
 command = "prettier"
-options = ["--write"]
-includes = ["*.js", "*.mjs", "*.ts", "*.tsx", "*.json", "*.md", "*.yaml", "*.yml"]
+options = ["--write", "--no-config", "--print-width", "120", "--single-quote"]
+includes = [
+  "*.js",
+  "*.mjs",
+  "*.ts",
+  "*.tsx",
+  "*.json",
+  "*.md",
+  "*.yaml",
+  "*.yml",
+]
 
 [formatter.rustfmt]
 command = "rustfmt"
 options = ["--edition", "2024"]
 includes = ["*.rs"]
+
+[formatter.taplo]
+command = "taplo"
+options = ["fmt", "--no-auto-config"]
+includes = ["*.toml"]
