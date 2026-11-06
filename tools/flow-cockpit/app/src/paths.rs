@@ -56,7 +56,7 @@ pub struct Defaults {
 }
 
 /// The default extensions folder, the first that exists of: `$FLOW_COCKPIT_EXTENSIONS` (a development override, such
-/// as a checkout's `crates/flow-cockpit/extensions`, so edits show without a rebuild), `<exe dir>/../share/flow-cockpit/
+/// as a checkout's `tools/flow-cockpit/extensions`, so edits show without a rebuild), `<exe dir>/../share/flow-cockpit/
 /// extensions` (Nix and Linux installs) and `<exe dir>/extensions` (Windows). `exe` is the resolved path of the
 /// running program, so its folder's parent is the install's root.
 pub fn default_extensions(env: impl Fn(&str) -> Option<String>, exe: Option<&Path>) -> Defaults {

@@ -1,5 +1,5 @@
 // Turns a `tui-review gen` cache into tests/fixture.gen.ts, since plugin tests have no file system. Not committed:
-//   cargo run --release --manifest-path ../../../crates/tui-review/Cargo.toml -- gen --out <dir> && node tests/make-fixture.mjs <dir>
+//   cargo run --release --manifest-path ../../../tools/tui-review/Cargo.toml -- gen --out <dir> && node tests/make-fixture.mjs <dir>
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 

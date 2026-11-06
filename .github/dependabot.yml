@@ -18,7 +18,7 @@ updates:
       npm:
         patterns: ['*']
   - package-ecosystem: cargo
-    directories: ['/crates/tui-review', '/crates/web-mcp', '/crates/flow-cockpit']
+    directories: ['/tools/tui-review', '/tools/web-mcp', '/tools/flow-cockpit']
     schedule:
       interval: weekly
       day: monday
@@ -28,7 +28,7 @@ updates:
   # ado-mcp's reqwest must stay the one azure_core uses (AGENTS.md: `cargo tree -d -i reqwest` shows one), and
   # azure_devops_rust_api (archived upstream) pins azure_core, so neither moves on its own.
   - package-ecosystem: cargo
-    directory: /crates/ado-mcp
+    directory: /tools/ado-mcp
     schedule:
       interval: weekly
       day: monday

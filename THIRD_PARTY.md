@@ -159,7 +159,7 @@ option) at the version pinned in `tools/installer/assets/uv.json` (sha256-checke
 
 ## flow-cockpit
 
-`crates/flow-cockpit/app/shell/vendor/` holds the libraries the views' building blocks and the boot script use, copied unchanged
+`tools/flow-cockpit/app/shell/vendor/` holds the libraries the views' building blocks and the boot script use, copied unchanged
 from their npm tarballs (each tarball checked against the registry's `dist.integrity`), each with its license next to it:
 
 - **marked** 18.1.3: MIT, https://github.com/markedjs/marked (`lib/marked.esm.js`, and `lib/marked.d.ts` as

@@ -1,7 +1,7 @@
 # tui-review
 
 `/tui-review` opens a diff pane beside the chat, so you can read a branch's changes and ask Claude about them in the
-same session. The diff, highlighting and git work happen in the `tui-review` binary (Rust, `crates/tui-review/`). The mod only paints,
+same session. The diff, highlighting and git work happen in the `tui-review` binary (Rust, `tools/tui-review/`). The mod only paints,
 from small binary chunk files the binary writes to disk, so a 100k-line PR costs the same memory and frame time as a 100-line one.
 
 ## Install
@@ -13,7 +13,7 @@ into its `bin` folder and sets the plugin's `binPath`, unless a `tui-review` is 
 archive for your platform from the [releases](https://github.com/deadmade/dead-claude-skills/releases), or build it,
 and put it on PATH or set its path with `/plugin configure tui-review`:
 
-    cargo build --release --manifest-path crates/tui-review/Cargo.toml   # or: nix build .#tui-review
+    cargo build --release --manifest-path tools/tui-review/Cargo.toml   # or: nix build .#tui-review
 
 ## Use
 
@@ -86,7 +86,7 @@ Reviews are cached in `<git common dir>/tui-review/` (shared by a repo's worktre
 
     claude --plugin-dir plugins/shared/tui-review        # hot-reloads on save
 
-    cd crates/tui-review
+    cd tools/tui-review
     cargo clippy --all-targets && cargo test && cargo bench
     cargo test --release --test perf -- --ignored --nocapture   # speed and memory budgets on a large fixture repo
     cargo run --release -- gen --out /tmp/tui-review-fixture && node ../../plugins/shared/tui-review/tests/make-fixture.mjs /tmp/tui-review-fixture
@@ -94,9 +94,9 @@ Reviews are cached in `<git common dir>/tui-review/` (shared by a repo's worktre
 
 Plugin tests have no file system, so `tests/make-fixture.mjs` turns `tui-review gen` output into `tests/fixture.gen.ts`
 (not committed). The tests read the real Rust output, so they also hold the TypeScript reader to the Rust writer.
-The cache layout is documented in `crates/tui-review/src/format.rs`.
+The cache layout is documented in `tools/tui-review/src/format.rs`.
 
-tui-review ships with the repo's releases (see the main README): `npm run release` bumps `crates/tui-review/Cargo.toml`, `Cargo.lock` and
+tui-review ships with the repo's releases (see the main README): `npm run release` bumps `tools/tui-review/Cargo.toml`, `Cargo.lock` and
 the plugin manifest with everything else (a test checks they match), and the tag's `release.yml` runs
 `.github/workflows/crates-build.yml`, which builds Windows and Linux (static), x64 only. Run
 `crates-build.yml` by hand to build without releasing.

@@ -1,5 +1,5 @@
 // The start form, in jsdom. Runs in flow-cockpit.yml after `npm ci`, not in `npm test`:
-//   node --test crates/flow-cockpit/app/shell/start-form.test.mjs
+//   node --test tools/flow-cockpit/app/shell/start-form.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';

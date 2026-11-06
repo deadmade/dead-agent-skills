@@ -1,7 +1,7 @@
 # mcp-azure
 
 Azure DevOps Server tools for Claude: pull requests, work items, YAML pipeline runs, search, wikis and repo files. The
-server is `ado-mcp`, a stdio MCP server (Rust, `crates/ado-mcp/`) that talks to one self-hosted collection with a
+server is `ado-mcp`, a stdio MCP server (Rust, `tools/ado-mcp/`) that talks to one self-hosted collection with a
 personal access token. It calls the REST API through Microsoft's `azure_devops_rust_api` crate, with a few calls sent
 by hand where the crate falls short.
 
@@ -90,7 +90,7 @@ By hand:
     /plugin install mcp-azure@dead-claude-skills
     /plugin configure mcp-azure
 
-Build the binary with `cargo build --release` in `crates/ado-mcp` (or `nix build .#ado-mcp`), then put it on PATH or
+Build the binary with `cargo build --release` in `tools/ado-mcp` (or `nix build .#ado-mcp`), then put it on PATH or
 set `binPath` to it.
 
 The PAT needs Code (Read & Write), Work Items (Read & Write), Build (Read & Execute), Project and Team (Read), Wiki

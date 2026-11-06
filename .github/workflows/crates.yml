@@ -5,13 +5,13 @@ name: crates
 on:
   pull_request:
     paths:
-      - 'crates/tui-review/**'
+      - 'tools/tui-review/**'
       - 'plugins/shared/tui-review/**'
-      - 'crates/web-mcp/**'
+      - 'tools/web-mcp/**'
       - 'plugins/shared/web-mcp/**'
-      - 'crates/ado-mcp/**'
+      - 'tools/ado-mcp/**'
       - 'plugins/opt-in/mcp/mcp-azure/**'
-      - 'crates/flow-cockpit/**'
+      - 'tools/flow-cockpit/**'
       - 'plugins/opt-in/flow-cockpit/**'
       - 'plugins/flows/**'
       - 'tools/harness-compiler/src/**'
@@ -44,19 +44,19 @@ jobs:
         with:
           filters: |
             tui-review:
-              - 'crates/tui-review/**'
+              - 'tools/tui-review/**'
               - 'plugins/shared/tui-review/**'
               - '.github/workflows/crates.yml'
             web-mcp:
-              - 'crates/web-mcp/**'
+              - 'tools/web-mcp/**'
               - 'plugins/shared/web-mcp/**'
               - '.github/workflows/crates.yml'
             ado-mcp:
-              - 'crates/ado-mcp/**'
+              - 'tools/ado-mcp/**'
               - 'plugins/opt-in/mcp/mcp-azure/**'
               - '.github/workflows/crates.yml'
             cockpit:
-              - 'crates/flow-cockpit/**'
+              - 'tools/flow-cockpit/**'
               - 'plugins/opt-in/flow-cockpit/**'
               - 'plugins/flows/**'
               - 'tools/harness-compiler/src/**'
@@ -89,7 +89,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: crates/${{ matrix.crate }}
+        working-directory: tools/${{ matrix.crate }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -98,7 +98,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          workspaces: crates/${{ matrix.crate }}
+          workspaces: tools/${{ matrix.crate }}
 
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
@@ -167,10 +167,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          workspaces: crates/flow-cockpit
+          workspaces: tools/flow-cockpit
 
       - name: Clippy
-        working-directory: crates/flow-cockpit
+        working-directory: tools/flow-cockpit
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       # The core's phase-table test reads the built flows skills (.claude-plugin/flows/skills, gitignored).
@@ -181,21 +181,21 @@ jobs:
 
       # CI=true makes the relative-worktree test fail, not skip, when the runner's git is older than 2.48.
       - name: Core tests
-        working-directory: crates/flow-cockpit
+        working-directory: tools/flow-cockpit
         run: |
           git --version
           cargo test -p flow-cockpit-core
 
       - name: App build
         if: runner.os == 'Windows'
-        working-directory: crates/flow-cockpit
+        working-directory: tools/flow-cockpit
         run: cargo build -p flow-cockpit
 
       - name: Views tests and type checks
         run: |
-          node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/extensions/tests/*.test.ts'
-          npx tsc -p crates/flow-cockpit/app/shell
-          npx tsc -p crates/flow-cockpit/extensions
+          node --test 'tools/flow-cockpit/app/shell/*.test.mjs' 'tools/flow-cockpit/extensions/tests/*.test.ts'
+          npx tsc -p tools/flow-cockpit/app/shell
+          npx tsc -p tools/flow-cockpit/extensions
 
   # The package Linux users run (nix run .#flow-cockpit); its build runs the app's tests and checks the default extensions
   # it installs.

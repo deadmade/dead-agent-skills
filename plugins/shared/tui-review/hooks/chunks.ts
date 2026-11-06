@@ -1,4 +1,4 @@
-// Views over tui-review's cache files (layout: crates/tui-review/src/format.rs). Nothing is parsed: the bytes `$.fs.read` hands back
+// Views over tui-review's cache files (layout: tools/tui-review/src/format.rs). Nothing is parsed: the bytes `$.fs.read` hands back
 // get typed-array views laid over them, so any line is a direct lookup and no per-line objects are made.
 
 export const VERSION = 2;

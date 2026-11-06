@@ -66,11 +66,11 @@ function main() {
     ['package-lock.json', json],
     ['package-lock.json', /^( {6}"version": )"[^"]*"/m],
     ...[
-      ['crates/tui-review', 'tui-review'],
-      ['crates/web-mcp', 'web-mcp'],
-      ['crates/flow-cockpit', 'flow-cockpit-core'],
-      ['crates/flow-cockpit', 'flow-cockpit'],
-      ['crates/ado-mcp', 'ado-mcp'],
+      ['tools/tui-review', 'tui-review'],
+      ['tools/web-mcp', 'web-mcp'],
+      ['tools/flow-cockpit', 'flow-cockpit-core'],
+      ['tools/flow-cockpit', 'flow-cockpit'],
+      ['tools/ado-mcp', 'ado-mcp'],
     ].flatMap(([dir, name]) => [
       [`${dir}/Cargo.toml`, /^(version = )"[^"]*"/m],
       [`${dir}/Cargo.lock`, new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm')],

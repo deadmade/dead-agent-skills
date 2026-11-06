@@ -140,11 +140,11 @@ test('binPath: the flow cockpit in a folder of its own, the others loose in bin'
 test('binAdvice: rerun for the flow cockpit, build for the others', () => {
   assert.match(binAdvice('flow-cockpit'), /close flow-cockpit if it is open and run the installer again/);
   assert.doesNotMatch(binAdvice('flow-cockpit'), /cargo/);
-  assert.match(binAdvice('web-mcp'), /cargo build --release` in crates\/web-mcp/);
+  assert.match(binAdvice('web-mcp'), /cargo build --release` in tools\/web-mcp/);
 });
 
 test('tui-review versions match the release the installer fetches', () => {
-  const cargo = readFileSync(new URL('../../../crates/tui-review/Cargo.toml', import.meta.url), 'utf8');
+  const cargo = readFileSync(new URL('../../../tools/tui-review/Cargo.toml', import.meta.url), 'utf8');
   assert.equal(/^version = "(.+)"/m.exec(cargo)![1], json('package.json').version);
 });
 
