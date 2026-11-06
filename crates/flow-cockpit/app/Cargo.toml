@@ -8,24 +8,24 @@ publish.workspace = true
 description = "The flow cockpit window: shows flow runs, audits and Claude sessions through replaceable TypeScript views."
 
 [build-dependencies]
-tauri-build = { version = "=2.7.4", features = [] }
+tauri-build = { workspace = true, features = [] }
 
 [dependencies]
-flow-cockpit-core = { path = "../core" }
-include_dir = "0.7"
-jiff = "0.2.38"
-oxc_allocator = "=0.157.0"
-oxc_ast = "=0.157.0"
-oxc_codegen = "=0.157.0"
-oxc_parser = "=0.157.0"
-oxc_semantic = "=0.157.0"
-oxc_span = "=0.157.0"
-oxc_transformer = "=0.157.0"
-portable-pty = "=0.9.0"
-serde = { version = "1", features = ["derive"] }
-tauri = { version = "=2.12.5", features = [] }
-ts-rs = "=12.0.1"
-uuid = { version = "1", features = ["v4"] }
+flow-cockpit-core = { workspace = true }
+include_dir = { workspace = true }
+jiff = { workspace = true }
+oxc_allocator = { workspace = true }
+oxc_ast = { workspace = true }
+oxc_codegen = { workspace = true }
+oxc_parser = { workspace = true }
+oxc_semantic = { workspace = true }
+oxc_span = { workspace = true }
+oxc_transformer = { workspace = true }
+portable-pty = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tauri = { workspace = true, features = [] }
+ts-rs = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 
 [lints]
 workspace = true

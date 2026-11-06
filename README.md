@@ -102,6 +102,14 @@ and `git push --follow-tags origin main`. The tag builds the installer and the b
 release they're downloaded from. From a checkout,
 `npm ci` once, then `node tools/installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.
 
+The Rust packages share one workspace: dependency versions and release settings live in the root `Cargo.toml`,
+with one `Cargo.lock` and `target/`. From the repo root, build with `cargo build --workspace --locked` or select a
+binary with `cargo build --release --locked -p web-mcp --bin web-mcp`. Before testing, run
+`cargo build --locked -p web-mcp --bin fake-agent-browser`, then `cargo test --workspace --locked` and
+`cargo clippy --workspace --all-targets --locked -- -D warnings`. The full workspace needs cockpit's GTK/WebKit
+libraries on Linux; `nix develop` supplies them. CI also tests each package separately and checks the declared
+minimum Rust version. Add dependencies to `[workspace.dependencies]` and inherit them in member manifests.
+
 Author plugins in `plugins/catalog.json` and their source resources under `plugins/`. The catalog declares shared
 resources, dependencies, targets and native overlays; hooks use neutral events in each plugin's `hooks/hooks.json`.
 Run `npm run build:harnesses`, review both native distributions and root catalog changes, then include them in the

@@ -1,4 +1,4 @@
-// Cuts a release: one version for package.json (and its lock) and both crates; the plugin manifests and marketplaces
+// Cuts a release: one version for package.json (and its lock) and the Rust workspace; the plugin manifests and marketplaces
 // are generated from it (tools/harness-compiler). Committed and tagged vX.Y.Z on main. Pushing the tag runs
 // .github/workflows/release.yml, which builds the installer, tui-review and web-mcp and publishes the GitHub release. Claude Code only offers plugin
 // updates when this version changes. --detach commits off main instead, leaving the branch where it was: release.yml
@@ -26,6 +26,20 @@ export function nextVersion(current, tags, bump) {
     { major: `${major + 1}.0.0`, minor: `${major}.${minor + 1}.0`, patch: `${major}.${minor}.${patch + 1}` }[bump] ??
     bump;
   return /^\d+\.\d+\.\d+$/.test(next ?? '') ? next : undefined;
+}
+
+export function versionBumps() {
+  const json = /^( {2,4}"version": )"[^"]*"/m;
+  return [
+    ['package.json', json],
+    ['package-lock.json', json],
+    ['package-lock.json', /^( {6}"version": )"[^"]*"/m],
+    ['Cargo.toml', /^(version = )"[^"]*"/m],
+    ...['tui-review', 'web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit'].map((name) => [
+      'Cargo.lock',
+      new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm'),
+    ]),
+  ];
 }
 
 function main() {
@@ -58,24 +72,9 @@ function main() {
   if (git('tag', '--list', `v${next}`)) die(`tag v${next} already exists`);
 
   // Each file's own version line, edited in place so the rest of the file keeps its formatting. JSON: the top-level
-  // (or marketplace metadata) "version"; package-lock.json also its root package's. Each Rust crate: its version, and its
-  // entry in Cargo.lock so --locked builds pass.
-  const json = /^( {2,4}"version": )"[^"]*"/m;
-  const bumps = [
-    ['package.json', json],
-    ['package-lock.json', json],
-    ['package-lock.json', /^( {6}"version": )"[^"]*"/m],
-    ...[
-      ['crates/tui-review', 'tui-review'],
-      ['crates/web-mcp', 'web-mcp'],
-      ['crates/flow-cockpit', 'flow-cockpit-core'],
-      ['crates/flow-cockpit', 'flow-cockpit'],
-      ['crates/ado-mcp', 'ado-mcp'],
-    ].flatMap(([dir, name]) => [
-      [`${dir}/Cargo.toml`, /^(version = )"[^"]*"/m],
-      [`${dir}/Cargo.lock`, new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm')],
-    ]),
-  ];
+  // (or marketplace metadata) "version"; package-lock.json also its root package's. Rust inherits the workspace
+  // version; update every local package entry in Cargo.lock so --locked builds pass.
+  const bumps = versionBumps();
   const files = [...new Set([...bumps.map(([f]) => f), '.claude-plugin', '.agents/plugins'])];
   for (const [f, version] of bumps) {
     const text = readFileSync(f, 'utf8');

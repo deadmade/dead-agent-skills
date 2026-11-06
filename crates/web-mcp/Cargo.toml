@@ -1,59 +1,51 @@
 [package]
 name = "web-mcp"
-version = "0.6.0"
-edition = "2024"
-rust-version = "1.97"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = "Stdio MCP server for the web-mcp plugin: search, fetch, browser and lookup tools that archive everything in .web/."
-license = "MIT"
-publish = false
+license.workspace = true
+publish.workspace = true
 
 [dependencies]
-rmcp = { version = "=3.8.0", features = ["server", "transport-io", "macros"] }
-jiff = "0.2"
-sha2 = "0.11"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "fs", "sync", "io-util", "time", "net", "process"] }
-url = "2"
-quick-xml = "0.42"
-anyhow = "1"
-dom_smoothie = "=0.19.0"
-htmd = "=0.5.6"
-dom_query = "0.29"
-pdf_oxide = "=0.3.78"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
-reqwest = { version = "=0.13.5", default-features = false, features = ["rustls-no-provider", "http2", "gzip", "brotli"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-futures = { version = "0.3", default-features = false, features = ["std"] }
-base64 = "0.23"
-zip = { version = "=9.3.0", default-features = false, features = ["deflate"] }
+rmcp = { workspace = true, features = ["server", "transport-io", "macros"] }
+jiff = { workspace = true }
+sha2 = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-std", "fs", "sync", "io-util", "time", "net", "process"] }
+url = { workspace = true }
+quick-xml = { workspace = true }
+anyhow = { workspace = true }
+dom_smoothie = { workspace = true }
+htmd = { workspace = true }
+dom_query = { workspace = true }
+pdf_oxide = { workspace = true }
+image = { workspace = true, features = ["jpeg", "png", "webp", "gif"] }
+reqwest = { workspace = true, features = ["rustls-no-provider", "http2", "gzip", "brotli"] }
+rustls = { workspace = true, features = ["ring", "std", "tls12"] }
+futures = { workspace = true, features = ["std"] }
+base64 = { workspace = true }
+zip = { workspace = true, features = ["deflate"] }
 # Without zstd: no C toolchain needed to build.
-tantivy = { version = "=0.27.0", default-features = false }
-model2vec-rs = { version = "0.4.0", optional = true }
+tantivy = { workspace = true }
+model2vec-rs = { workspace = true, optional = true }
 
 [target.'cfg(unix)'.dependencies]
 # geteuid, to refuse a search folder another user owns; already in the tree through tokio.
-libc = "0.2"
+libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 # The kill-on-close job that takes the window's Chrome down with web-mcp; already in the tree through tokio.
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Security"] }
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Security"] }
 
 [dev-dependencies]
-criterion = { version = "=0.8.2", default-features = false }
-tokio = { version = "1", features = ["test-util"] }
+criterion = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
 
 [[bench]]
 name = "extract"
 harness = false
-
-[lints.clippy]
-pedantic = { level = "warn", priority = -1 }
-
-[profile.release]
-lto = "thin"
-codegen-units = 1
-strip = true
 
 # Test double for agent-browser; only the tests use it, the release ships `web-mcp` alone.
 [[bin]]
@@ -69,3 +61,6 @@ test-hooks = []
 [[example]]
 name = "h4"
 required-features = ["h4"]
+
+[lints]
+workspace = true

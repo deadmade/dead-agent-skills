@@ -67,14 +67,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(\\.claude-plugin/|plugins/|tools/harness-compiler/|crates/|scripts/check-repo\\.mjs$|package\\.json$)";
+            files = "^(\\.claude-plugin/|plugins/|tools/harness-compiler/|crates/|scripts/check-repo\\.mjs$|Cargo\\.(toml|lock)$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/catalog\\.json$|\\.claude-plugin/|\\.agents/plugins/|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(plugins/catalog\\.json$|\\.claude-plugin/|\\.agents/plugins/|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|crates/|Cargo\\.(toml|lock)$|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };
@@ -85,17 +85,30 @@
     # The tui-review plugin's Rust binary: `nix build .#tui-review`, or `nix run .#tui-review -- gen`. Its tests run in the build.
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
+      # Cargo resolves the whole workspace even for a single package. Keep every member in the source,
+      # but exclude unrelated plugins/docs and local build artifacts.
+      workspaceSource = pkgs.lib.cleanSourceWith {
+        src = pkgs.lib.cleanSource ./.;
+        filter = path: type: let
+          relative = pkgs.lib.removePrefix (toString ./. + "/") (toString path);
+        in
+          builtins.baseNameOf path
+          != "target"
+          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "crates" || pkgs.lib.hasPrefix "crates/" relative);
+      };
       manifest = (pkgs.lib.importTOML ./crates/tui-review/Cargo.toml).package;
       webMcp = (pkgs.lib.importTOML ./crates/web-mcp/Cargo.toml).package;
-      cockpit = (pkgs.lib.importTOML ./crates/flow-cockpit/Cargo.toml).workspace.package;
+      workspace = (pkgs.lib.importTOML ./Cargo.toml).workspace.package;
       cockpitApp = (pkgs.lib.importTOML ./crates/flow-cockpit/app/Cargo.toml).package;
       adoMcp = (pkgs.lib.importTOML ./crates/ado-mcp/Cargo.toml).package;
     in {
       tui-review = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
-        inherit (manifest) version;
-        src = ./crates/tui-review;
-        cargoLock.lockFile = ./crates/tui-review/Cargo.lock;
+        inherit (workspace) version;
+        src = workspaceSource;
+        cargoLock.lockFile = ./Cargo.lock;
+        cargoBuildFlags = ["-p" "tui-review" "--bin" "tui-review"];
+        cargoTestFlags = ["-p" "tui-review"];
         # tests/review.rs builds its fixture repositories with git.
         nativeCheckInputs = [pkgs.git];
         meta = {
@@ -106,9 +119,13 @@
       # web-mcp, the web-mcp plugin's MCP server: `nix build .#web-mcp`.
       web-mcp = pkgs.rustPlatform.buildRustPackage {
         pname = webMcp.name;
-        inherit (webMcp) version;
-        src = ./crates/web-mcp;
-        cargoLock.lockFile = ./crates/web-mcp/Cargo.lock;
+        inherit (workspace) version;
+        src = workspaceSource;
+        cargoLock.lockFile = ./Cargo.lock;
+        cargoBuildFlags = ["-p" "web-mcp" "--bin" "web-mcp"];
+        cargoTestFlags = ["-p" "web-mcp"];
+        # Test clients load the system trust store even when they only call the local fake server.
+        nativeCheckInputs = [pkgs.cacert];
         # Debug checks: the fetch tests' WEB_MCP_TEST_PUBLIC_IP hook exists only in debug builds or the `test-hooks` feature.
         checkType = "debug";
         meta = {
@@ -120,10 +137,11 @@
       # config. It links the system's GTK and WebKit, so Linux gets it from here, not as a release download.
       flow-cockpit = pkgs.rustPlatform.buildRustPackage {
         pname = cockpitApp.name;
-        inherit (cockpit) version;
-        src = ./crates/flow-cockpit;
-        cargoLock.lockFile = ./crates/flow-cockpit/Cargo.lock;
-        buildAndTestSubdir = "app";
+        inherit (workspace) version;
+        src = workspaceSource;
+        cargoLock.lockFile = ./Cargo.lock;
+        cargoBuildFlags = ["-p" "flow-cockpit" "--bin" "flow-cockpit"];
+        cargoTestFlags = ["-p" "flow-cockpit"];
         nativeBuildInputs = with pkgs; [pkg-config wrapGAppsHook3];
         buildInputs = with pkgs; [webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
         # The hosted-session tests start a command in a session of its own with `setsid`, which the build's PATH lacks.
@@ -136,7 +154,7 @@
         postInstall = ''
           dest=$out/share/flow-cockpit/extensions
           mkdir -p "$dest"
-          for dir in extensions/*/; do
+          for dir in crates/flow-cockpit/extensions/*/; do
             name=$(basename "$dir")
             [ "$name" = tests ] || cp -r "$dir" "$dest/$name"
           done
@@ -170,9 +188,11 @@
       # ado-mcp, the mcp-azure plugin's MCP server: `nix build .#ado-mcp`.
       ado-mcp = pkgs.rustPlatform.buildRustPackage {
         pname = adoMcp.name;
-        inherit (adoMcp) version;
-        src = ./crates/ado-mcp;
-        cargoLock.lockFile = ./crates/ado-mcp/Cargo.lock;
+        inherit (workspace) version;
+        src = workspaceSource;
+        cargoLock.lockFile = ./Cargo.lock;
+        cargoBuildFlags = ["-p" "ado-mcp" "--bin" "ado-mcp"];
+        cargoTestFlags = ["-p" "ado-mcp"];
         # The tests read git remotes and build reqwest clients, whose platform verifier needs CA certificates (cacert's
         # setup hook sets SSL_CERT_FILE in the sandbox); debug checks keep the ADO_TIMEOUT_MS hook, debug builds only.
         nativeCheckInputs = [pkgs.git pkgs.cacert];
@@ -196,7 +216,7 @@
         buildInputs = pre-commit.enabledPackages;
         # What tools/upstream-sync/src/adapters/*.ts and the workflows use besides stdenv, the Rust toolchain for the crates, and the
         # libraries the flow cockpit window builds against.
-        packages = with pkgs; [git gh nodejs_26 uv cargo rustc clippy rustfmt rust-analyzer pkg-config webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
+        packages = with pkgs; [git gh nodejs_26 uv python3 cargo rustc clippy rustfmt rust-analyzer pkg-config webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };
     });

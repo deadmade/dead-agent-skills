@@ -4,7 +4,7 @@ name: Build crates
 # release.yml calls this with the release tag. PR and manual runs only build.
 on:
   pull_request:
-    paths: ['.github/workflows/crates-build.yml', 'crates/**']
+    paths: ['.github/workflows/crates-build.yml', 'crates/**', 'Cargo.toml', 'Cargo.lock']
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -35,7 +35,6 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: crates/${{ matrix.crate }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,11 +49,12 @@ jobs:
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          workspaces: crates/${{ matrix.crate }}
-          key: ${{ matrix.platform.target }}
+          workspaces: .
+          key: ${{ matrix.crate }}-${{ matrix.platform.target }}
 
       - name: Build
-        run: cargo build --release --locked --target "$TARGET"
+        shell: pwsh
+        run: cargo build --release --locked -p "$env:CRATE" --bin "$env:CRATE" --target "$env:TARGET"
 
       - name: Smoke test
         run: '"target/$TARGET/release/$CRATE" --version'
@@ -79,7 +79,7 @@ jobs:
           stage="$RUNNER_TEMP/stage"
           mkdir -p "$stage/extensions" "$RUNNER_TEMP/dist"
           cp "target/$TARGET/release/flow-cockpit.exe" "$stage/"
-          for dir in extensions/*/; do
+          for dir in crates/flow-cockpit/extensions/*/; do
             ext=$(basename "$dir")
             [ "$ext" = tests ] || cp -r "$dir" "$stage/extensions/$ext"
           done

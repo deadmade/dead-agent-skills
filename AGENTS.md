@@ -31,9 +31,13 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; tui-review and web-mcp
   are also offered on their own but live in `shared/`. Moving a folder doesn't touch installs (they key on the
   plugin `name`); renaming a plugin does.
-- `crates/`: the four Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`), `web-mcp` (web-mcp's server), `ado-mcp` (mcp-azure’s server), and
-  `flow-cockpit` (the flow cockpit window, a workspace of `core` and `app`). Each keeps its own
-  `Cargo.lock`; nothing in the plugins reaches into them at runtime.
+- `crates/`: five Rust packages in one root Cargo workspace: `tui-review` (formerly `brv`), `web-mcp`,
+  `ado-mcp`, and flow-cockpit's `core` and `app`. The root `Cargo.toml` owns all dependency versions,
+  package metadata, Clippy settings and the release profile; members inherit them and select their own features.
+  There is one root `Cargo.lock` and `target/`. Use `-p <package>` to build or test one member. Nothing in the
+  plugins reaches into the crates at runtime. `scripts/check_cargo_workspace.py` (Python 3.11+) rejects local
+  dependency versions, nested workspaces and extra lockfiles in CI. Incompatible upstream transitive versions
+  may coexist; direct dependency versions must be declared only in `[workspace.dependencies]`.
 - `crates/ado-mcp/`: the mcp-azure server. Its library (`lib.rs`) also backs `timetrack` (`src/bin/timetrack/`), a
   personal TUI (Windows) that times work items: `ADO_ORG_URL`/`ADO_PAT` from the environment, `ado_mcp::mine` lists the
   open items assigned to me across the collection. It also clocks the workday in and out; `TIMETRACK_TARGET` (`h:mm`,
@@ -42,7 +46,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   for the clock. `claude.rs` reads Claude Code's session logs (`projects/**/*.jsonl` under `CLAUDE_CONFIG_DIR` or
   `~/.claude`, an undocumented format, so unknown lines are skipped) for a lane under the timeline and Claude time per
   ticket: a branch naming a known ticket id, else the ticket timed then. Not released or installed;
-  `cargo install --path crates/ado-mcp --bin timetrack`.
+  `cargo install --locked --path crates/ado-mcp --bin timetrack`.
 - `plugins/default/`: the dead-skills bundle. Its `dependencies` are the core plugins; itself it carries the global rules
   (`rules.md`, a SessionStart hook), Context7 (`.mcp.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
   their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id
@@ -94,7 +98,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
   pin); either way it sets `agentBrowserPath` to the one in use (`upstreamPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
-  `search` reads Google, Bing, DuckDuckGo and Brave (papers: Google Scholar and Semantic Scholar too) as tabs of one browser window per server (ADR 0007, `window.rs`): an owner session `web-mcp-<pid>-window` launches it on the first call that needs a browser and keeps it until exit; every engine, `browser` session and fetch fallback attaches as a tab (`--cdp <owner's cdp url> --pin-tab`, `attach.json`, idle 3600 s). Attached session names carry a generation `g<n>`, bumped when the owner reports a new cdp url (it relaunches a dead Chrome itself); a window closed by hand comes back through `tab_gone` → `tab new`. Browser first found of `WEB_MCP_CHROME`, Chrome for Testing from `agent-browser install`, `helium`, `chromium`; never branded Chrome. Under `WEB_MCP_SEARCH_DIR` (default the data dir, no temp fallback) each server holds the first free profile slot `profiles/<n>/` (its consent marks too); rests stay machine-wide. agent-browser's attach behaviour (`tab_gone`, `close` without a daemon, a dead Chrome's error) is recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in `docs/features/web-mcp-search/findings.md`; tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`, so `cargo build --bins` before the unit tests), which changes with any agent-browser answer web-mcp reads. I still don't care about cookies (downloaded on first use, not vendored; THIRD_PARTY.md) loads for every engine, Bing included. On Windows web-mcp puts itself in a kill-on-close job, so Chrome dies with it. `browser` and the fetch fallback need what search needs; the installer warns when the window can't open (no usable browser, or Linux without a display and Xvfb) and then counts web-mcp unhealthy. A blocked engine rests 30 min. No passage index: ranking is BM25 over each search's own pages. Engine parsers test against captured result pages in `crates/web-mcp/tests/fixtures/engines/`; Google's and Semantic Scholar's aren't captured yet, so their tests are `#[ignore]`d until they are.
+  `search` reads Google, Bing, DuckDuckGo and Brave (papers: Google Scholar and Semantic Scholar too) as tabs of one browser window per server (ADR 0007, `window.rs`): an owner session `web-mcp-<pid>-window` launches it on the first call that needs a browser and keeps it until exit; every engine, `browser` session and fetch fallback attaches as a tab (`--cdp <owner's cdp url> --pin-tab`, `attach.json`, idle 3600 s). Attached session names carry a generation `g<n>`, bumped when the owner reports a new cdp url (it relaunches a dead Chrome itself); a window closed by hand comes back through `tab_gone` → `tab new`. Browser first found of `WEB_MCP_CHROME`, Chrome for Testing from `agent-browser install`, `helium`, `chromium`; never branded Chrome. Under `WEB_MCP_SEARCH_DIR` (default the data dir, no temp fallback) each server holds the first free profile slot `profiles/<n>/` (its consent marks too); rests stay machine-wide. agent-browser's attach behaviour (`tab_gone`, `close` without a daemon, a dead Chrome's error) is recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in `docs/features/web-mcp-search/findings.md`; tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`, so `cargo build --locked -p web-mcp --bin fake-agent-browser` before the unit tests), which changes with any agent-browser answer web-mcp reads. I still don't care about cookies (downloaded on first use, not vendored; THIRD_PARTY.md) loads for every engine, Bing included. On Windows web-mcp puts itself in a kill-on-close job, so Chrome dies with it. `browser` and the fetch fallback need what search needs; the installer warns when the window can't open (no usable browser, or Linux without a display and Xvfb) and then counts web-mcp unhealthy. A blocked engine rests 30 min. No passage index: ranking is BM25 over each search's own pages. Engine parsers test against captured result pages in `crates/web-mcp/tests/fixtures/engines/`; Google's and Semantic Scholar's aren't captured yet, so their tests are `#[ignore]`d until they are.
 - `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
   `tools/upstream-sync/src/adapters/*.ts`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
   plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
@@ -231,12 +235,12 @@ When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Dependency updates
 
-Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the `Cargo.lock` and pins of all four crates and the headroom-trim `uv.lock` current. ado-mcp's entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the JS vendored in `crates/flow-cockpit/app/shell/vendor/` (see above) and the `cisco-ai-skill-scanner` pin in the `scan-skills` script. The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
+Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the root `Cargo.lock` and workspace dependency versions and the headroom-trim `uv.lock` current. The root Cargo entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the JS vendored in `crates/flow-cockpit/app/shell/vendor/` (see above) and the `cisco-ai-skill-scanner` pin in the `scan-skills` script. The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
 
 ## Versions and releases
 
 Everything ships as one version: `package.json` and `package-lock.json`, the marketplace's `metadata.version`, every
-plugin's `.claude-plugin/plugin.json`, every crate's `Cargo.toml`/`Cargo.lock` and the installer URL in README.md.
+plugin's `.claude-plugin/plugin.json`, the root `Cargo.toml` workspace version and all five local entries in `Cargo.lock` and the installer URL in README.md.
 `check-repo.mjs` fails on drift. Never bump by hand. Every merge to `main` that touches more than `docs/` or the root
 `*.md` files releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
 bump off `main` and tags it, so `main`'s `package.json` lags behind the tags and the next version counts from the
@@ -259,22 +263,24 @@ plugins of ours that the manifest no longer lists.
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
 - `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `tools/installer/` (sources and tests, strict).
-- tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
-- web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
+- Rust, from the root: `cargo build --locked -p web-mcp --bin fake-agent-browser`, then
+  `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
+  `cargo fmt --all -- --check`. Use `-p tui-review`, `-p web-mcp`, or another member instead of `--workspace`
+  for independent checks. Run `python3 scripts/check_cargo_workspace.py` and
+  `python3 -m unittest discover -s scripts -p 'check_cargo_workspace_test.py'` for the workspace policy.
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
   linking fails.
-- flow-cockpit: `cargo test` and `cargo clippy --workspace --all-targets -- -D warnings` in `crates/flow-cockpit` (the
-  app needs the dev shell's GTK and WebKit); `nix build .#flow-cockpit` builds the package and runs the app's tests
+- flow-cockpit: included in the root workspace checks (the app needs the dev shell's GTK and WebKit); `nix build .#flow-cockpit` builds the package and runs the app's tests
   except the three timing ones its `checkFlags` skip. The views tests (jsdom, after `npm ci`):
   `node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/extensions/tests/*.test.ts'`, then
   `npx tsc -p crates/flow-cockpit/app/shell` and `npx tsc -p crates/flow-cockpit/extensions`. They run only there and in
-  `flow-cockpit.yml`, never in `npm test` or the pre-commit hook.
-- ado-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/ado-mcp`. CI uses the latest stable
-  Rust, which can carry lints the pinned `rust-version` (1.97) lacks. A test that times concurrency makes one fast call
+  `crates.yml`, never in `npm test` or the pre-commit hook.
+- ado-mcp: `cargo test --locked -p ado-mcp` from the root. CI lints with latest stable Rust and separately checks
+  the workspace with its declared `rust-version` (1.97). A test that times concurrency makes one fast call
   first and bounds the slow one against it (`view_concurrent` in `tests/pr.rs`, `tests/wi.rs`): under the full
   parallel run on Windows, process start and git subprocesses outweigh a fixed wall-clock bound.
-- tui-review mod tests need a generated fixture first, from `crates/tui-review`:
-  `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
+- tui-review mod tests need a generated fixture first, from the root:
+  `cargo run --locked -p tui-review --release -- gen --out <dir> && node plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/shared/tui-review`.
 - headroom-trim server: `uv run --locked python -m unittest discover -s tests` in `plugins/opt-in/headroom-trim/server`,
   with `UV_PROJECT_ENVIRONMENT` set to a folder outside the repo (the default `.venv` lands in the tree). One test fills a
@@ -293,14 +299,11 @@ plugins of ours that the manifest no longer lists.
   it fails on a high or critical finding. A finding judged benign gets a scoped suppression with its reason in
   `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.
 
-CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests and the headroom-trim server tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `crates.yml` (clippy and tests,
-plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches; `flow-cockpit.yml` on PRs touching the
-flow cockpit's crate, plugin, the flake or the npm manifests (core tests and clippy on Linux and Windows, the app's Windows build, the
-views tests and both `tsc -p` checks; on Linux `nix build .#flow-cockpit`; with `CI=true` the core's relative-worktree
-test fails instead of skipping on a git older than 2.48); `crates-build.yml` (both binaries) and
-`crates-build.yml` (the Windows app's release build and zip, also on PRs touching its crate) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per source registry entry (new upstream
-skills, and a "Sync <name> failing" issue it closes on the next green run), and as a dry run (no PR, no issues) on PRs
-touching the sync code.
+CI: `test.yml` runs repository, installer, mod and skill checks on every PR and push to main.
+`crates.yml` checks the whole workspace and each member independently on Linux and Windows for Rust/build changes,
+including root Cargo files. It also runs tui-review's budgets, benchmarks and mod tests, cockpit's app and frontend
+checks, all four Nix packages, and a minimum-Rust workspace check. `crates-build.yml` builds the release matrix
+with explicit package/binary selection and packages from the root `target/`.
 
 The repo's rulesets live in its GitHub settings (Settings → Rules), not in the repo: main takes squash or rebase PRs
 once `test.yml`'s three jobs pass (admins bypass it, which `npm run release` pushed to main needs), and only admins move
