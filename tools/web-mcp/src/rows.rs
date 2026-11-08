@@ -33,6 +33,8 @@ struct Candidate<'a> {
     parent: NodeRef<'a>,
     items: Vec<(NodeRef<'a>, String)>,
     score: usize,
+    /// The score without the link share, to order groups when links give no difference.
+    volume: usize,
 }
 
 /// The two largest repeating groups of `html`, largest first; with `item`, the matches of that selector alone.
@@ -42,7 +44,8 @@ pub fn find_groups(html: &str, base: &Url, item: Option<&str>) -> Result<Vec<Gro
         .transpose()?;
     let doc = Document::from(html);
     doc.select(NOT_SHOWN).remove();
-    let link = Matcher::new("a[href]").expect("static selector");
+    let link =
+        Matcher::new("a[href]:not([href=\"\"]):not([href^=\"#\"])").expect("static selector");
     if let Some(matcher) = item {
         let found = doc.select_matcher(&matcher);
         let nodes = found.nodes();
@@ -54,7 +57,7 @@ pub fn find_groups(html: &str, base: &Url, item: Option<&str>) -> Result<Vec<Gro
     }
     let mut found = candidates(&doc, &link);
     drop_wrapped(&mut found);
-    found.sort_by_key(|c| std::cmp::Reverse(c.score));
+    found.sort_by_key(|c| std::cmp::Reverse((c.score, c.volume)));
     Ok(found
         .iter()
         .take(GROUPS_RETURNED)
@@ -62,8 +65,8 @@ pub fn find_groups(html: &str, base: &Url, item: Option<&str>) -> Result<Vec<Gro
         .collect())
 }
 
-/// Prints `groups` (or only group `pick`, counted from 1) as numbered rows: at most `limit` per group, and no
-/// more than `budget` characters in all, stopping before the row that would pass it.
+/// Prints `groups` (or only group `pick`, counted from 1) as numbered rows: at most `limit` per group. The
+/// printed rows stay within `budget` characters, each whole; the group and `Showing` lines come on top.
 pub fn render(groups: &[Group], pick: Option<usize>, limit: usize, budget: usize) -> String {
     let mut out = String::new();
     let mut used = 0;
@@ -73,8 +76,7 @@ pub fn render(groups: &[Group], pick: Option<usize>, limit: usize, budget: usize
         .filter(|(i, _)| pick.is_none_or(|p| p == i + 1));
     for (i, g) in shown {
         let head = format!("Group {}: {} items ({})\n", i + 1, g.total, g.kind);
-        used += head.chars().count();
-        out.push_str(&head);
+        let mut body = String::new();
         let mut printed = 0;
         for (n, row) in g.rows.iter().take(limit).enumerate() {
             let mut line = format!("{}. {}", n + 1, row.text);
@@ -86,9 +88,14 @@ pub fn render(groups: &[Group], pick: Option<usize>, limit: usize, budget: usize
                 break;
             }
             used += line.chars().count();
-            out.push_str(&line);
+            body.push_str(&line);
             printed += 1;
         }
+        if printed == 0 && !out.is_empty() {
+            break;
+        }
+        out.push_str(&head);
+        out.push_str(&body);
         let _ = writeln!(out, "Showing {printed} of {}.\n", g.total);
     }
     out.trim_end().to_owned()
@@ -122,7 +129,7 @@ fn group<'a>(
     }
 }
 
-/// Whether `node` is an `a[href]` or holds one.
+/// Whether `node` is a link (an `a[href]` that is not empty or only a `#` anchor) or holds one.
 fn has_link(node: &NodeRef, link: &Matcher) -> bool {
     std::iter::once(*node)
         .chain(node.descendants_it())
@@ -178,14 +185,16 @@ fn candidates<'a>(doc: &'a Document, link: &Matcher) -> Vec<Candidate<'a>> {
         {
             let chars: usize = items.iter().map(|(_, t)| t.chars().count()).sum();
             let linked = items.iter().filter(|(n, _)| has_link(n, link)).count();
-            // count times the smaller of the average length and the cap, times the square of the share of items with a link
-            let score =
-                chars.min(SCORE_CAP * items.len()) * linked * linked / (items.len() * items.len());
+            // count times the smaller of the average length and the cap
+            let volume = chars.min(SCORE_CAP * items.len());
+            // times the square of the share of items with a link
+            let score = volume * linked * linked / (items.len() * items.len());
             found.push(Candidate {
                 kind,
                 parent: *parent,
                 items,
                 score,
+                volume,
             });
         }
     }
@@ -268,7 +277,7 @@ mod tests {
     #[test]
     fn tiles_page_first_group_is_the_tiles() {
         let found = groups(TILES);
-        assert!(found[0].total >= 6);
+        assert_eq!(found[0].total, count(TILES, "h3 + div > article"));
         assert_ne!(found[0].rows[0].text, "");
     }
 
@@ -284,36 +293,71 @@ mod tests {
         assert!(found[0].kind.starts_with("LI"));
     }
 
+    /// `n` `li`s, each a link with text of the given length plus `inner` HTML after it.
+    fn linked(n: usize, text_len: usize, inner: &str) -> String {
+        many(n, |i| {
+            format!(
+                "<li><a href=\"/p/{i}\">{}</a>{inner}</li>",
+                "w".repeat(text_len)
+            )
+        })
+    }
+
     #[test]
     fn nested_group_is_dropped() {
-        let inner = format!("<ul>{}</ul>", items("li", "", 6));
-        let outer = many(6, |_| format!("<li>{inner}</li>"));
-        let found = groups(&format!("<ul>{outer}</ul>"));
+        let inner = format!("<ul>{}</ul>", linked(6, 20, ""));
+        let found = groups(&format!("<ul>{}</ul>", linked(6, 20, &inner)));
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].total, 6);
     }
 
     #[test]
-    fn wrapper_and_inner_tie_make_one_group() {
-        let wrapped = many(8, |i| {
-            format!("<li><article>product number {i} text</article></li>")
-        });
-        let second = many(6, |i| format!("<li>list two entry {i} text</li>"));
-        let html = format!("<ul>{wrapped}</ul><ol>{second}</ol>");
-        let found = groups(&html);
-        assert_eq!(found.len(), 2);
-        assert_eq!(found[0].total, 8);
-        assert_eq!(found[1].total, 6);
+    fn inner_group_with_a_lower_score_is_dropped() {
+        // each outer item holds its own long text and a shorter inner list, so its group scores higher
+        let inner = format!("<ul>{}</ul>", linked(6, 20, ""));
+        let found = groups(&format!("<ul>{}</ul>", linked(6, 60, &inner)));
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].total, 6);
     }
 
     #[test]
-    fn link_share_outweighs_text_volume() {
-        let text = "a longer entry with plenty of words in it, number";
-        let plain = many(6, |i| format!("<p>{text} {i}</p>"));
-        let linked = many(6, |i| format!("<li><a href=\"/x/{i}\">{text} {i}</a></li>"));
-        let found = groups(&format!("<div>{plain}</div><ul>{linked}</ul>"));
+    fn a_hash_link_is_not_the_row_link() {
+        let item = "<li><a href=\"#\">fav</a><a href=\"\">none</a><a href=\"/p/1\">Title of the product</a></li>";
+        let found = groups(&format!("<ul>{}</ul>", item.repeat(6)));
+        assert_eq!(
+            found[0].rows[0].link.as_ref().unwrap().as_str(),
+            "https://shop.example/p/1"
+        );
+    }
+
+    #[test]
+    fn without_links_the_larger_group_comes_first() {
+        let cards = many(200, |i| {
+            format!("<div class=\"card\" onclick=\"go()\">card number {i} with long text</div>")
+        });
+        let found = groups(&format!(
+            "<ul>{}</ul><section>{cards}</section>",
+            items("li", "", 6)
+        ));
+        assert_eq!(found[0].total, 200);
+    }
+
+    #[test]
+    fn link_share_is_squared() {
+        // scores: half-linked 600 * 1/4 = 150, fully linked 240; a plain share would give 300 and the other order
+        let half = many(6, |i| {
+            let text = "x".repeat(100);
+            if i < 3 {
+                format!("<p><a href=\"/a\">{text}</a></p>")
+            } else {
+                format!("<p>{text}</p>")
+            }
+        });
+        let full = many(6, |i| {
+            format!("<li><a href=\"/b/{i}\">{}</a></li>", "y".repeat(40))
+        });
+        let found = groups(&format!("<div>{half}</div><ul>{full}</ul>"));
         assert_eq!(found[0].kind, "LI");
-        assert_eq!(found[1].kind, "P");
     }
 
     #[test]
@@ -410,5 +454,26 @@ mod tests {
             assert_eq!(line, format!("{}. {}", i + 1, group.rows[i].text));
         }
         assert!(out.contains(&format!("Showing {printed} of 50.")));
+    }
+
+    #[test]
+    fn render_prints_the_link_after_the_text() {
+        let group = Group {
+            kind: "LI".into(),
+            total: 1,
+            rows: vec![Row {
+                text: "Title".into(),
+                link: Some(Url::parse("https://shop.example/p/1").unwrap()),
+            }],
+        };
+        let out = render(&[group], None, 5, 1000);
+        assert!(out.contains("1. Title | https://shop.example/p/1\n"));
+    }
+
+    #[test]
+    fn render_skips_a_group_the_budget_has_no_room_for() {
+        let first = rows(2, 150);
+        let out = render(&[first, rows(2, 150)], None, 5, 400);
+        assert!(!out.contains("Group 2"));
     }
 }
