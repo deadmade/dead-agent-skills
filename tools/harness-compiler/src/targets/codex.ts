@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { copy, json, text } from '../emit/fs.ts';
 import { renderCodexTheme } from '../transforms/themes.ts';
-import { INTEGRATIONS, READMES, packageReadme, setupSkill } from '../templates/codex.ts';
+import { INTEGRATIONS, MCP_SETTINGS, READMES, mcpSettings, packageReadme, setupSkill } from '../templates/codex.ts';
 import { codexThemeSetup, projectRulesSkill } from '../templates/skills.ts';
 import { isConductor } from '../flows/compose.ts';
 import { nativeHooks } from './hooks.ts';
@@ -65,6 +65,7 @@ export const codex: Target = {
     if (INTEGRATIONS.includes(plugin.name))
       text(join(dest, 'skills', `setup-${plugin.name}`, 'SKILL.md'), setupSkill(context));
     if (READMES.includes(plugin.name)) text(join(dest, 'README.md'), packageReadme(context));
+    if (MCP_SETTINGS.includes(plugin.name)) json(join(dest, 'codex-mcp.json'), mcpSettings(context));
     if (plugin.name === 'flows') {
       // A conductor runs only when the user calls it, the form the packs' own openai.yaml files ship.
       for (const skill of readdirSync(join(plugin.dir!, 'skills'))) {

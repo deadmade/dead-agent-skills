@@ -38,16 +38,8 @@ Standalone options include hallmark, Rust, C# and Postgres skills, plus MCP setu
 Atlassian. MCP setup skills provide native `codex mcp add` commands and authentication instructions; installing a
 setup skill alone does not configure a global server. No setup skill requires the project installer.
 
-For example, Context7 can be configured directly:
-
-```sh
-codex mcp add dead-agent-skills-dead-skills --url https://mcp.context7.com/mcp
-```
-
-web-mcp needs its release binary on PATH (or its absolute path in the native MCP command). Browser/search tools also
-need agent-browser. The setup skill and package README describe these prerequisites. GitHub uses
-`GITHUB_PERSONAL_ACCESS_TOKEN`; Azure uses the ado-mcp release binary with `ADO_ORG_URL` and `ADO_PAT` with a documented environment
-allowlist. Atlassian uses native Codex OAuth login. Credentials are not embedded in the marketplace.
+Each MCP setup skill and package README carries the exact `codex mcp add` command, the release binary it needs and
+the environment variables to set, so no setup is spelled out here. Credentials are not embedded in the marketplace.
 
 Shared startup rules and desktop notifications have packaged adapters for both harnesses. Night City supplies
 both native themes. md-pane, status lines, LSP plugins and Claude UI mods remain Claude-only extensions. Flows share phases, approval gates and saved state through host adapters. Without
