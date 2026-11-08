@@ -170,9 +170,14 @@ test('the page’s URL filter rejects script schemes, including ones hidden in c
     '&#106;avascript:alert(1)',
     'java&Tab;script:alert(1)',
     '&#x6A;avascript&colon;alert(1)',
+    // Two leading slashes or backslashes name a host: from a file page on Windows that is a network share.
+    '//evil.example/a.png',
+    '\\\\evil.example\\a.png',
+    '/\\evil.example/a.png',
+    '\\/evil.example/a.png',
   ])
     assert.equal(safe(href), false, href);
-  for (const href of ['https://example.com/?a=1&b=2', 'mailto:a@b.c', './a.md', '#top', 'a/b.md', ''])
+  for (const href of ['https://example.com/?a=1&b=2', 'mailto:a@b.c', './a.md', '#top', 'a/b.md', '/a/b.md', ''])
     assert.equal(safe(href), true, href);
 });
 

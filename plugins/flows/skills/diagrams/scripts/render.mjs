@@ -194,10 +194,13 @@ const esc = (s) => s.replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
 const trees = new Map([...document.querySelectorAll('template[data-tree]')].map((t) => [t.dataset.key, t.innerHTML]));
 // A scheme other than http, https or mailto (javascript:, data:, ...) is dropped; browsers skip control characters in
 // it. marked leaves character references in an href alone and browsers decode them (&#106;avascript:, java&Tab;script:),
-// so any & before the first / ? or # counts as unsafe.
+// so any & before the first / ? or # counts as unsafe. Two leading slashes or backslashes name a host, and from a page
+// opened as a file on Windows that is a network share, so they are unsafe too.
 const safe = (href) => {
   const h = href.replace(/[\\u0000-\\u0020]/g, '');
-  return !/^[^/?#]*&/.test(h) && (!/^[a-z][a-z0-9+.-]*:/i.test(h) || /^(https?|mailto):/i.test(h));
+  return (
+    !/^[^/?#]*&/.test(h) && !/^[\\\\/]{2}/.test(h) && (!/^[a-z][a-z0-9+.-]*:/i.test(h) || /^(https?|mailto):/i.test(h))
+  );
 };
 // Inside an open <pre> or <script>, marked leaves following text unescaped (escaped: true); the page escapes it anyway.
 marked.use({
