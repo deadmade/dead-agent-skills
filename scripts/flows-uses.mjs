@@ -17,8 +17,8 @@ export const BUILTIN = 'claude-code';
 const START = '<!-- uses:start -->';
 const END = '<!-- uses:end -->';
 
-// flows' skills, split by frontmatter: conductors carry `disable-model-invocation: true`; the rest (writing) Claude
-// may load on its own.
+// flows' skills, split by frontmatter: conductors carry `disable-model-invocation: true`; the rest (writing, diagrams)
+// Claude may load on its own.
 const flowsSkills = (root) => {
   const dir = join(root, FLOWS, 'skills');
   return readdirSync(dir, { withFileTypes: true })

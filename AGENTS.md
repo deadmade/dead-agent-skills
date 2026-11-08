@@ -87,9 +87,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `references/`); on Claude Code its correctness lens is the built-in `code-review` (the host adapter template), and
   the one agent it vendors is `flows:pr-test-analyzer`, next to tob's checker in `agents/`. `/self-review` was a plugin
   of its own until 0.5.0, so the installer keeps flows on a machine that had it.
-  flows also owns the prose standard: `skills/writing/` is the one skill in it Claude may load on its own
-  (`flows:writing`). `flows-uses.mjs` treats only `disable-model-invocation: true` skills as conductors, so a
-  `uses:` line may list `flows:writing`. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
+  flows also owns the prose standard: `skills/writing/` is one of the two skills in it Claude may load on its own
+  (`flows:writing`; the other, `flows:diagrams`, is described below). `flows-uses.mjs` treats only
+  `disable-model-invocation: true` skills as conductors, so a `uses:` line may list either. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
   check on `*.md` writes for conversation shorthand, off with `FLOWS_PROSE_CHECK=off`. The writing skill also holds the copyedit
   (`references/copyedit.md`, run as `/flows:writing copyedit <file>`): a fresh agent on the strongest model edits a
   document by the skill, then `scripts/compare.mjs` replaces it only when nothing code can check was lost (the list is
