@@ -126,6 +126,24 @@ test('Codex refuses to overwrite unowned MCP names', async () => {
     f.close();
   }
 });
+test('Codex recovers an existing default Context7 connection and can rerun', async () => {
+  const f = fixture();
+  try {
+    const command = f.io.command!;
+    f.io.command = (...args) =>
+      args[0] === 'mcp' && args[1] === 'list'
+        ? readFileSync(new URL('../core/fixtures/codex-mcp-list.json', import.meta.url), 'utf8')
+        : command(...args);
+    await applyCodex(f.io);
+    assert.deepEqual(f.state().mcp, ['dead-skills']);
+    assert.ok(!f.calls.some((c) => c[0] === 'mcp' && c[1] === 'add'));
+    await applyCodex(f.io);
+    assert.deepEqual(f.state().mcp, ['dead-skills']);
+    assert.equal(f.state().version, VERSION);
+  } finally {
+    f.close();
+  }
+});
 test('missing Codex and cancellation do not install anything', async () => {
   const count = failures.length;
   await applyCodex({ which: () => undefined });

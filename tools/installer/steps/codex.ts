@@ -8,7 +8,16 @@ import { join, resolve } from 'node:path';
 import { CODEX_MARKETPLACE } from '../core/agents.ts';
 import { selectTarget } from '../core/catalog.ts';
 import { readCatalog } from '../system/catalog.ts';
-import { type CodexState, MCP_COMPONENTS, codexPlan, installedCodex, mcpName, mcpEnvironment } from '../core/codex.ts';
+import {
+  type CodexState,
+  MCP_COMPONENTS,
+  CONTEXT7_URL,
+  recoverableContext7,
+  codexPlan,
+  installedCodex,
+  mcpName,
+  mcpEnvironment,
+} from '../core/codex.ts';
 import { binAsset } from '../core/binaries.ts';
 import { categorize } from '../core/options.ts';
 import { PKG, VERSION, ask, done, failures, tryJson } from '../context.ts';
@@ -146,8 +155,15 @@ export async function applyCodex(io: CodexIO = {}) {
   if (!Array.isArray(existingMcp)) throw new Error('Unrecognized codex mcp list JSON');
   const configure = (component: string, args: string[]) => {
     const name = mcpName(component);
-    if (existingMcp.some((s: any) => s.name === name) && !mcp.includes(component))
+    const existing = existingMcp.find((s: any) => s.name === name);
+    if (existing && !mcp.includes(component)) {
+      if (component === 'dead-skills' && recoverableContext7(existing)) {
+        mcp.push(component);
+        save();
+        return;
+      }
       throw new Error(`MCP name ${name} already exists outside this install; left unchanged`);
+    }
     run('mcp', 'add', name, ...args);
     if (!mcp.includes(component)) mcp.push(component);
     save();
@@ -180,7 +196,7 @@ export async function applyCodex(io: CodexIO = {}) {
     // Do not mark the release current until every requested operation succeeds.
     save();
   }
-  configure('dead-skills', ['--url', 'https://mcp.context7.com/mcp']);
+  configure('dead-skills', ['--url', CONTEXT7_URL]);
   if (plan.wanted.includes('web-mcp')) {
     let binary = find('web-mcp');
     if (!binary) {
