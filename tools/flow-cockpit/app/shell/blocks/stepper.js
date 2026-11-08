@@ -1,6 +1,8 @@
 // The phase track from the approved run view: one line of segments with a tick for each gate, the current phase
 // named under it, and the full list of phases and gates on demand.
 
+import { el } from '../dom.js';
+
 let next = 0;
 
 /** `2026-10-28` as `28 Oct`; anything else as written. @param {string} iso */
@@ -13,14 +15,6 @@ const day = (iso) => {
 
 /** @param {string[]} items */
 const joined = (items) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`);
-
-/** @param {string} tag @param {string} className @param {string} [text] */
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
 
 /** @param {{ n: number, approved: string | null }[]} gates */
 function gateLine(gates) {

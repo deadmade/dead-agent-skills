@@ -6,6 +6,8 @@
 // One session id is generated when the form is made and again whenever it resets (after a start or a cancel). Every
 // preview and the start carry that same id, so the command shown is the command that runs.
 
+import { el } from './dom.js';
+
 /**
  * @typedef {import('./api').DataApi} DataApi
  * @typedef {import('./api').ShellApi} ShellApi
@@ -30,18 +32,6 @@ const PANE = Object.freeze({ cols: 80, rows: 24 });
 
 /** @param {unknown} err */
 const reason = (err) => (err instanceof Error ? err.message : String(err));
-
-/**
- * @template {keyof HTMLElementTagNameMap} K
- * @param {K} tag @param {string} [className] @param {...(Node | string)} kids
- * @returns {HTMLElementTagNameMap[K]}
- */
-function el(tag, className = '', ...kids) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  node.append(...kids);
-  return node;
-}
 
 /** A control under its visible label, which names it for a screen reader too. @param {string} label @param {HTMLElement} control */
 const labelled = (label, control) => el('label', 'field', label, control);

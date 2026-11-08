@@ -3,6 +3,8 @@
 // dialog (no Tauri plugin) asks once. "Close anyway" calls `shell.confirmClose`, which only the shell's own chrome
 // holds: it stops the sessions and closes the window from the app's side, so a view can never close it.
 
+import { el } from './dom.js';
+
 /**
  * @typedef {{ confirmClose(): Promise<void> }} CloseShell
  * @typedef {(event: string, handler: () => void) => Promise<unknown>} Listen
@@ -10,18 +12,6 @@
 
 /** @param {unknown} err */
 const reason = (err) => (err instanceof Error ? err.message : String(err));
-
-/**
- * @template {keyof HTMLElementTagNameMap} K
- * @param {K} tag @param {string} [className] @param {...(Node | string)} kids
- * @returns {HTMLElementTagNameMap[K]}
- */
-function el(tag, className = '', ...kids) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  node.append(...kids);
-  return node;
-}
 
 /**
  * Mounts the dialog into `host` and shows it whenever the app asks to close. Resolves once it is listening.

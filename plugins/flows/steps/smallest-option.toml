@@ -1,0 +1,6 @@
+#:schema ./step.schema.json
+
+text = '''
+One option is always the smallest that would work, named in one line (ponytail's `lite` level), even when it isn't your pick.
+<!-- overrides ponytail/skills/ponytail/SKILL.md: "| lite | Build what was asked. Name the smaller option in one line and let the user pick. |" -->
+'''

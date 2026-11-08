@@ -1,6 +1,7 @@
 // The run bar on a hosted session's Session tab: the flow run the session is linked to, as the phase stepper, a segment
 // per plan task, the task in progress and the run's `now:` line. Read-only: it only reads the data the views read.
 import { stepper } from './blocks/stepper.js';
+import { el } from './dom.js';
 
 /**
  * @typedef {import('../../bindings/AgentInfo').AgentInfo} AgentInfo
@@ -30,14 +31,6 @@ export async function findLinkedRun(data, project, sessionId) {
     if (run?.sessions.includes(sessionId)) return run;
   }
   return null;
-}
-
-/** @param {string} tag @param {string} className @param {string} [text] */
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
 }
 
 /** What each state of a task that is under way is called. @type {Partial<Record<import('../../bindings/TaskState').TaskState, string>>} */
