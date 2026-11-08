@@ -54,7 +54,7 @@ export function checkUseNames(root, uses) {
   for (const [conductor, used] of Object.entries(uses)) {
     const at = `${FLOWS}/skills/${conductor}/SKILL.md`;
     for (const [plugin, names] of Object.entries(used)) {
-      // flows' own non-conductor skills (writing) are listed under flows; other conductors aren't listed at all.
+      // flows' own non-conductor skills (writing, diagrams) are listed under flows; other conductors aren't listed at all.
       if (plugin === 'flows') {
         for (const name of names) {
           const own = skills.find((s) => s.name === name);
