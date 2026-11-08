@@ -83,9 +83,8 @@ is a finding, not a reason to pad.
 
 Follow mattpocock `grilling` on the candidate options, with the evidence as the facts: per option, the rows for and
 against it, whether their setting (data size, workload, team) transfers to this codebase, its cost here, and what
-would make it a bad fit. Recommended answers are fine. Record each settled choice under **Options**. One option is
-always the smallest that would work, named in one line (ponytail's `lite` level), even when it isn't your pick.
-<!-- overrides ponytail/skills/ponytail/SKILL.md: "| lite | Build what was asked. Name the smaller option in one line and let the user pick. |" -->
+would make it a bad fit. Recommended answers are fine. Record each settled choice under **Options**.
+[step: smallest-option]
 
 ## Phase 4: Report
 

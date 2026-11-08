@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 // drift. Run directly to rewrite both.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { composeFlows, isConductor } from '../tools/harness-compiler/src/flows/compose.ts';
+import { OVERRIDE, composeFlows, isConductor } from '../tools/harness-compiler/src/flows/compose.ts';
 import { TOKENS as CLAUDE_CODE } from '../tools/harness-compiler/src/templates/hosts/claude-code.ts';
 import { TOKENS as CODEX } from '../tools/harness-compiler/src/templates/hosts/codex.ts';
 
@@ -112,9 +112,12 @@ export function checkOverrides(root) {
     readFileSync(join(root, file), 'utf8')
       .split(/\r?\n/)
       .forEach((line, i) => {
-        const m = MARKER.exec(line);
-        if (!m) return;
         const at = `${file}:${i + 1}`;
+        const m = MARKER.exec(line);
+        if (!m) {
+          if (OVERRIDE.test(line)) problems.push(`${at}: an overrides marker that cannot be read: ${line.trim()}`);
+          return;
+        }
         const target = join(root, PACKS, m[1]);
         if (!existsSync(target) || !statSync(target).isFile())
           return problems.push(`${at}: overrides ${m[1]}, which is not a file`);

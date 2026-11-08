@@ -70,9 +70,10 @@ change it:
   question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
   it this way (links), trade-offs for _this_ codebase, rough effort. End with your recommendation and why. The user
   picks; record the choice and the rejected options in flow.md under **Options**, one `### <decision>` with
-  `Picked: <the choice in plain words>`. One option is always the smallest that would work, named in one line
-  (ponytail's `lite` level), even when it isn't your pick.
-  <!-- overrides ponytail/skills/ponytail/SKILL.md: "| lite | Build what was asked. Name the smaller option in one line and let the user pick. |" -->
+  `Picked: <the choice in plain words>`.
+
+[step: smallest-option]
+
 - **Size.** A quick task (everything that matters is in the request) doesn't need this flow: say so and offer to
   leave it. Only on the user's yes, set `phase: done` with a note and do the task. A small change stays in the flow:
   its short design doc is the spec, and Gate 1, the seam lines, the plan's Global Constraints and the build stop all

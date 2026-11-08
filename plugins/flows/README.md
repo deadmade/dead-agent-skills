@@ -163,11 +163,8 @@ copyedit that revises a document by it before a gate.
   since flow.md is the log where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
 - **The copyedit** (`skills/writing/references/copyedit.md`, `/flows:writing copyedit <file.md>`): a fresh agent
   revises a document by the skill for a reader who wasn't in the conversation, and the edit goes through only when
-  code finds nothing lost that it can check. It refuses the edit when a heading or its order, a code block, a code span,
-  a link target or link definition, a URL, an HTML comment, a number, a checkbox step, a table's shape or a quote is
-  lost, when the edit has under 60% as many prose words as the original, when the editor wrote nothing, or when the
-  document changed since it was saved. Code can't see meaning, so a dropped sentence or a flipped negation still needs
-  the diff it shows. It commits nothing. Before a gate shows a spec, a plan, a research report or an audit report, the
+  code finds nothing lost that it can check. What it refuses is listed in that file. Code can't see meaning, so a
+  dropped sentence or a flipped negation still needs the diff it shows. It commits nothing. Before a gate shows a spec, a plan, a research report or an audit report, the
   conductors run it on that document; when it refuses an edit, the gate shows the unedited document and what the edit
   lost.
 

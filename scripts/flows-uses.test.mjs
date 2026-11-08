@@ -203,6 +203,18 @@ test('checkOverrides: a marker naming a directory is a problem, not a crash', ()
   assert.equal(checkOverrides(fx).length, 1);
 });
 
+test('checkOverrides: a marker it cannot read is reported, not skipped', () => {
+  const fx = mkdtempSync(join(tmpdir(), 'ov-'));
+  mkdirSync(join(fx, 'plugins/flows/skills/fix'), { recursive: true });
+  writeFileSync(
+    join(fx, 'plugins/flows/skills/fix/SKILL.md'),
+    'intro\n<!-- overrides ponytail/skills/ponytail/SKILL.md: lite level, unquoted -->\n',
+  );
+  assert.deepEqual(checkOverrides(fx), [
+    'plugins/flows/skills/fix/SKILL.md:2: an overrides marker that cannot be read: <!-- overrides ponytail/skills/ponytail/SKILL.md: lite level, unquoted -->',
+  ]);
+});
+
 test('checkOverrides: a missing pack file fails', () => {
   const fx = mkdtempSync(join(tmpdir(), 'ov-'));
   mkdirSync(join(fx, 'plugins/flows/skills/fix'), { recursive: true });
