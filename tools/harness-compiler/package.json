@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test \"test/**/*.test.ts\""
+    "test": "node --test \"test/**/*.test.ts\" \"test/**/*.test.mjs\""
   },
   "engines": {
     "node": ">=26"
