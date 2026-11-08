@@ -52,7 +52,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (`rules.md`, a SessionStart hook), Context7 (`.mcp.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
   their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id
   (`custom:dead-skills:night-city`: a plugin theme's id carries the plugin name).
-- Night City (`plugins/default/`): a theme (`themes/night-city.json`) plus a mod (`hooks/`). It is the house
+- Night City (`plugins/default/`): a theme (`themes/palette.json`) plus a mod (`hooks/`). It is the house
   look: notify's wording and the installer's `paint` (`ui/view.ts`) use its palette, with no
   stock fallback. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
   highlighting off. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
@@ -320,8 +320,7 @@ change; its two OS matrix jobs retain their required check names even when their
 those jobs. `crates.yml` tests and lints selected Rust packages together and independently on Linux and Windows,
 checks their minimum Rust version and Nix packages, and runs cockpit's frontend checks only when selected. Flow
 templates and compiler changes also select cockpit, whose tests read their output.
-Root Cargo, Nix and npm dependencies, CI changes and unknown paths select all checks; docs/ and generated
-`graphify-out/cache/hook_sessions/*.nudges` changes select none.
+Root Cargo, Nix and npm dependencies, CI changes and unknown paths select all checks; docs/ changes select none.
 Manual runs select everything. `crates-build.yml` builds only selected binaries on PRs, but release calls always build
 the complete matrix because each version ships all binaries. Keep routing and its tests current when adding consumers.
 

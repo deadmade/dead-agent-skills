@@ -147,8 +147,8 @@ test('real git diff includes both sides of a rename and excludes base-only chang
   }
 });
 
-// Captured from PR #122 at 0b9dca7: web-mcp changes plus docs and generated session nudges.
-test('PR 122 selects only web-mcp even with graphify session cache files', () => {
+// Captured from PR #122 at 0b9dca7: web-mcp changes plus docs.
+test('PR 122 selects only web-mcp', () => {
   const paths = JSON.parse(readFileSync(new URL('./fixtures/ci-pr122-paths.json', import.meta.url), 'utf8'));
   assert.deepEqual(selectChecks(paths), {
     node: true,
@@ -157,9 +157,4 @@ test('PR 122 selects only web-mcp even with graphify session cache files', () =>
     binaries: ['web-mcp'],
     packages: ['web-mcp'],
   });
-});
-
-test('generated graphify session nudges select no checks; unknown graphify files still select all', () => {
-  assert.deepEqual(selectChecks(['graphify-out/cache/hook_sessions/session.nudges']), selectChecks([]));
-  assert.deepEqual(selectChecks(['graphify-out/new-input.json']), selectChecks([], true));
 });

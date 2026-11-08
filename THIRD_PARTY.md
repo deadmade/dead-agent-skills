@@ -194,7 +194,7 @@ from their npm tarballs (each tarball checked against the registry's `dist.integ
 
 ## Night City (dead-skills)
 
-The palette of `plugins/default/themes/night-city.json` is derived from the Cyberpunk Neon theme
+The palette of `plugins/default/themes/palette.json` is derived from the Cyberpunk Neon theme
 (`plugins/theme-gallery/themes/cyberpunk.json`) of [livlign/ccthemes](https://github.com/livlign/ccthemes) (MIT
 License, Copyright its authors), with changed and added colors. Nothing is vendored or synced.
 

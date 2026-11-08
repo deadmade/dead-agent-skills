@@ -14,7 +14,7 @@
   --left: clamp(22rem, 22vw, 28rem); --measure: 70ch;
   --bar-h: 56px;
 
-  /* Night City (plugins/default/themes/night-city.json) */
+  /* Night City (plugins/default/themes/palette.json) */
   --color-paper: #1A1626;      /* background */
   --color-paper-2: #221D33;
   --color-paper-3: #2A2340;    /* userMessageBackground */

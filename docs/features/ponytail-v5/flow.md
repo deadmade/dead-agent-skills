@@ -16,8 +16,8 @@ such things in the future?"
 
 ## Artifacts
 
-- Spec: [2026-10-20-ponytail-v5-design.md](../../superpowers/specs/2026-10-20-ponytail-v5-design.md)
-- Plan: [2026-10-20-ponytail-v5.md](../../superpowers/plans/2026-10-20-ponytail-v5.md)
+- Spec: [2026-10-20-ponytail-v5-design.md](2026-10-20-ponytail-v5-design.md)
+- Plan: [2026-10-20-ponytail-v5.md](2026-10-20-ponytail-v5.md)
 - ADRs: [0002-vendor-ponytail.md](../../adr/0002-vendor-ponytail.md)
 - CONTEXT.md: none (no new terms)
 

@@ -1,4 +1,4 @@
-//! Drawing, in Night City's palette (plugins/default/themes/night-city.json): a big clock on the running ticket, a
+//! Drawing, in Night City's palette (plugins/default/themes/palette.json): a big clock on the running ticket, a
 //! timeline of today with Claude's lane under it, the ticket list, and Today, Week and Help as overlays.
 
 use ado_mcp::Ticket;
