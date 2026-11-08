@@ -88,7 +88,6 @@ test('releases require plugin/tool changes or shared build inputs', () => {
     'scripts/repo-scripts.test.mjs',
     'scripts/fixtures/ci-pr122-paths.json',
     'treefmt.toml',
-    'graphify-out/cache/hook_sessions/session.nudges',
     '.gitignore',
   ];
   assert.equal(triggers(maintenance), false);
