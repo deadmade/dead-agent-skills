@@ -3,11 +3,10 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-const crates = ['web-mcp', 'ado-mcp', 'flow-cockpit'];
+const crates = ['web-mcp', 'ado-mcp'];
 const roots = {
   'web-mcp': ['tools/web-mcp/', 'plugins/shared/web-mcp/'],
   'ado-mcp': ['tools/ado-mcp/', 'plugins/opt-in/mcp/mcp-azure/'],
-  'flow-cockpit': ['tools/flow-cockpit/', 'plugins/opt-in/flow-cockpit/'],
 };
 
 export function selectChecks(paths, all = false) {
@@ -28,8 +27,7 @@ export function selectChecks(paths, all = false) {
         path.startsWith('plugins/') ||
         path.endsWith('/Cargo.toml') ||
         path === 'tools/ado-mcp/src/bin/timetrack/ui.rs' ||
-        path === 'tools/web-mcp/src/api.rs' ||
-        path === 'tools/flow-cockpit/app/shell/tokens.css'
+        path === 'tools/web-mcp/src/api.rs'
       )
         node = true;
       if (path.startsWith('plugins/')) skills = true;
@@ -47,8 +45,6 @@ export function selectChecks(paths, all = false) {
       everything();
     } else if (path.startsWith('plugins/') || path.startsWith('tools/harness-compiler/')) {
       node = skills = true;
-      // Cockpit tests consume flow templates and the compiler's composed skills.
-      if (path.startsWith('plugins/flows/') || path.startsWith('tools/harness-compiler/')) selected.add('flow-cockpit');
     } else if (
       path.startsWith('tools/installer/') ||
       path.startsWith('tools/upstream-sync/') ||
@@ -64,8 +60,7 @@ export function selectChecks(paths, all = false) {
     }
   }
   const binaries = crates.filter((c) => selected.has(c));
-  const packages = binaries.flatMap((c) => (c === 'flow-cockpit' ? ['flow-cockpit-core', c] : [c]));
-  return { node, skills, rust: packages.length > 0, binaries, packages };
+  return { node, skills, rust: binaries.length > 0, binaries, packages: binaries };
 }
 
 export function changedPaths(eventName, event, git = (args) => execFileSync('git', args, { encoding: 'utf8' })) {

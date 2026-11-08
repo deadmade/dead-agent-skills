@@ -1,10 +1,5 @@
 [workspace]
-members = [
-    "tools/web-mcp",
-    "tools/ado-mcp",
-    "tools/flow-cockpit/core",
-    "tools/flow-cockpit/app",
-]
+members = ["tools/web-mcp", "tools/ado-mcp"]
 resolver = "3"
 
 [workspace.package]
@@ -25,23 +20,13 @@ base64 = "0.23"
 criterion = { version = "=0.8.2", default-features = false }
 dom_query = "0.29"
 dom_smoothie = "=0.19.0"
-flow-cockpit-core = { path = "tools/flow-cockpit/core" }
 futures = { version = "0.3", default-features = false }
 htmd = "=0.5.6"
 image = { version = "0.25", default-features = false }
-include_dir = "0.7"
 jiff = "0.2.38"
 libc = "0.2"
 model2vec-rs = "0.4.0"
-oxc_allocator = "=0.157.0"
-oxc_ast = "=0.157.0"
-oxc_codegen = "=0.157.0"
-oxc_parser = "=0.157.0"
-oxc_semantic = "=0.157.0"
-oxc_span = "=0.157.0"
-oxc_transformer = "=0.157.0"
 pdf_oxide = "=0.3.78"
-portable-pty = "=0.9.0"
 quick-xml = "0.42"
 ratatui = "0.30"
 reqwest = { version = "=0.13.5", default-features = false }
@@ -51,13 +36,8 @@ serde = "1"
 serde_json = "1"
 sha2 = "0.11"
 tantivy = { version = "=0.27.0", default-features = false }
-tauri = "=2.12.5"
-tauri-build = "=2.7.4"
 tokio = "1"
-toml = "1.1.8"
-ts-rs = "=12.0.1"
 url = "2"
-uuid = "1"
 windows-sys = "0.61"
 zip = { version = "=9.3.0", default-features = false }
 

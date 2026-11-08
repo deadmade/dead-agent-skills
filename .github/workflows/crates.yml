@@ -33,22 +33,12 @@ jobs:
         with:
           node-version-file: package.json
 
-      - name: WebKitGTK
-        if: runner.os == 'Linux' && contains(fromJSON(needs.changes.outputs.packages), 'flow-cockpit')
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev
-
       - name: Rust toolchain
         run: rustup update stable && rustup default stable && rustup component add clippy rustfmt
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: .
-
-      - name: Native distributions
-        if: contains(fromJSON(needs.changes.outputs.packages), 'flow-cockpit')
-        run: |
-          npm ci
-          npm run build:harnesses
 
       - name: Workspace policy and formatting
         run: |
@@ -82,14 +72,7 @@ jobs:
             cargo test --locked -p $package
           }
 
-      - name: Views tests and type checks
-        if: contains(fromJSON(needs.changes.outputs.packages), 'flow-cockpit')
-        run: |
-          node --test 'tools/flow-cockpit/app/shell/*.test.mjs' 'tools/flow-cockpit/extensions/tests/*.test.ts'
-          npx tsc -p tools/flow-cockpit/app/shell
-          npx tsc -p tools/flow-cockpit/extensions
-
-  # Validate each independently installed Linux package, including cockpit's default extensions.
+  # Validate each independently installed Linux package.
   nix:
     needs: changes
     if: needs.changes.outputs.rust == 'true'
@@ -107,9 +90,6 @@ jobs:
         run: |
           nix build .#${{ matrix.package }} -L
           ./result/bin/${{ matrix.package }} --version
-          if [ "${{ matrix.package }}" = flow-cockpit ]; then
-            ./result/bin/flow-cockpit --print-paths
-          fi
 
   msrv:
     needs: changes
@@ -122,9 +102,6 @@ jobs:
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["rust-version"])')
           rustup toolchain install "$version" --profile minimal
           rustup override set "$version"
-      - name: WebKitGTK
-        if: contains(fromJSON(needs.changes.outputs.packages), 'flow-cockpit')
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: .
