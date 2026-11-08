@@ -118,7 +118,9 @@ test('manual runs and initial pushes select all; PR and push use their complete 
 
 test('real git diff includes both sides of a rename and excludes base-only changes', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ci-changes-'));
-  const git = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+  // A commit hook's GIT_INDEX_FILE would make these commands write to the caller's index.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  const git = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env });
   try {
     git(['init', '-q']);
     git(['config', 'user.name', 'CI test']);
