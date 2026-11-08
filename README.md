@@ -28,7 +28,7 @@ codex plugin add web-mcp@dead-agent-skills
 ```
 
 On that branch the Claude catalog is `.claude-plugin/marketplace.json`; the Codex catalog is `.agents/plugins/marketplace.json`.
-They have separate plugin selections and host-specific packages. The repository still has its original GitHub name;
+They have separate plugin selections and host-specific packages. The repository moved to this GitHub name, but
 Claude's marketplace/plugin identifiers remain stable for existing users.
 
 The native packages live under `.agents/plugins/` (Codex) and `.claude-plugin/` (Claude Code), including skill packs, reviewer briefs, C# libraries and licenses.
@@ -98,33 +98,8 @@ it always denies Claude reading `.env` files and credential dirs and keeps sessi
 lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own) and
 compacts the context at 350K tokens (`autoCompactWindow`, unless you set your own; it only matters on 1M-context models). It also switches Claude Code to a short, answer-first `concise` output style (`outputStyle`, unless you chose one; the style file goes to `~/.claude/output-styles/`). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
-Everything ships as one version. Merges to main that change plugins, tools or shared build inputs release a patch;
-CI, root documentation and analysis artifacts alone do not. A bigger step is `npm run release -- minor`
-and `git push --follow-tags origin main`. The tag builds the installer and the binaries and publishes the GitHub
-release they're downloaded from, then commits the native distributions onto the `release` branch. From a checkout,
-`npm ci` and `npm run build:harnesses` once, then `node tools/installer/install.ts` runs the installer (Node 26 or newer)
-and `npm run typecheck` checks it.
-
-The Rust packages share one workspace: dependency versions and release settings live in the root `Cargo.toml`,
-with one `Cargo.lock` and `target/`. From the repo root, build with `cargo build --workspace --locked` or select a
-binary with `cargo build --release --locked -p web-mcp --bin web-mcp`. Before testing, run
-`cargo build --locked -p web-mcp --bin fake-agent-browser`, then `cargo test --workspace --locked` and
-`cargo clippy --workspace --all-targets --locked -- -D warnings`. The full workspace needs cockpit's GTK/WebKit
-libraries on Linux; `nix develop` supplies them. CI also tests each package separately and checks the declared
-minimum Rust version. PR checks select the affected components; shared dependency changes run all checks, and
-releases still build every binary. Add dependencies to `[workspace.dependencies]` and inherit them in member manifests.
-
-Author plugins in `plugins/catalog.json` and their source resources under `plugins/`. The catalog declares shared
-resources, dependencies, targets and native overlays; hooks use neutral events in each plugin's `hooks/hooks.json`.
-`npm run build:harnesses` writes both native distributions and their catalogs to `.claude-plugin/` and
-`.agents/plugins/`; review them, but don't commit them: `main` ignores both, and only the `release` branch carries them.
-Never edit them by hand. `npm test` (its repo checks), `npm pack` and the vendoring scripts build them first; a
-problem the build finds in the composed flows text fails the build.
-
-Required unsupported capabilities fail generation; optional unsupported events have diagnostics and are omitted.
-Native extensions such as Claude engine modules never enter Codex packages. A future harness needs a catalog target,
-capability table, package/theme adapter and packaged live-event adapter, with native fixtures and integration tests;
-shared feature handlers continue to consume normalized inputs.
+Contributor steps — versioning and releases, the Rust workspace, authoring plugins and building both harness
+packages — are in [AGENTS.md](AGENTS.md), which this file doesn't repeat.
 
 Native hooks require Node on PATH. Review native hook trust before enabling them in Codex, then verify startup in a
 fresh session. Installation alone does not prove trust. Existing installer-managed instructions stay until a matching
