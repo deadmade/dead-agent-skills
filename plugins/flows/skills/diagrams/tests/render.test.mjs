@@ -105,7 +105,8 @@ test('keeps markdown HTML inert: JSON-escaped, an escaped title, and a page scri
   // The browser side cannot run here, so this checks the renderers that make the HTML text and filter the URLs.
   assert.match(r.html, /html\(\{ text \}\) \{\s*return esc\(text\);/);
   assert.match(r.html, /link\(\{ href, tokens \}\) \{\s*return safe\(href\) \? false : /);
-  assert.match(r.html, /image\(\{ href, text \}\) \{\s*return safe\(href\) \? false : esc\(text\)/);
+  assert.match(r.html, /image\(\{ href, title, text \}\) \{\s*if \(!safe\(href\)\) return esc\(text\);/);
+  assert.match(r.html, /doc\.innerHTML = clean\(marked\.parse\(/);
   assert.match(r.html, /\(https\?\|mailto\):/);
   assert.match(r.html, /\[\^\/\?#\]\*&/);
   // After an open <pre> or <script>, marked leaves text unescaped (escaped: true); the page must turn that off.
@@ -114,7 +115,7 @@ test('keeps markdown HTML inert: JSON-escaped, an escaped title, and a page scri
 
 test('the page’s clean pass strips script-like elements, handlers and unsafe addresses and keeps its own markup', () => {
   const html = render('# T\n').html;
-  const source = `${html.match(/const safe = [^]*?\n\};/)[0]}\n${html.match(/function clean[^]*?\n\}\n/)[0]}\nreturn clean;`;
+  const source = `${html.match(/const safe = [^]*?\n\};/)[0]}\n${html.match(/const KEEP = [^]*?\n\}\n/)[0]}\nreturn clean;`;
   const { document } = new JSDOM('').window;
   const clean = new Function('document', source)(document);
   const out = new JSDOM(
@@ -135,6 +136,28 @@ test('the page’s clean pass strips script-like elements, handlers and unsafe a
     [null, null, 'https://e.com/?a=1&b=2'],
   );
   assert.ok(out.querySelector('figure.diagram > pre.source') && out.querySelector('details.dir[open] > summary'));
+});
+
+test('the clean pass keeps only the attributes marked and the tree write, so an alt-text injection loses its id and style', () => {
+  const html = render('# T\n').html;
+  const source = `${html.match(/const safe = [^]*?\n\};/)[0]}\n${html.match(/const KEEP = [^]*?\n\}\n/)[0]}\nreturn clean;`;
+  const { document } = new JSDOM('').window;
+  const clean = new Function('document', source)(document);
+  // what marked 16 writes for ![a" style=... id="plan-map" x](https://ok/x.png), where the alt text is not escaped
+  const out = new JSDOM(
+    clean(
+      '<img src="https://ok/x.png" alt="a" style="position:fixed;inset:0" id="plan-map" srcset="https://e/x 1x" data-k="1" x"="">' +
+        '<ol start="3"><li><input type="checkbox" checked disabled></li></ol><table><tr><td align="center" class="c">1</td></tr></table>',
+    ),
+  ).window.document;
+  const img = out.querySelector('img');
+  assert.deepEqual(
+    [...img.attributes].map((a) => a.name),
+    ['src', 'alt'],
+  );
+  assert.equal(out.getElementById('plan-map'), null);
+  assert.equal(out.querySelector('ol').getAttribute('start'), '3');
+  assert.ok(out.querySelector('input[type=checkbox][checked][disabled]') && out.querySelector('td[align=center].c'));
 });
 
 test('the page’s URL filter rejects script schemes, including ones hidden in character references', () => {

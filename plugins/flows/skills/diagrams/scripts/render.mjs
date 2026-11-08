@@ -212,8 +212,10 @@ marked.use({
     link({ href, tokens }) {
       return safe(href) ? false : this.parser.parseInline(tokens);
     },
-    image({ href, text }) {
-      return safe(href) ? false : esc(text);
+    // marked puts the alt text in the attribute unescaped, so the page writes the tag itself.
+    image({ href, title, text }) {
+      if (!safe(href)) return esc(text);
+      return '<img src="' + esc(href) + '" alt="' + esc(text) + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>';
     },
     code({ text, lang }) {
       const kind = (lang ?? '').split(/\\s/)[0];
@@ -224,7 +226,10 @@ marked.use({
   },
 });
 
-// A second layer behind the html renderer: no script-like element, event handler or unsafe address survives marked.
+// A second layer behind the renderers: no script-like element survives marked, and an element keeps only the attributes
+// marked itself writes (href, src, alt, title, class, type, checked, disabled, open, start, align) plus the tree's
+// own (class, open); style, id, srcset, data-* and event handlers are dropped, and an address must pass safe().
+const KEEP = new Set(['href', 'src', 'alt', 'title', 'class', 'type', 'checked', 'disabled', 'open', 'start', 'align']);
 function clean(html) {
   const t = document.createElement('template');
   t.innerHTML = html;
@@ -232,7 +237,7 @@ function clean(html) {
     if (/^(script|style|iframe|object|embed|link|meta|base|form)$/i.test(el.localName)) el.remove();
     else
       for (const { name, value } of [...el.attributes])
-        if (/^on/i.test(name) || (/^(href|src|xlink:href)$/i.test(name) && !safe(value))) el.removeAttribute(name);
+        if (!KEEP.has(name) || (/^(href|src)$/.test(name) && !safe(value))) el.removeAttribute(name);
   }
   return t.innerHTML;
 }
