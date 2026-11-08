@@ -1,4 +1,5 @@
 #:schema ./step.schema.json
+uses = ["flows:diagrams"]
 repeat = true
 
 text = '''
@@ -16,4 +17,7 @@ text = '''
   picks the method in the same answer. Every other gate asks for approval alone.
 - The gate message says whether the document it shows was copyedited: `copyedited`, `copyedit refused` with the lines
   `compare.mjs` printed, `not copyedited: no subagents`, or `not copyedited: a given plan is not changed`.
+- Before a gate shows a spec or a plan, read `<flow-root>/skills/diagrams/SKILL.md` and follow it; the gate shows the
+  page it produces beside the usual summary. Render after the copyedit. A spec or plan the run was given, and flow.md,
+  are rendered but never edited.
 '''

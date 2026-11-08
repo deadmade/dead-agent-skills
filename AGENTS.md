@@ -97,6 +97,11 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
   `plugins/flows/skills/writing/tests/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
   our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
+  flows also holds `skills/diagrams/` (`flows:diagrams`, model-invocable like `writing`): `check.mjs` checks the `mermaid`
+  and `files` blocks of a spec or plan, `render.mjs` writes it and its pictures as one HTML page, and `steps/gate.toml`
+  has every gate that shows a spec or plan run both. The checker installs Mermaid and jsdom (`package.json` and
+  `package-lock.json` beside `SKILL.md`) into the user's cache folder, never into the plugin; tests that need them skip
+  offline.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`,
   built for Windows and Linux x64 only (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the
   installer downloads it and sets `binPath`. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4` feature)
@@ -253,7 +258,7 @@ When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Dependency updates
 
-Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the root `Cargo.lock` and workspace dependency versions and the headroom-trim `uv.lock` current. The root Cargo entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the JS vendored in `tools/flow-cockpit/app/shell/vendor/` (see above) and the `cisco-ai-skill-scanner` pin in the `scan-skills` script. The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
+Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the root `Cargo.lock` and workspace dependency versions the headroom-trim `uv.lock` and the diagrams skill's `package-lock.json` current. The root Cargo entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the JS vendored in `tools/flow-cockpit/app/shell/vendor/` (see above) and the `cisco-ai-skill-scanner` pin in the `scan-skills` script, and the Mermaid and marked versions the diagrams page loads from a CDN (constants in `plugins/flows/skills/diagrams/scripts/render.mjs`). The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
 
 ## Versions and releases
 
