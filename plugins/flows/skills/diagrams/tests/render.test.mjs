@@ -1,0 +1,126 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const SKILL = join(import.meta.dirname, '..');
+const RENDER = join(SKILL, 'scripts', 'render.mjs');
+const FIXTURE = readFileSync(join(SKILL, 'tests', 'fixtures', 'api-mcp-diagrams.md'), 'utf8');
+
+const temp = () => mkdtempSync(join(tmpdir(), 'diagrams-render-'));
+const fence = (kind, body) => `\`\`\`${kind}\n${body}\n\`\`\`\n`;
+
+// Runs the renderer on `markdown` with a temp folder as the working directory (the checker's root).
+function render(markdown) {
+  const dir = temp();
+  const doc = join(dir, 'doc.md');
+  const out = join(dir, 'out.html');
+  writeFileSync(doc, markdown);
+  const r = spawnSync(process.execPath, [RENDER, doc, out], { encoding: 'utf8', cwd: dir });
+  const html = existsSync(out) ? readFileSync(out, 'utf8') : undefined;
+  return { code: r.status, text: (r.stdout ?? '') + (r.stderr ?? ''), html, out };
+}
+
+// The markdown a page carries, read back from its JSON block.
+const embedded = (html) => JSON.parse(html.match(/<script type="application\/json" id="md">(.*?)<\/script>/s)[1]);
+const planMap = (html) => html.match(/<template id="plan-map">(.*?)<\/template>/s)?.[1] ?? '';
+
+const plan = (...tasks) =>
+  `# Demo Implementation Plan\n\n${tasks
+    .map(
+      ([id, ...files]) =>
+        `### Task ${id}: t${id}\n\n**Does:** x\n**Depends on:** none\n\n${files.length ? `**Files:**\n${files.join('\n')}\n\n` : ''}- [ ] step\n`,
+    )
+    .join('\n')}`;
+
+test('writes one page that holds every block’s text', () => {
+  const r = render(FIXTURE);
+  assert.equal(r.code, 0, r.text);
+  assert.match(r.html, /^<!doctype html>/i);
+  assert.equal(embedded(r.html), FIXTURE);
+  assert.match(r.html, /sequenceDiagram/);
+  assert.match(r.html, /<title>Four api-mcp diagrams/);
+});
+
+test('draws the folder tree in Node with markers and per-folder counts, unchanged folders collapsed, <details> to collapse', () => {
+  const r = render(
+    fence(
+      'files',
+      '+ a/b/c/x.ts\n~ a/b/c/y.ts\n- a/b/d/z.ts\n+ a/b/d/w.ts\n> a/b/e/old.ts -> a/b/e/new.ts\n+ top.md\n+ <i>.ts',
+    ),
+  );
+  assert.equal(r.code, 0, r.text);
+  // a/ and a/b/ hold no file of their own, so they fold into one line; c has two changes, d has two.
+  assert.match(r.html, /<summary>[^]*?a\/b[^]*?<\/summary>/);
+  assert.doesNotMatch(r.html, /<summary>[^<]*<span class="name">a\/<\/span>/);
+  assert.match(r.html, /<details class="dir" open>/);
+  const summary = (name) => r.html.match(new RegExp(`<summary>(?:(?!</summary>).)*?${name}.*?</summary>`, 's'))[0];
+  assert.match(summary('c\\/'), /m-add[^>]*>\+1/);
+  assert.match(summary('c\\/'), /m-mod[^>]*>~1/);
+  assert.match(summary('d\\/'), /m-del[^>]*>-1/);
+  assert.match(summary('e\\/'), /m-move[^>]*>&gt;1/);
+  assert.match(summary('a\\/b'), /\+2/);
+  assert.match(r.html, /<li class="file m-move">[^]*?new\.ts[^]*?old\.ts/);
+  assert.match(r.html, /&lt;i&gt;\.ts/);
+  assert.doesNotMatch(r.html, /<i>\.ts/);
+});
+
+test('refuses and writes nothing when the check fails', () => {
+  const r = render(`${fence('files', '+ ok.txt')}\n${fence('files', '+ fine.txt\nmove it')}`);
+  assert.equal(r.code, 1);
+  assert.match(r.text, /error: block 2: .*move it/);
+  assert.equal(r.html, undefined);
+});
+
+test('a plan gets a file map from its Files lists', () => {
+  const r = render(plan([1, '- Create: `src/new.ts`, `docs/a.md`'], [2, '- Modify: `src/new.ts` (again)']));
+  assert.equal(r.code, 0, r.text);
+  const map = planMap(r.html);
+  assert.match(map, /Task 1: t1/);
+  assert.match(map, /Task 2: t2/);
+  assert.match(map, /<li class="file m-add">[^]*?new\.ts/);
+  assert.match(map, /<li class="file m-mod">[^]*?new\.ts/);
+  assert.match(map, /docs\/?<\/span>/);
+});
+
+test('a task without Files shows no map lines', () => {
+  const r = render(plan([1, '- Create: `src/new.ts`'], [2]));
+  assert.equal(r.code, 0, r.text);
+  const map = planMap(r.html);
+  assert.match(map, /Task 1: t1/);
+  assert.doesNotMatch(map, /Task 2/);
+  assert.equal(planMap(render('# Notes\n\nNo tasks here.\n').html), '');
+});
+
+test('escapes HTML and </script> in the markdown', () => {
+  const evil = '# <img src=x onerror=alert(1)>\n\n</script><script>alert(1)</script> <!-- x\n';
+  const r = render(evil);
+  assert.equal(r.code, 0, r.text);
+  assert.equal(embedded(r.html), evil);
+  assert.equal(r.html.split('</script>').length - 1, 2, 'only the page’s own two scripts close');
+  assert.doesNotMatch(r.html, /<img src=x/);
+  assert.match(r.html, /<title>&lt;img src=x onerror=alert\(1\)&gt;<\/title>/);
+});
+
+test('Mermaid runs at the strict security level', () => {
+  const { html } = render('# T\n');
+  assert.match(html, /securityLevel: 'strict'/);
+  assert.doesNotMatch(html, /securityLevel: '(loose|antiscript|sandbox)'/);
+  assert.match(html, /cdn\.jsdelivr\.net\/npm\/mermaid@12\.3\.0\//);
+  assert.match(html, /cdn\.jsdelivr\.net\/npm\/marked@18\.1\.3\//);
+});
+
+test('ELK is set once for the page', () => {
+  const { html } = render('# T\n');
+  assert.equal(html.match(/layout: 'elk'/g).length, 1);
+  assert.equal(html.match(/mermaid\.initialize\(/g).length, 1);
+});
+
+test('the page links no web font and no stylesheet', () => {
+  const { html } = render(FIXTURE);
+  assert.doesNotMatch(html, /<link\b/i);
+  assert.doesNotMatch(html, /@import|@font-face|fonts\.(googleapis|gstatic)/i);
+  assert.doesNotMatch(html, /src="https?:/i);
+});
