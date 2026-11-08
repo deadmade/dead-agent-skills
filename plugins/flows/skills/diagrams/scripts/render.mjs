@@ -190,14 +190,29 @@ mermaid.initialize({
 });
 
 const esc = (s) => s.replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
-const trees = [...document.querySelectorAll('template[data-tree]')].map((t) => t.innerHTML);
-let tree = 0;
+// Trees are keyed by the fence text, so a fence nested in a list or quote cannot pick another block's tree.
+const trees = new Map([...document.querySelectorAll('template[data-tree]')].map((t) => [t.dataset.key, t.innerHTML]));
+// A scheme other than http, https or mailto (javascript:, data:, ...) is dropped; browsers skip control characters in it.
+const safe = (href) => {
+  const h = href.replace(/[\\u0000-\\u0020]/g, '');
+  return !/^[a-z][a-z0-9+.-]*:/i.test(h) || /^(https?|mailto):/i.test(h);
+};
 marked.use({
   renderer: {
+    // The document is shown, never run: raw HTML in it becomes text.
+    html({ text }) {
+      return esc(text);
+    },
+    link({ href, tokens }) {
+      return safe(href) ? false : this.parser.parseInline(tokens);
+    },
+    image({ href, text }) {
+      return safe(href) ? false : esc(text);
+    },
     code({ text, lang }) {
       const kind = (lang ?? '').split(/\\s/)[0];
       if (kind === 'mermaid') return '<figure class="diagram"><pre class="source">' + esc(text) + '</pre></figure>';
-      if (kind === 'files') return '<figure>' + (trees[tree++] ?? '') + '</figure>';
+      if (kind === 'files' && trees.has(text.trim())) return '<figure>' + trees.get(text.trim()) + '</figure>';
       return false;
     },
   },
@@ -225,14 +240,18 @@ for (const pre of doc.querySelectorAll('.diagram > pre.source')) {
 const line = (p) => `${p.level}: ${p.block ? `block ${p.block}: ` : ''}${p.message}`;
 
 // The page for `markdown`; `root` is the repository the checker compares file maps with. Throws, with the checker's
-// lines as the message, when the checker finds an error.
+// lines as the message, when the checker finds an error; its warnings go to stderr.
 export async function renderPage(markdown, root) {
   const problems = await checkMarkdown(markdown, root);
   if (problems.some((p) => p.level === 'error')) throw new Error(problems.map(line).join('\n'));
+  for (const p of problems) console.error(line(p));
 
   const trees = extractBlocks(markdown)
     .filter((b) => b.kind === 'files')
-    .map((b) => `<template data-tree>${treeHtml(parseFilesBlock(b.text))}</template>`);
+    .map(
+      (b) =>
+        `<template data-tree data-key="${escapeHtml(b.text.trim())}">${treeHtml(parseFilesBlock(b.text))}</template>`,
+    );
   const map = planMapHtml(markdown);
   const title = escapeHtml(markdown.match(/^# (.+)$/m)?.[1].trim() ?? 'Document');
   // `<` is escaped so quoted HTML such as </script> cannot end the script early.
@@ -264,6 +283,10 @@ ${script()}</script>
 // realpath: argv[1] keeps a symlinked folder while import.meta.url resolves it.
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [doc, out] = process.argv.slice(2);
+  if (!doc || !out) {
+    console.error('usage: node render.mjs <doc.md> <out.html>');
+    process.exit(1);
+  }
   let markdown;
   try {
     markdown = readFileSync(doc, 'utf8');

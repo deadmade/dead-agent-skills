@@ -13,14 +13,14 @@ const temp = () => mkdtempSync(join(tmpdir(), 'diagrams-render-'));
 const fence = (kind, body) => `\`\`\`${kind}\n${body}\n\`\`\`\n`;
 
 // Runs the renderer on `markdown` with a temp folder as the working directory (the checker's root).
-function render(markdown) {
+function render(markdown, args = (doc, out) => [doc, out]) {
   const dir = temp();
   const doc = join(dir, 'doc.md');
   const out = join(dir, 'out.html');
   writeFileSync(doc, markdown);
-  const r = spawnSync(process.execPath, [RENDER, doc, out], { encoding: 'utf8', cwd: dir });
+  const r = spawnSync(process.execPath, [RENDER, ...args(doc, out)], { encoding: 'utf8', cwd: dir });
   const html = existsSync(out) ? readFileSync(out, 'utf8') : undefined;
-  return { code: r.status, text: (r.stdout ?? '') + (r.stderr ?? ''), html, out };
+  return { code: r.status, text: (r.stdout ?? '') + (r.stderr ?? ''), err: r.stderr ?? '', html, out };
 }
 
 // The markdown a page carries, read back from its JSON block.
@@ -94,14 +94,37 @@ test('a task without Files shows no map lines', () => {
   assert.equal(planMap(render('# Notes\n\nNo tasks here.\n').html), '');
 });
 
-test('escapes HTML and </script> in the markdown', () => {
+test('keeps markdown HTML inert: JSON-escaped, an escaped title, and a page script that escapes raw HTML and drops script URLs', () => {
   const evil = '# <img src=x onerror=alert(1)>\n\n</script><script>alert(1)</script> <!-- x\n';
   const r = render(evil);
   assert.equal(r.code, 0, r.text);
   assert.equal(embedded(r.html), evil);
   assert.equal(r.html.split('</script>').length - 1, 2, 'only the page’s own two scripts close');
-  assert.doesNotMatch(r.html, /<img src=x/);
   assert.match(r.html, /<title>&lt;img src=x onerror=alert\(1\)&gt;<\/title>/);
+  // The browser side cannot run here, so this checks the renderers that make the HTML text and filter the URLs.
+  assert.match(r.html, /html\(\{ text \}\) \{\s*return esc\(text\);/);
+  assert.match(r.html, /link\(\{ href, tokens \}\) \{\s*return safe\(href\) \? false : /);
+  assert.match(r.html, /image\(\{ href, text \}\) \{\s*return safe\(href\) \? false : esc\(text\)/);
+  assert.match(r.html, /\(https\?\|mailto\):/);
+});
+
+test('each folder tree is keyed by the text of its fence', () => {
+  const r = render(`${fence('files', '+ a.ts')}\n${fence('files', '+ b.ts')}`);
+  assert.match(r.html, /<template data-tree data-key="\+ a\.ts">/);
+  assert.match(r.html, /<template data-tree data-key="\+ b\.ts">/);
+});
+
+test('prints the checker’s warnings to stderr and still writes the page', () => {
+  const r = render(fence('files', '~ gone.ts'));
+  assert.equal(r.code, 0, r.text);
+  assert.match(r.err, /warning: block 1: ~ gone\.ts does not exist/);
+  assert.ok(r.html);
+});
+
+test('a missing output argument prints a usage line and exits 1', () => {
+  const r = render('# T\n', (doc) => [doc]);
+  assert.equal(r.code, 1);
+  assert.match(r.err, /usage: node render\.mjs <doc\.md> <out\.html>/);
 });
 
 test('Mermaid runs at the strict security level', () => {
