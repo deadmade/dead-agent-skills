@@ -28,7 +28,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26
+          node-version-file: package.json
 
       - name: Sources
         id: list
@@ -52,7 +52,7 @@ jobs:
       # The sync CLI runs TypeScript directly on Node.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26
+          node-version-file: package.json
 
       # The sync rebuilds the harnesses and the repo checks run the compiler, which needs its packages.
       - run: npm ci
