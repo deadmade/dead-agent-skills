@@ -87,7 +87,7 @@ _Avoid_: source of truth, manifest
 A flows skill the user starts by name that runs other skills in order and keeps a record of the run: a flow.md for the
 build and research flows; /review-code, /understand and /learn keep their own (an audit file, a scratch file, the
 chat).
-_Avoid_: workflow, flow (alone; a flow run is one execution)
+_Avoid_: workflow, flow (alone; one execution of a flow is a run)
 
 **Flow step**:
 A piece of conductor text written once, in `plugins/flows/steps/<name>.toml`, and copied word for word into every
