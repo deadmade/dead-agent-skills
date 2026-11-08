@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { glance, run } from '../scripts/glance.mjs';
+import { glance, parse, run } from '../scripts/glance.mjs';
 
 const task = (id, title, depends, { does = `does ${id}`, files = ['a.js'], adds = 'nothing new', size = '~10' } = {}) =>
   [
@@ -277,4 +277,30 @@ test('the CLI runs through a symlinked folder', () => {
   const res = spawnSync(process.execPath, [join(dir, 'scripts', 'glance.mjs'), file], { encoding: 'utf8' });
   assert.equal(res.status, 0, res.stderr);
   assert.match(res.stdout, /^<!-- glance -->/);
+});
+
+test('parse keeps each file with its verb', () => {
+  const t = [
+    '### Task 1: a',
+    '',
+    '**Does:** x',
+    '**Depends on:** none',
+    '**Files:**',
+    '- Create: `a.js` (new, small), `b.js`',
+    '- Modify: `c.js` (see `d.js`), `e.js (not a path)',
+    '- Delete: `f.js`',
+    '- Test: `g.js`',
+    '',
+    '- [ ] a step',
+    '',
+  ].join('\n');
+  const [task] = parse(plan(t)).tasks;
+  assert.deepEqual(task.entries, [
+    { verb: 'Create', path: 'a.js' },
+    { verb: 'Create', path: 'b.js' },
+    { verb: 'Modify', path: 'c.js' },
+    { verb: 'Modify', path: '' },
+    { verb: 'Delete', path: 'f.js' },
+  ]);
+  assert.equal(task.files, 4);
 });

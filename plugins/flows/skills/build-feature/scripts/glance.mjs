@@ -93,7 +93,36 @@ function stripComments(text) {
   return out;
 }
 
-function parse(text) {
+// `a, b (a note, with a comma), c` split at `, ` outside parentheses and code spans.
+function items(text) {
+  const out = [];
+  let depth = 0;
+  let code = false;
+  let from = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '`') code = !code;
+    else if (code) continue;
+    else if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    else if (c === ',' && depth === 0 && text[i + 1] === ' ') {
+      out.push(text.slice(from, i));
+      from = i + 2;
+    }
+  }
+  out.push(text.slice(from));
+  return out.map((s) => s.trim()).filter(Boolean);
+}
+
+// A `- Create|Modify|Delete:` bullet's files. An item that is not one backticked path with an optional (note) gets an
+// empty path, for the caller to report; this parser never throws on a Files line.
+function fileEntries(bullet) {
+  const m = bullet.match(/^- (Create|Modify|Delete):\s*(.*)$/);
+  if (!m) return [];
+  return items(m[2]).map((item) => ({ verb: m[1], path: item.match(/^`([^`]+)`(?:\s*\(.*\))?$/s)?.[1] ?? '' }));
+}
+
+export function parse(text) {
   // Like plan.rs: comments are stripped and fenced lines are neither headings nor fields.
   const lines = stripComments(text).split('\n');
   const title = (lines.find((l) => l.startsWith('# ')) ?? '# Plan')
@@ -127,9 +156,13 @@ function parse(text) {
     // Paths written inline after **Files:**, then the bullets under it, blank lines around them allowed; the list
     // ends at a bold line, a heading or a step.
     t.files = ((field(t.lines, 'Files') ?? '').match(/`[^`]+`/g) ?? []).length;
+    t.entries = [];
     for (const l of at < 0 ? [] : t.lines.slice(at + 1)) {
       if (/^(\*\*|#|- \[)/.test(l.trim())) break;
-      if (l.startsWith('- ')) t.files += 1;
+      if (l.startsWith('- ')) {
+        t.files += 1;
+        t.entries.push(...fileEntries(l.trimEnd()));
+      }
     }
   }
   return { title, tasks: tasks.sort((a, b) => order(a.id, b.id)) };
