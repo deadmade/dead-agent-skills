@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -78,4 +79,34 @@ test('run-rules names exactly the packs that exist', () => {
       .sort(),
     packs(fileURLToPath(new URL('../', import.meta.url))),
   );
+});
+
+test('no file still names the old repository slug', () => {
+  let paths;
+  try {
+    paths = execFileSync(
+      'git',
+      [
+        'grep',
+        '-l',
+        'deadmade/dead-claude-skills',
+        '--',
+        '.',
+        ...[
+          'docs/features',
+          'docs/adr',
+          'docs/audits',
+          'docs/solutions',
+          'tools/flow-cockpit/core/tests/fixtures',
+          'tools/installer/core/release.test.ts',
+          'scripts/repo-facts.test.mjs',
+        ].map((path) => `:(exclude)${path}`),
+      ],
+      { cwd: fileURLToPath(new URL('../', import.meta.url)), encoding: 'utf8' },
+    );
+  } catch (error) {
+    if (error.status === 1) return;
+    throw error;
+  }
+  assert.fail(`${paths.trim()} still names the old repository; use package.json's repository`);
 });

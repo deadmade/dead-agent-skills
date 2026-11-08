@@ -12,7 +12,7 @@ holds only the sources, so name the branch.
 **Claude Code** — add the marketplace, then pick plugins:
 
 ```text
-/plugin marketplace add deadmade/dead-claude-skills@release
+/plugin marketplace add deadmade/dead-agent-skills@release
 /plugin install dead-skills@dead-claude-skills
 /plugin install flows@dead-claude-skills
 ```
@@ -20,7 +20,7 @@ holds only the sources, so name the branch.
 **Codex** — add the same repository using Codex's native marketplace commands:
 
 ```sh
-codex plugin marketplace add deadmade/dead-claude-skills --ref release
+codex plugin marketplace add deadmade/dead-agent-skills --ref release
 codex plugin add flows@dead-agent-skills
 codex plugin add dead-skills@dead-agent-skills
 codex plugin add graphify@dead-agent-skills
@@ -72,7 +72,7 @@ passive lookups and a browser with an archive of everything it pulled, and
 
 Also available: [flow-cockpit](plugins/opt-in/flow-cockpit/README.md), whose skill writes the views of the flow cockpit, a window
 over your flow runs, audits and Claude sessions (on Linux the app comes from the flake:
-`nix run github:deadmade/dead-claude-skills#flow-cockpit`; on Windows the installer downloads it to
+`nix run github:deadmade/dead-agent-skills#flow-cockpit`; on Windows the installer downloads it to
 `%USERPROFILE%\.claude\bin\flow-cockpit\`). It also installs hooks that record questions, permission
 prompts and agent starts and stops per session into a local capture folder, which only the window reads.
 
@@ -89,7 +89,7 @@ Cloudflare's security-audit and the mattpocock, pstack and Trail of Bits picks).
 their skills, hooks and ponytail's band stay out of your sessions outside the conductors, and the installer removes
 old installs of them.
 
-    npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/latest/download/installer.tgz
+    npx --allow-remote=root https://github.com/deadmade/dead-agent-skills/releases/latest/download/installer.tgz
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It points the marketplace at the `release` branch, which follows the newest

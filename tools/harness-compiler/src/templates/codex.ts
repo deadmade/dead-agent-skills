@@ -12,14 +12,12 @@ export function integrationSetup(context: EmitContext) {
   };
   let setup = `Use the native Codex CLI to configure this integration; no project installer is required.\n\n\`\`\`sh\n${commands[name]}\n\`\`\`\n\nNever paste credentials into chat or package files. Preserve an existing server with this name and ask before replacing it.`;
   if (name === 'web-mcp')
-    setup +=
-      '\n\nPut the web-mcp release binary on PATH (or use its absolute path in the command). Install agent-browser separately for browser/search tools; fetch uses it for browser fallback; lookup works without it. Release binaries: https://github.com/deadmade/dead-claude-skills/releases .';
+    setup += `\n\nPut the web-mcp release binary on PATH (or use its absolute path in the command). Install agent-browser separately for browser/search tools; fetch uses it for browser fallback; lookup works without it. Release binaries: https://github.com/${context.repository}/releases .`;
   if (name === 'mcp-github')
     setup +=
       '\n\nSet GITHUB_PERSONAL_ACCESS_TOKEN in the environment that starts Codex, then restart Codex. Do not put the token in the manifest.';
   if (name === 'mcp-azure')
-    setup +=
-      '\n\nPut the ado-mcp release binary on PATH (or use its absolute path in the command). Set ADO_ORG_URL (the Azure DevOps Server collection URL) and ADO_PAT in the environment that starts Codex. In the native server table [mcp_servers.dead-agent-skills-mcp-azure], add env_vars = ["ADO_ORG_URL", "ADO_PAT", "ADO_PROJECT_DIR"]. ADO_PROJECT_DIR optionally overrides the repository used for project detection. Preserve all unrelated configuration; ask for missing non-secret preferences. Release binaries: https://github.com/deadmade/dead-claude-skills/releases .';
+    setup += `\n\nPut the ado-mcp release binary on PATH (or use its absolute path in the command). Set ADO_ORG_URL (the Azure DevOps Server collection URL) and ADO_PAT in the environment that starts Codex. In the native server table [mcp_servers.dead-agent-skills-mcp-azure], add env_vars = ["ADO_ORG_URL", "ADO_PAT", "ADO_PROJECT_DIR"]. ADO_PROJECT_DIR optionally overrides the repository used for project detection. Preserve all unrelated configuration; ask for missing non-secret preferences. Release binaries: https://github.com/${context.repository}/releases .`;
   if (name === 'atlassian')
     setup +=
       '\n\nComplete OAuth with codex mcp login dead-agent-skills-atlassian. Authentication is a separate user action.';

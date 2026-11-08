@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { posix, win32 } from 'node:path';
 import { BUNDLE } from './plugins.ts';
-import { RELEASES, newer, semver } from './release.ts';
+import { REPO, RELEASES, newer, semver } from './release.ts';
 
 // tools/installer/assets/agent-browser.json and uv.json.
 export interface UpstreamPin {
@@ -65,7 +65,7 @@ export const BIN_PLUGINS: Record<string, BinPlugin> = {
     key: 'appPath',
     targets: ['win32-x64'],
     linuxHint: (version) =>
-      `run the app with \`nix run github:deadmade/dead-claude-skills/v${version}#flow-cockpit\`, or add the flake's flow-cockpit package to your system config`,
+      `run the app with \`nix run github:${REPO}/v${version}#flow-cockpit\`, or add the flake's flow-cockpit package to your system config`,
     folder: true,
   },
 };

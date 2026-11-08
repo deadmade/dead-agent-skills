@@ -39,7 +39,7 @@ The window shows a run as waiting on you while one of its sessions has a questio
 
 1. The app.
    - Linux: from this repository's flake (it links the system's GTK and WebKit, so it is not a plain download):
-     `nix run github:deadmade/dead-claude-skills#flow-cockpit`, or `packages.x86_64-linux.flow-cockpit` from the flake
+     `nix run github:deadmade/dead-agent-skills#flow-cockpit`, or `packages.x86_64-linux.flow-cockpit` from the flake
      in your system config. From a checkout: `nix build .#flow-cockpit`. The installer prints the command pinned to
      its release.
    - Windows x64: the installer downloads the release's zip into `%USERPROFILE%\.claude\bin\flow-cockpit\`

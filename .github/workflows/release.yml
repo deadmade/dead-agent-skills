@@ -149,13 +149,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$TAG" dist/* --title "$TAG" --generate-notes \
-            --notes "Install or update with \`npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/download/$TAG/installer.tgz\`, which points the marketplace at the release branch (Claude Code then updates the plugins on its own) and installs this release's binaries, or with \`/plugin update\` if you added the marketplace by hand from its release branch (\`deadmade/dead-claude-skills@release\`).
+            --notes "Install or update with \`npx --allow-remote=root https://github.com/${{ github.repository }}/releases/download/$TAG/installer.tgz\`, which points the marketplace at the release branch (Claude Code then updates the plugins on its own) and installs this release's binaries, or with \`/plugin update\` if you added the marketplace by hand from its release branch (\`${{ github.repository }}@release\`).
 
           installer.tgz: the installer, built to JS.
 
           web-mcp-*: the binary behind the web-mcp plugin, for Windows and Linux x64; the installer downloads yours.
           ado-mcp-*: the mcp-azure server for Windows and Linux x64; the installer downloads it.
-          flow-cockpit-*: the flow cockpit window for Windows x64, with its default extensions; the installer downloads it. Linux runs it from the flake: \`nix run github:deadmade/dead-claude-skills/$TAG#flow-cockpit\`."
+          flow-cockpit-*: the flow cockpit window for Windows x64, with its default extensions; the installer downloads it. Linux runs it from the flake: \`nix run github:${{ github.repository }}/$TAG#flow-cockpit\`."
 
   # The branch the installer points the marketplace at (RELEASE_BRANCH in tools/installer/core/release.ts): Claude Code's
   # marketplace auto-update follows it, so plugins update without rerunning the installer. Moved once the release exists,

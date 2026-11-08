@@ -9,6 +9,7 @@ export interface NativeEvent {
 export interface EmitContext {
   root: string; // repository root
   version: string;
+  repository: string;
   plugin: Plugin;
   plugins: Plugin[]; // the plugins of this target
   all: Plugin[];
