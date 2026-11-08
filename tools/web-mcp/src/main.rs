@@ -13,6 +13,7 @@ mod papers;
 mod passages;
 mod profile;
 mod rank;
+mod rows;
 mod search;
 mod tools;
 mod window;
