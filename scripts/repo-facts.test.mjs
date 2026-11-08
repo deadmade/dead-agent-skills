@@ -42,7 +42,7 @@ test('flake and devEngines agree on the Node major', () => {
 
 test('hand-typed Night City colours are in the palette', () => {
   const palettePath = 'plugins/default/themes/palette.json';
-  const OFF_PALETTE = ['#221D33', '#2F2848'];
+  const OFF_PALETTE = ['#221D33'];
   const allowed = new Set([...Object.values(JSON.parse(read(palettePath)).colors), ...OFF_PALETTE]);
   const viewPath = 'tools/installer/ui/view.ts';
   const uiPath = 'tools/ado-mcp/src/bin/timetrack/ui.rs';
