@@ -157,3 +157,33 @@ test('a build reports Codex text naming a Claude-only phrase', () => {
   assert.equal(problems.length, 1, problems.join('\n'));
   assert.match(problems[0], /^\[codex\] skills\/f\/SKILL\.md:6: .*WebSearch/);
 });
+
+test('Codex flows README lists declared companion plugins in dependency order', () => {
+  const root = flows(`${CONDUCTOR}# f\n`);
+  put(root, 'plugins/catalog.json', [
+    {
+      name: 'flows',
+      source: 'plugins/flows',
+      resources: ['skills'],
+      dependencies: ['alpha', 'beta'],
+      targets: ['codex'],
+    },
+    ...['alpha', 'beta'].map((name) => ({
+      name,
+      source: `plugins/${name}`,
+      resources: [],
+      dependencies: [],
+      targets: ['codex'],
+    })),
+  ]);
+  for (const name of ['alpha', 'beta']) put(root, `plugins/${name}/plugin.json`, { description: name });
+  const out = join(root, 'out');
+  buildTree(root, out);
+  const readme = readFileSync(join(out, '.agents/plugins/flows/README.md'), 'utf8');
+  assert.deepEqual(readme.match(/^codex plugin add .*$/gm), [
+    'codex plugin add flows@dead-agent-skills',
+    'codex plugin add alpha@dead-agent-skills',
+    'codex plugin add beta@dead-agent-skills',
+  ]);
+  assert.doesNotMatch(readme, /^codex plugin add graphify@/m);
+});

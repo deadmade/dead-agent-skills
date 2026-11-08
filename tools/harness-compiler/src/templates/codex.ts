@@ -1,5 +1,8 @@
+import type { EmitContext } from '../targets/target.ts';
+
 // Codex install prose. It is generated into the Codex distribution only; plugins/ never carries it.
-export function integrationSetup(name: string) {
+export function integrationSetup(context: EmitContext) {
+  const { name } = context.plugin;
   const commands: Record<string, string> = {
     'web-mcp': 'codex mcp add dead-agent-skills-web-mcp -- web-mcp',
     'mcp-github':
@@ -23,14 +26,15 @@ export function integrationSetup(name: string) {
   return setup;
 }
 
-export function packageReadme(name: string) {
+export function packageReadme(context: EmitContext) {
+  const { name, dependencies } = context.plugin;
   if (name === 'flows')
-    return '# Codex flows\n\nInstall directly from this marketplace:\n\n```sh\ncodex plugin add flows@dead-agent-skills\ncodex plugin add dead-skills@dead-agent-skills\ncodex plugin add graphify@dead-agent-skills\ncodex plugin add web-mcp@dead-agent-skills\n```\n\nCodex does not install Claude dependency declarations. Companion integrations are optional at runtime: each conductor names its fallback for a missing one. Run the web-mcp setup skill to configure its server. Packs, reviewer briefs and graphify resources are bundled. No installer or build is required.\n';
+    return `# Codex flows\n\nInstall directly from this marketplace:\n\n\`\`\`sh\ncodex plugin add flows@dead-agent-skills\n${dependencies.map((dependency) => `codex plugin add ${dependency}@dead-agent-skills`).join('\n')}\n\`\`\`\n\nCodex does not install Claude dependency declarations. Companion integrations are optional at runtime: each conductor names its fallback for a missing one. Run the web-mcp setup skill to configure its server. Packs, reviewer briefs and graphify resources are bundled. No installer or build is required.\n`;
   if (name === 'dead-skills')
     return '# Shared coding rules, Night City and Context7\n\nRun the setup-night-city skill to copy the packaged native theme safely and select it with /theme. No installer is required.\n\nThe trusted startup hook supplies shared coding rules. Review and trust hooks in Codex, then verify a fresh session before removing any installer-managed global rules block. Existing user instructions are preserved. The project-rules skill also carries the conventions. Context7 can be configured without an installer:\n\n```sh\ncodex mcp add dead-agent-skills-dead-skills --url https://mcp.context7.com/mcp\n```\n';
-  return `# ${name}\n\n${integrationSetup(name)}\n\nThe setup skill guides native MCP registration and authentication. Installing this setup plugin alone does not register a global MCP server.\n`;
+  return `# ${name}\n\n${integrationSetup(context)}\n\nThe setup skill guides native MCP registration and authentication. Installing this setup plugin alone does not register a global MCP server.\n`;
 }
 export const INTEGRATIONS = ['web-mcp', 'mcp-github', 'mcp-azure', 'atlassian'];
 export const READMES = ['flows', 'dead-skills', ...INTEGRATIONS];
-export const setupSkill = (name: string) =>
-  `---\nname: setup-${name}\ndescription: Set up the ${name} integration installed by dead-agent-skills.\n---\n\n${integrationSetup(name)}\n`;
+export const setupSkill = (context: EmitContext) =>
+  `---\nname: setup-${context.plugin.name}\ndescription: Set up the ${context.plugin.name} integration installed by dead-agent-skills.\n---\n\n${integrationSetup(context)}\n`;

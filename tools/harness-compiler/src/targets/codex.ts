@@ -62,8 +62,8 @@ export const codex: Target = {
       json(join(dest, 'resources.json'), { [name]: `./resources/${name}/skills/${name}/SKILL.md` });
     }
     if (INTEGRATIONS.includes(plugin.name))
-      text(join(dest, 'skills', `setup-${plugin.name}`, 'SKILL.md'), setupSkill(plugin.name));
-    if (READMES.includes(plugin.name)) text(join(dest, 'README.md'), packageReadme(plugin.name));
+      text(join(dest, 'skills', `setup-${plugin.name}`, 'SKILL.md'), setupSkill(context));
+    if (READMES.includes(plugin.name)) text(join(dest, 'README.md'), packageReadme(context));
     if (plugin.name === 'flows') {
       // A conductor runs only when the user calls it, the form the packs' own openai.yaml files ship.
       for (const skill of readdirSync(join(plugin.dir!, 'skills'))) {
