@@ -60,6 +60,7 @@ import { MCP_AZURE, FLOW_COCKPIT, WEB_MCP, applyBin } from './steps/binaries.ts'
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
 import { applyDcg } from './steps/dcg.ts';
+import { applyOutputStyle } from './steps/output-style.ts';
 import { addMarketplaces, applyPlugins, listed, removeForeign } from './steps/plugins.ts';
 import { applySettings } from './steps/settings.ts';
 import { clearTargets } from './system/files.ts';
@@ -314,6 +315,7 @@ await applyCcstatusline(current.ccstatusline, on('ccstatusline'));
 await applyDcg(current.dcg, on('dcg'));
 if (browser.path) await configureAgentBrowser(browser.path);
 if (clean) done.push(...clearTargets(CONFIG));
+await applyOutputStyle(join(CONFIG, 'output-styles', 'concise.md'), (question) => ask(question, false));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);
 

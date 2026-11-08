@@ -57,6 +57,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   stock fallback. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
   highlighting off. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
   Code otherwise draws in 256 colours and the theme's indigos turn grey.
+  The installer always sets `outputStyle: "concise"` unless the user chose a style, and `steps/output-style.ts` writes
+  `tools/installer/assets/concise-output-style.md` to `~/.claude/output-styles/concise.md` (after a clean slate's delete, a
+  differing file only replaced on a yes). It is part of the Claude Code setup only; the Codex step does not touch it.
   The ccstatusline toggle writes `tools/installer/assets/ccstatusline-night-city.json` (`ccstatusline.json`, the old stock config, is
   kept only so the installer recognises and replaces it):
   Powerline (needs a Nerd Font), and since Powerline mode draws a gradient in its first colour only, the ナイトシティ
