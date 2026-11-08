@@ -22,7 +22,7 @@ export function integrationSetup(context: EmitContext) {
   };
   let setup = `Use the native Codex CLI to configure this integration; no project installer is required.\n\n\`\`\`sh\n${commands[name]}\n\`\`\`\n\nNever paste credentials into chat or package files. Preserve an existing server with this name and ask before replacing it.`;
   if (name === 'web-mcp')
-    setup += `\n\nPut the web-mcp release binary on PATH (or use its absolute path in the command). Install agent-browser separately for browser/search tools; fetch uses it for browser fallback; lookup works without it. Release binaries: https://github.com/${context.repository}/releases .`;
+    setup += `\n\nPut the web-mcp release binary on PATH (or use its absolute path in the command). Install agent-browser separately for browser/search/rows tools; fetch uses it for browser fallback; lookup works without it. Release binaries: https://github.com/${context.repository}/releases .`;
   if (name === 'mcp-github')
     setup +=
       '\n\nSet GITHUB_PERSONAL_ACCESS_TOKEN in the environment that starts Codex, then restart Codex. Do not put the token in the manifest.';

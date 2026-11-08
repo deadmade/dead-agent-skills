@@ -58,7 +58,7 @@ waits for you, and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, [Azure DevOps Server](plugins/opt-in/mcp/mcp-azure/README.md), Atlassian on Codex), skill packs
 like hallmark and graphify, and tools such as
 [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
-Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search read in one browser window of its own, page fetching,
+Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search read in one browser window of its own, page fetching, a page's repeating items as numbered rows,
 passive lookups and a browser with an archive of everything it pulled, and
 [headroom-trim](plugins/opt-in/headroom-trim/README.md), which shrinks every tool result with headroom's offline compression before Claude reads it.
 

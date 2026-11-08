@@ -104,7 +104,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   offline. The page's script is a template literal in `render.mjs`, so each backslash in its regexes is written twice
   (`/^[\\\\/]{2}/` produces `/^[\\/]{2}/`); the tests run the produced page's `safe` and `clean` source, so check the
   output, not the template.
-- `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`,
+- `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser`, `rows` and `lookup`,
   built for Windows and Linux x64 only (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the
   installer downloads it and sets `binPath`. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4` feature)
   showed embeddings don't lift recall over BM25 on BEIR, so none ship. One browser window per server, every engine,
@@ -112,11 +112,14 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in
   `docs/features/web-mcp-search/findings.md`, and specific bugs in `docs/solutions/` (Google's `/goto` links, a hidden
   tab's `click`/`press`, agent-browser's install and a Windows Chrome quirk).
+  `rows` needs the browser window like `browser`, holds a 1 s gap per host, and its group detection is tested on
+  captured pages in `tests/fixtures/rows/` (`docs/adr/0012-rows-tool-and-shop-skill.md`).
   Contributor rules: tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`;
   `cargo build --locked -p web-mcp --bin fake-agent-browser` before the unit tests), which changes with any
   agent-browser answer web-mcp reads and doesn't model every upstream quirk
   (`docs/solutions/click-and-press-reach-nothing-in-a-hidden-tab.md`). Test-only hooks (debug builds or the
-  `test-hooks` feature): `WEB_MCP_TEST_PUBLIC_IP` treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS`,
+  `test-hooks` feature): the fake's `$FAKE_AB_PAGES` folder serves a result page for an engine host and, for any other
+  host, `<last path segment of the URL>.html`; `WEB_MCP_TEST_PUBLIC_IP` treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS`,
   `WEB_MCP_PAPERS_MS` and `WEB_MCP_LOOKUP_MS` shorten the fetch fallback's, each paper source's and each lookup
   source's deadline. Env knobs: `WEB_MCP_CHROME` picks the browser binary; `WEB_MCP_SEARCH_DIR` picks where profile
   slots live (no temp fallback).

@@ -225,11 +225,11 @@ test('windowProblem: no browser, no display on Linux, and the cases that are fin
   const ok = { browserRuns: true, platform: 'linux' as const, display: false, xvfb: false };
   assert.equal(
     windowProblem({ ...ok, browserRuns: false }),
-    "web-mcp's browser window can't open: no browser it can use. search, browser and the fetch fallback won't work until you run agent-browser install, or install Helium or Chromium.",
+    "web-mcp's browser window can't open: no browser it can use. search, browser, rows and the fetch fallback won't work until you run agent-browser install, or install Helium or Chromium.",
   );
   assert.equal(
     windowProblem(ok),
-    "web-mcp's browser window can't open: this Linux has no display and no Xvfb. search, browser and the fetch fallback won't work until you install Xvfb or run Claude Code in a desktop session.",
+    "web-mcp's browser window can't open: this Linux has no display and no Xvfb. search, browser, rows and the fetch fallback won't work until you install Xvfb or run Claude Code in a desktop session.",
   );
   assert.equal(windowProblem({ ...ok, display: true }), undefined);
   assert.equal(windowProblem({ ...ok, xvfb: true }), undefined);

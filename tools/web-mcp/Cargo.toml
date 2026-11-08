@@ -3,7 +3,7 @@ name = "web-mcp"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-description = "Stdio MCP server for the web-mcp plugin: search, fetch, browser and lookup tools that archive everything in .web/."
+description = "Stdio MCP server for the web-mcp plugin: search, fetch, browser, rows and lookup tools that archive everything in .web/."
 license.workspace = true
 publish.workspace = true
 
