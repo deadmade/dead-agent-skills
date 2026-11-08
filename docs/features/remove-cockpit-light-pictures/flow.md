@@ -1,7 +1,7 @@
 ---
 flow: feature
-phase: finish
-now: Waiting for you: pick how the branch ends.
+phase: done
+now: Done: pull request #133 is open against main (https://github.com/deadmade/dead-agent-skills/pull/133).
 ---
 
 # Remove flow-cockpit, show plans as pictures the light way: flow
