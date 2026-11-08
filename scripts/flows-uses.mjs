@@ -128,8 +128,8 @@ export function checkOverrides(root) {
   return problems;
 }
 
-// The parts of flow.md, plans and audit reports the flow cockpit reads: each must stay in the templates and the
-// conductor text that make a run write them.
+// The shapes glance and the gates rely on: each part of flow.md, plans and audit reports must stay in the templates and
+// the conductor text that make a run write them.
 const TEMPLATE_FILES = [
   `${FLOWS}/skills/build-feature/references/flow-template.md`,
   `${FLOWS}/skills/research-feature/references/research-template.md`,
@@ -140,7 +140,7 @@ const GATE_STEP = `${FLOWS}/steps/gate.toml`;
 const DEVIATIONS_STEP = `${FLOWS}/steps/deviations.toml`;
 const PLAN_STEP = `${FLOWS}/steps/plan-shape.toml`;
 const GATE_LINE = '- Gate <n>, <what>:';
-export function checkTemplates(root) {
+export function checkShapes(root) {
   const problems = [];
   const need = (file, parts) => {
     const text = readFileSync(join(root, file), 'utf8').replace(/\r\n/g, '\n');

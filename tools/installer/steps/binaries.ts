@@ -1,6 +1,5 @@
-// web-mcp, ado-mcp and the flow cockpit, the binaries of their plugins: one on PATH is used as is; otherwise the
-// release for this version goes to ~/.claude/bin (the flow cockpit to a folder of its own there, its default extensions
-// beside it) and the plugin's userConfig key points at it. Linux gets the flow cockpit from the flake instead.
+// web-mcp and ado-mcp, the binaries of their plugins: one on PATH is used as is; otherwise the release for this version
+// goes to ~/.claude/bin and the plugin's userConfig key points at it.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,7 +12,6 @@ import { progress } from '../ui/ui.ts';
 
 export const WEB_MCP = `web-mcp@${MARKETPLACE}`;
 export const MCP_AZURE = `mcp-azure@${MARKETPLACE}`;
-export const FLOW_COCKPIT = `flow-cockpit@${MARKETPLACE}`;
 export const BIN_DIR = join(CONFIG, 'bin');
 
 // The version a binary reports (`<name> <version>`), or undefined when there is none or it does not run.
@@ -31,9 +29,8 @@ export async function applyBin(
   arch = process.arch,
   extra: Record<string, string> = {},
 ) {
-  const { name, key, linuxHint, folder } = BIN_PLUGINS[pluginName];
+  const { name, key } = BIN_PLUGINS[pluginName];
   const version = VERSION;
-  if (platform === 'linux' && linuxHint) return done.push(`${name}: ${linuxHint(version)}`);
   const asset = binAsset(name, platform, arch, version);
   const bin = binPath(BIN_DIR, pluginName, platform);
   const action = binAction({
@@ -45,7 +42,7 @@ export async function applyBin(
   if (action === 'skip') done.push(`${name}: using the one on PATH`);
   let ours = action === 'configure';
   if (action === 'unsupported')
-    failures.push(`${name}: no release build for ${platform}-${arch}${folder ? '' : `; ${binAdvice(pluginName)}`}`);
+    failures.push(`${name}: no release build for ${platform}-${arch}; ${binAdvice(pluginName)}`);
   if (action === 'download') {
     const r = await progress(`Downloading ${name} ${version}`, async () => {
       await downloadBin(name, asset!, bin);

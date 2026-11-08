@@ -75,45 +75,12 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   const dirs: Record<string, string> = {
     'web-mcp': '.claude-plugin/web-mcp',
     'mcp-azure': '.claude-plugin/mcp-azure',
-    'flow-cockpit': '.claude-plugin/flow-cockpit',
   };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
     assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
   assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0')!, /no web-mcp build for linux-ia32/);
   assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
   assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0')!, /no web-mcp build for darwin-arm64/);
-});
-
-test('binAsset gives the Windows zip for flow-cockpit', () => {
-  const win = binAsset('flow-cockpit', 'win32', 'x64', '1.2.3')!;
-  assert.equal(
-    win.url,
-    'https://github.com/deadmade/dead-agent-skills/releases/download/v1.2.3/flow-cockpit-x86_64-pc-windows-msvc.zip',
-  );
-  assert.equal(win.sha256, `${win.url}.sha256`);
-  assert.equal(win.exe, 'flow-cockpit.exe');
-  // The zip holds the exe and its default extensions, so it goes into a folder of its own.
-  assert.equal(win.folder, true);
-  assert.equal(binAsset('web-mcp', 'win32', 'x64', '1.2.3')!.folder, false);
-  assert.equal(BIN_PLUGINS['flow-cockpit'].key, 'appPath');
-});
-
-test('binAsset has no linux asset for flow-cockpit', () => {
-  assert.equal(binAsset('flow-cockpit', 'linux', 'x64', '1.2.3'), undefined);
-  assert.equal(binAsset('flow-cockpit', 'win32', 'arm64', '1.2.3'), undefined);
-  assert.equal(binAsset('flow-cockpit', 'darwin', 'arm64', '1.2.3'), undefined);
-});
-
-test('flow-cockpit has a pinned linux hint', () => {
-  const hint = BIN_PLUGINS['flow-cockpit'].linuxHint!('1.2.3');
-  assert.match(hint, /nix run github:deadmade\/dead-agent-skills\/v1\.2\.3#flow-cockpit/);
-  assert.equal(BIN_PLUGINS['web-mcp'].linuxHint, undefined);
-});
-
-// The hint names the flake's package: the output the installer points Linux users at must exist.
-test('the flake has the flow-cockpit package the linux hint runs', () => {
-  const flake = readFileSync(new URL('../../../flake.nix', import.meta.url), 'utf8');
-  assert.match(flake, /^\s+flow-cockpit = pkgs\.rustPlatform\.buildRustPackage/m);
 });
 
 // The installer downloads the name crates-build.yml uploads: the same target and the same file name.
@@ -123,7 +90,7 @@ test('crates-build.yml packs the zip binAsset downloads', () => {
     '\n',
   );
   const matrix = yml.split('        platform:\n')[1].split('        exclude:')[0];
-  const pack = yml.split('      - name: Package\n')[1].split('      - name: Package cockpit')[0];
+  const pack = yml.split('      - name: Package\n')[1];
   for (const platform of ['win32', 'linux']) {
     const file = binAsset('web-mcp', platform, 'x64', '1.2.3')!.file;
     const [, target, archive] = /^web-mcp-(.+)\.(zip|tar\.gz)$/.exec(file)!;
@@ -132,25 +99,14 @@ test('crates-build.yml packs the zip binAsset downloads', () => {
   }
   assert.match(pack, /name=\$CRATE-\$TARGET/);
   assert.match(pack, /sha256sum "\$f" > "\$f\.sha256"/);
-  assert.match(yml, /if: matrix\.crate == 'flow-cockpit'/);
-  assert.match(yml, /target: x86_64-pc-windows-msvc/);
-  assert.match(yml, /name=flow-cockpit-\$TARGET/);
-  assert.match(yml, /"\$RUNNER_TEMP\/dist\/\$name\.zip"/);
-  assert.equal('flow-cockpit-x86_64-pc-windows-msvc.zip', binAsset('flow-cockpit', 'win32', 'x64', '1.2.3')!.file);
 });
 
-test('binPath: the flow cockpit in a folder of its own, the others loose in bin', () => {
-  const win = 'C:\\Users\\u\\.claude\\bin';
-  assert.equal(binPath(win, 'flow-cockpit', 'win32'), 'C:\\Users\\u\\.claude\\bin\\flow-cockpit\\flow-cockpit.exe');
-  assert.equal(binPath(win, 'web-mcp', 'win32'), 'C:\\Users\\u\\.claude\\bin\\web-mcp.exe');
+test('binPath puts the binary loose in bin', () => {
+  assert.equal(binPath('C:\\Users\\u\\.claude\\bin', 'web-mcp', 'win32'), 'C:\\Users\\u\\.claude\\bin\\web-mcp.exe');
   assert.equal(binPath('/h/.claude/bin', 'web-mcp', 'linux'), '/h/.claude/bin/web-mcp');
 });
 
-// A flow cockpit install that fails is most likely its open window holding the folder; building it by hand doesn't
-// bring the default extensions along.
-test('binAdvice: rerun for the flow cockpit, build for the others', () => {
-  assert.match(binAdvice('flow-cockpit'), /close flow-cockpit if it is open and run the installer again/);
-  assert.doesNotMatch(binAdvice('flow-cockpit'), /cargo/);
+test('binAdvice: build the binary by hand', () => {
   assert.match(binAdvice('web-mcp'), /cargo build --release --locked -p web-mcp --bin web-mcp/);
 });
 

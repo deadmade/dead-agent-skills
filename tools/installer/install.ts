@@ -56,7 +56,7 @@ import {
 } from './context.ts';
 import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
 import { HEADROOM_TRIM, installGraphify, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
-import { MCP_AZURE, FLOW_COCKPIT, WEB_MCP, applyBin } from './steps/binaries.ts';
+import { MCP_AZURE, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
 import { applyDcg } from './steps/dcg.ts';
@@ -287,7 +287,6 @@ await applyPlugins({
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
 if (selected.includes(MCP_AZURE))
   await applyBin('mcp-azure', MCP_AZURE, process.platform, process.arch, selfValues[MCP_AZURE]);
-if (selected.includes(FLOW_COCKPIT)) await applyBin('flow-cockpit', FLOW_COCKPIT);
 
 // The built-in web tools are denied only once web-mcp's browser window can open.
 const browser = selected.includes(WEB_MCP) ? await installAgentBrowser() : { works: false };

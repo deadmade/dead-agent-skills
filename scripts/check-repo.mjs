@@ -13,7 +13,7 @@ import { TOKENS as CODEX } from '../tools/harness-compiler/src/templates/hosts/c
 import {
   checkOverrides,
   checkPackPaths,
-  checkTemplates,
+  checkShapes,
   checkUseNames,
   currentDeps,
   expectedDeps,
@@ -96,7 +96,7 @@ problems.push(
   ...new Set(Object.values(uses ?? {}).flatMap((all) => checkUseNames('.', all))),
   ...checkOverrides('.'),
   ...checkPackPaths('.'),
-  ...checkTemplates('.'),
+  ...checkShapes('.'),
 );
 const regen = 'run node scripts/flows-uses.mjs';
 if (uses && JSON.stringify(currentDeps('.')) !== JSON.stringify(expectedDeps(uses['claude-code'], packs('.'))))

@@ -102,13 +102,6 @@
     "targets": ["claude-code"]
   },
   {
-    "name": "flow-cockpit",
-    "source": "plugins/opt-in/flow-cockpit",
-    "resources": ["skills"],
-    "dependencies": [],
-    "targets": ["claude-code"]
-  },
-  {
     "name": "agent-review",
     "source": "plugins/shared/agent-review",
     "resources": ["skills"],
