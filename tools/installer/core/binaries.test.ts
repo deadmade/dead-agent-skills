@@ -89,7 +89,7 @@ test('crates-build.yml packs the zip binAsset downloads', () => {
     /\r\n/g,
     '\n',
   );
-  const matrix = yml.split('        platform:\n')[1].split('        exclude:')[0];
+  const matrix = yml.split('        platform:\n')[1].split('    runs-on:')[0];
   const pack = yml.split('      - name: Package\n')[1];
   for (const platform of ['win32', 'linux']) {
     const file = binAsset('web-mcp', platform, 'x64', '1.2.3')!.file;
