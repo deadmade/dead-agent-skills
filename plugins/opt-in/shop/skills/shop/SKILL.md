@@ -46,7 +46,7 @@ Use it for new prices and for model specs.
 - Group 1 is the products. Group 2 is a guide text below the list; ignore it.
 - To read the filters, call `rows` again with `item` set to `div.filter-element`. Build the next address from each filter's link. Never guess a filter id.
 - Do not use `?fs=` for search, and do not use `bpmax` or `sort`. Read the price from the rows and apply the limit yourself.
-- Finding a category slug without a disallowed path is untested until the live check (Task 7) reports. Try the links `rows` returns on `https://geizhals.de/` and on a product page's breadcrumb, and skip every `/hardware/` link. If no slug turns up, ask the user for the category address.
+- To find a category address, call `rows` on `https://geizhals.de/` with `item` set to `a.o-category` and `limit` 200. It returns one row per category link (78 on 2026-11-09). A row linking to `?cat=<slug>` is a category address to use as it is (Monitore: `?cat=monlcd19wide`). A row linking to `?o=<n>` is a group: call `rows` on it without `item`, and each row of group 1 links to a `?cat=<slug>` address. A category may not appear at all (server racks were not found under Netzwerk, `?o=14`); then ask the user for the category address. Without `item`, the home page's rows give one link per row and hide most slugs.
 
 ## A blocked or changed page
 
