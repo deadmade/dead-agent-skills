@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { JSDOM } from 'jsdom';
 
 const SKILL = join(import.meta.dirname, '..');
 const RENDER = join(SKILL, 'scripts', 'render.mjs');
@@ -107,6 +108,33 @@ test('keeps markdown HTML inert: JSON-escaped, an escaped title, and a page scri
   assert.match(r.html, /image\(\{ href, text \}\) \{\s*return safe\(href\) \? false : esc\(text\)/);
   assert.match(r.html, /\(https\?\|mailto\):/);
   assert.match(r.html, /\[\^\/\?#\]\*&/);
+  // After an open <pre> or <script>, marked leaves text unescaped (escaped: true); the page must turn that off.
+  assert.match(r.html, /walkTokens\(token\) \{\s*if \(token\.type === 'text'\) token\.escaped = false;/);
+});
+
+test('the page’s clean pass strips script-like elements, handlers and unsafe addresses and keeps its own markup', () => {
+  const html = render('# T\n').html;
+  const source = `${html.match(/const safe = [^]*?\n\};/)[0]}\n${html.match(/function clean[^]*?\n\}\n/)[0]}\nreturn clean;`;
+  const { document } = new JSDOM('').window;
+  const clean = new Function('document', source)(document);
+  const out = new JSDOM(
+    clean(
+      '<p onclick="x()">t</p><img src=x onerror=alert(1)><script>alert(1)</script><iframe src="https://e"></iframe>' +
+        '<svg onload=x></svg><a href="javascript:x" onclick="y()">l</a><a href="&#106;avascript:x">m</a>' +
+        '<form action="/x"></form><style>p{}</style><a href="https://e.com/?a=1&amp;b=2" title="k">ok</a>' +
+        '<figure class="diagram"><pre class="source">d</pre></figure><details class="dir" open><summary>s</summary></details>',
+    ),
+  ).window.document;
+  for (const tag of ['script', 'iframe', 'form', 'style']) assert.equal(out.querySelector(tag), null, tag);
+  assert.deepEqual(
+    [...out.querySelectorAll('*')].flatMap((e) => [...e.attributes].map((a) => a.name)).filter((n) => /^on/.test(n)),
+    [],
+  );
+  assert.deepEqual(
+    [...out.querySelectorAll('a')].map((a) => a.getAttribute('href')),
+    [null, null, 'https://e.com/?a=1&b=2'],
+  );
+  assert.ok(out.querySelector('figure.diagram > pre.source') && out.querySelector('details.dir[open] > summary'));
 });
 
 test('the page’s URL filter rejects script schemes, including ones hidden in character references', () => {

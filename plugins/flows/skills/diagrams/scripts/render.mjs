@@ -199,7 +199,11 @@ const safe = (href) => {
   const h = href.replace(/[\\u0000-\\u0020]/g, '');
   return !/^[^/?#]*&/.test(h) && (!/^[a-z][a-z0-9+.-]*:/i.test(h) || /^(https?|mailto):/i.test(h));
 };
+// Inside an open <pre> or <script>, marked leaves following text unescaped (escaped: true); the page escapes it anyway.
 marked.use({
+  walkTokens(token) {
+    if (token.type === 'text') token.escaped = false;
+  },
   renderer: {
     // The document is shown, never run: raw HTML in it becomes text.
     html({ text }) {
@@ -220,8 +224,21 @@ marked.use({
   },
 });
 
+// A second layer behind the html renderer: no script-like element, event handler or unsafe address survives marked.
+function clean(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  for (const el of [...t.content.querySelectorAll('*')]) {
+    if (/^(script|style|iframe|object|embed|link|meta|base|form)$/i.test(el.localName)) el.remove();
+    else
+      for (const { name, value } of [...el.attributes])
+        if (/^on/i.test(name) || (/^(href|src|xlink:href)$/i.test(name) && !safe(value))) el.removeAttribute(name);
+  }
+  return t.innerHTML;
+}
+
 const doc = document.getElementById('doc');
-doc.innerHTML = marked.parse(JSON.parse(document.getElementById('md').textContent));
+doc.innerHTML = clean(marked.parse(JSON.parse(document.getElementById('md').textContent)));
 const map = document.getElementById('plan-map');
 const h1 = doc.querySelector('h1');
 if (map) h1 ? h1.after(map.content) : doc.prepend(map.content);
