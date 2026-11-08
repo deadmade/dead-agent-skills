@@ -36,3 +36,32 @@ test('flake and devEngines agree on the Node major', () => {
   for (const [, major] of majors) assert.equal(`^${major}`, version);
   assert.doesNotMatch(flake, /\bpkgs\.nodejs\b|\binherit\s*\(pkgs\)[^;]*\bnodejs\b/);
 });
+
+test('hand-typed Night City colours are in the palette', () => {
+  const palettePath = 'plugins/default/themes/palette.json';
+  const OFF_PALETTE = ['#221D33', '#2F2848'];
+  const allowed = new Set([...Object.values(JSON.parse(read(palettePath)).colors), ...OFF_PALETTE]);
+  const cssPath = 'tools/flow-cockpit/app/shell/tokens.css';
+  const viewPath = 'tools/installer/ui/view.ts';
+  const uiPath = 'tools/ado-mcp/src/bin/timetrack/ui.rs';
+  const nightCity = read(viewPath).match(/const NIGHT_CITY = \{([\s\S]*?)\n\};/);
+  assert.ok(nightCity, `NIGHT_CITY missing from ${viewPath}`);
+  const copies = [
+    [cssPath, [...read(cssPath).matchAll(/#[0-9a-f]{6}\b/gi)].map(([color]) => color)],
+    [
+      viewPath,
+      [...nightCity[1].matchAll(/\[(\d+),\s*(\d+),\s*(\d+)\]/g)].map(
+        ([, ...rgb]) => '#' + rgb.map((n) => Number(n).toString(16).padStart(2, '0')).join(''),
+      ),
+    ],
+    [uiPath, [...read(uiPath).matchAll(/0x00([0-9a-f]{2})_([0-9a-f]{4})\b/gi)].map(([, rg, gb]) => '#' + rg + gb)],
+  ];
+  const deviations = [];
+  for (const [path, colors] of copies) {
+    assert.ok(colors.length > 0, `No colours found in ${path}`);
+    for (const color of colors) {
+      if (!allowed.has(color.toUpperCase())) deviations.push(`${color} in ${path} is absent from ${palettePath}`);
+    }
+  }
+  assert.deepEqual(deviations, []);
+});

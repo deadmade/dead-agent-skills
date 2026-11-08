@@ -23,8 +23,14 @@ export function selectChecks(paths, all = false) {
     const crate = crates.find((c) => roots[c].some((root) => path.startsWith(root)));
     if (crate) {
       selected.add(crate);
-      // Manifests also participate in repository/package consistency checks.
-      if (path.startsWith('plugins/') || path.endsWith('/Cargo.toml')) node = true;
+      // Manifests and hand-typed palette copies participate in repository consistency checks.
+      if (
+        path.startsWith('plugins/') ||
+        path.endsWith('/Cargo.toml') ||
+        path === 'tools/ado-mcp/src/bin/timetrack/ui.rs' ||
+        path === 'tools/flow-cockpit/app/shell/tokens.css'
+      )
+        node = true;
       if (path.startsWith('plugins/')) skills = true;
       continue;
     }
