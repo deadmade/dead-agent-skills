@@ -17,7 +17,7 @@ const MAX_HOPS: usize = 3;
 const LOOKUP_UA: &str = concat!(
     "web-mcp/",
     env!("CARGO_PKG_VERSION"),
-    " (+https://github.com/deadmade/dead-claude-skills)"
+    " (+https://github.com/deadmade/dead-agent-skills)"
 );
 
 pub struct Answer {
@@ -191,7 +191,7 @@ mod tests {
         assert!(req.contains("accept: application/json"), "{req}");
         assert!(req.contains("user-agent: web-mcp/"), "{req}");
         assert!(
-            req.contains("(+https://github.com/deadmade/dead-claude-skills)"),
+            req.contains("(+https://github.com/deadmade/dead-agent-skills)"),
             "{req}"
         );
     }

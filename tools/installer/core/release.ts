@@ -1,4 +1,5 @@
 // Our marketplace on its release branch, and the URLs of the release this installer belongs to.
+import { readFileSync } from 'node:fs';
 import type { Settings } from './settings.ts';
 
 export const MARKETPLACE = 'dead-claude-skills';
@@ -6,7 +7,8 @@ export const MARKETPLACE = 'dead-claude-skills';
 // Our marketplace on the `release` branch, which release.yml moves to each new release once it is published: Claude
 // Code's marketplace auto-update follows it, so plugins update after every release without rerunning the installer
 // (the binaries still come from the installer). As `claude plugin marketplace add` takes it, and as its settings entry.
-export const REPO = 'deadmade/dead-claude-skills';
+export const REPO = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'))
+  .repository as string;
 export const RELEASE_BRANCH = 'release';
 export const marketplaceArg = () => `${REPO}@${RELEASE_BRANCH}`;
 export const marketplaceSource = () => ({ source: 'github', repo: REPO, ref: RELEASE_BRANCH });

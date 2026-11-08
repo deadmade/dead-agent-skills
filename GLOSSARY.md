@@ -1,4 +1,4 @@
-# dead-claude-skills
+# dead-agent-skills
 
 Personal native Claude Code and Codex marketplaces and the installer that sets up a machine from it.
 

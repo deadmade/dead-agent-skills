@@ -11,7 +11,7 @@ const put = (root: string, path: string, value: string | object) => {
 };
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'compiler-'));
-  put(root, 'package.json', { version: '1.2.3' });
+  put(root, 'package.json', { version: '1.2.3', repository: 'fixture/owner' });
   put(root, 'plugins/catalog.json', [
     { name: 'a', source: 'plugins/a', resources: ['skills'], dependencies: [], targets: ['claude-code', 'codex'] },
     { name: 'only-claude', source: 'plugins/b', resources: [], dependencies: ['a'], targets: ['claude-code'] },
@@ -62,6 +62,8 @@ test('one neutral source compiles to two native distributions', () => {
   assert.equal(existsSync(join(out, '.agents/plugins/modded/ui.tsx')), false);
   const cc = (p: string) => JSON.parse(readFileSync(join(out, '.claude-plugin', p), 'utf8'));
   const cx = (p: string) => JSON.parse(readFileSync(join(out, '.agents/plugins', p), 'utf8'));
+  for (const name of ['a', 'only-claude', 'modded'])
+    assert.equal(cc(`${name}/.claude-plugin/plugin.json`).repository, 'https://github.com/fixture/owner');
   assert.equal(cc('a/.claude-plugin/plugin.json').version, '1.2.3');
   assert.deepEqual(cc('a/.claude-plugin/plugin.json').dependencies, ['official@claude-plugins-official']);
   assert.ok(cc('a/.claude-plugin/plugin.json').userConfig.token.sensitive);
@@ -94,7 +96,7 @@ test('a plugin without plugin.json or with a missing resource is rejected before
 // A flows plugin with one conductor, one other skill and one step.
 function flows(conductor: string) {
   const root = mkdtempSync(join(tmpdir(), 'compiler-'));
-  put(root, 'package.json', { version: '1.2.3' });
+  put(root, 'package.json', { version: '1.2.3', repository: 'fixture/owner' });
   put(root, 'plugins/catalog.json', [
     {
       name: 'flows',

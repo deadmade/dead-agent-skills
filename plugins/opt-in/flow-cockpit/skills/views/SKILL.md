@@ -14,7 +14,7 @@ seconds after a file in any extensions folder changes, so the user sees your cha
 
 The app is the plugin's `appPath` setting, `${user_config.appPath}`, or `flow-cockpit` on PATH when that is not set;
 it is written `"$app"` below. On Linux it comes from this repository's flake
-(`nix run github:deadmade/dead-claude-skills#flow-cockpit`, or its `flow-cockpit` package in a system config). On
+(`nix run github:deadmade/dead-agent-skills#flow-cockpit`, or its `flow-cockpit` package in a system config). On
 Windows the installer puts it at `%USERPROFILE%\.claude\bin\flow-cockpit\flow-cockpit.exe`, with its default extensions
 beside it. Before you start, check that it runs; if it doesn't, tell the user how to get it and stop:
 

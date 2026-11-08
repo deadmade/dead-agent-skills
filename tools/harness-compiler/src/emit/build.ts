@@ -27,7 +27,9 @@ export interface Build {
 // Writes the generated trees of both targets and the repository marketplaces into <output>, laid out like the repository.
 export function buildTree(root: string, output: string): Build {
   const plugins = loadPlugins(root);
-  const version: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+  const { version, repository }: { version: string; repository: string } = JSON.parse(
+    readFileSync(join(root, 'package.json'), 'utf8'),
+  );
   const built: Build = { diagnostics: [], problems: [], estimates: {} };
   const { diagnostics } = built;
   const palettes = new Map<string, Palette>();
@@ -84,6 +86,7 @@ export function buildTree(root: string, output: string): Build {
       }
       target.emit({
         root,
+        repository,
         version,
         plugin,
         plugins: entries.map((e) => e.plugin),

@@ -93,7 +93,6 @@ export interface Manifest {
   description: string;
   author?: { name: string; url?: string; email?: string };
   homepage?: string;
-  repository?: string;
   license?: string;
   keywords?: string[];
   dependencies: Dependency[];

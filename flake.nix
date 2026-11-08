@@ -1,5 +1,5 @@
 {
-  description = "dead-claude-skills: dev shell and pre-commit checks";
+  description = "dead-agent-skills: dev shell and pre-commit checks";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -60,7 +60,7 @@
 
       installer-test = pkgs.writeShellApplication {
         name = "installer-test";
-        runtimeInputs = [node];
+        runtimeInputs = [node pkgs.git];
         text = ''exec npm test'';
       };
     in

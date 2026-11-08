@@ -28,6 +28,7 @@ export function selectChecks(paths, all = false) {
         path.startsWith('plugins/') ||
         path.endsWith('/Cargo.toml') ||
         path === 'tools/ado-mcp/src/bin/timetrack/ui.rs' ||
+        path === 'tools/web-mcp/src/api.rs' ||
         path === 'tools/flow-cockpit/app/shell/tokens.css'
       )
         node = true;

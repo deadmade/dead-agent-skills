@@ -169,3 +169,7 @@ for (const path of [
     assert.equal(selectChecks([path]).node, true, path);
   });
 }
+
+test('the web API slug participates in Node repository checks', () => {
+  assert.equal(selectChecks(['tools/web-mcp/src/api.rs']).node, true);
+});

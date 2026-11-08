@@ -42,7 +42,7 @@ test('web-mcp downloads the release archive built for this machine', () => {
   const win = binAsset('web-mcp', 'win32', 'x64', '1.2.3')!;
   assert.equal(
     win.url,
-    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/web-mcp-x86_64-pc-windows-msvc.zip',
+    'https://github.com/deadmade/dead-agent-skills/releases/download/v1.2.3/web-mcp-x86_64-pc-windows-msvc.zip',
   );
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'web-mcp.exe');
@@ -88,7 +88,7 @@ test('binAsset gives the Windows zip for flow-cockpit', () => {
   const win = binAsset('flow-cockpit', 'win32', 'x64', '1.2.3')!;
   assert.equal(
     win.url,
-    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/flow-cockpit-x86_64-pc-windows-msvc.zip',
+    'https://github.com/deadmade/dead-agent-skills/releases/download/v1.2.3/flow-cockpit-x86_64-pc-windows-msvc.zip',
   );
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'flow-cockpit.exe');
@@ -106,7 +106,7 @@ test('binAsset has no linux asset for flow-cockpit', () => {
 
 test('flow-cockpit has a pinned linux hint', () => {
   const hint = BIN_PLUGINS['flow-cockpit'].linuxHint!('1.2.3');
-  assert.match(hint, /nix run github:deadmade\/dead-claude-skills\/v1\.2\.3#flow-cockpit/);
+  assert.match(hint, /nix run github:deadmade\/dead-agent-skills\/v1\.2\.3#flow-cockpit/);
   assert.equal(BIN_PLUGINS['web-mcp'].linuxHint, undefined);
 });
 

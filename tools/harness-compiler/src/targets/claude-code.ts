@@ -46,7 +46,7 @@ function manifest(context: EmitContext, mods: UiMod[]) {
     description: plugin.description,
     ...(m.author ? { author: m.author } : {}),
     ...(m.homepage ? { homepage: m.homepage } : {}),
-    ...(m.repository ? { repository: m.repository } : {}),
+    repository: `https://github.com/${context.repository}`,
     ...(m.license ? { license: m.license } : {}),
     ...(m.keywords ? { keywords: m.keywords } : {}),
     ...(dependencies.length ? { dependencies: [...new Set(dependencies)] } : {}),
