@@ -6,7 +6,8 @@ The default bundle, on every machine:
 - **Context7**: up-to-date library docs.
 - **Night City**: the theme and its mod, below.
 - **Notifications**: a desktop popup when a turn ends or the harness reports a supported waiting event, below.
-- The core plugins as dependencies: claude-code-setup, claude-md-management, security-guidance and claude-security.
+- The core plugins as dependencies: claude-code-setup, claude-md-management, security-guidance, claude-security and
+  agent-review.
 
 It no longer depends on superpowers, ponytail or code-review. superpowers and ponytail are skill packs inside the
 [flows](../flows/README.md) plugin that only its conductors read, so outside them Claude runs without ponytail's rules

@@ -68,9 +68,18 @@ together. Its number is the repo's, not any plugin's.
 _Avoid_: version (alone), plugin release
 
 **Plugin version**:
-A plugin's own number, which moves only when that plugin changes. Vendored plugins synced from an upstream release
-carry upstream's number.
+The number a vendored pack synced from an upstream release carries: upstream's own. Every other plugin takes the
+repo's version.
 _Avoid_: release version
+
+**Repo fact**:
+A value the repository states once and many files need: a path list, a name, a version, a command.
+_Avoid_: setting, config
+
+**Owner file**:
+The one file that holds a repo fact. Tools read it; none restates it, and where a copy must stay, a check fails when it
+differs.
+_Avoid_: source of truth, manifest
 
 ## Flows
 
@@ -132,7 +141,7 @@ _Avoid_: session (one browser), user profile
 
 **Automation flag**:
 `navigator.webdriver` reading `true`: what a browser started for automation tells every page. web-mcp's window turns
-it off (ADR 0009). Bot checks read it first; in the spike, Google sent the flagged window's typed search to `/sorry`.
+it off ([ADR 0009](docs/adr/0009-no-automation-flag.md)). Bot checks read it first; in the spike, Google sent the flagged window's typed search to `/sorry`.
 _Avoid_: stealth, webdriver mode
 
 **Typed search**:

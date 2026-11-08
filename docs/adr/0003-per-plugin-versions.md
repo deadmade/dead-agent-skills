@@ -1,5 +1,9 @@
 # Each plugin carries its own version; a release only sets the repo's
 
+Status: superseded. Plugins no longer hold their own number: the build stamps the repo's version into the marketplaces
+and generated packages (AGENTS.md, Release). [ADR 0006](0006-release-on-every-merge.md) replaced its installer-pin
+sentence.
+
 Every release used to copy one number into every plugin, both crates, package.json and the marketplace. Claude Code
 offers a plugin update only when its version changes, so every plugin looked outdated after every release, whether it
 changed or not.

@@ -244,8 +244,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 copied from upstream by `tools/upstream-sync/src/adapters/*.ts` and `sources.ts` (the weekly `sync.yml` opens the PRs)
 and overwritten on every sync; to change one, change its sync script's transform, not the vendored files. Hand-written
 exceptions a sync still skips: `plugin.json` for pstack-picks and the `*-skills` and postgres packs (and their
-`evals/`), and the ponytail/superpowers packs' `plugin.json` version, bumped by `release.mjs` instead. `tob-picks` is
-CC BY-SA 4.0; THIRD_PARTY.md has every pack's actual license.
+`evals/`). ponytail and superpowers vendor no manifest at all (a pack is a plain resource folder; the compiler never
+loads one as a plugin). `tob-picks` is CC BY-SA 4.0; THIRD_PARTY.md has every pack's actual license.
 `tools/flow-cockpit/app/shell/vendor/` (DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync
 script: it is copied unchanged from the npm tarballs THIRD_PARTY.md names, so a new version replaces the files rather
 than editing them.

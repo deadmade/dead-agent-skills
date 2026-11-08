@@ -205,7 +205,7 @@ impl Profiles {
             "executablePath": utf8(&r.chrome)?,
             "headed": true,
             // Newline-separated, no commas: agent-browser splits `args` on both. The last switch keeps
-            // `--remote-debugging-port=0` (agent-browser's) from setting `navigator.webdriver` (ADR 0009).
+            // `--remote-debugging-port=0` (agent-browser's) from setting `navigator.webdriver` (docs/adr/0009-no-automation-flag.md).
             "args": "--lang=en-US\n--disable-background-timer-throttling\n--disable-renderer-backgrounding\n--disable-blink-features=AutomationControlled",
         });
         write_json(&slot.join("agent-browser.json"), &json)
