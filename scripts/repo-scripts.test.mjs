@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { posix } from 'node:path';
 
 const root = new URL('../', import.meta.url);
-const source = (path) => readFileSync(new URL(path, root), 'utf8');
+const source = (path) => readFileSync(new URL(path, root), 'utf8').replaceAll('\r\n', '\n');
 const COMPILER = 'tools/harness-compiler/src/cli.ts';
 
 test('package scripts and prepack build through the harness compiler, and the package ships the built trees', () => {
