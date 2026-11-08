@@ -16,8 +16,8 @@
   }: let
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
-    # Upstream files copied by tools/upstream-sync/src/adapters/*.ts: fixing them here would churn every sync PR.
-    vendored = ["^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/review-code/(LICENSE|UPSTREAM)$" "^tools/flow-cockpit/bindings/" "^tools/flow-cockpit/app/shell/vendor/" "^tools/flow-cockpit/core/tests/fixtures/" "^tools/ado-mcp/tests/fixtures/" "^tools/web-mcp/tests/fixtures/"];
+    # treefmt.toml's excludes as regexes, for the hooks that don't read treefmt.toml themselves.
+    vendored = map (g: "^" + builtins.replaceStrings ["." "**" "*"] ["\\." ".*" "[^/]*"] g + "$") (nixpkgs.lib.importTOML ./treefmt.toml).excludes;
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let
