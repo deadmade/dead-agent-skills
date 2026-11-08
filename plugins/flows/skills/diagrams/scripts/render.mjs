@@ -192,10 +192,12 @@ mermaid.initialize({
 const esc = (s) => s.replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
 // Trees are keyed by the fence text, so a fence nested in a list or quote cannot pick another block's tree.
 const trees = new Map([...document.querySelectorAll('template[data-tree]')].map((t) => [t.dataset.key, t.innerHTML]));
-// A scheme other than http, https or mailto (javascript:, data:, ...) is dropped; browsers skip control characters in it.
+// A scheme other than http, https or mailto (javascript:, data:, ...) is dropped; browsers skip control characters in
+// it. marked leaves character references in an href alone and browsers decode them (&#106;avascript:, java&Tab;script:),
+// so any & before the first / ? or # counts as unsafe.
 const safe = (href) => {
   const h = href.replace(/[\\u0000-\\u0020]/g, '');
-  return !/^[a-z][a-z0-9+.-]*:/i.test(h) || /^(https?|mailto):/i.test(h);
+  return !/^[^/?#]*&/.test(h) && (!/^[a-z][a-z0-9+.-]*:/i.test(h) || /^(https?|mailto):/i.test(h));
 };
 marked.use({
   renderer: {

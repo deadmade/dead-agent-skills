@@ -106,6 +106,23 @@ test('keeps markdown HTML inert: JSON-escaped, an escaped title, and a page scri
   assert.match(r.html, /link\(\{ href, tokens \}\) \{\s*return safe\(href\) \? false : /);
   assert.match(r.html, /image\(\{ href, text \}\) \{\s*return safe\(href\) \? false : esc\(text\)/);
   assert.match(r.html, /\(https\?\|mailto\):/);
+  assert.match(r.html, /\[\^\/\?#\]\*&/);
+});
+
+test('the page’s URL filter rejects script schemes, including ones hidden in character references', () => {
+  const html = render('# T\n').html;
+  const safe = new Function(`${html.match(/const safe = [^]*?\n\};/)[0]}; return safe;`)();
+  for (const href of [
+    'javascript:alert(1)',
+    'JaVa\tScRiPt:alert(1)',
+    'data:text/html,x',
+    '&#106;avascript:alert(1)',
+    'java&Tab;script:alert(1)',
+    '&#x6A;avascript&colon;alert(1)',
+  ])
+    assert.equal(safe(href), false, href);
+  for (const href of ['https://example.com/?a=1&b=2', 'mailto:a@b.c', './a.md', '#top', 'a/b.md', ''])
+    assert.equal(safe(href), true, href);
 });
 
 test('each folder tree is keyed by the text of its fence', () => {
