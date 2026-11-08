@@ -39,7 +39,7 @@ test('layers', () => {
   assert.match(b, /^ 3 {2}\[4 d ←2,3\]$/m);
 });
 
-test('depends forms the cockpit accepts', () => {
+test('depends forms the parser accepts', () => {
   const b = block(
     plan(
       task(1, 'a', 'none'),
@@ -54,7 +54,7 @@ test('depends forms the cockpit accepts', () => {
   assert.match(b, /\[4 d ←3,8c\]/);
 });
 
-test('a wrapped Depends line, as in cockpit-harness/plan.md:214-215', () => {
+test('a wrapped Depends line, as in a long plan', () => {
   const t5 = [
     '### Task 5: wrapped',
     '',
@@ -230,7 +230,7 @@ test('headings and fields inside fences and comments are not read', () => {
   assert.doesNotMatch(b, /\[7 |\[2 /);
 });
 
-test('a `<!--` in prose or left open is text, as plan.rs reads it', () => {
+test('a `<!--` in prose or left open is text, as the parser reads it', () => {
   const t1 = task(1, 'a', 'none', { does: 'mentions `<!--` and never closes it' });
   const t3 = task(3, 'c', 'Task 2').replace('- [ ] a step', '<!-- a note -->\n- [ ] a step');
   assert.match(block(plan(t1, task(2, 'b', 'Task 1'), t3)), /^Plan: Demo · 3 tasks/m);

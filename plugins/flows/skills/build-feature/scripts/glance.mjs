@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 // Draws a plan's task graph and task table as plain text between `<!-- glance -->` markers at the top of plan.md.
 // With `--check` it prints the block and writes nothing, for a plan the run was given and must not change.
-// Fields are read the way flow-cockpit's plan parser reads them (tools/flow-cockpit/core/src/doc/plan.rs), so both
-// draw the same graph from the same plan.
-// Keep the two in step: a change to plan.rs's field or Depends rules belongs here too.
+// The field, `Depends` and comment rules below are this script's own; the diagrams skill reads a plan's Files lists
+// through the same parser.
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -52,7 +51,7 @@ const order = (a, b) => {
   return Number(an) - Number(bn) || al.localeCompare(bl);
 };
 
-// plan.rs `depends`: `none`, or the ids that follow a `Task`/`Tasks` word.
+// `depends`: `none`, or the ids that follow a `Task`/`Tasks` word.
 function depends(value) {
   const words = value.split(/[\s,.;()]+/).filter(Boolean);
   if (words[0]?.toLowerCase() === 'none') return [];
@@ -69,7 +68,7 @@ function depends(value) {
 
 const isFence = (line) => /^\s*(```|~~~)/.test(line);
 
-// plan.rs `strip_comments`: a `<!-- … -->` is removed only where it starts a line outside a fence; a `<!--` in prose,
+// `stripComments`: a `<!-- … -->` is removed only where it starts a line outside a fence; a `<!--` in prose,
 // inline code or a fence, or one never closed, is text.
 function stripComments(text) {
   let out = '';
@@ -123,7 +122,7 @@ function fileEntries(bullet) {
 }
 
 export function parse(text) {
-  // Like plan.rs: comments are stripped and fenced lines are neither headings nor fields.
+  // Comments are stripped and fenced lines are neither headings nor fields.
   const lines = stripComments(text).split('\n');
   const title = (lines.find((l) => l.startsWith('# ')) ?? '# Plan')
     .slice(2)

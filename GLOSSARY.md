@@ -6,7 +6,7 @@ Personal native Claude Code and Codex marketplaces and the installer that sets u
 
 **Harness**:
 The coding-agent application that runs a conversation and hosts plugins, such as Claude Code or Codex.
-_Avoid_: model (the model is selected within a harness), cockpit (the separate observing app)
+_Avoid_: model (the model is selected within a harness)
 
 **Plugin definition**:
 The authored description of a plugin's shared resources, behavior and integration needs across harnesses.
@@ -184,36 +184,7 @@ _Avoid_: starter, bootstrap
 headroom's lossy shrinking of one tool result; what it cuts is gone for good.
 _Avoid_: compress (headroom's word for all of its modes), compact
 
-## Flow cockpit
-
-**Flow cockpit**:
-The desktop window that shows what the conductors and Claude sessions are doing, read from their documents and the
-capture. It can also start and host Claude sessions itself.
-_Avoid_: dashboard, board
-
-**Flow run**:
-One run of a build or research conductor, recorded in a `docs/features/<slug>/flow.md`, from its start to `phase: done`.
-_Avoid_: run (alone; a web-mcp run is something else), flow (alone; that's the conductor), ticket
-
-**Audit**:
-One `docs/audits/<date>-review-<scope>.md` report written by `/review-code` (older ones by `/test-audit`, `/doc-audit` or `/harden`, which it replaced).
-_Avoid_: audit run, report (alone)
-
-**Claude session**:
-One Claude Code conversation together with the subagents it starts.
-_Avoid_: session (alone; a web-mcp session is a browser), chat
-
-**Loose session**:
-A Claude session that belongs to no flow run or audit.
-_Avoid_: orphan session, ad-hoc session
-
-**Hosted session**:
-A Claude session the flow cockpit started and owns the process for, running in its own PTY.
-_Avoid_: embedded session, live session (that's a status), background session (Claude Code's own term for `--bg`)
-
-**Capture**:
-The record of what one Claude session did, written event by event by the flow-cockpit plugin's hooks.
-_Avoid_: log, telemetry, trace
+## Harness compiler
 
 **Capability diagnostic**:
 A target-specific explanation of an optional feature omitted during package generation. Required unsupported
@@ -226,27 +197,6 @@ source. It supports migration checks; installation alone is not hook trust or co
 **Owned generated output**:
 Both native distributions (`.agents/plugins/` and `.claude-plugin/`), both root marketplaces and the Claude theme rendered from the shared
 palette. Author sources, rebuild and review the outputs; they are gitignored, and only the release branch commits them.
-**View**:
-One screen or tab of the flow cockpit: a TypeScript file that `export default`s a `View`, drawn by the window.
-_Avoid_: page, panel, widget
-
-**Run bar**:
-The flow cockpit's view of a hosted session's linked flow run: the phase stepper, the plan's task segments, the task
-in progress, and the flow.md `now:` line, shown on that session's Session tab.
-_Avoid_: toolbar, status bar
-
-**Extension**:
-A folder of views (and an optional `style.css`) the flow cockpit loads from disk; one can add views or replace others.
-_Avoid_: plugin (that's Claude Code's), theme, add-on
-
-**Default extension**:
-One of the four extensions that ship with the flow cockpit: `list`, `run`, `docs` and `activity`.
-_Avoid_: built-in view, core view
-
-**Trusted repository**:
-A checkout named under `trusted` in the flow cockpit's `config.toml`, and the worktrees git links to it; only then do
-the extensions in its `.flow-cockpit/extensions/` load.
-_Avoid_: allowed repository, safe repository
 
 ## Azure DevOps (mcp-azure)
 
