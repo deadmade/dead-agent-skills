@@ -110,15 +110,18 @@ function run(file, args, { cwd, timeout, input }) {
   });
 }
 
+// An empty or relative value is unset, so the cache can never resolve against the working directory.
+const absolute = (value) => (value && isAbsolute(value) ? value : undefined);
 const cacheDir = () => {
   const base = WIN
-    ? (process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'))
-    : (process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'));
+    ? (absolute(process.env.LOCALAPPDATA) ?? join(homedir(), 'AppData', 'Local'))
+    : (absolute(process.env.XDG_CACHE_HOME) ?? join(homedir(), '.cache'));
   return join(base, 'dead-agent-skills', 'diagrams-node');
 };
 
 // The cache folder holding parse.mjs and an install of the pinned packages. The install is redone when the hash of
-// the three files differs from the stamp, and never touches the plugin folder.
+// the three files differs from the stamp, and never touches the plugin folder. The three files are copied afresh on
+// every run, so a stale or planted copy in the cache is never what runs.
 async function parserFolder() {
   const files = [
     [join(SKILL, 'package.json'), 'package.json'],
@@ -130,12 +133,12 @@ async function parserFolder() {
   const stamp = hash.digest('hex');
   const dir = cacheDir();
   const stampFile = join(dir, 'stamp');
+  mkdirSync(dir, { recursive: true });
+  for (const [from, name] of files) copyFileSync(from, join(dir, name));
   const current = existsSync(stampFile) && readFileSync(stampFile, 'utf8') === stamp;
   if (current && existsSync(join(dir, 'node_modules'))) return dir;
   const npm = findNpm();
   if (!npm) throw new Error('npm was not found on PATH');
-  mkdirSync(dir, { recursive: true });
-  for (const [from, name] of files) copyFileSync(from, join(dir, name));
   try {
     await run(npm[0], [...npm.slice(1), 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], {
       cwd: dir,

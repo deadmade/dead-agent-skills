@@ -130,17 +130,37 @@ test('a parser that cannot be installed is a warning', { skip: WIN }, () => {
 
 test('a helper that prints text that is not JSON is a warning too', { skip: WIN }, () => {
   // An npm that "installs" stand-ins for the two packages; the stand-in jsdom prints text on stdout when it loads.
+  // It is a node script, because the isolated PATH holds no mkdir or cat.
+  const modules = {
+    jsdom: "process.stdout.write('hello'); export class JSDOM { constructor() { this.window = { document: {} }; } }",
+    mermaid: 'export default { initialize() {}, mermaidAPI: { getDiagramFromText: async () => ({ type: "pie" }) } };',
+  };
   const bin = temp();
-  const stub = (name, code) =>
-    `mkdir -p node_modules/${name}\necho '{"name":"${name}","type":"module","main":"index.js"}' > node_modules/${name}/package.json\ncat > node_modules/${name}/index.js <<'EOF'\n${code}\nEOF\n`;
   fake(
     bin,
     'npm',
-    `#!/bin/sh\n${stub('jsdom', "process.stdout.write('hello'); export class JSDOM { constructor() { this.window = { document: {} }; } }")}${stub('mermaid', 'export default {}')}`,
+    `#!${process.execPath}
+const { mkdirSync, writeFileSync } = require('node:fs');
+for (const [name, code] of Object.entries(${JSON.stringify(modules)})) {
+  mkdirSync('node_modules/' + name, { recursive: true });
+  writeFileSync('node_modules/' + name + '/package.json', JSON.stringify({ name, type: 'module', main: 'index.js' }));
+  writeFileSync('node_modules/' + name + '/index.js', code);
+}
+`,
   );
   const r = isolated(fence('mermaid', 'flowchart LR\n  a --> b'), bin);
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /warning.*not parser-checked: /);
+  assert.match(r.out, /warning.*not parser-checked: .*not JSON/);
+});
+
+test('a relative cache folder setting is ignored', () => {
+  const home = temp();
+  const cwd = temp();
+  const env = { PATH: temp(), HOME: home, USERPROFILE: home, XDG_CACHE_HOME: 'rel-cache', LOCALAPPDATA: 'rel-cache' };
+  check(fence('mermaid', 'flowchart LR\n  a --> b'), { env, cwd });
+  assert.equal(existsSync(join(cwd, 'rel-cache')), false);
+  const fallback = WIN ? join(home, 'AppData', 'Local') : join(home, '.cache');
+  assert.equal(existsSync(join(fallback, 'dead-agent-skills', 'diagrams-node')), true);
 });
 
 test('works from another working directory', { skip: NEEDS_PARSER }, () => {
