@@ -144,7 +144,7 @@ figure { margin: 1.6rem 0; }
 .diagram svg { max-width: 100%; height: auto; }
 .diagram-error { border: 1px solid var(--del); color: var(--del); border-radius: 8px; padding: 0.8rem 1rem; text-align: left; }
 .diagram-error pre { color: var(--text); margin-bottom: 0; }
-.tree { border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem 1rem; font: 0.9375rem/1.7 var(--mono); overflow-x: auto; }
+.tree { max-width: 46rem; border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem 1rem; font: 0.9375rem/1.7 var(--mono); overflow-x: auto; }
 .tree ul { list-style: none; margin: 0; padding-left: 1.4rem; }
 .tree > ul { padding-left: 0; }
 .tree summary { cursor: pointer; }
