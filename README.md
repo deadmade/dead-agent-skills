@@ -96,7 +96,7 @@ update, then applies only the changes. It points the marketplace at the `release
 release, so Claude Code updates the plugins on its own (rerun the installer for new web-mcp binaries and the flow cockpit's Windows app), and
 it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). It
 lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own) and
-compacts the context at 350K tokens (`autoCompactWindow`, unless you set your own; it only matters on 1M-context models). Optional toggles add ccstatusline
+compacts the context at 350K tokens (`autoCompactWindow`, unless you set your own; it only matters on 1M-context models). It also switches Claude Code to a short, answer-first `concise` output style (`outputStyle`, unless you chose one; the style file goes to `~/.claude/output-styles/`). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
 Everything ships as one version. Merges to main that change plugins, tools or shared build inputs release a patch;
 CI, root documentation and analysis artifacts alone do not. A bigger step is `npm run release -- minor`
