@@ -19,7 +19,7 @@ a plugin changed since the last release without a bump.
 
 **Tech Stack:** Node ≥ 20.12 standard library only, `node:test`, git, GitHub Actions YAML, Dependabot config.
 
-**Spec:** [docs/superpowers/specs/2026-10-21-per-plugin-versions-design.md](../../superpowers/specs/2026-10-21-per-plugin-versions-design.md)
+**Spec:** [docs/superpowers/specs/2026-10-21-per-plugin-versions-design.md](2026-10-21-per-plugin-versions-design.md)
 (approved 2026-10-21). ADR: [docs/adr/0003-per-plugin-versions.md](../../adr/0003-per-plugin-versions.md).
 
 ## Global Constraints

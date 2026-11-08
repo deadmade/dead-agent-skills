@@ -12,7 +12,7 @@ ponytail is on 5.3.2 while cswap is on 0.27.2. But new versions only come when I
 
 ## Artifacts
 
-- Spec: [2026-10-21-per-plugin-versions-design.md](../../superpowers/specs/2026-10-21-per-plugin-versions-design.md)
+- Spec: [2026-10-21-per-plugin-versions-design.md](2026-10-21-per-plugin-versions-design.md)
   (builder check done 2026-10-21; Dependabot lockfile-only exempt and reinstall-with-warning are the user's answers,
   installed-version trigger and ponytail exemption are Claude's calls)
 - Plan: [plan.md](plan.md)

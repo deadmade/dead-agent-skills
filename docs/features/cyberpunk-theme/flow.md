@@ -10,9 +10,9 @@ could we design our own theme? Would be awesome to have like a cyberpunk style t
 
 ## Artifacts
 
-- Spec: [2026-10-13-night-city-design.md](../../superpowers/specs/2026-10-13-night-city-design.md) (builder check
+- Spec: [2026-10-13-night-city-design.md](2026-10-13-night-city-design.md) (builder check
   running)
-- Plan: [2026-10-13-night-city.md](../../superpowers/plans/2026-10-13-night-city.md)
+- Plan: [2026-10-13-night-city.md](2026-10-13-night-city.md)
 - ADRs: none (no decision met domain-modeling's three conditions)
 - CONTEXT.md: none (terms are local to one plugin; the spec defines them)
 - Grill: one round, 9 questions (name, auto-switch, intro trigger/length, reactions, flavor text, status line,

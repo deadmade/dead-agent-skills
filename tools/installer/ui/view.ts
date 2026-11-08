@@ -46,7 +46,7 @@ type Row =
 
 const width = (s: string) => stripVTControlCharacters(s).length;
 
-// The named colours in Night City's palette (plugins/default/themes/night-city.json).
+// The named colours in Night City's palette (plugins/default/themes/palette.json).
 const NIGHT_CITY = {
   magenta: [240, 139, 180],
   cyan: [124, 207, 224],

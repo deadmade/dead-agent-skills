@@ -13,8 +13,8 @@ chat; ctrl/cmd+click keeps the system opener.
 
 ## Artifacts
 
-- Spec: [2026-10-17-click-to-read-design.md](../../superpowers/specs/2026-10-17-click-to-read-design.md) (builder check done, answers folded in 2026-10-17)
-- Plan: [2026-10-17-click-to-read.md](../../superpowers/plans/2026-10-17-click-to-read.md)
+- Spec: [2026-10-17-click-to-read-design.md](2026-10-17-click-to-read-design.md) (builder check done, answers folded in 2026-10-17)
+- Plan: [2026-10-17-click-to-read.md](2026-10-17-click-to-read.md)
 - ADRs: none (no decision met the three ADR conditions)
 - CONTEXT.md: none (no new domain terms; pane/reply are Claude Code's words)
 

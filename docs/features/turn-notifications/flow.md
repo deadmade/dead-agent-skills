@@ -10,8 +10,8 @@ phase: done
 
 ## Artifacts
 
-- Spec: [2026-10-15-turn-notifications-design.md](../../superpowers/specs/2026-10-15-turn-notifications-design.md)
-- Plan: [2026-10-15-turn-notifications.md](../../superpowers/plans/2026-10-15-turn-notifications.md)
+- Spec: [2026-10-15-turn-notifications-design.md](2026-10-15-turn-notifications-design.md)
+- Plan: [2026-10-15-turn-notifications.md](2026-10-15-turn-notifications.md)
 - ADRs: none
 - CONTEXT.md: none
 
