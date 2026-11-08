@@ -132,17 +132,17 @@ what remains is terms of art and fixed lists (coordinating conjunctions, "the fi
 ## ponytail
 
 `plugins/flows/packs/ponytail/` is vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT
-License, Copyright (c) 2026 DietrichGebert; full text in `LICENSE`): the Claude Code plugin's `.claude-plugin/plugin.json`,
-`hooks/` (without the other hosts' hook configs) and `skills/`, at upstream's newest stable release. It is synced by
-`tools/upstream-sync/src/adapters/release.ts` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The synced
-upstream commit is in `UPSTREAM`.
+License, Copyright (c) 2026 DietrichGebert; full text in `LICENSE`): `hooks/` (without the other hosts' hook configs)
+and `skills/`, at upstream's newest stable release, unchanged (a pack carries no `plugin.json`: it is a plain
+resource folder, never loaded as a plugin). It is synced by `tools/upstream-sync/src/adapters/release.ts` (weekly via
+GitHub Actions). The synced upstream commit is in `UPSTREAM`.
 
 ## superpowers
 
 `plugins/flows/packs/superpowers/` is vendored from [obra/superpowers](https://github.com/obra/superpowers) (MIT License,
-Copyright (c) 2025 Jesse Vincent; full text in `LICENSE`): the Claude Code plugin's `.claude-plugin/plugin.json`,
-`hooks/` (without Cursor's hook config) and `skills/`, at upstream's newest stable release. It is synced by
-`tools/upstream-sync/src/adapters/release.ts` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The
+Copyright (c) 2025 Jesse Vincent; full text in `LICENSE`): `hooks/` (without Cursor's hook config) and `skills/`, at
+upstream's newest stable release, unchanged (a pack carries no `plugin.json`: it is a plain resource folder, never
+loaded as a plugin). It is synced by `tools/upstream-sync/src/adapters/release.ts` (weekly via GitHub Actions). The
 synced upstream commit is in `UPSTREAM`.
 
 ## web-mcp
@@ -212,6 +212,6 @@ review-code and build-feature are adapted from its method.
 ## Re-listed plugins
 
 The marketplace entry for Atlassian only points at its upstream repository; no code is vendored here. Anthropic's
-plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
+plugins (claude-code-setup, claude-md-management, security-guidance,
 claude-security, skill-creator and the LSPs) aren't listed here at all: they install from Anthropic's
 `claude-plugins-official` marketplace. Each is covered by its own upstream license.

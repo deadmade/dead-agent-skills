@@ -16,7 +16,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   clean-slate backup/delete, processes, downloads); `steps/` one file per thing the installer
   applies; `ui/` the screens; `assets/` the shipped configs and pins. No runtime npm dependencies: Node's standard library
   only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
-  `core/` or `system/` with a test next to it, not into `install.ts` or a step. Programs start through `system/proc.ts`
+  `core/` or `system/` with a test next to it, not into `install.ts` or a step. `core/release.ts` reading `package.json`
+  at load time is the one exception, needed to make it the single owner of the repository slug. Programs start through `system/proc.ts`
   (`which`, `start`/`startSync`), never by bare name: on Windows that searches the current folder first, and a `.cmd`
   shim needs cmd.exe. Node runs the `.ts` files as they are
   (type stripping; Node 26+, `engines`), so only erasable syntax: no `enum`, `namespace` or parameter properties
@@ -71,12 +72,12 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/flows/`: the conductor skills (`/build-feature`, `/research-feature`, `/implement`, `/fix`, `/upgrade`,
   `/refactor`, `/review-code`, `/understand`, `/learn`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
-  plugin) live once in `plugins/flows/steps/*.toml`, composed into each conductor at build time (ADR 0009), so a
+  plugin) live once in `plugins/flows/steps/*.toml`, composed into each conductor at build time (`docs/adr/0009-conductors-composed-from-flow-steps.md`), so a
   SKILL.md says what it runs and names its steps (`[step: <name>]`). Compose (`tools/harness-compiler/src/flows/compose.ts`)
   stops the build on a broken step and fails the build (and check-repo) on built text that doesn't hold; host wording comes from
   `src/templates/hosts/<target>.ts`, and `harness-compiler lint`'s flows phrase list (`CLAUDE_ONLY`) keeps Claude-only
   names out of steps, skills and references. run-rules' **Agents** paragraph asks for few agents, combined where it
-  makes sense, each on a model that fits its job (ADR 0005). The installer's only part is
+  makes sense, each on a model that fits its job (`docs/adr/0005-agent-limits-and-models.md`). The installer's only part is
   `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` (`mergeSettings`); it never writes `CLAUDE_CODE_SUBAGENT_MODEL`.
   Conductors call each other by reading the callee's SKILL.md (`/fix` → `/review-code`). Each
   conductor's `uses:` frontmatter, plus its steps' and host wording's `uses`, lists what it runs;
@@ -96,16 +97,22 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
   `plugins/flows/skills/writing/tests/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
   our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
-- `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
-  x64 only (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
-  `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
-  feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
-  release binaries' sha256 in `tools/installer/assets/agent-browser.json` (bumped by `npm run sync -- apply agent-browser`, which imports
-  `AGENT_BROWSER_FILES` from `core/binaries.ts`). Unless a current one is on PATH, the installer keeps its own copy in
-  `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
-  pin); either way it sets `agentBrowserPath` to the one in use (`upstreamPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
-  (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
-  `search` reads Google, Bing, DuckDuckGo and Brave (papers: Google Scholar and Semantic Scholar too) as tabs of one browser window per server (ADR 0007, `window.rs`): an owner session `web-mcp-<pid>-window` launches it on the first call that needs a browser and keeps it until exit; every engine, `browser` session and fetch fallback attaches as a tab (`--cdp <owner's cdp url> --pin-tab`, `attach.json`, idle 3600 s). Attached session names carry a generation `g<n>`, bumped when the owner reports a new cdp url (it relaunches a dead Chrome itself); a window closed by hand comes back through `tab_gone` → `tab new`. Browser first found of `WEB_MCP_CHROME`, Chrome for Testing from `agent-browser install`, `helium`, `chromium`; never branded Chrome. Under `WEB_MCP_SEARCH_DIR` (default the data dir, no temp fallback) each server holds the first free profile slot `profiles/<n>/` (its consent marks too); rests stay machine-wide. agent-browser's attach behaviour (`tab_gone`, `close` without a daemon, a dead Chrome's error) is recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in `docs/features/web-mcp-search/findings.md`; tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`, so `cargo build --locked -p web-mcp --bin fake-agent-browser` before the unit tests), which changes with any agent-browser answer web-mcp reads. I still don't care about cookies (downloaded on first use, not vendored; THIRD_PARTY.md) loads for every engine, Bing included. On Windows web-mcp puts itself in a kill-on-close job, so Chrome dies with it. `browser` and the fetch fallback need what search needs; the installer warns when the window can't open (no usable browser, or Linux without a display and Xvfb) and then counts web-mcp unhealthy. A blocked engine rests 30 min. No passage index: ranking is BM25 over each search's own pages. Engine parsers test against captured result pages in `tools/web-mcp/tests/fixtures/engines/`; Semantic Scholar's result and no-results pages and Google's no-results page aren't captured yet, so those three tests are `#[ignore]`d until they are. Google's result links are opaque `/goto?url=…` redirects on its own host: the parser keeps them and `search::resolve_goto` reads each one's target, in rank order, from a cookie-less GET's `302 Location` (through `http_public`: the host's cap of 4 requests in flight applies, and Google has no spacing; a page that landed on a private address gets no request, `run_engine` skips Google as "its result links are on a private address", because `resolve_goto` calls `http_public` directly and not `fetch::send`, whose guard would otherwise apply). In our measurements Google redirected only a fresh page's first 2 to 4 links (fewest right after a burst) and then answers `200` with a delay page that grows with every further request; after a burst of parallel requests every request got it for about 30 s (one test, 2026-11-06), but the walk is sequential, and in one live run of six searches Google gave rows to every search after the first, so how soon after another search it resolves again is unmeasured. The walk stops at the first answer that isn't a redirect or a `404`, at a redirect to a `/sorry` page of Google's site (another Google host such as `support.google.com` is a result, and a redirect to another page of the search host drops that row and goes on), at a failed request and at the engine's deadline (the wait for the host's slot counts): Google contributes its first few rows, the rest are dropped, and a search may resolve none and skip Google ("its result links did not resolve", no rest: the next search asks Google again, even after a `/sorry` redirect). The page was still read then, so the consent mark clears and a follow-up search types into it. Only the front tab takes `click` and `press` (agent-browser#2146: it reports them done and delivers nothing to a hidden tab), so `Browser::attached` and `batch_once` raise the session's own tab before them: `tab list` names it (the `active` row's `targetId`) and a GET of `/json/activate/<targetId>` on the window's debug port brings it up, under one `front` lock held until the input is sent, so engines type one at a time and a typed follow-up search takes about the sum of their typing (one batch's time is unmeasured; the fake shows engines timing out at 3 s a batch; a waiter goes on after 5 s and raises its own tab anyway, which takes the front from the session typing then, from about 1.7 s a batch with four engines; the lock orders web-mcp's own raises and holds nothing else back; a refused activation is written to stderr, a failing `tab list` or a missing `active` row leaves no trace, and neither fails the call; the request goes through `loopback_client`, which ignores `HTTP_PROXY` because the port is on this machine). Never agent-browser's own `tab <id>`: it raises the tab too but makes the daemon forget its refs, so the next `click @e1` answers `Unknown ref` (measured; the fake doesn't model it, so only a live run shows it). `shortcut:` this leans on 0.41.1's `tab list` marking a session's own tab `active` and on Chrome's endpoint: test input in a hidden tab again when the pin moves. The fake answers `tab list` (an owner row `t1` and the session's `active` row `t-<session>`) and reads the window's debug port from `<state>/cdp-port`, so a test stands up a stub of Chrome's HTTP endpoint (the shared `fetch::tests::stub` in unit tests, `common::Fixture` in integration tests). Other fake knobs: `<pages>/<engine>.landed` (the URL the engine's page reports as where it landed, so a test's stub serves Google's `/goto` links) and `<state>/typedelay` (ms each typing batch sleeps first).
+- `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`,
+  built for Windows and Linux x64 only (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the
+  installer downloads it and sets `binPath`. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4` feature)
+  showed embeddings don't lift recall over BM25 on BEIR, so none ship. One browser window per server, every engine,
+  `browser` session and fetch fallback attached to it as a tab (`docs/adr/0007-one-browser-window.md`); its daemon and tab-raising behaviour is
+  recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in
+  `docs/features/web-mcp-search/findings.md`, and specific bugs in `docs/solutions/` (Google's `/goto` links, a hidden
+  tab's `click`/`press`, agent-browser's install and a Windows Chrome quirk).
+  Contributor rules: tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`;
+  `cargo build --locked -p web-mcp --bin fake-agent-browser` before the unit tests), which changes with any
+  agent-browser answer web-mcp reads and doesn't model every upstream quirk
+  (`docs/solutions/click-and-press-reach-nothing-in-a-hidden-tab.md`). Test-only hooks (debug builds or the
+  `test-hooks` feature): `WEB_MCP_TEST_PUBLIC_IP` treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS`,
+  `WEB_MCP_PAPERS_MS` and `WEB_MCP_LOOKUP_MS` shorten the fetch fallback's, each paper source's and each lookup
+  source's deadline. Env knobs: `WEB_MCP_CHROME` picks the browser binary; `WEB_MCP_SEARCH_DIR` picks where profile
+  slots live (no temp fallback).
 - `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
   `tools/upstream-sync/src/adapters/*.ts`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
   plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
@@ -233,12 +240,15 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 
 ## Vendored content: don't edit
 
-These are copied from upstream by `tools/upstream-sync/src/adapters/*.ts` (the weekly `sync.yml` opens the PRs) and overwritten on every
-sync: `plugins/shared/agent-review/skills/`, `plugins/shared/agent-review/LICENSE` and `UPSTREAM`, `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0; pstack-picks' `.claude-plugin/plugin.json` is hand-written), `plugins/flows/agents/`,
-`plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
-`plugins/flows/skills/review-code/LICENSE` and `UPSTREAM` (the self-review adapter's), and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
-`tools/flow-cockpit/app/shell/vendor/` (marked, DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync script: it is copied unchanged from
-the npm tarballs THIRD_PARTY.md names, so a new version replaces the files rather than editing them.
+`treefmt.toml`'s `excludes` lists every vendored path (`docs/vendor-a-pack.md` is the checklist for adding one). These are
+copied from upstream by `tools/upstream-sync/src/adapters/*.ts` and `sources.ts` (the weekly `sync.yml` opens the PRs)
+and overwritten on every sync; to change one, change its sync script's transform, not the vendored files. Hand-written
+exceptions a sync still skips: `plugin.json` for pstack-picks and the `*-skills` and postgres packs (and their
+`evals/`). ponytail and superpowers vendor no manifest at all (a pack is a plain resource folder; the compiler never
+loads one as a plugin). `tob-picks` is CC BY-SA 4.0; THIRD_PARTY.md has every pack's actual license.
+`tools/flow-cockpit/app/shell/vendor/` (DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync
+script: it is copied unchanged from the npm tarballs THIRD_PARTY.md names, so a new version replaces the files rather
+than editing them.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Dependency updates
@@ -248,8 +258,9 @@ Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps Gi
 ## Versions and releases
 
 Everything ships as one version: `package.json` and `package-lock.json`, the root `Cargo.toml` workspace version
-and all four local package entries in `Cargo.lock`, and the installer URL in README.md. The build stamps this version
-into the marketplaces and generated plugin manifests.
+and all four local package entries in `Cargo.lock`. The build stamps this version into the marketplaces and generated
+plugin manifests. README.md's installer command carries no version (it names `latest/`); `newerInstaller` is how a
+stale cached run of it hands over to a newer release.
 `check-repo.mjs` fails on drift. Never bump by hand. A merge to `main` that touches `plugins/`, `tools/` or shared
 build inputs (the allowlist in `release.yml`) releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
 bump off `main` and tags it, so `main`'s `package.json` lags behind the tags and the next version counts from the
@@ -271,12 +282,18 @@ plugins of ours that the manifest no longer lists.
 ## Checks
 
 - A fresh clone runs `npm ci` before committing: check-repo and the compiler, which the pre-commit hook runs, import `smol-toml`.
-- `npm test`: repo checks plus the upstream-sync workspace tests and all `tools/installer/**/*.test.ts`, `scripts/*.test.mjs`, `plugins/flows/skills/{writing,build-feature}/tests/*.test.mjs`, `plugins/default/hooks/*.test.mjs`, `plugins/flows/hooks/*.test.mjs` and `plugins/opt-in/headroom-trim/hooks/*.test.mjs`
-  (`claude plugin validate` is skipped when `claude` isn't on PATH). The installer tests run with a line-coverage floor
+- `npm test` is the one list of what runs (`package.json`'s `test` script): `scripts/check-repo.mjs`, then all
+  `tools/installer/**/*.test.ts` under a line-coverage floor, then the harness-compiler's and upstream-sync's own test
+  suites (each its own `npm test --workspace=...`, so a test file only one of them runs still runs), then
+  `scripts/*.test.mjs`, `plugins/flows/skills/{writing,build-feature}/tests/*.test.mjs`, `plugins/default/hooks/*.test.mjs`,
+  `plugins/flows/hooks/*.test.mjs`, `plugins/opt-in/headroom-trim/hooks/*.test.mjs` and
+  `plugins/opt-in/flow-cockpit/hooks/*.test.mjs` (`claude plugin validate`, inside `check-repo.mjs`, is skipped when
+  `claude` isn't on PATH). The installer tests run with a line-coverage floor
   (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `tools/installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
-- `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `tools/installer/` (sources and tests, strict).
+- `npm ci` once, then `npm run typecheck`, also one list: `tsc --noEmit` over `tools/installer/` (sources and tests,
+  strict), then the harness-compiler's and upstream-sync's own `typecheck`.
 - Rust, from the root: `cargo build --locked -p web-mcp --bin fake-agent-browser`, then
   `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
   `cargo fmt --all -- --check`. Use `-p web-mcp` or another member instead of `--workspace`
@@ -348,7 +365,8 @@ dependencies and targets. UI mods (TypeScript against Claude's UI engine) stay i
 is one emitter per harness (event and tool maps, manifest, MCP, LSP, theme, marketplace, and on Codex the
 per-conductor invocation policy: `agents/openai.yaml` with `allow_implicit_invocation: false`, written from
 `disable-model-invocation: true`), `transforms/` rewrites shipped Markdown per target (`rules.ts` holds the per-file edits for vendored text), `templates/` holds all harness-specific
-prose, `runtime/` is the shared hook runner copied into packages. Adding a harness is one new `targets/` file.
+prose, `runtime/` is the shared hook runner copied into packages. Adding a harness touches more than one file: a new
+`targets/<id>.ts` emitter and a `templates/hosts/<id>.ts` for its wording, at least.
 Commands: `npm run build:harnesses` (`harness-compiler build`, which exits 1 on a built-text problem after writing),
 `harness-compiler validate` and `lint` (fails when `plugins/` carries harness-specific files or wording outside
 `src/lint-allowlist.json`). Author → build → review generated output → commit the sources only.
@@ -358,7 +376,8 @@ Don't `import` a JSON file in `tools/harness-compiler/src` (compose reads `steps
 the installer's catalog test compiles the compiler with `tsc --outDir`, which emits the JSON there and breaks the test.
 `tools/installer/core/agents.ts` holds host metadata for the installer; `tools/installer/steps/codex.ts` uses Codex's
 native plugin and MCP commands, respecting CODEX_HOME.
-Keep Claude marketplace IDs and the legacy executable alias stable. The GitHub repository still has its old name.
+Keep Claude marketplace IDs and the legacy executable alias stable even though the GitHub repository has moved to a
+new slug: `package.json`'s `repository` is its one owner (see Versions and releases).
 Flow behavior is shared; each built conductor carries its host's wording through the `{{adapter}}` and other tokens in
 `tools/harness-compiler/src/templates/hosts/`.
 Without subagents the main session does delegated work (searching, exploring) itself; independent checks are skipped and
