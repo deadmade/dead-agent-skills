@@ -34,7 +34,7 @@ Claude's marketplace/plugin identifiers remain stable for existing users.
 The native packages live under `.agents/plugins/` (Codex) and `.claude-plugin/` (Claude Code), including skill packs, reviewer briefs, C# libraries and licenses.
 They install directly from the Git marketplace. Codex does not apply Claude's plugin dependency declarations, so
 install the companion plugins shown above for flows. Flows also document fallbacks when an integration is missing.
-Standalone options include hallmark, Rust, C# and Postgres skills, plus MCP setup plugins for GitHub, Azure and
+Standalone options include hallmark, shop (price checks on Kleinanzeigen and Geizhals through web-mcp), Rust, C# and Postgres skills, plus MCP setup plugins for GitHub, Azure and
 Atlassian. MCP setup skills provide native `codex mcp add` commands and authentication instructions; installing a
 setup skill alone does not configure a global server. No setup skill requires the project installer.
 

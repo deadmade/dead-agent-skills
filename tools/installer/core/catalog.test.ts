@@ -7,7 +7,7 @@ const root = resolve(import.meta.dirname, '../../..');
 const definitions = () => readCatalog(root);
 test('neutral catalog preserves names, default and dependency closure without native-only plugins', () => {
   const all = definitions();
-  assert.equal(all.length, 15);
+  assert.equal(all.length, 16);
   assert.deepEqual(
     selectTarget(all, 'codex').plugins.map((p) => p.name),
     [
@@ -19,12 +19,13 @@ test('neutral catalog preserves names, default and dependency closure without na
       'csharp-skills',
       'postgres',
       'web-mcp',
+      'shop',
       'mcp-github',
       'mcp-azure',
       'atlassian',
     ],
   );
-  assert.equal(selectTarget(all, 'claude-code').plugins.length, 14);
+  assert.equal(selectTarget(all, 'claude-code').plugins.length, 15);
   assert.deepEqual(portableSelection(all, []), ['dead-skills']);
   assert.deepEqual(portableSelection(all, ['flows']), ['dead-skills', 'flows', 'graphify', 'web-mcp']);
   assert.deepEqual(portableSelection(all, ['flows', 'flows']), ['dead-skills', 'flows', 'graphify', 'web-mcp']);

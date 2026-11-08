@@ -218,6 +218,7 @@ test('Codex offers shared catalog choices and installs the flows dependency clos
         'mcp-github',
         'postgres',
         'rust-skills',
+        'shop',
         'web-mcp',
       ]);
       for (const native of ['nix-lsp', 'md-pane']) assert.equal(Object.hasOwn(choices, native), false);
