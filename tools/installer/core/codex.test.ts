@@ -6,9 +6,10 @@ import { readFileSync } from 'node:fs';
 import { installedCodex, codexPlan, recoverableContext7 } from './codex.ts';
 
 // Captured from Codex CLI 0.167.0's `mcp list --json` on 2026-11-06.
+const URL7 = 'https://mcp.context7.com/mcp';
 const context7 = JSON.parse(readFileSync(new URL('./fixtures/codex-mcp-list.json', import.meta.url), 'utf8'))[0];
 test('recover default Context7 without accepting conflicting or customized connections', () => {
-  assert.equal(recoverableContext7(context7), true);
+  assert.equal(recoverableContext7(context7, URL7), true);
   for (const change of [
     { name: 'another-server' },
     { enabled: false },
@@ -18,9 +19,9 @@ test('recover default Context7 without accepting conflicting or customized conne
     { transport: { ...context7.transport, http_headers: { Authorization: 'custom' } } },
     { transport: { ...context7.transport, type: 'stdio' } },
   ])
-    assert.equal(recoverableContext7({ ...context7, ...change }), false);
-  assert.equal(recoverableContext7({ name: context7.name }), false);
-  assert.equal(recoverableContext7(null), false);
+    assert.equal(recoverableContext7({ ...context7, ...change }, URL7), false);
+  assert.equal(recoverableContext7({ name: context7.name }, URL7), false);
+  assert.equal(recoverableContext7(null, URL7), false);
 });
 test('native discovery preserves foreign plugins and rejects unknown discovery', () => {
   assert.deepEqual(installedCodex({ installed: [{ id: 'foreign@other' }, { id: 'dead-skills@dead-agent-skills' }] }), [

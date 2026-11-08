@@ -11,7 +11,6 @@ import { readCatalog } from '../system/catalog.ts';
 import {
   type CodexState,
   MCP_COMPONENTS,
-  CONTEXT7_URL,
   recoverableContext7,
   codexPlan,
   installedCodex,
@@ -38,6 +37,11 @@ export interface CodexIO {
   which?: typeof which;
   download?: typeof downloadBin;
   browser?: typeof installAgentBrowser;
+}
+
+// The url and environment variable names a plugin's Codex package states, generated from its plugin.json.
+function readCodexMcp(catalog: string, name: string): { url?: string; envVars: string[] } {
+  return JSON.parse(readFileSync(join(catalog, '.agents/plugins', name, 'codex-mcp.json'), 'utf8'));
 }
 
 export async function applyCodex(io: CodexIO = {}) {
@@ -149,6 +153,8 @@ export async function applyCodex(io: CodexIO = {}) {
     throw new Error(`${catalog} is a symlink; left unchanged`);
   cpSync(join(source, '.agents'), join(catalog, '.agents'), { recursive: true });
   run('plugin', 'marketplace', 'add', catalog);
+  const settings = (name: string) => readCodexMcp(catalog, name);
+  const context7 = settings('dead-skills').url!;
 
   const mcp = [...(previous?.mcp ?? [])];
   const existingMcp = JSON.parse(run('mcp', 'list', '--json'));
@@ -157,7 +163,7 @@ export async function applyCodex(io: CodexIO = {}) {
     const name = mcpName(component);
     const existing = existingMcp.find((s: any) => s.name === name);
     if (existing && !mcp.includes(component)) {
-      if (component === 'dead-skills' && recoverableContext7(existing)) {
+      if (component === 'dead-skills' && recoverableContext7(existing, context7)) {
         mcp.push(component);
         save();
         return;
@@ -196,7 +202,7 @@ export async function applyCodex(io: CodexIO = {}) {
     // Do not mark the release current until every requested operation succeeds.
     save();
   }
-  configure('dead-skills', ['--url', CONTEXT7_URL]);
+  configure('dead-skills', ['--url', context7]);
   if (plan.wanted.includes('web-mcp')) {
     let binary = find('web-mcp');
     if (!binary) {
@@ -215,7 +221,7 @@ export async function applyCodex(io: CodexIO = {}) {
   if (plan.wanted.includes('mcp-github')) {
     configure('mcp-github', [
       '--url',
-      'https://api.githubcopilot.com/mcp',
+      settings('mcp-github').url!,
       '--bearer-token-env-var',
       'GITHUB_PERSONAL_ACCESS_TOKEN',
     ]);
@@ -238,11 +244,11 @@ export async function applyCodex(io: CodexIO = {}) {
     if (lstatSync(config).isSymbolicLink())
       throw new Error('Codex config.toml is a symlink; add Azure env_vars where it is managed');
     const raw = readFileSync(config, 'utf8');
-    const next = mcpEnvironment(raw, mcpName('mcp-azure'), ['ADO_ORG_URL', 'ADO_PAT', 'ADO_PROJECT_DIR']);
+    const { envVars } = settings('mcp-azure');
+    const next = mcpEnvironment(raw, mcpName('mcp-azure'), envVars);
     if (next !== raw) writeAtomic(config, next);
     note('Codex Azure authentication', [
-      'Set ADO_ORG_URL (the collection URL) and ADO_PAT in the environment that starts Codex.',
-      'Optional: ADO_PROJECT_DIR overrides the repository used for project detection.',
+      `Set ${envVars.join(', ')} in the environment that starts Codex; the setup-mcp-azure skill says which are optional.`,
     ]);
   }
   const packaged = join(catalog, '.agents/plugins/dead-skills');

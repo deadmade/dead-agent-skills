@@ -8,11 +8,10 @@ export interface CodexState {
 }
 export const MCP_COMPONENTS = ['dead-skills', 'web-mcp', 'mcp-github', 'mcp-azure', 'atlassian'];
 export const mcpName = (component: string) => `dead-agent-skills-${component}`;
-export const CONTEXT7_URL = 'https://mcp.context7.com/mcp';
 
 // Recover a default Context7 entry when an earlier setup lost its ownership receipt.
 // Customized connections still require explicit ownership before we can replace them.
-export function recoverableContext7(server: any): boolean {
+export function recoverableContext7(server: any, url: string): boolean {
   const transport = server?.transport;
   return (
     server?.name === mcpName('dead-skills') &&
@@ -21,7 +20,7 @@ export function recoverableContext7(server: any): boolean {
     server.startup_timeout_sec == null &&
     server.tool_timeout_sec == null &&
     transport?.type === 'streamable_http' &&
-    transport.url === CONTEXT7_URL &&
+    transport.url === url &&
     Object.entries(transport).every(([key, value]) => ['type', 'url'].includes(key) || value == null)
   );
 }

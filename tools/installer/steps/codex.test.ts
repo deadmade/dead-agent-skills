@@ -94,6 +94,29 @@ test('Codex configures MCP using native CLI and emits environment-based authenti
     f.close();
   }
 });
+test('Codex MCP settings come from each plugin definition, and the installer reads the generated file', async () => {
+  const f = fixture();
+  try {
+    const file = (name: string) => join(f.source, '.agents/plugins', name, 'codex-mcp.json');
+    const read = (name: string) => JSON.parse(readFileSync(file(name), 'utf8'));
+    assert.deepEqual(read('mcp-azure'), { envVars: ['ADO_ORG_URL', 'ADO_PAT', 'ADO_PROJECT_DIR'] });
+    assert.deepEqual(read('mcp-github'), { url: 'https://api.githubcopilot.com/mcp', envVars: [] });
+    assert.deepEqual(read('dead-skills'), { url: 'https://mcp.context7.com/mcp', envVars: [] });
+    assert.equal(existsSync(file('web-mcp')), false);
+    writeFileSync(file('mcp-github'), JSON.stringify({ url: 'https://github.invalid/mcp', envVars: [] }));
+    writeFileSync(file('dead-skills'), JSON.stringify({ url: 'https://context7.invalid/mcp', envVars: [] }));
+    writeFileSync(file('mcp-azure'), JSON.stringify({ envVars: ['ADO_ONLY'] }));
+    f.select(['mcp-github', 'mcp-azure']);
+    await applyCodex(f.io);
+    const add = (name: string) => f.calls.find((c) => c[0] === 'mcp' && c[1] === 'add' && c[2] === name)!;
+    assert.ok(add('dead-agent-skills-mcp-github').includes('https://github.invalid/mcp'));
+    assert.ok(add('dead-agent-skills-dead-skills').includes('https://context7.invalid/mcp'));
+    assert.match(readFileSync(join(f.home, 'config.toml'), 'utf8'), /env_vars = \["ADO_ONLY"\]/);
+  } finally {
+    f.close();
+  }
+});
+
 test('Codex downloads the ado-mcp release when it is absent from PATH', async () => {
   const f = fixture();
   try {
