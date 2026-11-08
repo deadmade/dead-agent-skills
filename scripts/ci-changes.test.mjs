@@ -6,11 +6,11 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { changedPaths, selectChecks } from './ci-changes.mjs';
 
-const all = ['web-mcp', 'ado-mcp', 'flow-cockpit'];
+const all = ['web-mcp', 'ado-mcp'];
 
 test('full runs select exactly the remaining binaries and workspace packages', () => {
   assert.deepEqual(selectChecks([], true).binaries, all);
-  assert.deepEqual(selectChecks([], true).packages, ['web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit']);
+  assert.deepEqual(selectChecks([], true).packages, ['web-mcp', 'ado-mcp']);
 });
 
 test('an ado implementation change selects only ado checks', () => {
@@ -23,11 +23,11 @@ test('an ado implementation change selects only ado checks', () => {
   });
 });
 
-test('each crate selects its checks, including both cockpit packages', () => {
+test('each crate selects its checks', () => {
   for (const crate of all) {
     const result = selectChecks([`tools/${crate}/src/lib.rs`]);
     assert.deepEqual(result.binaries, [crate]);
-    assert.deepEqual(result.packages, crate === 'flow-cockpit' ? ['flow-cockpit-core', crate] : [crate]);
+    assert.deepEqual(result.packages, [crate]);
   }
 });
 
@@ -35,7 +35,6 @@ test('plugin changes select their native integration and Node checks', () => {
   for (const [path, crate] of [
     ['plugins/shared/web-mcp/.mcp.json', 'web-mcp'],
     ['plugins/opt-in/mcp/mcp-azure/.mcp.json', 'ado-mcp'],
-    ['plugins/opt-in/flow-cockpit/hooks/lib.mjs', 'flow-cockpit'],
   ]) {
     const result = selectChecks([path]);
     assert.deepEqual(result.binaries, [crate]);
@@ -43,10 +42,11 @@ test('plugin changes select their native integration and Node checks', () => {
   }
 });
 
-test('flow and compiler changes also test cockpit consumers', () => {
+test('flow and compiler changes select Node and skill checks, not Rust', () => {
   for (const path of ['plugins/flows/steps/run-rules.toml', 'tools/harness-compiler/src/flows/compose.ts']) {
     const result = selectChecks([path]);
-    assert.deepEqual(result.binaries, ['flow-cockpit']);
+    assert.deepEqual(result.binaries, []);
+    assert.equal(result.rust, false);
     assert.equal(result.node, true);
     assert.equal(result.skills, true);
   }
@@ -159,12 +159,7 @@ test('PR 122 selects only web-mcp', () => {
   });
 });
 
-for (const path of [
-  'Cargo.toml',
-  'flake.nix',
-  'tools/ado-mcp/src/bin/timetrack/ui.rs',
-  'tools/flow-cockpit/app/shell/tokens.css',
-]) {
+for (const path of ['Cargo.toml', 'flake.nix', 'tools/ado-mcp/src/bin/timetrack/ui.rs']) {
   test(`repository fact ${path} selects Node checks`, () => {
     assert.equal(selectChecks([path]).node, true, path);
   });

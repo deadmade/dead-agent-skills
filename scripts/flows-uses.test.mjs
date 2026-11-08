@@ -10,7 +10,7 @@ import {
   FLOWS,
   checkOverrides,
   checkPackPaths,
-  checkTemplates,
+  checkShapes,
   checkUseNames,
   currentDeps,
   expectedDeps,
@@ -253,7 +253,7 @@ test('checkPackPaths: a missing path in a steps/*.toml fails', () => {
   ]);
 });
 
-// checkTemplates: the parts the flow cockpit reads must stay in the templates and the conductor text.
+// checkShapes: the shapes glance and the gates rely on must stay in the templates and the conductor text.
 const TEMPLATES = [
   'plugins/flows/skills/build-feature/references/flow-template.md',
   'plugins/flows/skills/research-feature/references/research-template.md',
@@ -272,11 +272,11 @@ function without(file, needle) {
   const text = readFileSync(join(fx, file), 'utf8');
   assert.ok(text.includes(needle), `${file} has ${needle}`);
   writeFileSync(join(fx, file), text.split(needle).join('<removed>'));
-  return checkTemplates(fx);
+  return checkShapes(fx);
 }
 
-test('checkTemplates on the real repo returns []', () => {
-  assert.deepEqual(checkTemplates(ROOT), []);
+test('checkShapes on the real repo returns []', () => {
+  assert.deepEqual(checkShapes(ROOT), []);
 });
 
 for (const t of TEMPLATES) {
@@ -288,7 +288,7 @@ for (const t of TEMPLATES) {
     ['Picked:', 'Picked:'],
     ...(research ? [] : [['Status:', 'Status: open']]),
   ]) {
-    test(`checkTemplates names ${t} without ${what}`, () => {
+    test(`checkShapes names ${t} without ${what}`, () => {
       const problems = without(t, needle);
       assert.equal(problems.length, 1, problems.join('\n'));
       assert.ok(problems[0].startsWith(t), problems[0]);
@@ -305,7 +305,7 @@ for (const [file, what, needle] of [
   [AUDIT, 'Picks:', 'Picks:'],
   [AUDIT, 'Fixed', 'Fixed <date>'],
 ]) {
-  test(`checkTemplates names ${file} without ${what}`, () => {
+  test(`checkShapes names ${file} without ${what}`, () => {
     const problems = without(file, needle);
     assert.ok(problems.length >= 1 && problems.every((p) => p.startsWith(file)), problems.join('\n'));
   });

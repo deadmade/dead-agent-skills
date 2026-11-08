@@ -1,8 +1,8 @@
-// The binaries the installer downloads or points plugins at: web-mcp, ado-mcp, the flow cockpit and agent-browser.
+// The binaries the installer downloads or points plugins at: web-mcp, ado-mcp and agent-browser.
 import { createHash } from 'node:crypto';
 import { posix, win32 } from 'node:path';
 import { BUNDLE } from './plugins.ts';
-import { REPO, RELEASES, newer, semver } from './release.ts';
+import { RELEASES, newer, semver } from './release.ts';
 
 // tools/installer/assets/agent-browser.json and uv.json.
 export interface UpstreamPin {
@@ -44,30 +44,15 @@ export function missingBinaries(platform: string, wanted: string[], onPath: (bin
   });
 }
 
-// The binaries releases ship, built per platform by .github/workflows/crates-build.yml (the flow cockpit by
-// build-flow-cockpit.yml) and attached to the vX.Y.Z release by release.yml. Keyed by plugin; name: the binary;
-// key: the plugin's userConfig key for its path. targets: the BIN_TARGETS keys it is built for, when not all.
-// linuxHint: Linux gets it elsewhere, and this says how. folder: the archive holds more than the binary (the flow
-// cockpit's default extensions), so it is unpacked whole into a folder of its own.
+// The binaries releases ship, built per platform by .github/workflows/crates-build.yml and attached to the vX.Y.Z
+// release by release.yml. Keyed by plugin; name: the binary; key: the plugin's userConfig key for its path.
 export interface BinPlugin {
   name: string;
   key: string;
-  targets?: string[];
-  linuxHint?: (version: string) => string;
-  folder?: boolean;
 }
 export const BIN_PLUGINS: Record<string, BinPlugin> = {
   'web-mcp': { name: 'web-mcp', key: 'binPath' },
   'mcp-azure': { name: 'ado-mcp', key: 'binPath' },
-  // It links the system's GTK and WebKit on Linux, so Linux runs it from the flake, pinned to this release.
-  'flow-cockpit': {
-    name: 'flow-cockpit',
-    key: 'appPath',
-    targets: ['win32-x64'],
-    linuxHint: (version) =>
-      `run the app with \`nix run github:${REPO}/v${version}#flow-cockpit\`, or add the flake's flow-cockpit package to your system config`,
-    folder: true,
-  },
 };
 // Windows and Linux x64 only: no macOS or ARM builds.
 const BIN_TARGETS: Record<string, string> = {
@@ -79,29 +64,23 @@ const BIN_TARGETS: Record<string, string> = {
 export function binAsset(name: string, platform: string, arch: string, version: string) {
   const key = `${platform}-${arch}`;
   const target = BIN_TARGETS[key];
-  const plugin = Object.values(BIN_PLUGINS).find((p) => p.name === name);
-  if (!target || (plugin?.targets && !plugin.targets.includes(key))) return undefined;
+  if (!target) return undefined;
   const file = `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
   const url = `${RELEASES}/v${version}/${file}`;
   const exe = platform === 'win32' ? `${name}.exe` : name;
-  return { file, url, sha256: `${url}.sha256`, exe, folder: plugin?.folder === true };
+  return { file, url, sha256: `${url}.sha256`, exe };
 }
 
-// Where the binary of `pluginName` goes in binDir on `platform`: a folder plugin's in a folder of its own.
+// Where the binary of `pluginName` goes in binDir on `platform`.
 export function binPath(binDir: string, pluginName: string, platform: string) {
-  const { name, folder } = BIN_PLUGINS[pluginName];
-  const p = platform === 'win32' ? win32 : posix;
-  const exe = platform === 'win32' ? `${name}.exe` : name;
-  return folder ? p.join(binDir, name, exe) : p.join(binDir, exe);
+  const { name } = BIN_PLUGINS[pluginName];
+  return platform === 'win32' ? win32.join(binDir, `${name}.exe`) : posix.join(binDir, name);
 }
 
-// What to do when the binary of `pluginName` couldn't be installed. A folder plugin's failure is most likely its open
-// app holding the folder, and a hand-built one lacks what ships beside it, so it gets a rerun instead of a build.
+// What to do when the binary of `pluginName` couldn't be installed.
 export function binAdvice(pluginName: string) {
-  const { name, folder } = BIN_PLUGINS[pluginName];
-  return folder
-    ? `close ${name} if it is open and run the installer again`
-    : `build it from the repository root with \`cargo build --release --locked -p ${name} --bin ${name}\` (output: target/release) and set its path with /plugin configure ${pluginName}`;
+  const { name } = BIN_PLUGINS[pluginName];
+  return `build it from the repository root with \`cargo build --release --locked -p ${name} --bin ${name}\` (output: target/release) and set its path with /plugin configure ${pluginName}`;
 }
 
 // The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.

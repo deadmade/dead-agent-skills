@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { createServer as createHttp, type Server } from 'node:http';
 import { createServer as createHttps } from 'node:https';
 import { tmpdir } from 'node:os';
@@ -108,78 +108,5 @@ test('stopLocalServer reports a server that stays up', async () => {
   } finally {
     server.close();
     server.closeAllConnections();
-  }
-});
-
-// The flow cockpit's zip holds its exe and its default extensions: the whole archive is its folder, and an update
-// replaces the old folder whole, so a default the release dropped doesn't linger.
-function oldFolder() {
-  const dir = join(mkdtempSync(join(tmpdir(), 'dcs-net-')), 'fake');
-  mkdirSync(join(dir, 'extensions', 'gone'), { recursive: true });
-  writeFileSync(join(dir, 'extensions', 'gone', 'gone.ts'), 'old view');
-  writeFileSync(join(dir, exe), 'old binary');
-  return dir;
-}
-
-test('downloadBin unpacks a folder archive into its own folder, replacing the old copy whole', async () => {
-  const { server, url } = await release(archive);
-  const dir = oldFolder();
-  try {
-    await downloadBin('fake', { file: archive, url, sha256: `${url}.sha256`, exe, folder: true }, join(dir, exe));
-    assert.equal(readFileSync(join(dir, exe), 'utf8'), 'fake binary\n');
-    assert.deepEqual(readdirSync(dir), [exe], 'only what the archive holds');
-    assert.deepEqual(readdirSync(join(dir, '..')), ['fake'], 'no staged or old copy left beside it');
-  } finally {
-    server.close();
-  }
-});
-
-// A staged folder left by an installer killed mid-copy, under the same pid: its files must not ship.
-test('downloadBin ships only the archive, not a leftover staged folder', async () => {
-  const { server, url } = await release(archive);
-  const dir = oldFolder();
-  const leftover = join(`${dir}.tmp-${process.pid}`, 'extensions', 'stale');
-  mkdirSync(leftover, { recursive: true });
-  writeFileSync(join(leftover, 'stale.ts'), 'stale view');
-  try {
-    await downloadBin('fake', { file: archive, url, sha256: `${url}.sha256`, exe, folder: true }, join(dir, exe));
-    assert.deepEqual(readdirSync(dir), [exe], 'only what the archive holds');
-  } finally {
-    server.close();
-  }
-});
-
-test('downloadBin keeps the old folder when the archive lacks the program', async () => {
-  const { server, url } = await release(archive);
-  const dir = oldFolder();
-  const asset = { file: archive, url, sha256: `${url}.sha256`, exe: 'missing', folder: true };
-  try {
-    await assert.rejects(downloadBin('fake', asset, join(dir, 'missing')), /missing/);
-    assert.equal(readFileSync(join(dir, exe), 'utf8'), 'old binary');
-    assert.ok(existsSync(join(dir, 'extensions', 'gone', 'gone.ts')));
-    assert.deepEqual(readdirSync(join(dir, '..')), ['fake']);
-  } finally {
-    server.close();
-  }
-});
-
-// The old folder can't move aside (on Windows: the app is open). Here an `.old-<pid>` folder the sweep can't delete
-// blocks the rename; modes don't lock a folder on Windows, so the case runs elsewhere.
-test('downloadBin leaves no staged copy when the old folder cannot move aside', { skip: WIN }, async () => {
-  const { server, url } = await release(archive);
-  const dir = oldFolder();
-  const blocker = join(`${dir}.old-${process.pid}`, 'locked');
-  mkdirSync(blocker, { recursive: true });
-  writeFileSync(join(blocker, 'x'), '');
-  chmodSync(blocker, 0o500);
-  const asset = { file: archive, url, sha256: `${url}.sha256`, exe, folder: true };
-  try {
-    await assert.rejects(downloadBin('fake', asset, join(dir, exe)));
-    assert.equal(readFileSync(join(dir, exe), 'utf8'), 'old binary');
-    const left = readdirSync(join(dir, '..')).filter((f) => f.includes('.tmp-'));
-    assert.deepEqual(left, [], 'no staged copy left');
-  } finally {
-    chmodSync(blocker, 0o700);
-    server.close();
   }
 });

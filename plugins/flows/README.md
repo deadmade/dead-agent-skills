@@ -16,6 +16,7 @@ recommends; you decide.
 | `/review-code [branch\|all\|pr <number>] [base]` | review a branch before merge, the whole repo, or a pull request | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes; `pr` only reports | merge, or a PR (`!` lines to push) and CI watched |
 | `/learn [flow]`                                  | keep what the work taught                                       | no questions: the few lessons that matter, written to AGENTS.md/CLAUDE.md, `domain-modeling`, a `docs/solutions/` note or memory; ADRs, checks and skill fixes to the Parking lot                                                                                           | done                                              |
 | `/flows:writing copyedit <file.md>`              | revise a finished document for a new reader                     | a fresh agent revises it by the `writing` skill; `compare.mjs` refuses an edit that lost what code can check                                                                                                                                                                | the edited document, uncommitted                  |
+| `/flows:diagrams <file.md>`                      | check a spec or plan's pictures and show it as one page         | `check.mjs` parses each Mermaid diagram with Mermaid itself and checks file maps against the repo; `render.mjs` writes the text and pictures as one HTML page; every gate that shows a spec or plan runs both                                                               | a page, or its path                               |
 
 `branch` (the default) audits what changed against the base, plus the tests and docs that should have changed with
 it; `all` audits the whole repo, vendored content skipped.
@@ -33,7 +34,7 @@ build-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: writing
+├ flows: diagrams, writing
 ├ graphify: graphify
 ├ mattpocock-picks: codebase-design, domain-modeling, grilling, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
@@ -45,7 +46,7 @@ fix
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: writing
+├ flows: diagrams, writing
 ├ pstack-picks: blast-radius, how, interrogate, why
 ├ superpowers: finishing-a-development-branch, systematic-debugging, test-driven-development, using-git-worktrees
 └ web-mcp: fetch, search
@@ -54,7 +55,7 @@ implement
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: writing
+├ flows: diagrams, writing
 ├ graphify: graphify
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why
@@ -74,7 +75,7 @@ refactor
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: writing
+├ flows: diagrams, writing
 ├ graphify: graphify
 ├ mattpocock-picks: codebase-design, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
@@ -86,7 +87,7 @@ research-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: writing
+├ flows: diagrams, writing
 ├ graphify: graphify
 ├ mattpocock-picks: grilling, setup-matt-pocock-skills
 ├ paper-lookup: paper-lookup
@@ -97,7 +98,7 @@ review-code
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: writing
+├ flows: diagrams, writing
 ├ mattpocock-picks: grilling, improve-codebase-architecture
 ├ ponytail: ponytail-audit, ponytail-review
 ├ pstack-picks: blast-radius, interrogate, principle-boundary-discipline
@@ -120,7 +121,7 @@ upgrade
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ dead-skills: context7
-├ flows: writing
+├ flows: diagrams, writing
 ├ graphify: graphify
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why

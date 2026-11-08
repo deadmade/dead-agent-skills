@@ -48,7 +48,7 @@ test('a release updates the workspace and all local lock entries without changin
     writeFileSync(path, source.replace(pattern, '$1"9.8.7"'));
   }
   const locked = readFileSync(join(root, 'Cargo.lock'), 'utf8');
-  for (const name of ['web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit']) {
+  for (const name of ['web-mcp', 'ado-mcp']) {
     assert.match(locked, new RegExp(`name = "${name}"\\r?\\nversion = "9.8.7"`));
   }
   assert.equal(locked.replaceAll('version = "9.8.7"', `version = "${current}"`), before);
@@ -56,14 +56,13 @@ test('a release updates the workspace and all local lock entries without changin
   assert.equal(JSON.parse(readFileSync(join(root, 'package.json'))).version, '9.8.7');
   // Cargo itself verifies inherited package versions when it is available. npm tests also run without Rust.
   if (spawnSync('cargo', ['--version']).status !== 0) return;
-  const members = ['web-mcp', 'ado-mcp', 'flow-cockpit/core', 'flow-cockpit/app'];
+  const members = ['web-mcp', 'ado-mcp'];
   for (const member of members) {
     const dir = join(root, 'tools', member);
     mkdirSync(join(dir, 'src'), { recursive: true });
-    const name = member === 'flow-cockpit/app' ? 'flow-cockpit' : member.replace('/', '-');
     writeFileSync(
       join(dir, 'Cargo.toml'),
-      `[package]\nname = "${name}"\nversion.workspace = true\nedition.workspace = true\n`,
+      `[package]\nname = "${member}"\nversion.workspace = true\nedition.workspace = true\n`,
     );
     writeFileSync(join(dir, 'src/lib.rs'), '');
   }
@@ -76,6 +75,6 @@ test('a release updates the workspace and all local lock entries without changin
   assert.equal(metadata.status, 0, metadata.stderr);
   assert.deepEqual(
     JSON.parse(metadata.stdout).packages.map((p) => p.version),
-    Array(4).fill('9.8.7'),
+    Array(members.length).fill('9.8.7'),
   );
 });

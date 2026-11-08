@@ -89,23 +89,6 @@ test('replaceBin: a first install, the in-place swap (Linux), and a sweep that k
   assert.equal(readFileSync(bin, 'utf8'), 'v2');
 });
 
-test('replaceBin: swaps a whole folder and sweeps old folders', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'dcs-bin-'));
-  const app = join(dir, 'app');
-  for (const [folder, file] of [
-    [app, 'v1'],
-    [`${app}.old-1`, 'leftover'],
-    [`${app}.tmp`, 'v2'],
-  ]) {
-    mkdirSync(join(folder, 'extensions'), { recursive: true });
-    writeFileSync(join(folder, 'extensions', file), file);
-  }
-  replaceBin(`${app}.tmp`, app, true);
-  assert.ok(existsSync(join(app, 'extensions', 'v2')) && !existsSync(join(app, 'extensions', 'v1')));
-  assert.ok(!existsSync(`${app}.old-1`) && !existsSync(`${app}.tmp`));
-  assert.ok(!existsSync(`${app}.old-${process.pid}`));
-});
-
 test('replaceBin: a failed swap reports its own error, not the cleanup of the staged copy', () => {
   const dir = mkdtempSync(join(tmpdir(), 'dcs-bin-'));
   // A non-empty directory can't be renamed onto another non-empty one on Linux or Windows (onto a file, Windows

@@ -33,8 +33,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; web-mcp
   is also offered on its own but lives in `shared/`. Moving a folder doesn't touch installs (they key on the
   plugin `name`); renaming a plugin does.
-- `tools/`: four Rust packages in one root Cargo workspace: `web-mcp`,
-  `ado-mcp`, and flow-cockpit's `core` and `app`. The root `Cargo.toml` owns all dependency versions,
+- `tools/`: two Rust packages in one root Cargo workspace: `web-mcp`
+  and `ado-mcp`. The root `Cargo.toml` owns all dependency versions,
   package metadata, Clippy settings and the release profile; members inherit them and select their own features.
   There is one root `Cargo.lock` and `target/`. Use `-p <package>` to build or test one member. Nothing in the
   plugins reaches into the crates at runtime. `scripts/check_cargo_workspace.py` (Python 3.11+) rejects local
@@ -87,9 +87,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `references/`); on Claude Code its correctness lens is the built-in `code-review` (the host adapter template), and
   the one agent it vendors is `flows:pr-test-analyzer`, next to tob's checker in `agents/`. `/self-review` was a plugin
   of its own until 0.5.0, so the installer keeps flows on a machine that had it.
-  flows also owns the prose standard: `skills/writing/` is the one skill in it Claude may load on its own
-  (`flows:writing`). `flows-uses.mjs` treats only `disable-model-invocation: true` skills as conductors, so a
-  `uses:` line may list `flows:writing`. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
+  flows also owns the prose standard: `skills/writing/` is one of the two skills in it Claude may load on its own
+  (`flows:writing`; the other, `flows:diagrams`, is described below). `flows-uses.mjs` treats only
+  `disable-model-invocation: true` skills as conductors, so a `uses:` line may list either. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
   check on `*.md` writes for conversation shorthand, off with `FLOWS_PROSE_CHECK=off`. The writing skill also holds the copyedit
   (`references/copyedit.md`, run as `/flows:writing copyedit <file>`): a fresh agent on the strongest model edits a
   document by the skill, then `scripts/compare.mjs` replaces it only when nothing code can check was lost (the list is
@@ -97,6 +97,13 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
   `plugins/flows/skills/writing/tests/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
   our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
+  flows also holds `skills/diagrams/` (`flows:diagrams`, model-invocable like `writing`): `check.mjs` checks the `mermaid`
+  and `files` blocks of a spec or plan, `render.mjs` writes it and its pictures as one HTML page, and `steps/gate.toml`
+  has every gate that shows a spec or plan run both. The checker installs Mermaid and jsdom (`package.json` and
+  `package-lock.json` beside `SKILL.md`) into the user's cache folder, never into the plugin; tests that need them skip
+  offline. The page's script is a template literal in `render.mjs`, so each backslash in its regexes is written twice
+  (`/^[\\\\/]{2}/` produces `/^[\\/]{2}/`); the tests run the produced page's `safe` and `clean` source, so check the
+  output, not the template.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`,
   built for Windows and Linux x64 only (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the
   installer downloads it and sets `binPath`. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4` feature)
@@ -188,32 +195,6 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   current uv on PATH is used only while ours is absent (`uvPlan` in `core/binaries.ts`). It then runs `uv sync --locked`
   and fetches tiktoken's vocabulary (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0008-python-through-installer-uv.md`. Dependabot's `uv`
   entry keeps `uv.lock` current.
-- The flow cockpit (`docs/features/flow-observability/`): a Tauri window over flow runs, audits and Claude sessions, in
-  `tools/flow-cockpit/`, that can also start, resume and host real `claude` sessions in terminals of its own
-  (`docs/features/cockpit-harness/`; Linux only so far, the Windows build offers neither Start nor Resume), plus the `plugins/opt-in/flow-cockpit/` plugin, which carries only the `views` skill (Claude
-  writes extensions into the user's extensions folder, running the app from its `appPath` userConfig) and the capture
-  hooks. The installer offers it on Linux x64 and Windows x64 (`BIN_PLUGINS` in `core/binaries.ts`): on Linux it only
-  prints the flake's `nix run` command pinned to its release (`linuxHint`); on Windows it downloads
-  `crates-build.yml`'s zip (`flow-cockpit.exe` plus the default extensions) whole into
-  `~/.claude/bin/flow-cockpit/`, replacing an older folder whole, and sets `appPath`. The workspace: `core/` parses flow.md, plan.md, audit
-  reports, build logs and transcripts into a typed model and indexes projects, runs and sessions; `app/` is the window
-  (read-only commands for the views; the session-control commands in `app/src/pty.rs`, which spawn each hosted
-  `claude` in its own PTY, stream its bytes untouched and stop it with SIGHUP before any SIGKILL, for the shell's own
-  chrome only; a 2 s poll that also rereads `config.toml`, extension loading, `--print-types`,
-  `--print-paths`). `app/shell/` holds the view runtime, the building blocks, `tokens.css` and the shell's own chrome (start form,
-  terminal panes, chips, run bar, close confirmation), which alone gets the `shell` object of session controls that no
-  view's `ctx` has (JavaScript with JSDoc,
-  checked by `tsc --checkJs` against `api.d.ts`, which views import as the bare module `flow-cockpit`);
-  `extensions/<name>/` the four default extensions (a folder of view `.ts` files and an optional `style.css`, loaded
-  from disk, not compiled in), with their jsdom tests and fixtures in `extensions/tests/` and their `tsconfig.json`
-  beside them; `bindings/` the generated `.d.ts` of every type the views see (one `#[ignore]`d `export_bindings` test
-  per crate writes them; `bindings_are_current` fails when they are stale). Linux gets the app from the flake's
-  `flow-cockpit` package, since it links the system's GTK and WebKit; it installs every `extensions/` folder but
-  `tests/` at `share/flow-cockpit/extensions/` and checks that tree, and that copies of the defaults type-check against
-  `--print-types`. The app finds the defaults at `$FLOW_COCKPIT_EXTENSIONS` (a dev override: point it at `tools/flow-cockpit/extensions` to see edits live), else
-  `<exe dir>/../share/flow-cockpit/extensions`, else `<exe dir>/extensions`. Our code writes nothing (the webview
-  engine keeps its own small folder, `~/.local/share/dev.deadmade.flow-cockpit/`, `%LOCALAPPDATA%` on Windows), and it
-  reads the user's extensions and `config.toml` (`disabled`, `hidden`, `trusted`) from `~/.config/flow-cockpit/` (`%APPDATA%\flow-cockpit\` on Windows).
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
   on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
   talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
@@ -246,19 +227,16 @@ and overwritten on every sync; to change one, change its sync script's transform
 exceptions a sync still skips: `plugin.json` for pstack-picks and the `*-skills` and postgres packs (and their
 `evals/`). ponytail and superpowers vendor no manifest at all (a pack is a plain resource folder; the compiler never
 loads one as a plugin). `tob-picks` is CC BY-SA 4.0; THIRD_PARTY.md has every pack's actual license.
-`tools/flow-cockpit/app/shell/vendor/` (DOMPurify, Mermaid, @tauri-apps/api, @xterm/xterm, @xterm/addon-fit) has no sync
-script: it is copied unchanged from the npm tarballs THIRD_PARTY.md names, so a new version replaces the files rather
-than editing them.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Dependency updates
 
-Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the root `Cargo.lock` and workspace dependency versions and the headroom-trim `uv.lock` current. The root Cargo entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the JS vendored in `tools/flow-cockpit/app/shell/vendor/` (see above) and the `cisco-ai-skill-scanner` pin in the `scan-skills` script. The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
+Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the root `Cargo.lock` (workspace dependency versions included), the headroom-trim `uv.lock` and the diagrams skill's `package-lock.json` current. The root Cargo entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the `cisco-ai-skill-scanner` pin in the `scan-skills` script, and the Mermaid and marked versions the diagrams page loads from a CDN (constants in `plugins/flows/skills/diagrams/scripts/render.mjs`). The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
 
 ## Versions and releases
 
 Everything ships as one version: `package.json` and `package-lock.json`, the root `Cargo.toml` workspace version
-and all four local package entries in `Cargo.lock`. The build stamps this version into the marketplaces and generated
+and both local package entries in `Cargo.lock`. The build stamps this version into the marketplaces and generated
 plugin manifests. README.md's installer command carries no version (it names `latest/`); `newerInstaller` is how a
 stale cached run of it hands over to a newer release.
 `check-repo.mjs` fails on drift. Never bump by hand. A merge to `main` that touches `plugins/`, `tools/` or shared
@@ -271,7 +249,7 @@ A release you choose:
     npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-Either way the merge's run packs the installer (`installer.tgz`), builds web-mcp, ado-mcp and the flow cockpit's Windows app from the tag and
+Either way the merge's run packs the installer (`installer.tgz`), builds web-mcp and ado-mcp from the tag and
 publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back):
 the tag plus one `Distribution vX.Y.Z` commit holding the native distributions that `publish` built (the job that holds
 the write token runs no `npm ci`, so it gets them as the `native` artifact). Tags carry sources only.
@@ -285,9 +263,8 @@ plugins of ours that the manifest no longer lists.
 - `npm test` is the one list of what runs (`package.json`'s `test` script): `scripts/check-repo.mjs`, then all
   `tools/installer/**/*.test.ts` under a line-coverage floor, then the harness-compiler's and upstream-sync's own test
   suites (each its own `npm test --workspace=...`, so a test file only one of them runs still runs), then
-  `scripts/*.test.mjs`, `plugins/flows/skills/{writing,build-feature}/tests/*.test.mjs`, `plugins/default/hooks/*.test.mjs`,
-  `plugins/flows/hooks/*.test.mjs`, `plugins/opt-in/headroom-trim/hooks/*.test.mjs` and
-  `plugins/opt-in/flow-cockpit/hooks/*.test.mjs` (`claude plugin validate`, inside `check-repo.mjs`, is skipped when
+  `scripts/*.test.mjs`, `plugins/flows/skills/{writing,build-feature,diagrams}/tests/*.test.mjs`, `plugins/default/hooks/*.test.mjs`,
+  `plugins/flows/hooks/*.test.mjs` and `plugins/opt-in/headroom-trim/hooks/*.test.mjs` (`claude plugin validate`, inside `check-repo.mjs`, is skipped when
   `claude` isn't on PATH). The installer tests run with a line-coverage floor
   (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `tools/installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
@@ -301,11 +278,6 @@ plugins of ours that the manifest no longer lists.
   `python3 -m unittest discover -s scripts -p 'check_cargo_workspace_test.py'` for the workspace policy.
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
   linking fails.
-- flow-cockpit: included in the root workspace checks (the app needs the dev shell's GTK and WebKit); `nix build .#flow-cockpit` builds the package and runs the app's tests
-  except the three timing ones its `checkFlags` skip. The views tests (jsdom, after `npm ci`):
-  `node --test 'tools/flow-cockpit/app/shell/*.test.mjs' 'tools/flow-cockpit/extensions/tests/*.test.ts'`, then
-  `npx tsc -p tools/flow-cockpit/app/shell` and `npx tsc -p tools/flow-cockpit/extensions`. They run only there and in
-  `crates.yml`, never in `npm test` or the pre-commit hook.
 - ado-mcp: `cargo test --locked -p ado-mcp` from the root. CI lints with latest stable Rust and separately checks
   the workspace with its declared `rust-version` (1.97). A test that times concurrency makes one fast call
   first and bounds the slow one against it (`view_concurrent` in `tests/pr.rs`, `tests/wi.rs`): under the full
@@ -335,8 +307,7 @@ CI: `changes.yml` uses `scripts/ci-changes.mjs` to route checks from the complet
 range, including deleted and renamed paths). `test.yml` runs Node/plugin checks and skill scanning when their inputs
 change; its two OS matrix jobs retain their required check names even when their steps skip. A detection failure fails
 those jobs. `crates.yml` tests and lints selected Rust packages together and independently on Linux and Windows,
-checks their minimum Rust version and Nix packages, and runs cockpit's frontend checks only when selected. Flow
-templates and compiler changes also select cockpit, whose tests read their output.
+checks their minimum Rust version and Nix packages.
 Root Cargo, Nix and npm dependencies, CI changes and unknown paths select all checks; docs/ changes select none.
 Manual runs select everything. `crates-build.yml` builds only selected binaries on PRs, but release calls always build
 the complete matrix because each version ships all binaries. Keep routing and its tests current when adding consumers.
@@ -387,6 +358,6 @@ recorded as not checked, never replaced by a review in the main session or claim
 than editing them. Both native marketplaces work directly from the `release` branch (`@release`, `--ref release`),
 without the installer or a build; a `main` checkout has them only after a build. check-repo builds them first, so
 `npm test` and the pre-commit hook always read a fresh tree; run `npm run build:harnesses` yourself before a single
-test file that reads them (the installer's `core/*.test.ts`, the flow cockpit core's phase-table test), before
+test file that reads them (the installer's `core/*.test.ts`), before
 `node tools/installer/install.ts`, and after checking out an older commit that still tracked them (git deletes them
 on the way back). Sync PRs and release commits carry sources only.

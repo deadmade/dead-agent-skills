@@ -40,7 +40,6 @@ test('opt-ins from the real manifests', () => {
     [
       ...[
         'csharp-skills',
-        'flow-cockpit',
         'flows',
         'graphify',
         'hallmark',
@@ -104,6 +103,11 @@ test('retired plugins are ours but no longer in the marketplace', () => {
   assert.deepEqual(retiredPlugins([`dev-feature@${M}`, `md-pane@${M}`, `code-review@${O}`, 'x@y'], managed), [
     `dev-feature@${M}`,
   ]);
+});
+
+test('a flow-cockpit install is retired once the real catalog no longer lists it', () => {
+  const managed = [...bundleIds(bundle), ...optIns(marketplace, bundle)];
+  assert.deepEqual(retiredPlugins([`flow-cockpit@${M}`], managed), [`flow-cockpit@${M}`]);
 });
 
 test('stillInstalled names the packs installed from our marketplace, once each', () => {

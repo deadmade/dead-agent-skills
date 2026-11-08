@@ -62,7 +62,6 @@ test('releases require plugin/tool changes or shared build inputs', () => {
     'plugins/catalog.json',
     'tools/ado-mcp/src/wi.rs',
     'tools/web-mcp/src/search.rs',
-    'tools/flow-cockpit/app/src/main.rs',
     'tools/installer/install.ts',
     'tools/harness-compiler/src/cli.ts',
     'Cargo.toml',

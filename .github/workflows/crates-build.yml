@@ -1,6 +1,6 @@
 name: Build crates
 
-# Build release archives and checksums for all binaries; cockpit includes its default extensions.
+# Build release archives and checksums for all binaries.
 # release.yml calls this with the release tag. PR and manual runs only build.
 on:
   pull_request:
@@ -31,9 +31,6 @@ jobs:
         platform:
           - { os: windows-latest, target: x86_64-pc-windows-msvc, archive: zip }
           - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, archive: tar.gz }
-        exclude:
-          - crate: flow-cockpit
-            platform: { os: ubuntu-latest, target: x86_64-unknown-linux-musl, archive: tar.gz }
     runs-on: ${{ matrix.platform.os }}
     env:
       CRATE: ${{ matrix.crate }}
@@ -66,7 +63,6 @@ jobs:
         run: '"target/$TARGET/release/$CRATE" --version'
 
       - name: Package
-        if: matrix.crate != 'flow-cockpit'
         run: |
           name=$CRATE-$TARGET
           mkdir -p "$RUNNER_TEMP/dist"
@@ -77,22 +73,6 @@ jobs:
           fi
           cd "$RUNNER_TEMP/dist"
           for f in "$name".*; do sha256sum "$f" > "$f.sha256"; done
-
-      - name: Package cockpit
-        if: matrix.crate == 'flow-cockpit'
-        run: |
-          name=flow-cockpit-$TARGET
-          stage="$RUNNER_TEMP/stage"
-          mkdir -p "$stage/extensions" "$RUNNER_TEMP/dist"
-          cp "target/$TARGET/release/flow-cockpit.exe" "$stage/"
-          for dir in tools/flow-cockpit/extensions/*/; do
-            ext=$(basename "$dir")
-            [ "$ext" = tests ] || cp -r "$dir" "$stage/extensions/$ext"
-          done
-          for ext in activity docs list run; do test -d "$stage/extensions/$ext"; done
-          (cd "$stage" && 7z a -tzip "$RUNNER_TEMP/dist/$name.zip" flow-cockpit.exe extensions > /dev/null)
-          cd "$RUNNER_TEMP/dist"
-          sha256sum "$name.zip" > "$name.zip.sha256"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -157,41 +157,6 @@ option) at the version pinned in `tools/installer/assets/uv.json` (sha256-checke
 [headroom-ai](https://github.com/headroomlabs-ai/headroom) (Apache-2.0) at the version and hashes pinned in
 `plugins/opt-in/headroom-trim/server/uv.lock`, into the plugin's data folder on the user's machine.
 
-## flow-cockpit
-
-`tools/flow-cockpit/app/shell/vendor/` holds the libraries the views' building blocks and the boot script use, copied unchanged
-from their npm tarballs (each tarball checked against the registry's `dist.integrity`), each with its license next to it:
-
-- **marked** 18.1.3: MIT, https://github.com/markedjs/marked (`lib/marked.esm.js`, and `lib/marked.d.ts` as
-  `marked.esm.d.ts`; `LICENSE-marked`). Tarball `sha512-9ChMH8EVVgjgID49nsL6IWxWk5c6GtAsq/xw7U1ggkjkU5AGuv68oLTVlFRtvcUYZtpbNyjyvGo3YDu0fGapiw==`.
-- **DOMPurify** 3.4.17: Apache-2.0 or MPL-2.0, https://github.com/cure53/DOMPurify (`dist/purify.es.mjs`,
-  `dist/purify.es.d.mts`; `LICENSE-dompurify`, `LICENSE-dompurify-MPL`). Tarball
-  `sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==`.
-- **mermaid** 12.3.0: MIT, https://github.com/mermaid-js/mermaid (`dist/mermaid.min.js`; `LICENSE-mermaid`). Tarball
-  `sha512-4113TdXeLAsMruJ79OpFL5O8+LTFXhQqZ260rF3tgUmiNAtRm4Uume04I+65PRN6yZ69J4f8rVYWW8zRk65UYw==`.
-  `mermaid.min.js` is a bundle: it also carries mermaid's dependencies, each under its own license. Its license
-  banners name DOMPurify 3.4.17 (Apache-2.0 or MPL-2.0; its banner also names regenerator-runtime, MIT), lodash-es
-  (MIT, through dagre-d3-es) and cytoscape (MIT).
-  The rest, from mermaid 12.3.0's `package.json` with the licenses the registry gives for the versions it allows:
-  elkjs (EPL-2.0 OR GPL-3.0-or-later), chevrotain (Apache-2.0), d3 (ISC), d3-sankey (BSD-3-Clause), and MIT for
-  @braintree/sanitize-url, @iconify/utils, @mermaid-js/parser, @upsetjs/venn.js, cytoscape-cose-bilkent,
-  cytoscape-fcose, dagre-d3-es, dayjs, es-toolkit, katex, khroma, marked, roughjs, stylis and ts-dedent.
-- **@tauri-apps/api** 2.12.4 (npm `latest`): Apache-2.0 or MIT, https://github.com/tauri-apps/tauri (`core.js`, `core.d.ts`,
-  `event.js`, `event.d.ts` and `external/tslib/tslib.es6.js`, which `core.js` imports; `LICENSE-tauri-apps-api` is its
-  MIT text, `LICENSE-tauri-apps-api-Apache` its Apache-2.0 one). `boot.js` imports `invoke` and `listen` from it, so
-  the window needs no `withGlobalTauri`. `tslib.es6.js` is Microsoft's tslib (0BSD, its notice is the file's own
-  header). Tarball `sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==`
-  (sha256 `ea354409df3dcc473395111a5f6bf0031c8444cf827604515169aa3af5e9357a`).
-- **@xterm/xterm** 6.0.0 and **@xterm/addon-fit** 0.11.0 (npm `latest`): MIT, https://github.com/xtermjs/xterm.js
-  (`xterm.mjs` and `xterm.css` from `lib/` and `css/`, `addon-fit.mjs` from `lib/`, all unmodified; `LICENSE-xterm` is
-  xterm's own MIT text, and the addon's differs only in its copyright line, "Copyright (c) 2019, The xterm.js
-  authors"). `xterm.d.mts` and `addon-fit.d.mts` are the packages' `typings/*.d.ts` without their
-  `declare module '...'` wrapper, and the addon's import of `@xterm/xterm` pointed at `./xterm.mjs`, so `tsc` types
-  `session-pane.js`'s imports. Both modules are plain ES modules with no imports. `session-pane.js` draws a hosted
-  session's terminal with them, and `index.html` links `xterm.css`. Tarballs `xterm-xterm-6.0.0.tgz` (sha256
-  `908e66e04af6c8dc6b00dd3b54de088e2e81e5ed866284fd6c2fb3c2d1c7a3f6`) and `xterm-addon-fit-0.11.0.tgz` (sha256
-  `26003b4517a132b64e4ff228fd88a5fda3fff5e606c76093f6dcff772e9ecec0`).
-
 ## Night City (dead-skills)
 
 The palette of `plugins/default/themes/palette.json` is derived from the Cyberpunk Neon theme

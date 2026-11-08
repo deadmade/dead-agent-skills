@@ -47,3 +47,19 @@ suppressions:
     skills: [build-feature]
     paths: [tests/glance.test.mjs]
     reason: The test spawnSync's node on the skill's own scripts/glance.mjs, through a temp symlink, with an argument array and no shell.
+  - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
+    skills: [diagrams]
+    paths: [scripts/check.mjs]
+    reason: execFile of `npm ci --ignore-scripts` and of node on the skill's own parse.mjs in the cache folder, with fixed argument arrays and no shell.
+  - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
+    skills: [diagrams]
+    paths: [tests/check.test.mjs, tests/render.test.mjs]
+    reason: The tests spawnSync node on the skill's own scripts, with argument arrays and no shell.
+  - rule_id: COMMAND_INJECTION_JS_FUNCTION_CONSTRUCTOR
+    skills: [diagrams]
+    paths: [tests/render.test.mjs]
+    reason: The tests run the page's own sanitising functions, cut from the rendered HTML, against hostile markup in jsdom.
+  - rule_id: YARA_script_injection_generic
+    skills: [diagrams]
+    paths: [tests/render.test.mjs]
+    reason: The tests hold hostile markup (script tags, handlers, javascript addresses) as input to prove the page strips it.

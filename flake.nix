@@ -87,14 +87,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(plugins/|tools/harness-compiler/|tools/(ado-mcp|flow-cockpit|web-mcp)/|scripts/check-repo\\.mjs$|Cargo\\.(toml|lock)$|package\\.json$)";
+            files = "^(plugins/|tools/harness-compiler/|tools/(ado-mcp|web-mcp)/|scripts/check-repo\\.mjs$|Cargo\\.(toml|lock)$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|flow-cockpit|web-mcp)/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|plugins/opt-in/flow-cockpit/hooks/|package\\.json$)";
+            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|web-mcp)/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|package\\.json$)";
             pass_filenames = false;
           };
         };
@@ -113,11 +113,10 @@
         in
           builtins.baseNameOf path
           != "target"
-          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["web-mcp" "ado-mcp" "flow-cockpit"]);
+          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["web-mcp" "ado-mcp"]);
       };
       webMcp = (pkgs.lib.importTOML ./tools/web-mcp/Cargo.toml).package;
       workspace = (pkgs.lib.importTOML ./Cargo.toml).workspace.package;
-      cockpitApp = (pkgs.lib.importTOML ./tools/flow-cockpit/app/Cargo.toml).package;
       adoMcp = (pkgs.lib.importTOML ./tools/ado-mcp/Cargo.toml).package;
     in {
       # web-mcp, the web-mcp plugin's MCP server: `nix build .#web-mcp`.
@@ -135,57 +134,6 @@
         meta = {
           inherit (webMcp) description;
           mainProgram = "web-mcp";
-        };
-      };
-      # The flow cockpit window (Tauri, tools/flow-cockpit/app): `nix run .#flow-cockpit`, or the package in a system
-      # config. It links the system's GTK and WebKit, so Linux gets it from here, not as a release download.
-      flow-cockpit = pkgs.rustPlatform.buildRustPackage {
-        pname = cockpitApp.name;
-        inherit (workspace) version;
-        src = workspaceSource;
-        cargoLock.lockFile = ./Cargo.lock;
-        cargoBuildFlags = ["-p" "flow-cockpit" "--bin" "flow-cockpit"];
-        cargoTestFlags = ["-p" "flow-cockpit"];
-        nativeBuildInputs = with pkgs; [pkg-config wrapGAppsHook3];
-        buildInputs = with pkgs; [webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
-        # The hosted-session tests start a command in a session of its own with `setsid`, which the build's PATH lacks.
-        nativeCheckInputs = [pkgs.util-linux];
-        # These time the poll against file changes and the clock; they run in a local `cargo test`, not in the sandboxed
-        # build.
-        checkFlags = map (t: "--skip=${t}") ["poll_emits_once_per_change" "poll_sees_folders_created_later" "first_paint_before_link_scan"];
-        # The default extensions, which the app finds at <exe dir>/../share/flow-cockpit/extensions. `tests/` holds the
-        # views' tests and fixtures, not an extension; the tsconfig.json beside the folders isn't copied either.
-        postInstall = ''
-          dest=$out/share/flow-cockpit/extensions
-          mkdir -p "$dest"
-          for dir in tools/flow-cockpit/extensions/*/; do
-            name=$(basename "$dir")
-            [ "$name" = tests ] || cp -r "$dir" "$dest/$name"
-          done
-        '';
-        # The installed tree holds the four defaults and no tests, fixtures or configs, and the app finds it. Copied
-        # out as a user would, the defaults type-check against `--print-types` as they are (the skill's tsc line).
-        doInstallCheck = true;
-        nativeInstallCheckInputs = [pkgs.typescript];
-        installCheckPhase = ''
-          runHook preInstallCheck
-          dest=$out/share/flow-cockpit/extensions
-          test "$(ls "$dest" | tr '\n' ' ')" = "activity docs list run "
-          test -z "$(find "$dest" -name '*.test.ts' -o -name fixtures -o -name '*.json')"
-          $out/bin/flow-cockpit --print-paths | grep -Fx "default extensions: $dest"
-          copy=$(mktemp -d)
-          cp -r "$dest"/. "$copy"
-          chmod -R u+w "$copy"
-          $out/bin/flow-cockpit --print-types > "$copy/flow-cockpit.d.ts"
-          (cd "$copy" && tsc --noEmit --strict --target es2023 --lib es2023,dom,dom.iterable --module esnext \
-            --moduleResolution bundler --verbatimModuleSyntax --erasableSyntaxOnly flow-cockpit.d.ts ./*/*.ts)
-          runHook postInstallCheck
-        '';
-        meta = {
-          inherit (cockpitApp) description;
-          mainProgram = "flow-cockpit";
-
-          platforms = ["x86_64-linux"];
         };
       };
 
@@ -218,9 +166,8 @@
       default = pkgs.mkShell {
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
-        # What tools/upstream-sync/src/adapters/*.ts and the workflows use besides stdenv, the Rust toolchain for the crates, and the
-        # libraries the flow cockpit window builds against.
-        packages = with pkgs; [git gh nodejs_26 uv python3 cargo rustc clippy rustfmt rust-analyzer pkg-config webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
+        # What tools/upstream-sync/src/adapters/*.ts and the workflows use besides stdenv, and the Rust toolchain for the crates.
+        packages = with pkgs; [git gh nodejs_26 uv python3 cargo rustc clippy rustfmt rust-analyzer];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };
     });

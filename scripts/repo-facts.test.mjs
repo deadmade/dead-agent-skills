@@ -42,15 +42,13 @@ test('flake and devEngines agree on the Node major', () => {
 
 test('hand-typed Night City colours are in the palette', () => {
   const palettePath = 'plugins/default/themes/palette.json';
-  const OFF_PALETTE = ['#221D33', '#2F2848'];
+  const OFF_PALETTE = ['#221D33'];
   const allowed = new Set([...Object.values(JSON.parse(read(palettePath)).colors), ...OFF_PALETTE]);
-  const cssPath = 'tools/flow-cockpit/app/shell/tokens.css';
   const viewPath = 'tools/installer/ui/view.ts';
   const uiPath = 'tools/ado-mcp/src/bin/timetrack/ui.rs';
   const nightCity = read(viewPath).match(/const NIGHT_CITY = \{([\s\S]*?)\n\};/);
   assert.ok(nightCity, `NIGHT_CITY missing from ${viewPath}`);
   const copies = [
-    [cssPath, [...read(cssPath).matchAll(/#[0-9a-f]{6}\b/gi)].map(([color]) => color)],
     [
       viewPath,
       [...nightCity[1].matchAll(/\[(\d+),\s*(\d+),\s*(\d+)\]/g)].map(
@@ -97,7 +95,6 @@ test('no file still names the old repository slug', () => {
           'docs/adr',
           'docs/audits',
           'docs/solutions',
-          'tools/flow-cockpit/core/tests/fixtures',
           'tools/installer/core/release.test.ts',
           'scripts/repo-facts.test.mjs',
         ].map((path) => `:(exclude)${path}`),

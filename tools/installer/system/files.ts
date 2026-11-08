@@ -24,9 +24,8 @@ export function writeAtomic(file: string, text: string | Buffer) {
   rename(tmp, file);
 }
 
-// Moves staged to bin, a file or a folder. aside (Windows, and any folder): a running exe can be renamed but not
-// replaced, and a folder can't be renamed onto another, so the old one is moved to bin.old-<pid> first, put back if
-// the swap fails, and deleted when nothing in it runs any more (a later call sweeps it).
+// Moves staged to bin. aside (Windows): a running exe can be renamed but not replaced, so the old one is moved to
+// bin.old-<pid> first, put back if the swap fails, and deleted when nothing runs it any more (a later call sweeps it).
 export function replaceBin(staged: string, bin: string, aside: boolean) {
   const old = `${bin}.old-${process.pid}`;
   for (const f of readdirSync(dirname(bin)))
