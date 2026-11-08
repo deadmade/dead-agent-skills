@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { composeFlows } from '../tools/harness-compiler/src/flows/compose.ts';
+import { composeFlows, isConductor } from '../tools/harness-compiler/src/flows/compose.ts';
 import { TOKENS as CLAUDE_CODE } from '../tools/harness-compiler/src/templates/hosts/claude-code.ts';
 import { TOKENS as CODEX } from '../tools/harness-compiler/src/templates/hosts/codex.ts';
 import {
@@ -52,6 +52,17 @@ function fixture(uses, files) {
   const fx = repo(conductor(uses), files);
   return checkUseNames(fx, composeFlows(join(fx, FLOWS), CLAUDE_CODE).uses);
 }
+
+test('isConductor reads only frontmatter and trims values across line endings', () => {
+  for (const value of ['true', ' true', 'true ']) {
+    for (const newline of ['\n', '\r\n']) {
+      assert.equal(isConductor(['---', `disable-model-invocation: ${value}`, '---', 'body'].join(newline)), true);
+    }
+  }
+  assert.equal(isConductor('---\ndisable-model-invocation: false\n---\n'), false);
+  assert.equal(isConductor('disable-model-invocation: true\n'), false);
+  assert.equal(isConductor('---\nname: plain\n---\ndisable-model-invocation: true\n'), false);
+});
 
 test('a valid map has no problems: local skill and agent, MCP tool, url plugin, official, builtin', () => {
   const uses =

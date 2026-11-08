@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { selectChecks } from './ci-changes.mjs';
+import { packs } from './flows-uses.mjs';
 import { workspacePackages } from './release.mjs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8').replaceAll('\r\n', '\n');
@@ -64,4 +66,16 @@ test('hand-typed Night City colours are in the palette', () => {
     }
   }
   assert.deepEqual(deviations, []);
+});
+
+test('run-rules names exactly the packs that exist', () => {
+  const names = read('plugins/flows/steps/run-rules.toml').match(/^- \*\*Packs\*\* \(([^)]+)\)/m);
+  assert.ok(names, 'run-rules must list its packs');
+  assert.deepEqual(
+    names[1]
+      .split(',')
+      .map((name) => name.trim())
+      .sort(),
+    packs(fileURLToPath(new URL('../', import.meta.url))),
+  );
 });
