@@ -119,7 +119,7 @@ test('the flake has the flow-cockpit package the linux hint runs', () => {
 // The installer downloads the name crates-build.yml uploads: the same target and the same file name.
 test('crates-build.yml packs the zip binAsset downloads', () => {
   const yml = readFileSync(new URL('../../../.github/workflows/crates-build.yml', import.meta.url), 'utf8');
-  assert.match(yml, /crate: \[.*flow-cockpit.*\]/);
+  assert.match(yml, /if: matrix\.crate == 'flow-cockpit'/);
   assert.match(yml, /target: x86_64-pc-windows-msvc/);
   assert.match(yml, /name=flow-cockpit-\$TARGET/);
   assert.match(yml, /"\$RUNNER_TEMP\/dist\/\$name\.zip"/);
