@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parse as parseToml } from 'smol-toml';
 // The version a release gets: `bump` (patch, minor, major or X.Y.Z) applied to the highest of package.json's version
 // and the vX.Y.Z tags. A release cut on every merge to main stamps its commit off main, so main's package.json lags
 // behind the tags; counting from the tags keeps the next number past both.
@@ -28,6 +29,12 @@ export function nextVersion(current, tags, bump) {
   return /^\d+\.\d+\.\d+$/.test(next ?? '') ? next : undefined;
 }
 
+const toml = (path) => parseToml(readFileSync(new URL(path, import.meta.url), 'utf8'));
+
+// The package name of each Cargo.toml workspace member, in member order.
+export const workspacePackages = () =>
+  toml('../Cargo.toml').workspace.members.map((member) => toml(`../${member}/Cargo.toml`).package.name);
+
 export function versionBumps() {
   const json = /^( {2,4}"version": )"[^"]*"/m;
   return [
@@ -35,7 +42,7 @@ export function versionBumps() {
     ['package-lock.json', json],
     ['package-lock.json', /^( {6}"version": )"[^"]*"/m],
     ['Cargo.toml', /^(version = )"[^"]*"/m],
-    ...['web-mcp', 'ado-mcp', 'flow-cockpit-core', 'flow-cockpit'].map((name) => [
+    ...workspacePackages().map((name) => [
       'Cargo.lock',
       new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm'),
     ]),

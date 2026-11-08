@@ -27,7 +27,7 @@ const BLUE: Color = Color::from_u32(0x007a_a7f0);
 const ORANGE: Color = Color::from_u32(0x00f2_a36b);
 const RED: Color = Color::from_u32(0x00f2_788c);
 const SELECT: Color = Color::from_u32(0x0046_3a6e);
-const PANEL: Color = Color::from_u32(0x0022_1c33);
+const PANEL: Color = Color::from_u32(0x0022_1d33);
 
 /// Tickets get these in the order they were first timed today; the timeline and the list share them.
 const TICKET_COLORS: [Color; 6] = [PINK, CYAN, GREEN, YELLOW, BLUE, ORANGE];

@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 // drift. Run directly to rewrite both.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { composeFlows } from '../tools/harness-compiler/src/flows/compose.ts';
+import { composeFlows, isConductor } from '../tools/harness-compiler/src/flows/compose.ts';
 import { TOKENS as CLAUDE_CODE } from '../tools/harness-compiler/src/templates/hosts/claude-code.ts';
 import { TOKENS as CODEX } from '../tools/harness-compiler/src/templates/hosts/codex.ts';
 
@@ -25,10 +25,7 @@ const flowsSkills = (root) => {
     .filter((d) => d.isDirectory() && !d.name.startsWith('.') && existsSync(join(dir, d.name, 'SKILL.md')))
     .map((d) => d.name)
     .sort()
-    .map((name) => {
-      const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(join(dir, name, 'SKILL.md'), 'utf8'))?.[1] ?? '';
-      return { name, conductor: /^disable-model-invocation:\s*true\s*$/m.test(front) };
-    });
+    .map((name) => ({ name, conductor: isConductor(readFileSync(join(dir, name, 'SKILL.md'), 'utf8')) }));
 };
 
 // The pack names: the folders under PACKS.

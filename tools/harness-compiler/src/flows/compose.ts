@@ -67,6 +67,13 @@ function frontmatter(lines: string[]): { keys: Keys; end: number } {
   return { keys, end: close + 1 };
 }
 
+// Conductors opt out of implicit invocation in their frontmatter.
+export function isConductor(text: string): boolean {
+  return (
+    frontmatter(text.replaceAll('\r\n', '\n').split('\n')).keys.get('disable-model-invocation')?.value.trim() === 'true'
+  );
+}
+
 // A step is steps/<name>.toml (spec §1); its keys, their types and values come from step.schema.json.
 interface StepKeys {
   in?: string;
@@ -181,7 +188,7 @@ export function composeFlows(pluginDir: string, tokens: HostTokens): Composed {
     const flow = rel.startsWith('skills/') ? rel.split('/')[1] : undefined;
     const skill = flow && join(pluginDir, 'skills', flow, 'SKILL.md');
     const flowKeys: Keys = skill && existsSync(skill) ? frontmatter(read(skill).split('\n')).keys : new Map();
-    const conductor = flowKeys.get('disable-model-invocation')?.value === 'true' ? flow : undefined;
+    const conductor = skill && existsSync(skill) && isConductor(read(skill)) ? flow : undefined;
     const fileUses: Uses[] = [];
     const resolve = (line: string, file: string, at: number) =>
       line.replace(TOKEN, (_, key: string) => {
@@ -357,11 +364,7 @@ export function checkBuilt(dest: string, target: TargetId, composed: Composed): 
       const phrases = target === 'codex' ? CLAUDE_ONLY.flatMap((p) => p.exec(line)?.[0] ?? []) : [];
       if (phrases.length) problem(`names Claude-only ${phrases.join(', ')}`);
     });
-    if (
-      !/^skills\/[^/]+\/SKILL\.md$/.test(rel) ||
-      frontmatter(lines).keys.get('disable-model-invocation')?.value !== 'true'
-    )
-      continue;
+    if (!/^skills\/[^/]+\/SKILL\.md$/.test(rel) || !isConductor(text)) continue;
     const phase = text.search(/^## Phase/m);
     const start = phase < 0 ? text : text.slice(0, phase);
     const tokens = Math.ceil(Buffer.byteLength(start) / 4);

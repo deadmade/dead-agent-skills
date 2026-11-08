@@ -24,8 +24,8 @@ A checklist of the places a new vendored source touches. Tick each or say why no
 
 - [ ] `THIRD_PARTY.md`: source, license, what is vendored.
 - [ ] `AGENTS.md`: add the path to "Vendored content: don't edit".
-- [ ] `flake.nix`'s `vendored` list and `treefmt.toml`: exclude the vendored path from formatters and hooks.
-      `.pre-commit-config.yaml` is generated from that list, so don't edit it.
+- [ ] `treefmt.toml`: add the vendored path to `excludes`. The formatters and the flake's hooks both read it from there;
+      `.pre-commit-config.yaml` is generated, so don't edit it.
 
 ## Checks and wiring
 

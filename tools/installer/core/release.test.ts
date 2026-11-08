@@ -1,9 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { marketplaceArg, installerUrl, newerInstaller, pinMarketplace } from './release.ts';
+import { readFileSync } from 'node:fs';
+import { CODEX_MARKETPLACE } from './agents.ts';
+import { MARKETPLACE, marketplaceArg, installerUrl, newerInstaller, pinMarketplace } from './release.ts';
 import { type Settings } from './settings.ts';
 
 const M = 'dead-claude-skills';
+
+test('installer marketplace names match their generated owners', () => {
+  for (const [path, name] of [
+    ['.claude-plugin/marketplace.json', MARKETPLACE],
+    ['.agents/plugins/marketplace.json', CODEX_MARKETPLACE],
+  ]) {
+    const marketplace = JSON.parse(
+      readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n'),
+    );
+    assert.equal(name, marketplace.name, path);
+  }
+});
 
 test('the marketplace follows its release branch; the installer comes from its own release', () => {
   assert.equal(marketplaceArg(), 'deadmade/dead-claude-skills@release');

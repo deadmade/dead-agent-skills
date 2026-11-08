@@ -118,7 +118,20 @@ test('the flake has the flow-cockpit package the linux hint runs', () => {
 
 // The installer downloads the name crates-build.yml uploads: the same target and the same file name.
 test('crates-build.yml packs the zip binAsset downloads', () => {
-  const yml = readFileSync(new URL('../../../.github/workflows/crates-build.yml', import.meta.url), 'utf8');
+  const yml = readFileSync(new URL('../../../.github/workflows/crates-build.yml', import.meta.url), 'utf8').replace(
+    /\r\n/g,
+    '\n',
+  );
+  const matrix = yml.split('        platform:\n')[1].split('        exclude:')[0];
+  const pack = yml.split('      - name: Package\n')[1].split('      - name: Package cockpit')[0];
+  for (const platform of ['win32', 'linux']) {
+    const file = binAsset('web-mcp', platform, 'x64', '1.2.3')!.file;
+    const [, target, archive] = /^web-mcp-(.+)\.(zip|tar\.gz)$/.exec(file)!;
+    assert.ok(matrix.includes(`target: ${target}, archive: ${archive}`), file);
+    assert.ok(pack.includes(`"$RUNNER_TEMP/dist/$name.${archive}"`), file);
+  }
+  assert.match(pack, /name=\$CRATE-\$TARGET/);
+  assert.match(pack, /sha256sum "\$f" > "\$f\.sha256"/);
   assert.match(yml, /if: matrix\.crate == 'flow-cockpit'/);
   assert.match(yml, /target: x86_64-pc-windows-msvc/);
   assert.match(yml, /name=flow-cockpit-\$TARGET/);

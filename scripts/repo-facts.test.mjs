@@ -1,0 +1,81 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { selectChecks } from './ci-changes.mjs';
+import { packs } from './flows-uses.mjs';
+import { workspacePackages } from './release.mjs';
+
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+
+test('ci-changes routes every Rust package in Cargo.toml', () => {
+  assert.deepEqual(
+    [...selectChecks([], true).packages].sort(),
+    [...workspacePackages()].sort(),
+    'Cargo.toml members and scripts/ci-changes.mjs name different Rust packages',
+  );
+});
+
+test('CI takes its Node version from package.json', () => {
+  for (const name of readdirSync(new URL('../.github/workflows/', import.meta.url))) {
+    if (!/\.ya?ml$/.test(name)) continue;
+    const workflow = read(`.github/workflows/${name}`);
+    assert.doesNotMatch(workflow, /\bnode-version:/, name);
+    const steps = workflow.split(/(?=^      - )/m);
+    for (const step of steps.filter((step) => /uses: actions\/setup-node@/.test(step))) {
+      assert.match(step, /^          node-version-file: package\.json$/m, name);
+    }
+  }
+});
+
+test('flake and devEngines agree on the Node major', () => {
+  const flake = read('flake.nix');
+  const pkg = JSON.parse(read('package.json'));
+  const version = pkg.devEngines?.runtime?.version;
+  assert.match(version ?? '', /^\^\d+$/);
+  const majors = [...flake.matchAll(/\bnodejs_(\d+)\b/g)];
+  assert.ok(majors.length > 0);
+  for (const [, major] of majors) assert.equal(`^${major}`, version);
+  assert.doesNotMatch(flake, /\bpkgs\.nodejs\b|\binherit\s*\(pkgs\)[^;]*\bnodejs\b/);
+});
+
+test('hand-typed Night City colours are in the palette', () => {
+  const palettePath = 'plugins/default/themes/palette.json';
+  const OFF_PALETTE = ['#221D33', '#2F2848'];
+  const allowed = new Set([...Object.values(JSON.parse(read(palettePath)).colors), ...OFF_PALETTE]);
+  const cssPath = 'tools/flow-cockpit/app/shell/tokens.css';
+  const viewPath = 'tools/installer/ui/view.ts';
+  const uiPath = 'tools/ado-mcp/src/bin/timetrack/ui.rs';
+  const nightCity = read(viewPath).match(/const NIGHT_CITY = \{([\s\S]*?)\n\};/);
+  assert.ok(nightCity, `NIGHT_CITY missing from ${viewPath}`);
+  const copies = [
+    [cssPath, [...read(cssPath).matchAll(/#[0-9a-f]{6}\b/gi)].map(([color]) => color)],
+    [
+      viewPath,
+      [...nightCity[1].matchAll(/\[(\d+),\s*(\d+),\s*(\d+)\]/g)].map(
+        ([, ...rgb]) => '#' + rgb.map((n) => Number(n).toString(16).padStart(2, '0')).join(''),
+      ),
+    ],
+    [uiPath, [...read(uiPath).matchAll(/0x00([0-9a-f]{2})_([0-9a-f]{4})\b/gi)].map(([, rg, gb]) => '#' + rg + gb)],
+  ];
+  const deviations = [];
+  for (const [path, colors] of copies) {
+    assert.ok(colors.length > 0, `No colours found in ${path}`);
+    for (const color of colors) {
+      if (!allowed.has(color.toUpperCase())) deviations.push(`${color} in ${path} is absent from ${palettePath}`);
+    }
+  }
+  assert.deepEqual(deviations, []);
+});
+
+test('run-rules names exactly the packs that exist', () => {
+  const names = read('plugins/flows/steps/run-rules.toml').match(/^- \*\*Packs\*\* \(([^)]+)\)/m);
+  assert.ok(names, 'run-rules must list its packs');
+  assert.deepEqual(
+    names[1]
+      .split(',')
+      .map((name) => name.trim())
+      .sort(),
+    packs(fileURLToPath(new URL('../', import.meta.url))),
+  );
+});

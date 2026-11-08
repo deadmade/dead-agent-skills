@@ -16,8 +16,8 @@
   }: let
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
-    # Upstream files copied by tools/upstream-sync/src/adapters/*.ts: fixing them here would churn every sync PR.
-    vendored = ["^plugins/shared/agent-review/(LICENSE$|UPSTREAM$|skills/)" "^plugins/flows/packs/" "^plugins/flows/agents/" "^plugins/shared/graphify/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/flows/skills/review-code/(LICENSE|UPSTREAM)$" "^tools/flow-cockpit/bindings/" "^tools/flow-cockpit/app/shell/vendor/" "^tools/flow-cockpit/core/tests/fixtures/" "^tools/ado-mcp/tests/fixtures/" "^tools/web-mcp/tests/fixtures/"];
+    # treefmt.toml's excludes as regexes, for the hooks that don't read treefmt.toml themselves.
+    vendored = map (g: "^" + builtins.replaceStrings ["." "**" "*"] ["\\." ".*" "[^/]*"] g + "$") (nixpkgs.lib.importTOML ./treefmt.toml).excludes;
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let
@@ -32,6 +32,7 @@
     preCommit = system: let
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (pkgs) lib;
+      node = pkgs.nodejs_26;
 
       # What package-lock.json pins (the compiler's smol-toml among it), for the sandboxed check, which has no `npm ci`:
       # check-repo and the compiler tests import it. Built from the manifests alone, so only they rebuild it.
@@ -42,7 +43,7 @@
       };
       nodeModules = pkgs.importNpmLock.buildNodeModules {
         inherit npmRoot;
-        inherit (pkgs) nodejs;
+        nodejs = node;
         derivationArgs = {
           # npm ci installs a workspace's dependencies only when its package.json is there.
           postPatch = lib.concatMapStrings (ws: "mkdir -p ${ws} && cp ${npmRoot}/${ws}/package.json ${ws}/\n") workspaces;
@@ -53,22 +54,14 @@
 
       check-repo = pkgs.writeShellApplication {
         name = "check-repo";
-        runtimeInputs = [pkgs.nodejs];
+        runtimeInputs = [node];
         text = ''exec node scripts/check-repo.mjs'';
       };
 
       installer-test = pkgs.writeShellApplication {
         name = "installer-test";
-        runtimeInputs = [pkgs.nodejs];
-        # The installer tests read the built distributions, and hook order isn't guaranteed: build them first.
-        text = ''
-          node tools/harness-compiler/src/cli.ts build
-          node --test --experimental-test-coverage --test-coverage-include='tools/installer/**' \
-            --test-coverage-exclude='tools/installer/**/*.test.ts' --test-coverage-lines=79 'tools/installer/**/*.test.ts'
-          node --test 'tools/upstream-sync/src/**/*.test.ts' 'tools/upstream-sync/src/**/*.test.mjs'
-          node --test 'tools/harness-compiler/test/**/*.test.ts' 'tools/harness-compiler/test/**/*.test.mjs'
-          exec node --test 'scripts/*.test.mjs' 'plugins/flows/skills/writing/tests/*.test.mjs' 'plugins/flows/skills/build-feature/tests/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/flows/hooks/*.test.mjs' 'plugins/opt-in/headroom-trim/hooks/*.test.mjs' 'plugins/opt-in/flow-cockpit/hooks/*.test.mjs'
-        '';
+        runtimeInputs = [node];
+        text = ''exec npm test'';
       };
     in
       git-hooks.lib.${system}.run {

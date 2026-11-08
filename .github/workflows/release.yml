@@ -48,7 +48,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26
+          node-version-file: package.json
 
       - run: npm ci
 
@@ -89,7 +89,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26
+          node-version-file: package.json
 
       - run: npm ci
 
@@ -124,7 +124,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26
+          node-version-file: package.json
 
       # The installer as npx runs it: prepack builds the native distributions and compiles tools/installer/**/*.ts to JS,
       # package.json's files picks what ships.
