@@ -101,7 +101,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   and `files` blocks of a spec or plan, `render.mjs` writes it and its pictures as one HTML page, and `steps/gate.toml`
   has every gate that shows a spec or plan run both. The checker installs Mermaid and jsdom (`package.json` and
   `package-lock.json` beside `SKILL.md`) into the user's cache folder, never into the plugin; tests that need them skip
-  offline.
+  offline. The page's script is a template literal in `render.mjs`, so each backslash in its regexes is written twice
+  (`/^[\\\\/]{2}/` produces `/^[\\/]{2}/`); the tests run the produced page's `safe` and `clean` source, so check the
+  output, not the template.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`,
   built for Windows and Linux x64 only (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the
   installer downloads it and sets `binPath`. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4` feature)
