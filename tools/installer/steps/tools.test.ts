@@ -73,6 +73,21 @@ test('a release tool downloads without asking', async () => {
   assert.deepEqual(done, [`web-mcp: installed ${VERSION} at ${path}`]);
 });
 
+test('agent-browser downloads its raw binary to <binDir>/agent-browser(.exe)', async () => {
+  for (const [platform, exe] of [
+    ['linux', 'agent-browser'],
+    ['win32', 'agent-browser.exe'],
+  ]) {
+    const t = io(undefined);
+    const seen: { raw?: boolean; bin: string }[] = [];
+    t.fake.version = () => undefined; // win32 paths do not start with binDir
+    t.fake.download = async (_name, asset, bin) => void seen.push({ raw: asset.raw, bin });
+    await ensureTool('agent-browser', { ...t.fake, platform });
+    assert.deepEqual(seen, [{ raw: true, bin: toolPath(binDir, 'agent-browser', platform) }]);
+    assert.ok(seen[0].bin.endsWith(exe));
+  }
+});
+
 test('no build for this platform: undefined and one failure line', async () => {
   const t = io(undefined);
   const darwin = { ...t.fake, platform: 'darwin', arch: 'arm64', off: 'stays off' };

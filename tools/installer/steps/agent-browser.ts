@@ -1,72 +1,28 @@
-// web-mcp's `browser` tool drives agent-browser. A current one on PATH is used as is; otherwise upstream's release
-// binary for the version pinned in tools/installer/assets/agent-browser.json goes to ~/.claude/bin. Either way its browser is
-// installed; installAgentBrowser says whether web-mcp's browser window can open, configureAgentBrowser points
-// web-mcp's agentBrowserPath at the copy in use. Asks before a download; every failure is a summary line.
+// web-mcp's `browser` tool drives agent-browser. Our copy of upstream's release binary, pinned in
+// tools/installer/assets/tools.json, goes to ~/.claude/bin (steps/tools.ts decides); its browser is then installed.
+// installAgentBrowser says whether web-mcp's browser window can open, configureAgentBrowser points web-mcp's
+// agentBrowserPath at the copy in use. Every failure is a summary line.
 import { homedir } from 'node:os';
-import { join } from 'node:path';
-import {
-  AGENT_BROWSER_FILES,
-  type UpstreamPin,
-  agentBrowserAsset,
-  upstreamPlan,
-  windowProblem,
-} from '../core/binaries.ts';
-import { ASSETS, BIN_DIR, ask, done, failures, readJson } from '../context.ts';
+import { windowProblem } from '../core/binaries.ts';
+import { BIN_DIR, ask, done, failures } from '../context.ts';
 import { searchBrowserWorks } from '../system/browser.ts';
-import { downloadBin } from '../system/net.ts';
-import { claude, errCode, startSync, versionOf, which } from '../system/proc.ts';
-import { log, progress } from '../ui/ui.ts';
+import { claude, errCode, startSync, which } from '../system/proc.ts';
+import { log } from '../ui/ui.ts';
 import { WEB_MCP } from './binaries.ts';
+import { ensureTool } from './tools.ts';
 
 export async function installAgentBrowser(binDir = BIN_DIR): Promise<{ path?: string; works: boolean }> {
-  const pin: UpstreamPin = readJson(join(ASSETS, 'agent-browser.json'));
-  const pinned = pin.upstream ?? '';
-  const key = `${process.platform}-${process.arch}`;
-  const asset = agentBrowserAsset(process.platform, process.arch, pin);
-  const bin = asset && join(binDir, asset.exe);
-  const ours = bin && versionOf(bin);
-  const theirs = which('agent-browser');
-  const plan = upstreamPlan({
-    theirs: theirs && versionOf(theirs),
-    ours,
-    pinned,
-  });
-  if (plan.use === 'path') return useAgentBrowser(theirs!, false);
-  if (!asset) {
-    failures.push(
-      AGENT_BROWSER_FILES[key]
-        ? `agent-browser: bad pin in tools/installer/assets/agent-browser.json (${JSON.stringify(pin)})`
-        : `agent-browser: no upstream build for ${key}`,
-    );
+  const tool = await ensureTool('agent-browser', { binDir });
+  if (!tool) {
     windowWorks();
     return { works: false };
   }
-  // --with-deps runs sudo, so it is offered only with a download, behind its own prompt (default no).
-  let deps = false;
-  if (plan.download !== 'skip') {
-    const what = plan.download === 'install' ? 'Download' : `Upgrade ${ours} to`;
-    if (
-      !(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))
-    ) {
-      done.push('agent-browser: install skipped by you');
-      windowWorks();
-      return { works: false };
-    }
-    deps =
-      process.platform === 'linux' &&
-      (await ask('Also install the browser system packages (agent-browser install --with-deps, runs sudo)?', false));
-    const r = await progress(`Downloading agent-browser ${pinned}`, async () => {
-      await downloadBin('agent-browser', asset, bin!);
-      return { ok: true };
-    });
-    if (!r.ok) {
-      failures.push(`agent-browser ${pinned}: ${r.err}`);
-      windowWorks();
-      return { works: false };
-    }
-    done.push(`agent-browser: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
-  }
-  return useAgentBrowser(bin!, deps);
+  // --with-deps runs sudo, so it is offered only after a download, behind its own prompt (default no).
+  const deps =
+    tool.changed &&
+    process.platform === 'linux' &&
+    (await ask('Also install the browser system packages (agent-browser install --with-deps, runs sudo)?', false));
+  return useAgentBrowser(tool.path, deps);
 }
 
 // Runs `agent-browser install` (the browser download) on the copy in use, every run, so a download that failed before
