@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: execute
+phase: done
 ---
 
 # web-mcp search without SearXNG, better results: flow

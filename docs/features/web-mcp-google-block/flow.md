@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: finish
+phase: done
 ---
 
 # web-mcp Google block: flow

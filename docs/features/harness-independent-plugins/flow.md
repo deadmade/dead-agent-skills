@@ -213,3 +213,11 @@ and compiled tests. Existing native trust/authentication, theme visual and Windo
 The old `.web/` research cache was moved outside the checkout to
 `/tmp/dead-agent-skills-cleanup-heukllih/web-research-cache` for recovery. Active/locked worktrees and `.superpowers/`
 recovery records were preserved. No remote branches were pushed.
+
+## Validation evidence (moved from README.md)
+
+Validation evidence on Linux: Codex 0.166.0 accepted the native marketplace/package; Claude Code 2.1.316 validated
+native manifests. Fixtures are pinned to Claude 2.1.314 and Codex 0.166.0 with per-fixture provenance; most lifecycle
+examples are documentation-derived, not captured events. These are tested baselines, not a claim of a verified minimum
+version. Authenticated hook trust/execution, missing-Node interpretation, native theme visuals and Windows acceptance
+remain pending.
