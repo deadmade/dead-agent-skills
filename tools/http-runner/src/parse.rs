@@ -170,8 +170,7 @@ fn parse_block(lines: &[Line], vars: &mut Vars) -> Result<Option<Request>, Parse
             header(n, l, &mut request, vars)?;
         }
     }
-    // shortcut: comment lines are dropped from the body too, so a body line starting with # or // is lost; keep body lines if a text body ever needs one.
-    let body: Vec<Line> = lines.filter(|&(_, l)| !is_comment(l)).collect();
+    let body: Vec<Line> = lines.collect();
     let used = |&(_, l): &Line| !l.trim().is_empty();
     if let (Some(first), Some(last)) = (body.iter().position(used), body.iter().rposition(used)) {
         request.body = Some(body_text(&body[first..=last], vars)?);
@@ -607,6 +606,14 @@ mod tests {
         let req =
             one("# {{$prompt x}}\n// {{$aadToken}}\nGET https://a.example/x\n# {{$prompt y}}\n");
         assert_eq!(req.path, lit("/x"));
+    }
+
+    #[test]
+    fn comment_like_lines_stay_in_the_body() {
+        let req = one(
+            "POST https://a.example/x\nContent-Type: text/plain\n\nfirst\n# second\n// third\nlast\n",
+        );
+        assert_eq!(req.body, Some(lit("first\n# second\n// third\nlast")));
     }
 
     #[test]
