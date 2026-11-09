@@ -34,5 +34,10 @@ tokio = { workspace = true, features = [
 ] }
 url = { workspace = true }
 
+# Test double for the system browser; only the tests use it, the release ships `http-runner` alone.
+[[bin]]
+name = "fake-browser"
+path = "tests/bin/fake_browser.rs"
+
 [lints]
 workspace = true
