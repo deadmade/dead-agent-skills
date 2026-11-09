@@ -211,7 +211,10 @@ export async function applyCodex(io: CodexIO = {}) {
       binary = join(base, 'bin', VERSION, asset.exe);
       if (!existsSync(binary)) await (io.download ?? downloadBin)('web-mcp', asset, binary);
     }
-    const browser = await (io.browser ?? installAgentBrowser)(join(base, 'bin'));
+    // With no pinned agent-browser build here, keep the one on PATH, as web-mcp itself falls back to it.
+    const browser = resolveTool('agent-browser', process.platform, process.arch, VERSION)
+      ? await (io.browser ?? installAgentBrowser)(join(base, 'bin'))
+      : { path: find('agent-browser'), works: !!find('agent-browser') };
     configure('web-mcp', [...(browser.path ? ['--env', `WEB_MCP_AGENT_BROWSER=${browser.path}`] : []), '--', binary]);
     if (!browser.works)
       note('Codex web-mcp', [

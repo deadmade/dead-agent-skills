@@ -139,6 +139,29 @@ test('Codex downloads the ado-mcp release when it is absent from PATH', async ()
     f.close();
   }
 });
+test('Codex keeps a PATH agent-browser on a platform with no pinned build', async () => {
+  const f = fixture();
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+  const arch = Object.getOwnPropertyDescriptor(process, 'arch')!;
+  try {
+    Object.defineProperty(process, 'platform', { ...platform, value: 'darwin' });
+    Object.defineProperty(process, 'arch', { ...arch, value: 'arm64' });
+    f.select(['flows']);
+    f.io.which = (name) => `/path/${name}`;
+    f.io.browser = async () => {
+      throw new Error('the installer must not fetch agent-browser here');
+    };
+    const before = failures.length;
+    await applyCodex(f.io);
+    const add = f.calls.find((c) => c[0] === 'mcp' && c[1] === 'add' && c[2] === 'dead-agent-skills-web-mcp')!;
+    assert.ok(add.includes('WEB_MCP_AGENT_BROWSER=/path/agent-browser'));
+    assert.equal(failures.length, before);
+  } finally {
+    Object.defineProperty(process, 'platform', platform);
+    Object.defineProperty(process, 'arch', arch);
+    f.close();
+  }
+});
 test('Codex refuses to overwrite unowned MCP names', async () => {
   const f = fixture();
   try {

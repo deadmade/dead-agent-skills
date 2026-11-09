@@ -28,5 +28,6 @@ always installed with `--upgrade`.
   PATH.
 - The "using the one on PATH" summary line goes away.
 - The Codex step keeps its own PATH-first lookup and versioned folder; only its asset lookup uses the manifest.
-  That PATH-first lookup covers only web-mcp and ado-mcp; agent-browser under Codex follows the one rule (ours, in the
-  bin folder it is given).
+  That PATH-first lookup covers web-mcp and ado-mcp; agent-browser under Codex follows the one rule (ours, in the
+  bin folder it is given), except on a platform with no pinned agent-browser build, where the Codex step keeps a copy
+  on PATH, as web-mcp itself does.
