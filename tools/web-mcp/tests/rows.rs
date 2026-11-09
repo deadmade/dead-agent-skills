@@ -324,6 +324,28 @@ fn rows_deeply_nested_hostile_page_returns_in_bounded_time() {
     );
 }
 
+/// A page of 3,000 nested levels must get its answer within a few seconds. Deeper only slows the test: the HTML
+/// parser alone takes 30 s on 20,000 levels in a debug build.
+fn nested_page_returns_in_bounded_time(open: &str, close: &str) {
+    let html = format!("{}{}", open.repeat(3_000), close.repeat(3_000));
+    let (mut mcp, _) = start(&[("nest.html", html)]);
+    let started = Instant::now();
+    let r = mcp.call("rows", json!({"url": url("nest")}));
+    let took = started.elapsed();
+    assert!(!is_error(&r), "{r}");
+    assert!(took < Duration::from_secs(5), "{took:?}");
+}
+
+#[test]
+fn rows_deep_element_only_nesting_returns_in_bounded_time() {
+    nested_page_returns_in_bounded_time("<div>", "</div>");
+}
+
+#[test]
+fn rows_deep_whitespace_only_nesting_returns_in_bounded_time() {
+    nested_page_returns_in_bounded_time("<div> ", "</div> ");
+}
+
 #[test]
 fn rows_refuses_a_page_over_4_mib() {
     let big = page("Big", &"x".repeat(4 * 1024 * 1024 + 1));

@@ -1,6 +1,6 @@
 //! Finds a rendered page's repeating sibling groups and prints them as numbered rows.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::time::Duration;
 
@@ -18,6 +18,11 @@ const MIN_ITEMS: usize = 6;
 const MIN_TEXT: usize = 16;
 /// Each item's text is counted up to this many characters; collecting it stops there.
 const SCORE_CAP: usize = 400;
+/// The most nodes one `rows` call walks to read text and find links: a hostile page of deep nesting holds no text to
+/// stop `text_of` early, so without it the walk under every child costs depth times nodes.
+// shortcut: a page that spends it reads as having no text or links past that point; the captured pages use 10 to 17
+// visits per node, so raise it if a real page with over 60,000 elements loses groups.
+const VISITS: usize = 1_000_000;
 const ROW_CHARS: usize = 200;
 const KIND_CHARS: usize = 80;
 const GROUPS_RETURNED: usize = 2;
@@ -153,25 +158,27 @@ pub fn find_groups(html: &str, base: &Url, item: Option<&str>) -> Result<Vec<Gro
     doc.select(NOT_SHOWN).remove();
     let link =
         Matcher::new("a[href]:not([href=\"\"]):not([href^=\"#\"])").expect("static selector");
+    let mut budget = VISITS;
     if let Some(matcher) = item {
         let found = doc.select_matcher(&matcher);
         let nodes = found.nodes();
+        let items: Vec<_> = nodes
+            .iter()
+            .map(|n| (*n, text_of(n, &mut budget)))
+            .collect();
         return Ok(nodes
             .first()
-            .map(|first| {
-                let items = nodes.iter().map(|n| (*n, text_of(n)));
-                group(kind_of(first), items, &link, base)
-            })
+            .map(|first| group(kind_of(first), items.into_iter(), &link, base, &mut budget))
             .into_iter()
             .collect());
     }
-    let mut found = candidates(&doc, &link);
+    let mut found = candidates(&doc, &link, &mut budget);
     drop_wrapped(&mut found);
     found.sort_by_key(|c| std::cmp::Reverse((c.score, c.volume)));
     Ok(found
         .into_iter()
         .take(GROUPS_RETURNED)
-        .map(|c| group(c.kind, c.items.into_iter(), &link, base))
+        .map(|c| group(c.kind, c.items.into_iter(), &link, base, &mut budget))
         .collect())
 }
 
@@ -218,6 +225,7 @@ fn group<'a>(
     items: impl Iterator<Item = (NodeRef<'a>, String)>,
     link: &Matcher,
     base: &Url,
+    budget: &mut usize,
 ) -> Group {
     let rows = items
         .map(|(n, text)| Row {
@@ -229,6 +237,7 @@ fn group<'a>(
                 .to_owned(),
             link: std::iter::once(n)
                 .chain(n.descendants_it())
+                .take_while(|_| spend(budget))
                 .filter(|a| a.is_match(link))
                 .filter_map(|a| base.join(a.attr("href")?.trim()).ok())
                 .find(|u| matches!(u.scheme(), "http" | "https")),
@@ -238,9 +247,10 @@ fn group<'a>(
 }
 
 /// Whether `node` is a link (an `a[href]` that is not empty or only a `#` anchor) or holds one.
-fn has_link(node: &NodeRef, link: &Matcher) -> bool {
+fn has_link(node: &NodeRef, link: &Matcher, budget: &mut usize) -> bool {
     std::iter::once(*node)
         .chain(node.descendants_it())
+        .take_while(|_| spend(budget))
         .any(|n| n.is_match(link))
 }
 
@@ -256,19 +266,32 @@ fn kind_of(node: &NodeRef) -> String {
         .fold(tag, |kind, c| format!("{kind}.{c}"))
 }
 
+/// Takes one visit from `budget`; false once it is spent.
+fn spend(budget: &mut usize) -> bool {
+    *budget = budget.saturating_sub(1);
+    *budget > 0
+}
+
 /// The text under `node`, whitespace-collapsed to one line and cut at `SCORE_CAP` characters while it is collected,
-/// so a deeply nested hostile page costs bounded memory and time.
-fn text_of(node: &NodeRef) -> String {
+/// so a deeply nested hostile page costs bounded memory and time. The walk stops when `budget` is spent.
+fn text_of(node: &NodeRef, budget: &mut usize) -> String {
     let mut out = String::new();
     let mut len = 0;
-    'collect: for t in node.descendants_it().filter(NodeRef::is_text) {
+    'collect: for t in node.descendants_it().take_while(|_| spend(budget)) {
+        if !t.is_text() {
+            continue;
+        }
         for word in t.text().split_whitespace() {
+            // the separator is only worth pushing when a character can follow it
             if len > 0 {
+                if len + 1 >= SCORE_CAP {
+                    break 'collect;
+                }
                 out.push(' ');
                 len += 1;
             }
             for c in word.chars() {
-                if len == SCORE_CAP {
+                if len >= SCORE_CAP {
                     break 'collect;
                 }
                 out.push(c);
@@ -276,24 +299,23 @@ fn text_of(node: &NodeRef) -> String {
             }
         }
     }
-    out.truncate(out.trim_end().len());
     out
 }
 
 /// Every set of at least `MIN_ITEMS` like children of one parent outside `nav`, `header` and `footer`.
-fn candidates<'a>(doc: &'a Document, link: &Matcher) -> Vec<Candidate<'a>> {
+fn candidates<'a>(doc: &'a Document, link: &Matcher, budget: &mut usize) -> Vec<Candidate<'a>> {
     let skipped = Matcher::new("nav, header, footer").expect("static selector");
+    // the nodes in or under a skipped one; the walk is in document order, so a parent is known before its children
+    let mut inside = HashSet::new();
     let mut found = Vec::new();
     for parent in doc.select("*").nodes() {
-        if std::iter::once(*parent)
-            .chain(parent.ancestors_it(None))
-            .any(|n| n.is_match(&skipped))
-        {
+        if parent.is_match(&skipped) || parent.parent().is_some_and(|p| inside.contains(&p.id)) {
+            inside.insert(parent.id);
             continue;
         }
         let mut by_kind: BTreeMap<String, Vec<(NodeRef, String)>> = BTreeMap::new();
         for child in parent.element_children() {
-            let text = text_of(&child);
+            let text = text_of(&child, budget);
             if text.chars().count() >= MIN_TEXT {
                 by_kind
                     .entry(kind_of(&child))
@@ -307,7 +329,10 @@ fn candidates<'a>(doc: &'a Document, link: &Matcher) -> Vec<Candidate<'a>> {
         {
             // the items' text, each already cut at the cap
             let volume: usize = items.iter().map(|(_, t)| t.chars().count()).sum();
-            let linked = items.iter().filter(|(n, _)| has_link(n, link)).count();
+            let linked = items
+                .iter()
+                .filter(|(n, _)| has_link(n, link, budget))
+                .count();
             // times the square of the share of items with a link
             let score = volume * linked * linked / (items.len() * items.len());
             found.push(Candidate {
@@ -409,7 +434,7 @@ mod tests {
     fn nav_header_and_footer_are_skipped() {
         for tag in ["nav", "header", "footer"] {
             let html = format!(
-                "<{tag}>{}</{tag}><main><ul>{}</ul></main>",
+                "<{tag}><div>{}</div></{tag}><main><ul>{}</ul></main>",
                 items("a", "l", 10).replace("<a ", "<a href=\"/x\" "),
                 items("li", "", 6)
             );
@@ -618,6 +643,14 @@ mod tests {
         };
         let out = render(&[group], None, 5, 1000);
         assert!(out.contains("1. Title | https://shop.example/p/1\n"));
+    }
+
+    #[test]
+    fn text_stops_at_the_cap_after_a_word_that_ends_on_it() {
+        let html = format!("<p>{} more words</p>", "w".repeat(SCORE_CAP));
+        let doc = Document::from(html.as_str());
+        let text = text_of(&doc.select("p").nodes()[0], &mut 1000);
+        assert_eq!(text.chars().count(), SCORE_CAP);
     }
 
     #[test]
