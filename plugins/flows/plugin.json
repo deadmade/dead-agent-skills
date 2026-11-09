@@ -1,5 +1,5 @@
 {
-  "description": "Conductor skills with approval gates and resumable state: build, research, review and learn. Includes the writing skill, copyedit pass and skill packs; Claude Code also runs the prose-check hook.",
+  "description": "Conductor skills, most with approval gates and resumable state: build, research, evaluate, review and learn. Includes the writing skill, copyedit pass and skill packs; Claude Code also runs the prose-check hook.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"

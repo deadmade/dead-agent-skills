@@ -63,7 +63,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   hand.
 - `plugins/opt-in/mcp/mcp-github/`: an MCP server config only.
 - `plugins/flows/`: the conductor skills (`/build-feature`, `/research-feature`, `/implement`, `/fix`, `/upgrade`,
-  `/refactor`, `/review-code`, `/understand`, `/learn`). Each runs other plugins' skills in order;
+  `/refactor`, `/review-code`, `/understand`, `/learn`, `/evaluate`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
   plugin) live once in `plugins/flows/steps/*.toml`, composed into each conductor at build time (`docs/adr/0009-conductors-composed-from-flow-steps.md`), so a
   SKILL.md says what it runs and names its steps (`[step: <name>]`). Compose (`tools/harness-compiler/src/flows/compose.ts`)
