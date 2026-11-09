@@ -112,8 +112,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in
   `docs/features/web-mcp-search/findings.md`, and specific bugs in `docs/solutions/` (Google's `/goto` links, a hidden
   tab's `click`/`press`, agent-browser's install and a Windows Chrome quirk).
-  `rows` needs the browser window like `browser`, holds a 1 s gap per host, and its group detection is tested on
-  captured pages in `tests/fixtures/rows/` (`docs/adr/0012-rows-tool-and-shop-skill.md`).
+  `rows` opens its pages as a tab of that window too, holds a 1 s gap per host, and its group detection is tested on
+  captured pages in `tests/fixtures/rows/` (`docs/adr/0012-rows-tool-and-shop-skill.md`). Its tree walk is bounded by
+  a visit budget that charges text by bytes, because a hostile page can hide a huge text node under thousands of
+  nested parents (`docs/solutions/rows-walk-budget-counts-bytes-not-nodes.md`).
   Contributor rules: tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`;
   `cargo build --locked -p web-mcp --bin fake-agent-browser` before the unit tests), which changes with any
   agent-browser answer web-mcp reads and doesn't model every upstream quirk
