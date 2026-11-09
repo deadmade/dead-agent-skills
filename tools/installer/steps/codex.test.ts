@@ -345,3 +345,53 @@ test('existing instructions and foreign configuration survive reruns', async () 
     f.close();
   }
 });
+
+// The keys the installer offers: what every category page of the real screens lists.
+async function offered(f: ReturnType<typeof fixture>, platform: string, arch: string, webMcpOnPath: boolean) {
+  const keys: string[] = [];
+  f.io.which = (name) => (name === 'web-mcp' && !webMcpOnPath ? undefined : `/tools/${name}`);
+  f.io.screen = async (state, controls) => {
+    for (let page = 0; ; page++) {
+      let text: string;
+      try {
+        text = controls.render({ ...(state as any), screen: 'category', page }, { columns: 160, rows: 80 }).join('\n');
+      } catch {
+        break;
+      }
+      keys.push(...[...text.matchAll(/^│ [ ❯] ([a-z][a-z0-9-]*) /gm)].map((m) => m[1]));
+    }
+    return { ...(state as any), result: 'apply' };
+  };
+  const real = Object.getOwnPropertyDescriptors(process);
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+  Object.defineProperty(process, 'arch', { value: arch, configurable: true });
+  try {
+    await applyCodex(f.io);
+  } finally {
+    Object.defineProperty(process, 'platform', real.platform);
+    Object.defineProperty(process, 'arch', real.arch);
+  }
+  return keys;
+}
+
+test('Codex hides every web-mcp-dependent plugin when web-mcp has no build for the platform', async () => {
+  const f = fixture();
+  try {
+    const keys = await offered(f, 'darwin', 'arm64', false);
+    assert.ok(keys.includes('hallmark'));
+    for (const hidden of ['web-mcp', 'flows', 'shop']) assert.ok(!keys.includes(hidden), `${hidden} was offered`);
+    assert.ok(!f.calls.some((c) => c[0] === 'plugin' && c[1] === 'add' && /^(shop|web-mcp|flows)@/.test(c[2])));
+  } finally {
+    f.close();
+  }
+});
+
+test('Codex offers shop when web-mcp has a build for the platform', async () => {
+  const f = fixture();
+  try {
+    const keys = await offered(f, 'linux', 'x64', false);
+    for (const shown of ['web-mcp', 'flows', 'shop']) assert.ok(keys.includes(shown), `${shown} was not offered`);
+  } finally {
+    f.close();
+  }
+});

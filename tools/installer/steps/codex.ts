@@ -88,6 +88,8 @@ export async function applyCodex(io: CodexIO = {}) {
       !binAsset(k === 'mcp-azure' ? 'ado-mcp' : k, process.platform, process.arch, VERSION) &&
       !find(k === 'mcp-azure' ? 'ado-mcp' : k),
   );
+  const dependents = (dependency: string) =>
+    plugins.filter((p) => p.dependencies.includes(dependency)).map((p) => p.name);
   const data: Data = {
     version: VERSION,
     platform: `Codex · ${process.platform}-${process.arch}`,
@@ -114,12 +116,16 @@ export async function applyCodex(io: CodexIO = {}) {
     core: 'Codex: shared rules + Context7, always installed; Claude UI features stay on Claude Code',
     hidden: hidden
       .filter((k) => !current[k])
-      .map((key) => ({ key, why: 'no release binary on this platform; flows requires web-mcp' })),
+      .map((key) => ({
+        key,
+        why: `no release binary on this platform${dependents(key).length ? `; ${dependents(key).join(', ')} requires ${key}` : ''}`,
+      })),
   };
-  // A flow dependency must not silently bypass platform restrictions.
-  if (hidden.includes('web-mcp') && !current.flows)
+  // A plugin that depends on a hidden one must not silently bypass platform restrictions.
+  const blocked = hidden.flatMap((k) => dependents(k)).filter((k) => !current[k]);
+  if (blocked.length)
     data.pages = data.pages
-      .map((p) => ({ ...p, keys: p.keys.filter((k) => k !== 'flows') }))
+      .map((p) => ({ ...p, keys: p.keys.filter((k) => !blocked.includes(k)) }))
       .filter((p) => p.keys.length);
   let state = initial({ ...current });
   for (;;) {
