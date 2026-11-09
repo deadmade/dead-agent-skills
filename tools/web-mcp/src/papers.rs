@@ -47,7 +47,7 @@ impl fmt::Display for PaperError {
     }
 }
 
-fn collapse(s: &str) -> String {
+pub(crate) fn collapse(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 

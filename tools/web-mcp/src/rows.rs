@@ -8,9 +8,10 @@ use dom_query::{Document, Matcher, NodeId, NodeRef};
 use url::Url;
 
 use crate::Ctx;
-use crate::archive::Item;
 use crate::browser::BrowserError;
-use crate::fetch::{private_landing, slash};
+use crate::fetch::private_landing;
+use crate::papers::collapse;
+use crate::search::keep_page;
 
 /// A group needs this many like siblings, each with at least `MIN_TEXT` characters of text.
 const MIN_ITEMS: usize = 6;
@@ -39,7 +40,6 @@ pub struct Row {
 
 pub struct Group {
     pub kind: String,
-    pub total: usize,
     pub rows: Vec<Row>,
 }
 
@@ -90,28 +90,10 @@ pub async fn run(
     if html.len() > MAX_HTML {
         return Err("page too large to read as rows".into());
     }
-    let at = ctx
-        .archive
-        .put(Item::Page {
-            url: url.clone(),
-            final_url: landed.clone(),
-            raw: html.clone().into_bytes(),
-            raw_ext: "html",
-            rendered: None,
-            markdown: String::new(),
-            images: Vec::new(),
-            cache: false,
-        })
-        .await
-        .map_or_else(
-            |e| format!("not archived: {e}"),
-            |a| {
-                format!(
-                    "archived at .web/{}",
-                    slash(&a.path.with_file_name("raw.html"))
-                )
-            },
-        );
+    let at = match keep_page(ctx, url.clone(), landed.clone(), html.clone()).await {
+        Ok(path) => format!("archived at {path}"),
+        Err(not_archived) => not_archived,
+    };
     let groups = find_groups(&html, &landed, item)?;
     let source = format!(
         "Source: {landed} (fetched {}, {at}). {UNTRUSTED}",
@@ -171,7 +153,10 @@ pub fn find_groups(html: &str, base: &Url, item: Option<&str>) -> Result<Vec<Gro
         let nodes = found.nodes();
         return Ok(nodes
             .first()
-            .map(|first| group(kind_of(first), nodes.iter(), &link, base))
+            .map(|first| {
+                let items = nodes.iter().map(|n| (*n, text_of(n)));
+                group(kind_of(first), items, &link, base)
+            })
             .into_iter()
             .collect());
     }
@@ -179,9 +164,9 @@ pub fn find_groups(html: &str, base: &Url, item: Option<&str>) -> Result<Vec<Gro
     drop_wrapped(&mut found);
     found.sort_by_key(|c| std::cmp::Reverse((c.score, c.volume)));
     Ok(found
-        .iter()
+        .into_iter()
         .take(GROUPS_RETURNED)
-        .map(|c| group(c.kind.clone(), c.items.iter().map(|(n, _)| n), &link, base))
+        .map(|c| group(c.kind, c.items.into_iter(), &link, base))
         .collect())
 }
 
@@ -195,7 +180,7 @@ pub fn render(groups: &[Group], pick: Option<usize>, limit: usize, budget: usize
         .enumerate()
         .filter(|(i, _)| pick.is_none_or(|p| p == i + 1));
     for (i, g) in shown {
-        let head = format!("Group {}: {} items ({})\n", i + 1, g.total, g.kind);
+        let head = format!("Group {}: {} items ({})\n", i + 1, g.rows.len(), g.kind);
         let mut body = String::new();
         let mut printed = 0;
         for (n, row) in g.rows.iter().take(limit).enumerate() {
@@ -216,37 +201,33 @@ pub fn render(groups: &[Group], pick: Option<usize>, limit: usize, budget: usize
         }
         out.push_str(&head);
         out.push_str(&body);
-        let _ = writeln!(out, "Showing {printed} of {}.\n", g.total);
+        let _ = writeln!(out, "Showing {printed} of {}.\n", g.rows.len());
     }
     out.trim_end().to_owned()
 }
 
 fn group<'a>(
     kind: String,
-    nodes: impl Iterator<Item = &'a NodeRef<'a>>,
+    items: impl Iterator<Item = (NodeRef<'a>, String)>,
     link: &Matcher,
     base: &Url,
 ) -> Group {
-    let rows: Vec<Row> = nodes
-        .map(|n| Row {
-            text: text_of(n)
+    let rows = items
+        .map(|(n, text)| Row {
+            text: text
                 .chars()
                 .take(ROW_CHARS)
                 .collect::<String>()
                 .trim_end()
                 .to_owned(),
-            link: std::iter::once(*n)
+            link: std::iter::once(n)
                 .chain(n.descendants_it())
                 .filter(|a| a.is_match(link))
                 .filter_map(|a| base.join(a.attr("href")?.trim()).ok())
                 .find(|u| matches!(u.scheme(), "http" | "https")),
         })
         .collect();
-    Group {
-        kind,
-        total: rows.len(),
-        rows,
-    }
+    Group { kind, rows }
 }
 
 /// Whether `node` is a link (an `a[href]` that is not empty or only a `#` anchor) or holds one.
@@ -276,10 +257,6 @@ fn text_of(node: &NodeRef) -> String {
         text.push(' ');
     }
     collapse(&text)
-}
-
-fn collapse(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Every set of at least `MIN_ITEMS` like children of one parent outside `nav`, `header` and `footer`.
@@ -379,7 +356,7 @@ mod tests {
     fn ads_page_first_group_is_the_ads() {
         let found = groups(ADS);
         assert_eq!(
-            found[0].total,
+            found[0].rows.len(),
             count(ADS, "ul#srchrslt-adtable > li[data-clickable=card]")
         );
         assert_ne!(found[0].rows[0].text, "");
@@ -388,20 +365,23 @@ mod tests {
     #[test]
     fn product_cards_page_first_group_is_the_products() {
         let found = groups(CARDS);
-        assert_eq!(found[0].total, count(CARDS, "div.card.galleryview__item"));
+        assert_eq!(
+            found[0].rows.len(),
+            count(CARDS, "div.card.galleryview__item")
+        );
     }
 
     #[test]
     fn product_cards_page_item_selector_reads_the_filters() {
         let found = find_groups(CARDS, &base(), Some("div.filter-element")).unwrap();
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].total, count(CARDS, "div.filter-element"));
+        assert_eq!(found[0].rows.len(), count(CARDS, "div.filter-element"));
     }
 
     #[test]
     fn tiles_page_first_group_is_the_tiles() {
         let found = groups(TILES);
-        assert_eq!(found[0].total, count(TILES, "h3 + div > article"));
+        assert_eq!(found[0].rows.len(), count(TILES, "h3 + div > article"));
         assert_ne!(found[0].rows[0].text, "");
     }
 
@@ -432,7 +412,7 @@ mod tests {
         let inner = format!("<ul>{}</ul>", linked(6, 20, ""));
         let found = groups(&format!("<ul>{}</ul>", linked(6, 20, &inner)));
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].total, 6);
+        assert_eq!(found[0].rows.len(), 6);
     }
 
     #[test]
@@ -441,7 +421,7 @@ mod tests {
         let inner = format!("<ul>{}</ul>", linked(6, 20, ""));
         let found = groups(&format!("<ul>{}</ul>", linked(6, 60, &inner)));
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].total, 6);
+        assert_eq!(found[0].rows.len(), 6);
     }
 
     #[test]
@@ -463,7 +443,7 @@ mod tests {
             "<ul>{}</ul><section>{cards}</section>",
             items("li", "", 6)
         ));
-        assert_eq!(found[0].total, 200);
+        assert_eq!(found[0].rows.len(), 200);
     }
 
     #[test]
@@ -510,7 +490,7 @@ mod tests {
         );
         let found = find_groups(&html, &base(), Some("li.pick")).unwrap();
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].total, 3);
+        assert_eq!(found[0].rows.len(), 3);
     }
 
     #[test]
@@ -542,7 +522,6 @@ mod tests {
     fn rows(n: usize, len: usize) -> Group {
         Group {
             kind: "LI".into(),
-            total: n,
             rows: (0..n)
                 .map(|i| Row {
                     text: format!("row{i} ").repeat(len / 5).trim().into(),
@@ -584,7 +563,6 @@ mod tests {
     fn render_prints_the_link_after_the_text() {
         let group = Group {
             kind: "LI".into(),
-            total: 1,
             rows: vec![Row {
                 text: "Title".into(),
                 link: Some(Url::parse("https://shop.example/p/1").unwrap()),

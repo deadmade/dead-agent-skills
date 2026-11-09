@@ -215,7 +215,7 @@ pub async fn run_engine(
         }
         Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e) => {
             profiles.set_consent_seen(e, true);
-            keep_page(ctx, url, landed, html).await;
+            let _ = keep_page(ctx, url, landed, html).await;
             return Err("consent (clearing)".into());
         }
         Parsed::Blocked(b) => {
@@ -231,7 +231,9 @@ pub async fn run_engine(
     };
     Err(format!(
         "{what} ({})",
-        keep_page(ctx, url, landed, html).await
+        keep_page(ctx, url, landed, html)
+            .await
+            .unwrap_or_else(|e| e)
     ))
 }
 
@@ -416,8 +418,14 @@ fn typed_ready(ready_js: &str, origin: f64) -> String {
     format!("({js}) && performance.timeOrigin !== {origin}")
 }
 
-/// Archives an engine page that held no results, for whoever fixes the parser; returns its `.web/` path.
-async fn keep_page(ctx: &Ctx, url: Url, landed: Url, html: String) -> String {
+/// Archives a page that held no results, for whoever fixes the parser; returns its `.web/` path, or the
+/// `not archived: …` reason as the error.
+pub(crate) async fn keep_page(
+    ctx: &Ctx,
+    url: Url,
+    landed: Url,
+    html: String,
+) -> Result<String, String> {
     let put = ctx.archive.put(Item::Page {
         url,
         final_url: landed,
@@ -429,8 +437,11 @@ async fn keep_page(ctx: &Ctx, url: Url, landed: Url, html: String) -> String {
         cache: false,
     });
     match put.await {
-        Ok(a) => format!(".web/{}", slash(&a.path.with_file_name("raw.html"))),
-        Err(e) => format!("not archived: {e}"),
+        Ok(a) => Ok(format!(
+            ".web/{}",
+            slash(&a.path.with_file_name("raw.html"))
+        )),
+        Err(e) => Err(format!("not archived: {e}")),
     }
 }
 
