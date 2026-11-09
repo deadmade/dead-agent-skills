@@ -294,6 +294,28 @@ fn rows_item_that_matches_nothing_says_so() {
 }
 
 #[test]
+fn rows_deeply_nested_hostile_page_returns_in_bounded_time() {
+    // 1,500 nested divs holding about 200 KB of text: building the text under every child took over 10 s
+    let depth = 1500;
+    let level = format!("{} ", "word".repeat(32));
+    let html = format!(
+        "{}{}{}",
+        format!("<div>{level}").repeat(depth),
+        "x".repeat(1000),
+        "</div>".repeat(depth)
+    );
+    let (mut mcp, _) = start(&[("deep.html", html)]);
+    let started = Instant::now();
+    let r = mcp.call("rows", json!({"url": url("deep")}));
+    assert!(!is_error(&r), "{r}");
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
 fn rows_refuses_a_page_over_4_mib() {
     let big = page("Big", &"x".repeat(4 * 1024 * 1024 + 1));
     let (mut mcp, _) = start(&[("big.html", big)]);

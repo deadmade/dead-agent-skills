@@ -20,8 +20,9 @@ they pull is archived in `.web/` in the project before Claude sees it.
 - `rows { url, group?, item?, limit? }`: opens one page in a throwaway tab of web-mcp's browser window and returns its
   repeating items (ads, products, search hits) as numbered rows: the item's text on one line, cut at about 200
   characters, and its first link, made absolute. It finds sibling elements of one kind outside `nav`, `header` and
-  `footer`, scores each group by its count times its text volume (capped) times the square of the share of its items
-  that hold a link, drops a group nested inside a better one, and returns the two largest (`group` 1 or 2 picks one).
+  `footer`, scores each group by its count times its text volume (each item's text counted up to 400
+  characters) times the square of the share of its items that hold a link, drops a group nested inside a better one,
+  and returns the two largest (`group` 1 or 2 picks one).
   `item`, a CSS selector, overrides the guess: on a Geizhals result page the guide text is group 2, so the filters are
   read with `item`. `limit` is 1 to 200 (default 30); the reply is capped at about 12,000 characters, never cuts a row
   in half, and ends each group with `Showing <k> of <total>.`. It reads what has loaded, with no scrolling and no

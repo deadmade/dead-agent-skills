@@ -16,7 +16,7 @@ use crate::search::keep_page;
 /// A group needs this many like siblings, each with at least `MIN_TEXT` characters of text.
 const MIN_ITEMS: usize = 6;
 const MIN_TEXT: usize = 16;
-/// An item's text counts toward the score only up to this many characters.
+/// Each item's text is counted up to this many characters; collecting it stops there.
 const SCORE_CAP: usize = 400;
 const ROW_CHARS: usize = 200;
 const GROUPS_RETURNED: usize = 2;
@@ -253,14 +253,28 @@ fn kind_of(node: &NodeRef) -> String {
         .fold(tag, |kind, c| format!("{kind}.{c}"))
 }
 
-/// All text under `node`, whitespace-collapsed to one line.
+/// The text under `node`, whitespace-collapsed to one line and cut at `SCORE_CAP` characters while it is collected,
+/// so a deeply nested hostile page costs bounded memory and time.
 fn text_of(node: &NodeRef) -> String {
-    let mut text = String::new();
-    for t in node.descendants_it().filter(NodeRef::is_text) {
-        text.push_str(&t.text());
-        text.push(' ');
+    let mut out = String::new();
+    let mut len = 0;
+    'collect: for t in node.descendants_it().filter(NodeRef::is_text) {
+        for word in t.text().split_whitespace() {
+            if len > 0 {
+                out.push(' ');
+                len += 1;
+            }
+            for c in word.chars() {
+                if len == SCORE_CAP {
+                    break 'collect;
+                }
+                out.push(c);
+                len += 1;
+            }
+        }
     }
-    collapse(&text)
+    out.truncate(out.trim_end().len());
+    out
 }
 
 /// Every set of at least `MIN_ITEMS` like children of one parent outside `nav`, `header` and `footer`.
@@ -288,10 +302,9 @@ fn candidates<'a>(doc: &'a Document, link: &Matcher) -> Vec<Candidate<'a>> {
             .into_iter()
             .filter(|(_, items)| items.len() >= MIN_ITEMS)
         {
-            let chars: usize = items.iter().map(|(_, t)| t.chars().count()).sum();
+            // the items' text, each already cut at the cap
+            let volume: usize = items.iter().map(|(_, t)| t.chars().count()).sum();
             let linked = items.iter().filter(|(n, _)| has_link(n, link)).count();
-            // count times the smaller of the average length and the cap
-            let volume = chars.min(SCORE_CAP * items.len());
             // times the square of the share of items with a link
             let score = volume * linked * linked / (items.len() * items.len());
             found.push(Candidate {
