@@ -950,6 +950,24 @@ async fn masked_digit_reply_value_joined_to_a_literal_digit_is_masked_as_one_run
 }
 
 #[tokio::test]
+async fn reference_to_a_parent_element_is_not_sent() {
+    let rig = rig(
+        "parent-ref",
+        &[("localhost", &[("KEY", "12345678")])],
+        |_| ok("<r><echo>12345678</echo><sid>00012345</sid></r>"),
+    );
+    let file = rig.file(
+        "# @name login\nGET http://localhost:PORT/login\nX-Key: {{$dotenv KEY}}\n\n###\n# @name use\nGET http://localhost:PORT/use/{{login.response.body.//r}}\n",
+    );
+    let result = rig.run(&file, "use").await;
+    says(&result, "was not sent");
+    says(&result, "selects a value");
+    assert_eq!(rig.carrier.paths(), ["/login"]);
+    never(&result, "1234567800012345");
+    absent_from_saved(&rig, "1234567800012345");
+}
+
+#[tokio::test]
 async fn digit_values_joined_to_each_other_are_masked_as_one_run() {
     let rig = rig(
         "joined-values",

@@ -6,6 +6,7 @@ use jsonpath_rust::parser::parse_json_path;
 use serde_json::Value as Json;
 use sxd_document::dom::Document;
 use sxd_xpath::Value as Xml;
+use sxd_xpath::nodeset::Node;
 
 use crate::mask::maskable;
 
@@ -32,9 +33,10 @@ const SELECTING: [&str; 10] = [
 
 /// A path starting with `$` is `JSONPath`; any other is `XPath` 1.0 with no namespace map. A path
 /// selects and never computes, so a `JSONPath` filter, any `XPath` function but `local-name` and
-/// `name`, and an `XPath` whose result is not a node-set are refused. The first match wins: a JSON
-/// string yields its content, any other JSON value its JSON text; an `XPath` node its text content
-/// (an attribute its value).
+/// `name`, an `XPath` whose result is not a node-set, and one that reads the document root or an
+/// element with element children are refused. The first match wins: a JSON string yields its
+/// content, any other JSON value its JSON text; an `XPath` node its text content (an attribute its
+/// value).
 ///
 /// # Errors
 ///
@@ -89,14 +91,28 @@ fn from_xml(body: &str, path: &str) -> Result<String, String> {
     }
     match sxd_xpath::evaluate_xpath(&document, path) {
         Err(e) => Err(format!("cannot use XPath `{path}`: {e}")),
-        Ok(Xml::Nodeset(nodes)) if nodes.size() == 0 => {
-            Err(format!("XPath `{path}` matches nothing in the reply"))
-        }
-        Ok(nodes @ Xml::Nodeset(_)) => Ok(nodes.into_string()),
+        // The node `Value::string` reads, so what is checked is what is returned.
+        Ok(Xml::Nodeset(nodes)) => match nodes.document_order_first() {
+            None => Err(format!("XPath `{path}` matches nothing in the reply")),
+            Some(node) if joins_text(node) => Err(format!(
+                "XPath `{path}` reads a parent element or the whole document, but a reference selects a value and never computes one; \
+                 name a leaf element, a text node or an attribute"
+            )),
+            Some(node) => Ok(node.string_value()),
+        },
         Ok(_) => Err(format!(
             "XPath `{path}` yields a computed result, but a reference selects a value and never computes one; \
              use the plain path to the element or attribute"
         )),
+    }
+}
+
+/// Whether the text of `node` is its descendants' text joined, which no mask would match.
+fn joins_text(node: Node) -> bool {
+    match node {
+        Node::Root(_) => true,
+        Node::Element(element) => element.children().iter().any(|c| c.element().is_some()),
+        _ => false,
     }
 }
 
@@ -360,6 +376,32 @@ mod tests {
     }
 
     #[test]
+    fn xpath_parent_element_or_document_root_is_refused() {
+        let xml = "<r><echo>12345678</echo><sid>00012345</sid></r>";
+        for path in ["//r", "/", "/*", "//*", "//echo/.."] {
+            let err = from_body(xml, path).unwrap_err();
+            assert!(err.contains("selects a value"), "{path}: {err}");
+            assert!(err.contains("leaf element"), "{path}: {err}");
+        }
+    }
+
+    #[test]
+    fn xpath_leaf_nodes_return_their_own_text() {
+        for (path, want) in [
+            ("//authToken", "T1"),
+            ("//*[local-name()='authToken']", "T1"),
+            ("//authToken/text()", "T1"),
+            ("(//authToken)[1]", "T1"),
+            ("//comment()", "note"),
+        ] {
+            let xml = SOAP.replace("<return>", "<return><!--note-->");
+            assert_eq!(from_body(&xml, path), Ok(want.into()), "{path}");
+        }
+        assert_eq!(from_body("<a b=\"v\"/>", "/a/@b"), Ok("v".into()));
+        assert_eq!(from_body("<a>x<!--c-->y</a>", "/a"), Ok("xy".into()));
+    }
+
+    #[test]
     fn xpath_paths_that_only_select_still_work() {
         let xml = "<a x=\"f(y)\"><b>1</b><b>2</b></a>";
         for (path, want) in [
@@ -410,8 +452,9 @@ mod tests {
 
     #[test]
     fn xml_at_the_nesting_limit_is_read() {
-        assert_eq!(on_a_small_stack(nested(256), "/a"), Ok("x".into()));
-        assert!(on_a_small_stack(nested(257), "/a").is_err());
+        assert_eq!(on_a_small_stack(nested(256), "//a/text()"), Ok("x".into()));
+        let err = on_a_small_stack(nested(257), "//a/text()").unwrap_err();
+        assert!(err.contains("256"), "{err}");
     }
 
     #[test]

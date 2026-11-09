@@ -50,6 +50,7 @@ the call's deadline. The result and the saved file keep its status, say why and 
 carrier, hold none of its body or headers, and the chain stops there. A reply withheld for masking time also saves none
 of the request's text.
 
-A reference selects a value and never computes one: an XPath function other than `local-name()` and `name()`, or a
-JSONPath `?` filter, is refused, because a changed copy of a value gets past masking. A reference into XML nested deeper
-than 256 levels is refused too.
+A reference selects a value and never computes one: an XPath function other than `local-name()` and `name()` in a
+predicate, a result that is not a node set, a parent element or the document root, and a JSONPath `?` filter are refused,
+because a changed copy of a value, or several values joined, gets past masking. A reference into XML nested deeper than
+256 levels is refused too.
