@@ -150,7 +150,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   - Calls go through Microsoft's `azure_devops_rust_api` (`=0.39.1`, sending `api-version=7.1-preview`) on our own
     reqwest client via `.transport()`. Its features include `search`, `wiki` and `test`, never `test_results` (its
     default host is the Services-only `vstmr`). Pins are exact (`rmcp`, `reqwest`, `azure_core` too), and `reqwest`
-    must stay the one azure_core uses (`cargo tree -d -i reqwest` shows one). The crate compiles in aws-lc-rs (C
+    must stay the one azure_core uses (`Cargo.lock` holds one `reqwest` entry). The crate compiles in aws-lc-rs (C
     code). Its repo was archived on 2026-10-26, so no fix comes from upstream: a model the server's answer doesn't fit is read
     from the raw body into our own struct (`api::json`; `Batch` and `RawComments` in `wi.rs`, `Props` beside the
     crate model in `pr.rs`).
