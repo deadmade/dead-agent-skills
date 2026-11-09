@@ -1,14 +1,15 @@
 # flows
 
 Conductor skills: each one runs the skills the rest of this marketplace ships, in order, and stops at approval gates.
-Build and research flows keep a flow.md to resume from; /review-code keeps an audit file. Claude proposes and
-recommends; you decide.
+Build and research flows keep a flow.md to resume from; /review-code keeps an audit file. /evaluate has no gate and ends
+on one page. Claude proposes and recommends; you decide.
 
 | Command                                          | Job                                                             | Runs                                                                                                                                                                                                                                                                        | Ends in                                           |
 | ------------------------------------------------ | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | `/understand <topic>`                            | learn a codebase, subsystem or concept                          | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                                            | terms in GLOSSARY.md                              |
 | `/build-feature <what>`                          | a new feature with a design                                     | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                                                                                                                                           | `/review-code`, `/learn`                          |
 | `/research-feature <question>`                   | research a design question before building                      | frame, papers and engineering sources (web-mcp, paper-lookup), source check, a claim vote on what the options rest on, `grilling` on the options; no build, no benchmark                                                                                                    | a decision report, then `/build-feature`          |
+| `/evaluate <url or name> [purpose]`              | is this tool useful here?                                       | identifies the tool, reads the project, prior art, source check; reads only, never runs the tool                                                                                                                                                                            | one page: adopt, try or skip                      |
 | `/implement <ticket or plan>`                    | build a ticket or a given plan                                  | reads and checks the input, one gate to confirm it; a ticket in this session, a plan through superpowers execution; never plans, never changes a plan                                                                                                                       | `/review-code`, `/learn`                          |
 | `/fix <symptom>`                                 | fix a bug                                                       | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                                                                                                                                              | `/review-code`, `/learn`                          |
 | `/upgrade <pkg>[@v] …`                           | bump one dependency, a list, or all outdated                    | changelogs via web-mcp and context7, `blast-radius`; patch and minor bumps as one task, majors through a plan; bump, fix test-first in batches                                                                                                                              | `/review-code`, `/learn`                          |
@@ -24,7 +25,7 @@ it; `all` audits the whole repo, vendored content skipped.
 ## What each conductor uses
 
 Generated from each conductor's `uses:` line, its steps' and its host wording's by `node scripts/flows-uses.mjs`;
-`npm test` fails when it is stale.
+`npm test` fails when it is stale. The tree names what a conductor may run: a run can skip one, as /evaluate skips `why`.
 Installing flows installs every plugin below; the packs ship inside flows itself.
 
 <!-- uses:start -->
@@ -40,6 +41,15 @@ build-feature
 ├ ponytail: ponytail-review
 ├ pstack-picks: architect, arena, blast-radius, how, interrogate, principle-boundary-discipline, principle-redesign-from-first-principles, why
 ├ superpowers: brainstorming, executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees, writing-plans
+└ web-mcp: fetch, search
+
+evaluate
+├ claude-code: Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
+├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
+├ claude-security@claude-plugins-official: claude-security (claude-code)
+├ graphify: graphify
+├ mattpocock-picks: setup-matt-pocock-skills
+├ pstack-picks: how, why
 └ web-mcp: fetch, search
 
 fix

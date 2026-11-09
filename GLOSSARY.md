@@ -104,9 +104,17 @@ _Avoid_: managed copy, local copy
 
 **Conductor**:
 A flows skill the user starts by name that runs other skills in order and keeps a record of the run: a flow.md for the
-build and research flows; /review-code, /understand and /learn keep their own (an audit file, a scratch file, the
-chat).
+build and research flows; /review-code, /understand, /evaluate and /learn keep their own (an audit file, a scratch
+file, an evaluation page, the chat).
 _Avoid_: workflow, flow (alone; one execution of a flow is a run)
+
+**Evaluation page**:
+The one page /evaluate writes, ending in an adoption verdict; with the `prior-art.md` beside it, it is that run's whole record.
+_Avoid_: report, radar entry
+
+**Adoption verdict**:
+Adopt, try or skip, for one tool in one project.
+_Avoid_: ring, rating, score, run verdict
 
 **Flow step**:
 A piece of conductor text written once, in `plugins/flows/steps/<name>.toml`, and copied word for word into every

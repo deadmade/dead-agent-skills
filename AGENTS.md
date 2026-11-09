@@ -63,7 +63,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   hand.
 - `plugins/opt-in/mcp/mcp-github/`: an MCP server config only.
 - `plugins/flows/`: the conductor skills (`/build-feature`, `/research-feature`, `/implement`, `/fix`, `/upgrade`,
-  `/refactor`, `/review-code`, `/understand`, `/learn`). Each runs other plugins' skills in order;
+  `/refactor`, `/review-code`, `/understand`, `/learn`, `/evaluate`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
   plugin) live once in `plugins/flows/steps/*.toml`, composed into each conductor at build time (`docs/adr/0009-conductors-composed-from-flow-steps.md`), so a
   SKILL.md says what it runs and names its steps (`[step: <name>]`). Compose (`tools/harness-compiler/src/flows/compose.ts`)
@@ -73,7 +73,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   makes sense, each on a model that fits its job (`docs/adr/0005-agent-limits-and-models.md`). The installer's only part is
   `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` (`mergeSettings`); it never writes `CLAUDE_CODE_SUBAGENT_MODEL`.
   Conductors call each other by reading the callee's SKILL.md (`/fix` → `/review-code`). Each
-  conductor's `uses:` frontmatter, plus its steps' and host wording's `uses`, lists what it runs;
+  conductor's `uses:` frontmatter, plus its steps' and host wording's `uses`, names what it may run;
   `scripts/flows-uses.mjs` generates flows' `dependencies` and the README tree from them, and check-repo fails when a
   listed skill is gone or the generated parts are stale. `/review-code`
   replaced `/test-audit`, `/doc-audit`, `/harden`, `/self-review` and `/verify` (their method text is in its
@@ -117,7 +117,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   host, `<last path segment of the URL>.html`; `WEB_MCP_TEST_PUBLIC_IP` treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS`,
   `WEB_MCP_PAPERS_MS` and `WEB_MCP_LOOKUP_MS` shorten the fetch fallback's, each paper source's and each lookup
   source's deadline. Env knobs: `WEB_MCP_CHROME` picks the browser binary; `WEB_MCP_SEARCH_DIR` picks where profile
-  slots live (no temp fallback).
+  slots live (no temp fallback). `fetch` runs with `allow_private: true` (`tools.rs`, for the user's own localhost
+  sites), so a conductor that follows links from untrusted pages, as /evaluate does, has only a text rule on the URL:
+  a hostname resolving to a private address gets through, though a public URL's redirect onto one is refused.
 - `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
   `tools/upstream-sync/src/adapters/*.ts`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
   plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
