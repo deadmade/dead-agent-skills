@@ -105,7 +105,7 @@ _Avoid_: managed copy, local copy
 **Conductor**:
 A flows skill the user starts by name that runs other skills in order and keeps a record of the run: a flow.md for the
 build and research flows; /review-code, /understand, /evaluate and /learn keep their own (an audit file, a scratch
-file, an evaluation page, the chat).
+file, an evaluation page, the chat). /tidy runs one agent instead of other skills, and its record is its report in the chat.
 _Avoid_: workflow, flow (alone; one execution of a flow is a run)
 
 **Evaluation page**:

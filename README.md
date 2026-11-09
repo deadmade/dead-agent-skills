@@ -63,7 +63,7 @@ passive lookups and a browser with an archive of everything it pulled, and
 [headroom-trim](plugins/opt-in/headroom-trim/README.md), which shrinks every tool result with headroom's offline compression before Claude reads it.
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/build-feature`,
-`/fix`, `/review-code`, `/learn` and more) that run the other plugins' skills in order,
+`/fix`, `/review-code`, `/learn` and more), nearly all of which run the other plugins' skills in order,
 most with approval gates. Build and research flows keep a flow.md to resume from; /review-code keeps an audit file.
 They keep the number of agents small, ultracode included, and run each on a model suited to its job rather than the one you picked. Picking flows installs every plugin its conductors use.
 flows also sets the house standard for prose. A `writing` skill states Williams and Bizup's _Style_ in our own words.
