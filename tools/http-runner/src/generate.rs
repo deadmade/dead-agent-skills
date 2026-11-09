@@ -10,10 +10,12 @@ use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 use serde::de::{
-    self, DeserializeSeed, Deserializer, EnumAccess, IgnoredAny, MapAccess, SeqAccess,
-    VariantAccess, Visitor,
+    self, DeserializeSeed, Deserializer, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor,
 };
 use serde_norway::Value;
 use url::Url;
@@ -22,8 +24,8 @@ const METHODS: [&str; 7] = ["get", "put", "post", "delete", "options", "head", "
 const MAX_REF_STEPS: usize = 32;
 /// The most a spec file, the file written and any one body may hold.
 const MAX_SPEC_BYTES: usize = 32 << 20;
-/// libyaml scans flow nesting in quadratic time before the reader's own limit of 128 applies.
-const MAX_DEPTH: usize = 128;
+/// How long reading a spec may take: libyaml scans some small files in quadratic time.
+const DEADLINE: Duration = Duration::from_secs(10);
 /// What one YAML node is counted as, beside its text: the limit comes to five million nodes.
 const NODE_COST: usize = 64;
 const MAX_EXPANDED: usize = 5_000_000 * NODE_COST;
@@ -64,12 +66,7 @@ fn write(spec: &Path, output: &Path, base_url: Option<&str>) -> Result<Generated
             ));
         }
     }
-    let doc = read_spec(spec)?;
-    let base = base(&doc, base_url)?;
-    let name = spec
-        .file_name()
-        .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
-    let (text, requests, with_body) = render(&doc, &name, &base)?;
+    let (text, requests, with_body) = build(spec, base_url)?;
     let mut file_name = spec.file_stem().unwrap_or_default().to_owned();
     file_name.push(".http");
     let path = output.join(file_name);
@@ -92,6 +89,33 @@ fn write(spec: &Path, output: &Path, base_url: Option<&str>) -> Result<Generated
         requests,
         with_body,
     })
+}
+
+/// Reads the spec and renders the file, on a worker thread that is given `DEADLINE`, so a spec the YAML reader
+/// takes long over costs that long and no more. Nothing is created until this returns.
+///
+/// shortcut: a thread cannot be stopped, so a worker that overruns is left to finish on its own, holding a core and
+/// the spec's memory until libyaml is done; move to a child process that can be killed if such workers pile up.
+fn build(spec: &Path, base_url: Option<&str>) -> Result<(String, usize, usize), String> {
+    let (spec, base_url) = (spec.to_owned(), base_url.map(str::to_owned));
+    let (send, receive) = mpsc::channel();
+    thread::spawn(move || {
+        let built = read_spec(&spec).and_then(|doc| {
+            let base = base(&doc, base_url.as_deref())?;
+            let name = spec
+                .file_name()
+                .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+            render(&doc, &name, &base)
+        });
+        // After a timeout nobody is listening.
+        let _ = send.send(built);
+    });
+    receive.recv_timeout(DEADLINE).map_err(|_| {
+        format!(
+            "the spec could not be read within {} seconds",
+            DEADLINE.as_secs()
+        )
+    })?
 }
 
 fn read_spec(spec: &Path) -> Result<Value, String> {
@@ -132,20 +156,8 @@ fn read_spec(spec: &Path) -> Result<Value, String> {
     Ok(doc)
 }
 
-/// Reads YAML after two cheap refusals, since a small file can otherwise stall the reader or exhaust memory:
-/// deep flow nesting, and aliases, which `Value` would keep a copy of at every use.
+/// Reads YAML after a cheap refusal of aliases, which `Value` would keep a copy of at every use.
 fn yaml(text: &str) -> Result<Value, String> {
-    let mut depth = 0_usize;
-    for b in text.bytes() {
-        match b {
-            b'[' | b'{' => depth += 1,
-            b']' | b'}' => depth = depth.saturating_sub(1),
-            _ => {}
-        }
-        if depth > MAX_DEPTH {
-            return Err(format!("the spec nests brackets deeper than {MAX_DEPTH}"));
-        }
-    }
     let cost = Cell::new(0);
     let counted = Cost(&cost).deserialize(serde_norway::Deserializer::from_str(text));
     if cost.get() > MAX_EXPANDED {
@@ -235,7 +247,8 @@ impl<'de> Visitor<'de> for Cost<'_> {
     }
 
     fn visit_enum<A: EnumAccess<'de>>(self, data: A) -> Result<(), A::Error> {
-        let (IgnoredAny, tagged) = data.variant()?;
+        // Reading the tag as a seed charges its text, which every replay of an alias copies.
+        let ((), tagged) = data.variant_seed(self)?;
         tagged.newtype_variant_seed(self)
     }
 }
@@ -1241,10 +1254,26 @@ paths:
 
     #[test]
     fn deep_flow_nesting_is_refused_quickly() {
+        // Each closer sits in a comment, so a scan of the text never sees the nesting libyaml's reader does:
+        // 400 KB that libyaml takes minutes to read (159 s in a debug build).
+        let block = format!("{}\n#{}\n", "[".repeat(100), "]".repeat(100));
+        let spec = format!("x: {}", block.repeat(2_000));
         let started = std::time::Instant::now();
-        let err = refused("deep", &format!("x: {}\n", "[".repeat(40_000)), Some(BASE));
-        assert!(err.contains("nests brackets"), "{err}");
-        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+        let err = refused("deep", &spec, Some(BASE));
+        assert!(started.elapsed() < std::time::Duration::from_secs(12));
+        assert!(err.contains("could not be read within"), "{err}");
+    }
+
+    #[test]
+    fn alias_of_a_large_tag_is_refused() {
+        // 160 KB; each of the 12,000 aliases copies the 100 KB tag, 1.2 GB in all.
+        let spec = format!(
+            "a: &a !{} hello\nb: [{}]\n",
+            "t".repeat(100_000),
+            "*a, ".repeat(12_000)
+        );
+        let err = refused("large-tag", &spec, Some(BASE));
+        assert!(err.contains("aliases are replayed"), "{err}");
     }
 
     #[test]
