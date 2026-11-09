@@ -172,7 +172,10 @@ fn parse_block(lines: &[Line], vars: &mut Vars) -> Result<Option<Request>, Parse
     }
     let body: Vec<Line> = lines.collect();
     let used = |&(_, l): &Line| !l.trim().is_empty();
-    if let (Some(first), Some(last)) = (body.iter().position(used), body.iter().rposition(used)) {
+    // Blank and comment-like lines alone are a note after the request, not a body.
+    if body.iter().any(|l| used(l) && !is_comment(l.1))
+        && let (Some(first), Some(last)) = (body.iter().position(used), body.iter().rposition(used))
+    {
         request.body = Some(body_text(&body[first..=last], vars)?);
     }
     Ok(Some(request))
@@ -614,6 +617,12 @@ mod tests {
             "POST https://a.example/x\nContent-Type: text/plain\n\nfirst\n# second\n// third\nlast\n",
         );
         assert_eq!(req.body, Some(lit("first\n# second\n// third\nlast")));
+    }
+
+    #[test]
+    fn trailing_comment_is_not_a_body() {
+        let req = one("GET https://a.example/x\n\n# check the result\n###\n");
+        assert_eq!(req.body, None);
     }
 
     #[test]
