@@ -76,7 +76,6 @@
     "dependencies": [],
     "targets": ["claude-code", "codex"]
   },
-
   {
     "name": "http-runner",
     "source": "plugins/opt-in/mcp/http-runner",

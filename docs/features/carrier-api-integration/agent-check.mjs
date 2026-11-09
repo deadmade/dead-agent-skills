@@ -6,6 +6,7 @@
 //
 // Needs `cargo build --release --locked -p http-runner` and `npm run build:harnesses` first.
 // --store is HTTP_RUNNER_DIR, shared by the runs as one user's logins are.
+// Any file outside http-replies/ and dot folders counts as the fixture, so a pass proves a reply value was used, not that the fixture is a good one.
 
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, closeSync, copyFileSync, mkdirSync, openSync, readFileSync, readdirSync } from 'node:fs';

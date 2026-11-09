@@ -30,7 +30,7 @@ export function integrationSetup(context: EmitContext) {
   if (name === 'mcp-azure')
     setup += `\n\nPut the ado-mcp release binary on PATH (or use its absolute path in the command). Set ADO_ORG_URL (the Azure DevOps Server collection URL) and ADO_PAT in the environment that starts Codex. In the native server table [mcp_servers.dead-agent-skills-mcp-azure], add env_vars = [${envVars.map((v) => `"${v}"`).join(', ')}]. ADO_PROJECT_DIR optionally overrides the repository used for project detection. Preserve all unrelated configuration; ask for missing non-secret preferences. Release binaries: https://github.com/${context.repository}/releases .`;
   if (name === 'http-runner')
-    setup += `\n\nPut the http-runner release binary on PATH (or use its absolute path in the command). The user types each host's login on a page the server opens in their browser, so no credential goes in the environment, the command or the chat. Release binaries: https://github.com/${context.repository}/releases .`;
+    setup += `\n\nPut the http-runner release binary on PATH (or use its absolute path in the command). The user types each host's login on a page the server opens in their browser, so no credential goes in the environment, the command or the chat. The typed values live in logins.json in the per-user data folder or HTTP_RUNNER_DIR, a host is forgotten by deleting its entry there, and http-replies/ should be reviewed before it is committed. Release binaries: https://github.com/${context.repository}/releases .`;
   if (name === 'atlassian')
     setup +=
       '\n\nComplete OAuth with codex mcp login dead-agent-skills-atlassian. Authentication is a separate user action.';

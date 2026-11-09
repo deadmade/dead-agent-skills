@@ -96,7 +96,7 @@ _Avoid_: pin file, lockfile (it does not lock a tool's own dependencies)
 **Our copy**:
 The copy of a tool in the installer's bin folder (`<config>/bin`, `~/.claude/bin` by default; the Codex step uses its own
 bin folder for agent-browser) that the installer downloaded and that the plugin's settings point at. A copy elsewhere on
-PATH is never used, except by the Codex step, which looks on PATH first for web-mcp and ado-mcp, and for agent-browser
+PATH is never used, except by the Codex step, which looks on PATH first for web-mcp, ado-mcp and http-runner, and for agent-browser
 only where no build is pinned.
 _Avoid_: managed copy, local copy
 
