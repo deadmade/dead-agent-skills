@@ -1,7 +1,7 @@
 ---
 flow: feature
-phase: finish
-now: Waiting for you: pick how the branch ends.
+phase: done
+now: Done: PR handed over for shopping-search.
 ---
 
 # Shopping search: flow
@@ -159,6 +159,7 @@ Fix 3+6+9+10+11+12+13: base b0c1807ffec814ca11acd3f78a2a81a5c791ad98 — files c
 - 2026-11-09, Fix 1: `Archive::put` skips `page.md` when the markdown is empty and a `page.md` already exists, and does not point the index at `raw.html` as the audit proposed — that would make a repeat `fetch` of a text-less page read raw HTML as its markdown (fetch.rs:215, :641) — if wrong, a page fetched with text and later fetched empty keeps the old `page.md`.
 - 2026-11-09, Fix 1 and 2: the builders committed with `PRE_COMMIT_ALLOW_NO_CONFIG=1` (the new worktree has no generated pre-commit config); treefmt ran at none of the commits and is run once on all changed files before the merge — if wrong, a formatting-only commit follows.
 
+- 2026-11-09, Close: origin/main moved two commits and conflicted in `AGENTS.md` and `tools/installer/core/catalog.test.ts`; the branch was rebased onto it (both files resolved: the diagrams paragraph kept beside the `rows` bullet; counts 16 and 15) and every check re-run on the result (cargo workspace 655 passed, clippy, fmt, typecheck, build:harnesses, lint, `npm test` 56 of 56) — if wrong, the rebased SHAs differ from the ones named under Tasks.
 - 2026-11-09, Fix 2: the Codex installer fix touches `tools/installer/steps/codex.ts` and its test, outside the plan's Files lists — the user's pick of finding 2 at Gate 3 approved it — if wrong, a Codex user on a platform without a web-mcp build could still be offered `shop`.
 
 - 2026-11-09, Tasks 5 and 6: no separate task reviewer — docs, metadata and a text-only skill, checked by the files check and size check, the build, lint, `npm test` and the skill scan — a wrong sentence in the README or skill would surface at the final review and the live check.
