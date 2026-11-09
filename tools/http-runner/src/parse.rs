@@ -120,6 +120,7 @@ fn err(line: usize, message: impl Into<String>) -> ParseError {
 ///
 /// Returns the first line outside the supported format.
 pub fn parse(text: &str) -> Result<ParsedFile, ParseError> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let mut vars = Vars::new();
     let mut requests = Vec::new();
     let mut block = Vec::new();
@@ -132,6 +133,17 @@ pub fn parse(text: &str) -> Result<ParsedFile, ParseError> {
         }
     }
     requests.extend(parse_block(&block, &mut vars)?);
+    let mut first_line = HashMap::new();
+    for request in &requests {
+        if let Some(name) = &request.name
+            && let Some(first) = first_line.insert(name, request.line)
+        {
+            return Err(err(
+                request.line,
+                format!("request name `{name}` is already used by the request on line {first}"),
+            ));
+        }
+    }
     Ok(ParsedFile { requests })
 }
 
@@ -543,6 +555,31 @@ mod tests {
                 .as_deref(),
             Some("a-B_1")
         );
+    }
+
+    #[test]
+    fn a_repeated_name_is_refused_naming_both_lines() {
+        let err = refused(
+            "# @name a\nGET https://a.example/1\n\n###\n# @name b\nGET https://a.example/2\n\n###\n# @name a\nGET https://a.example/3\n",
+        );
+        assert_eq!(err.line, 10);
+        assert!(
+            err.message.contains("`a`") && err.message.contains("line 2"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn unnamed_requests_may_repeat() {
+        let file = parse("GET https://a.example/1\n\n###\nGET https://a.example/2\n").unwrap();
+        assert_eq!(file.requests.len(), 2);
+    }
+
+    #[test]
+    fn a_byte_order_mark_at_the_start_is_ignored() {
+        let plain = "# @name a\nGET https://a.example/x\n";
+        assert_eq!(parse(&format!("\u{feff}{plain}")), parse(plain));
+        assert_eq!(one("\u{feff}GET https://a.example/x\n").line, 1);
     }
 
     #[test]
