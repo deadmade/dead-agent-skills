@@ -31,10 +31,10 @@ const SELECTING: [&str; 10] = [
 ];
 
 /// A path starting with `$` is `JSONPath`; any other is `XPath` 1.0 with no namespace map. A path
-/// selects and never computes, so a `JSONPath` filter and any `XPath` function but `local-name`
-/// and `name` are refused. The first match wins: a JSON string yields its content, any other JSON
-/// value its JSON text; an `XPath` node its text content (an attribute its value), anything else
-/// its text.
+/// selects and never computes, so a `JSONPath` filter, any `XPath` function but `local-name` and
+/// `name`, and an `XPath` whose result is not a node-set are refused. The first match wins: a JSON
+/// string yields its content, any other JSON value its JSON text; an `XPath` node its text content
+/// (an attribute its value).
 ///
 /// # Errors
 ///
@@ -92,7 +92,11 @@ fn from_xml(body: &str, path: &str) -> Result<String, String> {
         Ok(Xml::Nodeset(nodes)) if nodes.size() == 0 => {
             Err(format!("XPath `{path}` matches nothing in the reply"))
         }
-        Ok(value) => Ok(value.into_string()),
+        Ok(nodes @ Xml::Nodeset(_)) => Ok(nodes.into_string()),
+        Ok(_) => Err(format!(
+            "XPath `{path}` yields a computed result, but a reference selects a value and never computes one; \
+             use the plain path to the element or attribute"
+        )),
     }
 }
 
@@ -342,6 +346,15 @@ mod tests {
             "1-substring(//authToken,2)",
         ] {
             let err = from_body(SOAP, path).unwrap_err();
+            assert!(err.contains("selects a value"), "{path}: {err}");
+        }
+    }
+
+    #[test]
+    fn xpath_result_that_is_not_a_node_set_is_refused() {
+        let xml = "<r><echo>12345678</echo><sid>00012345</sid><pin>12345</pin></r>";
+        for path in ["//echo+1", "//sid - 0", "//pin=12345", "'text'", "1"] {
+            let err = from_body(xml, path).unwrap_err();
             assert!(err.contains("selects a value"), "{path}: {err}");
         }
     }
