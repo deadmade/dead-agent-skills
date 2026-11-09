@@ -24,7 +24,7 @@ Behave like a person with a browser.
 - Never use what the shops' robots.txt disallows (as read on 2026-11-08):
   - Geizhals: the parameters `bpmax`, `sort` and `fs`; the `/redir/` shop links; the `/hardware/` category paths.
   - Kleinanzeigen: the `preis:`, `sortierung:` and `condition_s` paths; pages past `seite:5`.
-  - Galaxus: `*/search`, `*filterGrid=` and `*/marketplace/`. Galaxus has no recipe here.
+  - Galaxus: `*/search`, `*filterGrid=` and `*/marketplace/`. Galaxus has no recipe here, and its category pages load their tiles lazily: the same address gave 43 tiles once and 3 four minutes later.
 - Apply price limits yourself, from the rows.
 - Never state a price without naming its source and its date. The source is the shop and the address; the date is the fetched time in the `Source:` line of the reply.
 
@@ -35,7 +35,8 @@ Use it for used items.
 - The search address is `https://www.kleinanzeigen.de/s-<words joined by ->/k0`, for example `https://www.kleinanzeigen.de/s-serverschrank-19-zoll/k0`.
 - Group 1 is the ads. Group 2 is the filter panel; ignore it.
 - A row gives the price, the place, the time, a `V` or "Direkt kaufen" flag when there is one, and the link to the ad.
-- Kleinanzeigen has no depth or spec filter. Open the promising ads one at a time and read their descriptions. Accessories (shelves, rails, doors) are mixed in with the real items.
+- Kleinanzeigen has no depth or spec filter. Open the promising ads one at a time and read their descriptions: on an ad page the default groups are the seller's other ads, so call `rows` with `item` set to `#viewad-description-text`. Accessories (shelves, rails, doors) are mixed in with the real items.
+- A row is cut at 200 characters and its text can start with an image count (`2 86150 Augsburg`), so a price or a flag such as "Direkt kaufen" may be missing or cut. Take the exact price from the ad.
 - Show each ad's place and say when an ad is pickup only.
 
 ## Recipe: Geizhals
@@ -44,7 +45,9 @@ Use it for new prices and for model specs.
 
 - The category and the filters go in the address: `https://geizhals.de/?cat=<category>&xf=<id>_<value>~<id>_<value>&pagesize=30&promode=false`. For example, `?cat=monlcd19wide&xf=18036_IPS~18315_ab+2560x1440&pagesize=30&promode=false` is monitors with an IPS panel and at least 2560x1440.
 - Group 1 is the products. Group 2 is a guide text below the list; ignore it.
-- To read the filters, call `rows` again with `item` set to `div.filter-element`. Build the next address from each filter's link. Never guess a filter id.
+- A product row is cut at 200 characters and its price comes last, so most rows show no price. For prices call `rows` again on the same address with `item` set to `div.galleryview__price`: it returns `ab EUR <price> | product link` in the same order as the cards, and a price pairs with a name by the link. Prices move between loads, so say when you read them.
+- To read the filters, call `rows` again with `item` set to `div.filter-element`. Each row lists a filter's values as text and links only to that filter's own `&fcols=` page, not to the value addresses, so never guess an `xf` id. A range filter such as `ab 2560x1440` also lets 4K through: read the resolution from the card text.
+- A product page's offers link to `/redir/` shop addresses. Show them to the user; never open them.
 - Do not use `?fs=` for search, and do not use `bpmax` or `sort`. Read the price from the rows and apply the limit yourself.
 - To find a category address, call `rows` on `https://geizhals.de/` with `item` set to `a.o-category` and `limit` 200. It returns one row per category link (78 on 2026-11-09). A row linking to `?cat=<slug>` is a category address to use as it is (Monitore: `?cat=monlcd19wide`). A row linking to `?o=<n>` is a group: call `rows` on it without `item`, and each row of group 1 links to a `?cat=<slug>` address. A category may not appear at all (server racks were not found under Netzwerk, `?o=14`); then ask the user for the category address. Without `item`, the home page's rows give one link per row and hide most slugs.
 
