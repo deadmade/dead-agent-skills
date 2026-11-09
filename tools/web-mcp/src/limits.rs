@@ -55,7 +55,7 @@ impl HostLimits {
             let mut hosts = self.hosts.lock().unwrap_or_else(PoisonError::into_inner);
             let next = &mut hosts.get_mut(&host).expect("inserted above").1;
             let start = (*next).max(Instant::now());
-            *next = start + gap;
+            *next = start + gap.max(interval(url));
             start
         };
         tokio::time::sleep_until(start).await;
@@ -127,5 +127,15 @@ mod tests {
         let t1 = Instant::now();
         drop(l.acquire(&u("https://other.example/")).await);
         assert!(t1.elapsed() < Duration::from_millis(10));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn short_gap_never_shortens_the_hosts_own_spacing() {
+        let l = HostLimits::default();
+        let arxiv = u("https://export.arxiv.org/api/query");
+        let t0 = Instant::now();
+        drop(l.acquire_with(&arxiv, Duration::from_secs(1)).await);
+        drop(l.acquire(&arxiv).await);
+        assert!(t0.elapsed() >= Duration::from_secs(3));
     }
 }
