@@ -18,12 +18,15 @@ the placeholder link and id are why the leak check `0\d{3,}[ /-]?\d{5,}` still m
 
 ## Groups (largest sibling groups, counted on the scrubbed files)
 
-- `ads_page.html`: 25 `li` ads under `ul#srchrslt-adtable`; next a filter panel of 9 `details` sections
-  (`form#browsebox-form`), then 15-item `li` and `a` navigation groups.
-- `product_cards_page.html`: 30 `div.galleryview__item.card` products and 9 `div.filter-element` entries in the sidebar
-  filter row `filter-row-5080`. A guide text below the list (`section#ratgeber`) forms larger sibling groups than the product list: 40
-  `div.cms-fliesstext` paragraphs and 37 `li.cms-toc__item` entries. The probe's count of 30 products and 9 filter
-  blocks did not include them.
+A count of "elements" is the tags in the file; a count "in the group" is the siblings `rows` keeps, which need 16
+characters of text each, so it can be smaller. Where the two differ, the text gives both.
+
+- `ads_page.html`: 25 `li` ads under `ul#srchrslt-adtable`; next a filter panel of 10 `details` elements
+  (`form#browsebox-form`), 9 of them in the group, then 15-item `li` and `a` navigation groups.
+- `product_cards_page.html`: 30 `div.galleryview__item.card` products and 10 `div.filter-element` elements in the
+  sidebar filter row `filter-row-5080`, 9 of them in the group. A guide text below the list (`section#ratgeber`) forms
+  larger sibling groups than the product list: 40 `div.cms-fliesstext` paragraphs (39 in the group) and 37
+  `li.cms-toc__item` entries. The probe's count of 30 products and 9 filter blocks did not include them.
 - `tiles_page.html`: 43 `article` tiles in one `div` (50 `article` elements in all; 47 link to a `/product/` page).
   This is a category page, not the 15-tile search page the probe measured. Next come 21 keyword-filter `div`s in a
   `fieldset`, then 13 and 12 `li` navigation groups.
