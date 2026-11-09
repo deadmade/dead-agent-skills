@@ -4,16 +4,19 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt::Write as _;
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Duration;
 
 use http_runner::login_page::{Open, Pages};
 use http_runner::run::{self, Ctx, RunArgs};
 use http_runner::store::Store;
+use serde_json::{Value, json};
 use tokio::task::JoinHandle;
 
 /// One request as the carrier received it. Header names are lower case.
@@ -140,6 +143,44 @@ fn read(stream: &mut TcpStream) -> Option<Seen> {
 /// Hosts the store already knows, each with its typed values.
 pub type Confirmed<'a> = &'a [(&'a str, &'a [(&'a str, &'a str)])];
 
+/// A folder of this process's own for one test, emptied first.
+pub fn tempdir(tag: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("http-runner-{tag}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// A store in `dir/store` that holds `confirmed`.
+fn seeded_store(dir: &Path, confirmed: Confirmed) -> Arc<Store> {
+    let store = Arc::new(Store::at(dir.join("store")));
+    for (host, values) in confirmed {
+        let typed: BTreeMap<_, _> = values
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect();
+        store.save(host, &typed).unwrap();
+    }
+    store
+}
+
+/// The `n`th address (from 1) the fake browser wrote to `out`.
+fn nth_address(out: &Path, n: usize) -> Option<String> {
+    let text = std::fs::read_to_string(out).unwrap_or_default();
+    text.lines().nth(n - 1).map(str::to_string)
+}
+
+/// Waits for `nth_address`, from a thread that may block.
+fn wait_address(out: &Path, n: usize) -> String {
+    for _ in 0..250 {
+        if let Some(address) = nth_address(out, n) {
+            return address;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    panic!("the fake browser got no address {n}");
+}
+
 pub struct Rig {
     pub ctx: Arc<Ctx>,
     pub carrier: Carrier,
@@ -163,17 +204,8 @@ pub fn rig_with(
     handler: impl Fn(&Seen) -> String + Send + Sync + 'static,
 ) -> Rig {
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let dir = std::env::temp_dir().join(format!("http-runner-run-{tag}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    let store = Arc::new(Store::at(dir.join("store")));
-    for (host, values) in confirmed {
-        let typed: BTreeMap<_, _> = values
-            .iter()
-            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-            .collect();
-        store.save(host, &typed).unwrap();
-    }
+    let dir = tempdir(&format!("run-{tag}"));
+    let store = seeded_store(&dir, confirmed);
     let out = dir.join("browser.txt");
     let mut program: Vec<OsString> = vec![
         env!("CARGO_BIN_EXE_fake-browser").into(),
@@ -226,9 +258,8 @@ impl Rig {
     /// The `n`th address (from 1) the fake browser was given.
     pub async fn address(&self, n: usize) -> String {
         for _ in 0..250 {
-            let text = std::fs::read_to_string(&self.out).unwrap_or_default();
-            if let Some(line) = text.lines().nth(n - 1) {
-                return line.to_string();
+            if let Some(address) = nth_address(&self.out, n) {
+                return address;
             }
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
@@ -296,4 +327,132 @@ pub fn closed_port() -> u16 {
         .local_addr()
         .unwrap()
         .port()
+}
+
+/// The `http-runner` binary over stdio, initialized, with a fake browser and a login store of its own.
+pub struct Mcp {
+    /// The folder holding the store, the fake browser's log and the files a test writes.
+    pub dir: PathBuf,
+    out: PathBuf,
+    child: Child,
+    stdin: Option<ChildStdin>,
+    stdout: BufReader<ChildStdout>,
+    stderr: Option<thread::JoinHandle<String>>,
+    next_id: u64,
+}
+
+#[allow(clippy::needless_pass_by_value)] // callers build the JSON inline with `json!`
+impl Mcp {
+    /// A server whose store already holds `confirmed`; `envs` go on top of the fake browser's.
+    pub fn start(tag: &str, confirmed: Confirmed, envs: &[(&str, &str)]) -> Self {
+        let dir = tempdir(&format!("mcp-{tag}"));
+        seeded_store(&dir, confirmed);
+        let out = dir.join("browser.txt");
+        let mut child = Command::new(env!("CARGO_BIN_EXE_http-runner"))
+            .env("HTTP_RUNNER_DIR", dir.join("store"))
+            .env("HTTP_RUNNER_OPEN", env!("CARGO_BIN_EXE_fake-browser"))
+            .env("FAKE_BROWSER_OUT", &out)
+            .envs(envs.iter().copied())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let stdin = child.stdin.take();
+        let stdout = BufReader::new(child.stdout.take().unwrap());
+        let mut stderr = child.stderr.take().unwrap();
+        let stderr = thread::spawn(move || {
+            let mut text = String::new();
+            let _ = stderr.read_to_string(&mut text);
+            text
+        });
+        let mut mcp = Self {
+            dir,
+            out,
+            child,
+            stdin,
+            stdout,
+            stderr: Some(stderr),
+            next_id: 1,
+        };
+        mcp.request(
+            "initialize",
+            json!({"protocolVersion":"2025-06-18","capabilities":{},
+                   "clientInfo":{"name":"t","version":"0"}}),
+        );
+        mcp.send(&json!({"jsonrpc":"2.0","method":"notifications/initialized"}));
+        mcp
+    }
+
+    fn send(&mut self, message: &Value) {
+        let stdin = self.stdin.as_mut().unwrap();
+        writeln!(stdin, "{message}").unwrap();
+        stdin.flush().unwrap();
+    }
+
+    /// The whole JSON-RPC response, so a protocol error can be checked.
+    pub fn request_raw(&mut self, method: &str, params: Value) -> Value {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.send(&json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}));
+        loop {
+            let mut line = String::new();
+            assert!(
+                self.stdout.read_line(&mut line).unwrap() > 0,
+                "server exited"
+            );
+            let response: Value = serde_json::from_str(&line).unwrap();
+            if response["id"].as_u64() == Some(id) {
+                return response;
+            }
+        }
+    }
+
+    /// The response's `result`; a protocol error fails the test.
+    pub fn request(&mut self, method: &str, params: Value) -> Value {
+        let mut response = self.request_raw(method, params);
+        assert!(response["error"].is_null(), "{response}");
+        response["result"].take()
+    }
+
+    /// The text of a tool call's first block.
+    pub fn call(&mut self, tool: &str, arguments: Value) -> String {
+        let result = self.request("tools/call", json!({"name": tool, "arguments": arguments}));
+        result["content"][0]["text"].as_str().unwrap().to_owned()
+    }
+
+    /// Writes `t.http` and returns its path.
+    pub fn file(&self, text: &str) -> PathBuf {
+        let path = self.dir.join("t.http");
+        std::fs::write(&path, text).unwrap();
+        path
+    }
+
+    /// The `n`th address (from 1) the fake browser was given.
+    pub fn address(&self, n: usize) -> String {
+        wait_address(&self.out, n)
+    }
+
+    /// Types `pairs` on the first login page from another thread, since `call` blocks this one.
+    pub fn type_login(
+        &self,
+        pairs: &'static [(&'static str, &'static str)],
+    ) -> thread::JoinHandle<()> {
+        let out = self.out.clone();
+        thread::spawn(move || submit(&wait_address(&out, 1), pairs))
+    }
+
+    /// Closes the server's stdin as a client does on exit, waits for it and returns what it wrote to stderr.
+    pub fn finish(mut self) -> String {
+        self.stdin = None;
+        self.child.wait().unwrap();
+        self.stderr.take().unwrap().join().unwrap()
+    }
+}
+
+impl Drop for Mcp {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
 }
