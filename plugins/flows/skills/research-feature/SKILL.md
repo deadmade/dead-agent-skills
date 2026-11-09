@@ -66,7 +66,7 @@ prior-art agent, whose prompt takes the question in place of the feature:
 [step: prior-art]
 
 Without subagents: run the literature prompt yourself too, writing the same file to the same path. The source check
-is skipped and recorded under **Skipped**, and every evidence row's source-check result reads `not checked`.
+is skipped and recorded under **Skipped**, and every evidence row's `checked` column reads `not checked`.
 
 Link both reports under **Artifacts**. Here one source check covers both: when both have landed, give the source
 check in prior-art.md both files and say which is which: `prior-art.md` is the report its prompt names, and
@@ -74,17 +74,28 @@ check in prior-art.md both files and say which is which: `prior-art.md` is the r
 Then correct both.
 
 Write the evidence table under **Evidence**, rows from both reports, each with its strength on literature.md's scale
-(High / Med / Low) and its source-check result, and the approaches under **Prior art**. Thin or conflicting evidence
-is a finding, not a reason to pad.
+(High / Med / Low) and a `checked` column holding `source check: <verdict>`, or `source check: corrected` for a row the
+check made you rewrite, and the approaches under **Prior art**. Thin or conflicting evidence is a finding, not a reason
+to pad.
 
 ## Phase 3: Weigh
 
-<!-- runs: mattpocock `grilling` on the options against the evidence · output: 2–4 options, a recommendation -->
+<!-- runs: a claim vote on the rows the options name, then mattpocock `grilling` on the options against the evidence · output: 2–4 options, a recommendation -->
+
+Draft 2–4 candidate options first and write them under **Options**, as the options offered under a `### <decision>`
+heading, each naming the evidence rows for and against it. `Picked:` stays empty until the grilling settles it.
+
+[step: smallest-option]
+
+Then run the vote in [references/claim-vote.md](references/claim-vote.md) on the rows they name, before any grilling.
+The user can skip it by saying so; record that under **Skipped**.
+
+Without subagents: the vote is skipped and recorded under **Skipped**, and every row's `checked` column stays as Phase 2
+left it.
 
 Follow mattpocock `grilling` on the candidate options, with the evidence as the facts: per option, the rows for and
 against it, whether their setting (data size, workload, team) transfers to this codebase, its cost here, and what
 would make it a bad fit. Recommended answers are fine. Record each settled choice under **Options**.
-[step: smallest-option]
 
 ## Phase 4: Report
 
@@ -94,8 +105,9 @@ Write `docs/features/<slug>/research.md` and link it under **Artifacts** as the 
 
 1. **Question** and constraints, one paragraph.
 2. **Answer** in two or three sentences: the recommendation and the main reason.
-3. **Evidence**: the table (E1, E2, …: claim, source, type, setting, result, transfers here?, strength), with links
-   to both search reports.
+3. **Evidence**: the table (E1, E2, …: claim, source, type, setting, result, transfers here?, strength, checked), with
+   links to both search reports. Then the vote's quotes, the **Didn't survive** list and, when the host gave every
+   verifier the same model, one line saying so.
 4. **Options**: 2–4, each with its shape in two lines, the rows for and against it, its trade-offs for this
    codebase and a rough effort.
 5. **Recommendation** and what would change it.
