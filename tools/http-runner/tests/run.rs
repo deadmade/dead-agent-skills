@@ -776,6 +776,47 @@ async fn reply_echoing_another_hosts_basic_is_refused() {
     );
 }
 
+fn echo(s: &Seen) -> String {
+    let header = s.header("x-acct").unwrap_or_default();
+    ok(&format!("echo {} {header} {}", s.path, s.body))
+}
+
+#[tokio::test]
+async fn digit_value_joined_to_a_literal_digit_is_masked_as_one_run() {
+    let rig = rig("joined", &[("localhost", &[("ACCT", "3333333333")])], echo);
+    let file = rig.file(
+        "# @name a\nPOST http://localhost:PORT/x/{{$dotenv ACCT}}0101\nX-Acct: {{$dotenv ACCT}}0101\nContent-Type: application/json\n\n{\"a\":\"{{$dotenv ACCT}}0101\"}\n",
+    );
+    let result = rig.run(&file, "a").await;
+    let sent = &rig.carrier.seen()[0];
+    assert_eq!(sent.path, "/x/33333333330101");
+    assert_eq!(sent.header("x-acct"), Some("33333333330101"));
+    assert_eq!(sent.body, "{\"a\":\"33333333330101\"}");
+    let run = "99999999999999";
+    says(&result, &format!("echo /x/{run} {run} {{\"a\":\"{run}\"}}"));
+    never(&result, "3333333333");
+    never(&result, "33330101");
+    absent_from_saved(&rig, "3333333333");
+    absent_from_saved(&rig, "33330101");
+    says(&rig.saved_for("a")[0], &format!("/x/{run}"));
+}
+
+#[tokio::test]
+async fn digit_values_joined_to_each_other_are_masked_as_one_run() {
+    let rig = rig(
+        "joined-values",
+        &[("localhost", &[("A", "1111"), ("B", "2222")])],
+        echo,
+    );
+    let file = rig
+        .file("# @name a\nGET http://localhost:PORT/x/7{{$dotenv A}}{{$dotenv B}}\nX-Acct: none\n");
+    let result = rig.run(&file, "a").await;
+    assert_eq!(rig.carrier.seen()[0].path, "/x/711112222");
+    says(&result, "echo /x/999999999 none");
+    never(&result, "711112222");
+    absent_from_saved(&rig, "711112222");
+}
+
 #[tokio::test]
 async fn result_cut_at_40000_chars_on_a_boundary() {
     let body = "é".repeat(60_000);

@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -12,7 +13,7 @@ use reqwest::{Client, Method, StatusCode};
 
 use crate::extract::{credential_values, from_body};
 use crate::login_page::{Ask, HostFields, Outcome, Pages};
-use crate::mask::{Masker, Place, escape};
+use crate::mask::{Masker, Place, escape, maskable};
 use crate::parse::{ParsedFile, Part, Request, Source, Text, parse};
 use crate::replies::{self, Exchange};
 use crate::store::Store;
@@ -501,8 +502,9 @@ impl Sending<'_> {
         })
     }
 
-    fn fill(&self, request: &Request, text: &Text, place: Place) -> Result<String, String> {
+    fn fill(&mut self, request: &Request, text: &Text, place: Place) -> Result<String, String> {
         let mut out = String::new();
+        let mut digit_values = Vec::new();
         for part in &text.0 {
             let value = match part {
                 Part::Lit(lit) => {
@@ -534,7 +536,17 @@ impl Sending<'_> {
                     .to_string(),
                 Part::Timestamp => jiff::Timestamp::now().as_second().to_string(),
             };
+            if matches!(part, Part::Secret(_))
+                && maskable(&value)
+                && value.bytes().all(|b| b.is_ascii_digit())
+            {
+                digit_values.push(out.len()..out.len() + value.len());
+            }
             out.push_str(&escape(&value, place));
+        }
+        // A digit-only value matches only where no digit adjoins it, so one joined to digits needs its whole run masked.
+        for span in digit_values {
+            self.masker.add(digit_run(&out, span));
         }
         Ok(out)
     }
@@ -665,6 +677,14 @@ impl Sending<'_> {
         }
         text
     }
+}
+
+/// The maximal run of digits around `span`, which holds only digits.
+fn digit_run(text: &str, span: Range<usize>) -> &str {
+    let digit = |c: char| c.is_ascii_digit();
+    let start = text[..span.start].trim_end_matches(digit).len();
+    let end = text.len() - text[span.end..].trim_start_matches(digit).len();
+    &text[start..end]
 }
 
 /// `result` of a withheld reply, with the requests the chain will not send after it.
