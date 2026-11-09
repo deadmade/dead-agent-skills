@@ -1,0 +1,58 @@
+{
+  "targets": {
+    "win32-x64": "x86_64-pc-windows-msvc",
+    "linux-x64": "x86_64-unknown-linux-musl"
+  },
+  "tools": {
+    "web-mcp": {
+      "source": "release",
+      "plugin": "web-mcp",
+      "key": "binPath"
+    },
+    "ado-mcp": {
+      "source": "release",
+      "plugin": "mcp-azure",
+      "key": "binPath"
+    },
+    "agent-browser": {
+      "source": "github",
+      "repo": "vercel-labs/agent-browser",
+      "tagPrefix": "v",
+      "version": "0.41.1",
+      "raw": true,
+      "files": {
+        "win32-x64": {
+          "file": "agent-browser-win32-x64.exe",
+          "sha256": "ddab45e8bae84e5bc6aa1b084bceca9b579aff2e8272474d7d26953cf10965ee"
+        },
+        "linux-x64": {
+          "file": "agent-browser-linux-musl-x64",
+          "sha256": "951c795e21fddab1d4091ad2ca4f0e69f1eea6534288e6a251598df11ca8e9af"
+        }
+      }
+    },
+    "uv": {
+      "source": "github",
+      "repo": "astral-sh/uv",
+      "tagPrefix": "",
+      "version": "0.13.6",
+      "files": {
+        "win32-x64": {
+          "file": "uv-x86_64-pc-windows-msvc.zip",
+          "inner": "uv.exe",
+          "sha256": "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f"
+        },
+        "linux-x64": {
+          "file": "uv-x86_64-unknown-linux-musl.tar.gz",
+          "inner": "uv-x86_64-unknown-linux-musl/uv",
+          "sha256": "5d61f26b6c7213779eda90edc6971ea6b0b796bfb8d49a574c8ad69b59838548"
+        }
+      }
+    },
+    "graphify": {
+      "source": "pypi",
+      "package": "graphifyy",
+      "extras": "sql,pdf,office,watch,leiden"
+    }
+  }
+}

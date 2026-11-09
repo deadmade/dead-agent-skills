@@ -12,12 +12,13 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 
 - `tools/installer/`: TypeScript, by layer. `install.ts` is the entry point and only runs the flow (read state, screens, steps,
   summary); `context.ts` holds the shared paths, version and summary lines; `core/` the pure decisions by topic
-  (`settings`, `plugins`, `binaries`, `options`, `release`); `system/` everything that touches the OS (file writes and
+  (`settings`, `plugins`, `binaries`, `options`, `release`, `tools`: pins and what to download); `system/` everything that touches the OS (file writes and
   clean-slate backup/delete, processes, downloads); `steps/` one file per thing the installer
-  applies; `ui/` the screens; `assets/` the shipped configs and pins. No runtime npm dependencies: Node's standard library
+  applies; `ui/` the screens; `assets/` the shipped configs and `tools.json`, the manifest of every tool the installer downloads (`core/tools.ts` resolves it; bump a pin with `npm run sync -- apply uv|agent-browser`, one at a time and committed in between, as both write `tools.json`). No runtime npm dependencies: Node's standard library
   only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
   `core/` or `system/` with a test next to it, not into `install.ts` or a step. `core/release.ts` reading `package.json`
-  at load time is the one exception, needed to make it the single owner of the repository slug. Programs start through `system/proc.ts`
+  and `core/tools.ts` reading `assets/tools.json` at load time are the two exceptions, needed to make each the single owner
+  of the repository slug and of the tool pins. Programs start through `system/proc.ts`
   (`which`, `start`/`startSync`), never by bare name: on Windows that searches the current folder first, and a `.cmd`
   shim needs cmd.exe. Node runs the `.ts` files as they are
   (type stripping; Node 26+, `engines`), so only erasable syntax: no `enum`, `namespace` or parameter properties
@@ -105,7 +106,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (`/^[\\\\/]{2}/` produces `/^[\\/]{2}/`); the tests run the produced page's `safe` and `clean` source, so check the
   output, not the template.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser`, `rows` and `lookup`,
-  built for Windows and Linux x64 only (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the
+  built for Windows and Linux x64 only (`crates-build.yml`, `targets` in `assets/tools.json`; no macOS or ARM builds); the
   installer downloads it and sets `binPath`. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4` feature)
   showed embeddings don't lift recall over BM25 on BEIR, so none ship. One browser window per server, every engine,
   `browser` session and fetch fallback attached to it as a tab (`docs/adr/0007-one-browser-window.md`); its daemon and tab-raising behaviour is
@@ -195,9 +196,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   server of another identity unless that server's version is newer. A PostToolUse `http` hook posts to 127.0.0.1:47811;
   that port is written only in `hooks/hooks.json` and the installer reads it from there (`hookPort`), to stop the server
   before `uv sync` and before uninstalling the plugin. Every failure leaves Claude the original output.
-  The installer keeps the pinned uv (`tools/installer/assets/uv.json`, bumped by `npm run sync -- apply uv`) in `~/.claude/bin`:
-  once ours exists it always wins and is upgraded when older than the pin, since the launcher looks there first; a
-  current uv on PATH is used only while ours is absent (`uvPlan` in `core/binaries.ts`). It then runs `uv sync --locked`
+  The installer keeps the pinned uv (`tools/installer/assets/tools.json`, bumped by `npm run sync -- apply uv`) in `~/.claude/bin`:
+  ours always runs and is downloaded when missing or older than the pin, since the launcher looks there first; a uv on
+  PATH is ignored (`ensureTool` in `steps/tools.ts`). It then runs `uv sync --locked`
   and fetches tiktoken's vocabulary (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0008-python-through-installer-uv.md`. Dependabot's `uv`
   entry keeps `uv.lock` current.
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
@@ -236,7 +237,7 @@ When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Dependency updates
 
-Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the root `Cargo.lock` (workspace dependency versions included), the headroom-trim `uv.lock` and the diagrams skill's `package-lock.json` current. The root Cargo entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the `cisco-ai-skill-scanner` pin in the `scan-skills` script, and the Mermaid and marked versions the diagrams page loads from a CDN (constants in `plugins/flows/skills/diagrams/scripts/render.mjs`). The installer's `assets/*.json` pins and the vendored packs have their own weekly `sync.yml`.
+Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps GitHub Actions, the root npm packages, the root `Cargo.lock` (workspace dependency versions included), the headroom-trim `uv.lock` and the diagrams skill's `package-lock.json` current. The root Cargo entry ignores `reqwest` and `azure_core` on purpose: they move only together with `azure_devops_rust_api` (see the ado-mcp notes above). Bumped by hand, because Dependabot can't read them: the Nix inputs (`flake.lock`), the `cisco-ai-skill-scanner` pin in the `scan-skills` script, and the Mermaid and marked versions the diagrams page loads from a CDN (constants in `plugins/flows/skills/diagrams/scripts/render.mjs`). The installer's `assets/tools.json` pins and the vendored packs have their own weekly `sync.yml`.
 
 ## Versions and releases
 

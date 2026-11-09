@@ -157,9 +157,43 @@ test('Rust adapter copies and rewrites from a local upstream and is idempotent',
   assert.equal(target.git('status', '--porcelain'), '');
 });
 
-test('pin adapter returns structured results and missing digests fail', (t) => {
+const MANIFEST = 'tools/installer/assets/tools.json';
+const manifestFixture = () => ({
+  targets: { 'win32-x64': 'x86_64-pc-windows-msvc', 'linux-x64': 'x86_64-unknown-linux-musl' },
+  tools: {
+    'agent-browser': {
+      source: 'github',
+      repo: 'vercel-labs/agent-browser',
+      tagPrefix: 'v',
+      version: '0.1.0',
+      raw: true,
+      files: {
+        'win32-x64': { file: 'agent-browser-win32-x64.exe', sha256: '1'.repeat(64) },
+        'linux-x64': { file: 'agent-browser-linux-musl-x64', sha256: '2'.repeat(64) },
+      },
+    },
+    uv: {
+      source: 'github',
+      repo: 'astral-sh/uv',
+      tagPrefix: '',
+      version: '0.1.0',
+      files: {
+        'win32-x64': { file: 'uv-x86_64-pc-windows-msvc.zip', inner: 'uv.exe', sha256: '3'.repeat(64) },
+        'linux-x64': {
+          file: 'uv-x86_64-unknown-linux-musl.tar.gz',
+          inner: 'uv-x86_64-unknown-linux-musl/uv',
+          sha256: '4'.repeat(64),
+        },
+      },
+    },
+    graphify: { source: 'pypi', package: 'graphifyy', version: '0.9.9' },
+  },
+});
+const stringify = (manifest) => JSON.stringify(manifest, null, 2) + '\n';
+
+test('a pin bump writes the new version and hashes into one entry and leaves every other byte unchanged', (t) => {
   const f = fixture(t);
-  f.write('tools/installer/assets/uv.json', '{}');
+  f.write(MANIFEST, stringify(manifestFixture()));
   f.commit();
   const runner = (program) => {
     assert.equal(program, 'gh');
@@ -174,13 +208,42 @@ test('pin adapter returns structured results and missing digests fail', (t) => {
   const result = sync(f.repo, source(f.repo, 'uv'), f.dir, undefined, runner, () => {});
   assert.equal(result.title, 'Pin uv to 1.2.3');
   assert.equal(result.result.values.tag, '1.2.3');
+  const want = manifestFixture();
+  want.tools.uv.version = '1.2.3';
+  want.tools.uv.files['win32-x64'].sha256 = 'a'.repeat(64);
+  want.tools.uv.files['linux-x64'].sha256 = 'b'.repeat(64);
+  assert.equal(readFileSync(join(f.repo, MANIFEST), 'utf8'), stringify(want));
+});
+
+test('an agent-browser bump strips the tag prefix, writes its own hashes and leaves uv alone', (t) => {
+  const f = fixture(t);
+  f.write(MANIFEST, stringify(manifestFixture()));
+  f.commit();
+  const runner = () =>
+    JSON.stringify({
+      tag_name: 'v1.2.3',
+      assets: [
+        { name: 'agent-browser-win32-x64.exe', digest: `sha256:${'c'.repeat(64)}` },
+        { name: 'agent-browser-linux-musl-x64', digest: `sha256:${'d'.repeat(64)}` },
+      ],
+    });
+  sync(f.repo, source(f.repo, 'agent-browser'), f.dir, undefined, runner, () => {});
+  const want = manifestFixture();
+  want.tools['agent-browser'].version = '1.2.3';
+  want.tools['agent-browser'].files['win32-x64'].sha256 = 'c'.repeat(64);
+  want.tools['agent-browser'].files['linux-x64'].sha256 = 'd'.repeat(64);
+  assert.equal(readFileSync(join(f.repo, MANIFEST), 'utf8'), stringify(want));
+});
+
+test('a missing digest still fails', (t) => {
+  const f = fixture(t);
+  f.write(MANIFEST, stringify(manifestFixture()));
+  f.commit();
   assert.throws(
     () =>
       createContext(f.repo, f.dir, '', undefined, () => JSON.stringify({ tag_name: '1.2.3', assets: [] })).syncPin({
-        repo: 'x',
-        out: 'x',
-        files: { x: 'x' },
-        tagPattern: /^(.*)$/,
+        manifest: MANIFEST,
+        tool: 'uv',
       }),
     /digest/,
   );
@@ -239,9 +302,9 @@ test('GitHub issue operations deduplicate and successful reports close failures'
   assert.equal(calls.at(-1)[1], 'close');
   // A failed apply must invalidate earlier results before the destination check.
   const f = fixture(t);
-  f.write('tools/installer/assets/uv.json', '{}');
+  f.write(MANIFEST, '{}');
   f.commit();
-  f.write('tools/installer/assets/uv.json', 'dirty');
+  f.write(MANIFEST, 'dirty');
   const uvdir = artifactDirectory('uv');
   mkdirSync(uvdir, { recursive: true });
   writeFileSync(join(uvdir, 'result.json'), '{}');

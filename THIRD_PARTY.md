@@ -153,7 +153,7 @@ synced upstream commit is in `UPSTREAM`.
 ## headroom-trim
 
 Nothing is vendored. The installer downloads [uv](https://github.com/astral-sh/uv) (MIT or Apache-2.0, at its
-option) at the version pinned in `tools/installer/assets/uv.json` (sha256-checked), and uv installs
+option) at the version pinned in `tools/installer/assets/tools.json` (sha256-checked), and uv installs
 [headroom-ai](https://github.com/headroomlabs-ai/headroom) (Apache-2.0) at the version and hashes pinned in
 `plugins/opt-in/headroom-trim/server/uv.lock`, into the plugin's data folder on the user's machine.
 

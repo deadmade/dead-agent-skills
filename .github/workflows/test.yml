@@ -70,8 +70,7 @@ jobs:
           grep -qx package/plugins/catalog.json packed.txt
           grep -qx package/.claude-plugin/dead-skills/.claude-plugin/plugin.json packed.txt
           grep -qx package/tools/installer/install.js packed.txt
-          grep -qx package/tools/installer/assets/agent-browser.json packed.txt
-          grep -qx package/tools/installer/assets/uv.json packed.txt
+          grep -qx package/tools/installer/assets/tools.json packed.txt
           grep -qx package/tools/installer/system/proc.js packed.txt
           grep -qx package/.agents/plugins/marketplace.json packed.txt
           grep -qx package/.agents/plugins/flows/.codex-plugin/plugin.json packed.txt

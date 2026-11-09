@@ -19,10 +19,8 @@ export interface CloneOptions {
   depth?: number;
 }
 export interface PinOptions {
-  repo: string;
-  files: Record<string, string>;
-  out: string;
-  tagPattern: RegExp;
+  manifest: string;
+  tool: string;
 }
 export interface SyncContext {
   ROOT: string;

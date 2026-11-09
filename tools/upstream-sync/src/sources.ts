@@ -73,34 +73,36 @@ export function sources(ROOT: string): Source[] {
       name: 'agent-browser',
       adapter: pins,
       argument: 'agent-browser',
-      paths: ['tools/installer/assets/agent-browser.json'],
+      paths: ['tools/installer/assets/tools.json'],
       scan: false,
       check: () => {
-        const { upstream: tag, sha256 } = JSON.parse(read('tools/installer/assets/agent-browser.json'));
-        assert(Object.keys(sha256).length > 0, 'agent-browser.json pins no sha256');
+        const { version: tag, files } = JSON.parse(read('tools/installer/assets/tools.json')).tools['agent-browser'];
+        assert(Object.keys(files).length > 0, 'tools.json pins no agent-browser files');
+        for (const key of Object.keys(files))
+          assert(/^[0-9a-f]{64}$/.test(files[key].sha256 ?? ''), `tools.json has no agent-browser sha256 for ${key}`);
         return { tag };
       },
       title: ({ tag }) => `Pin agent-browser to ${tag}`,
       body: ({ tag }) =>
-        `Bumps tools/installer/assets/agent-browser.json to https://github.com/vercel-labs/agent-browser/releases/tag/v${tag}\n` +
+        `Bumps tools/installer/assets/tools.json to https://github.com/vercel-labs/agent-browser/releases/tag/v${tag}\n` +
         `and pins its Windows and Linux binaries' sha256. The installer downloads this version for web-mcp users.\n${CC}`,
     },
     {
       name: 'uv',
       adapter: pins,
       argument: 'uv',
-      paths: ['tools/installer/assets/uv.json'],
+      paths: ['tools/installer/assets/tools.json'],
       scan: false,
       check: () => {
-        const { upstream: tag, sha256 } = JSON.parse(read('tools/installer/assets/uv.json'));
-        assert(/^\d+\.\d+\.\d+$/.test(tag), `uv.json pins no semver upstream: ${tag}`);
+        const { version: tag, files } = JSON.parse(read('tools/installer/assets/tools.json')).tools.uv;
+        assert(/^\d+\.\d+\.\d+$/.test(tag), `tools.json pins no semver uv: ${tag}`);
         for (const key of ['win32-x64', 'linux-x64'])
-          assert(/^[0-9a-f]{64}$/.test(sha256?.[key] ?? ''), `uv.json has no sha256 for ${key}`);
+          assert(/^[0-9a-f]{64}$/.test(files?.[key]?.sha256 ?? ''), `tools.json has no uv sha256 for ${key}`);
         return { tag };
       },
       title: ({ tag }) => `Pin uv to ${tag}`,
       body: ({ tag }) =>
-        `Bumps tools/installer/assets/uv.json to https://github.com/astral-sh/uv/releases/tag/${tag}\n` +
+        `Bumps tools/installer/assets/tools.json to https://github.com/astral-sh/uv/releases/tag/${tag}\n` +
         `and pins its Windows and Linux archives' sha256. The installer downloads this uv for headroom-trim users.\n${CC}`,
     },
     {
