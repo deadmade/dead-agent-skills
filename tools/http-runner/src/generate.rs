@@ -22,8 +22,10 @@ use url::Url;
 
 const METHODS: [&str; 7] = ["get", "put", "post", "delete", "options", "head", "patch"];
 const MAX_REF_STEPS: usize = 32;
-/// The most a spec file, the file written and any one body may hold.
-const MAX_SPEC_BYTES: usize = 32 << 20;
+/// The largest spec file read: libyaml holds every event of a file before anything else sees it, so this bounds memory.
+const MAX_READ_BYTES: usize = 8 << 20;
+/// The most the file written and any one body in it may hold.
+const MAX_OUTPUT_BYTES: usize = 32 << 20;
 /// How long reading a spec may take: libyaml scans some small files in quadratic time.
 const DEADLINE: Duration = Duration::from_secs(10);
 /// What one YAML node is counted as, beside its text: the limit comes to five million nodes.
@@ -124,9 +126,9 @@ fn read_spec(spec: &Path) -> Result<Value, String> {
     if !meta.is_file() {
         return Err(format!("{} is not a file", spec.display()));
     }
-    if meta.len() > MAX_SPEC_BYTES as u64 {
+    if meta.len() > MAX_READ_BYTES as u64 {
         return Err(format!(
-            "{} is larger than {MAX_SPEC_BYTES} bytes",
+            "{} is larger than {MAX_READ_BYTES} bytes",
             spec.display()
         ));
     }
@@ -355,7 +357,7 @@ fn render(doc: &Value, spec_name: &str, base: &str) -> Result<(String, usize, us
     Ok((lines.join("\n"), requests, with_body))
 }
 
-/// Adds `block` to the file and refuses once it passes `MAX_SPEC_BYTES`: the spec holds a `$ref`'d example once,
+/// Adds `block` to the file and refuses once it passes `MAX_OUTPUT_BYTES`: the spec holds a `$ref`'d example once,
 /// but the file repeats it for every operation that uses it.
 fn append(
     lines: &mut Vec<String>,
@@ -366,9 +368,9 @@ fn append(
         *size += line.len() + 1;
         lines.push(line);
     }
-    if *size > MAX_SPEC_BYTES {
+    if *size > MAX_OUTPUT_BYTES {
         return Err(format!(
-            "the file would pass {MAX_SPEC_BYTES} bytes, because the spec repeats large examples"
+            "the file would pass {MAX_OUTPUT_BYTES} bytes, because the spec repeats large examples"
         ));
     }
     Ok(())
@@ -467,7 +469,7 @@ fn request_body_of(doc: &Value, request_body: &Value) -> Result<Body, String> {
         .ok_or_else(|| format!("the media type {media} is not a plain type/subtype"))?;
     let (value, others) = example(doc, entry)?;
     let text = match value {
-        Value::String(s) if s.len() > MAX_SPEC_BYTES => return Err(too_large()),
+        Value::String(s) if s.len() > MAX_OUTPUT_BYTES => return Err(too_large()),
         Value::String(s) => s.clone(),
         v if is_json(essence) => pretty(v)?,
         _ => {
@@ -487,16 +489,16 @@ fn request_body_of(doc: &Value, request_body: &Value) -> Result<Body, String> {
 }
 
 fn too_large() -> String {
-    format!("the example is larger than {MAX_SPEC_BYTES} bytes")
+    format!("the example is larger than {MAX_OUTPUT_BYTES} bytes")
 }
 
-/// An example as pretty JSON, stopped at `MAX_SPEC_BYTES`: indentation makes a deeply nested one far larger than its source.
+/// An example as pretty JSON, stopped at `MAX_OUTPUT_BYTES`: indentation makes a deeply nested one far larger than its source.
 fn pretty(value: &Value) -> Result<String, String> {
     struct Capped(Vec<u8>);
 
     impl Write for Capped {
         fn write(&mut self, data: &[u8]) -> io::Result<usize> {
-            if self.0.len() + data.len() > MAX_SPEC_BYTES {
+            if self.0.len() + data.len() > MAX_OUTPUT_BYTES {
                 return Err(io::Error::other("over the limit"));
             }
             self.0.extend_from_slice(data);
@@ -1262,6 +1264,17 @@ paths:
         let err = refused("deep", &spec, Some(BASE));
         assert!(started.elapsed() < std::time::Duration::from_secs(12));
         assert!(err.contains("could not be read within"), "{err}");
+    }
+
+    #[test]
+    fn spec_over_the_read_cap_is_refused() {
+        let err = refused(
+            "read-cap",
+            &format!("# {}\n", "x".repeat(8 << 20)),
+            Some(BASE),
+        );
+        assert!(err.contains("larger than 8388608 bytes"), "{err}");
+        assert!(err.contains("write the .http file yourself"), "{err}");
     }
 
     #[test]
