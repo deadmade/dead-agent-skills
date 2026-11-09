@@ -119,7 +119,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   source's deadline. Env knobs: `WEB_MCP_CHROME` picks the browser binary; `WEB_MCP_SEARCH_DIR` picks where profile
   slots live (no temp fallback). `fetch` runs with `allow_private: true` (`tools.rs`, for the user's own localhost
   sites), so a conductor that follows links from untrusted pages, as /evaluate does, has only a text rule on the URL:
-  a hostname resolving to a private address, or a redirect to one, gets through.
+  a hostname resolving to a private address gets through, though a public URL's redirect onto one is refused.
 - `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
   `tools/upstream-sync/src/adapters/*.ts`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
   plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path

@@ -157,7 +157,7 @@ Task 3: base 3eb4b97b7cc613d24c6af21081b7d6a5fd13c012, untracked at start: the a
 
 - `docs/features/{symposium-evaluation,strix-vendoring-evaluation,petri-bloom-evaluation}/flow.md`: abandon these open runs once /evaluate has answered them. Pick: do now. Symposium's copy here is done; the Strix and Petri Bloom folders exist only in the main checkout, which this worktree session may not edit, so those two wait for a session there.
 - `plugins/flows/skills/build-feature/SKILL.md`: let an evaluation page stand in for the prior art, as a research report does; not needed for the first version. Pick: follow-up.
-- `tools/web-mcp/src/tools.rs:376`: an option on `fetch` that refuses private addresses and private redirect hops, for unattended runs such as /evaluate (review finding 1). Pick: follow-up.
+- `tools/web-mcp/src/tools.rs:381`: an option on `fetch` that refuses a private first hop too, for unattended runs such as /evaluate (review finding 1; #151 already refuses a public address redirecting onto a private one). Pick: follow-up.
 - `plugins/flows/skills/build-feature/references/prior-art.md`: the prompt itself opens any link a page names; the public-URL rule exists only in /evaluate's wording around it (skill fix, through `writing-skills`; found by the first fix check on finding 1). Pick: follow-up.
 - `plugins/flows/skills/evaluate/`: keep the seeded verdict check as a skill eval; it lives only in a scratchpad now. It must fail on an adopt whose Security fact and mentions rest only on the tool's own pages, which the original baseline case reached before finding 2 (measured: the first seeded run gave `csvkite` adopt on exactly those inputs). Pick: follow-up.
 
@@ -177,9 +177,15 @@ Status: decided 2026-11-09: such an agent counts as no subagents, so the session
 
 ### Review finding 1 failed its fix check twice
 
-Status: decided 2026-11-09: close what text can close, and park the rest; the limit stands that a hostname resolving to a private address, or a redirect to one, still gets through, and the web-mcp option is in the Parking lot. Confirmed 2026-11-09.
+Status: decided 2026-11-09: close what text can close, and park the rest; the limit stands that a hostname resolving to a private address still gets through (a redirect onto one was part of this limit until #151, below), and the web-mcp option is in the Parking lot. Confirmed 2026-11-09.
 
 First attempt: the tool's page and the source check limited to public http(s) URLs. Second: the prior-art agent too, and a tool fact with a non-public link becomes "unknown". Left open: an Alternatives line could keep a value read from a private link (closed by the third attempt: any claim resting only on such a link is removed, and "public" excludes localhost and private IPs); a text rule sees only the URL string, while web-mcp's fetch runs with `allow_private: true` (`tools/web-mcp/src/tools.rs:376`, read).
+
+### origin/main moved under the branch (#151)
+
+Status: decided 2026-11-09: rebase on origin/main and keep `gh api`; correct only the sentence saying a page fetch can't read JSON, and the notes saying a redirect onto a private address gets through.
+
+web-mcp's `fetch` now returns JSON and refuses a public address that redirects onto a private one (read: `git show origin/main:plugins/shared/web-mcp/README.md`, lines 14 and 146). The first fact removes the reason given for the `gh api` route, which stays for its higher rate limit and because it works without web-mcp. Options offered: rebase and drop `gh api` (recommended); rebase and keep it; open the PR as it stood.
 
 ## Walkthrough
 

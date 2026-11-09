@@ -79,7 +79,7 @@ section right after the report's Gaps line, each fact marked `[source]`: licence
 activity, what it needs to run (runtime, services, keys), known security issues (the project's own advisories and an
 advisory database outside it, such as OSV), one source outside its project that mentions the tool, and what the tool is.
 It prefers the project's own API (for GitHub, the repository, `releases/latest` and `security-advisories` endpoints) or
-`LICENSE` file to the README, and writes "unknown" for a fact it cannot find. A page fetch can't read JSON, so it reads
+`LICENSE` file to the README, and writes "unknown" for a fact it cannot find. It reads
 those endpoints with `gh api --method GET` where `gh` is available, only when owner and repository each match
 `[A-Za-z0-9._-]+`, with both quoted; otherwise it reads the repository's own pages.
 
