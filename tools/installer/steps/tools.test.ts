@@ -13,14 +13,14 @@ beforeEach(() => {
   failures.length = 0;
 });
 
-// Records the prompts and downloads; our copy in binDir reports `ours`, any other copy 99.0.0.
+// Records the prompts and downloads; the installed copy reports `ours`.
 function io(ours: string | undefined, answer = true) {
   const asked: string[] = [];
   const downloaded: string[] = [];
   const fake: ToolIo = {
     ask: async (q) => (asked.push(q), answer),
     download: async (name, _asset, bin) => void downloaded.push(`${name} ${bin}`),
-    version: (bin) => (bin.startsWith(binDir) ? ours : '99.0.0'),
+    version: () => ours,
     binDir,
     platform: 'linux',
     arch: 'x64',
@@ -58,12 +58,6 @@ test('ours at or above the pin: no prompt, no download, changed false', async ()
   }
 });
 
-test('ours missing downloads whatever else is installed elsewhere', async () => {
-  const t = io(undefined); // version() reports 99.0.0 for every path but ours
-  assert.equal((await ensureTool('uv', t.fake))?.changed, true);
-  assert.equal(t.downloaded.length, 1);
-});
-
 test('a release tool downloads without asking', async () => {
   const t = io(undefined);
   t.fake.ask = async () => assert.fail('a release tool is not asked about');
@@ -73,6 +67,25 @@ test('a release tool downloads without asking', async () => {
   assert.deepEqual(done, [`web-mcp: installed ${VERSION} at ${path}`]);
 });
 
+test('a release tool at or above the installer version: no download, no output, changed false', async () => {
+  const path = toolPath(binDir, 'web-mcp', 'linux');
+  for (const ours of [VERSION, '99.0.0']) {
+    const t = io(ours);
+    assert.deepEqual(await ensureTool('web-mcp', t.fake), { path, changed: false });
+    assert.deepEqual([t.asked, t.downloaded, done, failures], [[], [], [], []]);
+  }
+});
+
+test('a release tool whose download throws: undefined and one failure line with the build advice', async () => {
+  const t = io(undefined);
+  t.fake.download = async () => {
+    throw new Error('network down');
+  };
+  assert.equal(await ensureTool('web-mcp', t.fake), undefined);
+  assert.deepEqual(failures, [`web-mcp ${VERSION}: network down; ${toolAdvice('web-mcp')}`]);
+  assert.deepEqual(done, []);
+});
+
 test('agent-browser downloads its raw binary to <binDir>/agent-browser(.exe)', async () => {
   for (const [platform, exe] of [
     ['linux', 'agent-browser'],
@@ -80,7 +93,6 @@ test('agent-browser downloads its raw binary to <binDir>/agent-browser(.exe)', a
   ]) {
     const t = io(undefined);
     const seen: { raw?: boolean; bin: string }[] = [];
-    t.fake.version = () => undefined; // win32 paths do not start with binDir
     t.fake.download = async (_name, asset, bin) => void seen.push({ raw: asset.raw, bin });
     await ensureTool('agent-browser', { ...t.fake, platform });
     assert.deepEqual(seen, [{ raw: true, bin: toolPath(binDir, 'agent-browser', platform) }]);

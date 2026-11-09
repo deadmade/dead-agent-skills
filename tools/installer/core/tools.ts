@@ -99,15 +99,12 @@ export function planTool({
 export const toolPath = (binDir: string, name: string, platform: string) =>
   platform === 'win32' ? win32.join(binDir, exeName(name, platform)) : posix.join(binDir, name);
 
-const releaseTool = (name: string) => {
+// What to do when the release tool `name` couldn't be installed.
+export function toolAdvice(name: string) {
   const tool = TOOLS.tools[name];
   if (tool?.source !== 'release') throw new Error(`${name} is not a release tool`);
-  return tool;
-};
-
-// What to do when the release tool `name` couldn't be installed.
-export const toolAdvice = (name: string) =>
-  `build it from the repository root with \`cargo build --release --locked -p ${name} --bin ${name}\` (output: target/release) and set its path with /plugin configure ${releaseTool(name).plugin}`;
+  return `build it from the repository root with \`cargo build --release --locked -p ${name} --bin ${name}\` (output: target/release) and set its path with /plugin configure ${tool.plugin}`;
+}
 
 // The release tool `plugin` uses, as [name, entry].
 export function toolOfPlugin(plugin: string): [string, ReleaseTool] {

@@ -12,9 +12,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 
 - `tools/installer/`: TypeScript, by layer. `install.ts` is the entry point and only runs the flow (read state, screens, steps,
   summary); `context.ts` holds the shared paths, version and summary lines; `core/` the pure decisions by topic
-  (`settings`, `plugins`, `binaries`, `options`, `release`); `system/` everything that touches the OS (file writes and
+  (`settings`, `plugins`, `binaries`, `options`, `release`, `tools`: pins and what to download); `system/` everything that touches the OS (file writes and
   clean-slate backup/delete, processes, downloads); `steps/` one file per thing the installer
-  applies; `ui/` the screens; `assets/` the shipped configs and `tools.json`, the manifest of every tool the installer downloads (`core/tools.ts` resolves it; bump a pin with `npm run sync -- apply uv|agent-browser`). No runtime npm dependencies: Node's standard library
+  applies; `ui/` the screens; `assets/` the shipped configs and `tools.json`, the manifest of every tool the installer downloads (`core/tools.ts` resolves it; bump a pin with `npm run sync -- apply uv|agent-browser`, one at a time and committed in between, as both write `tools.json`). No runtime npm dependencies: Node's standard library
   only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
   `core/` or `system/` with a test next to it, not into `install.ts` or a step. `core/release.ts` reading `package.json`
   and `core/tools.ts` reading `assets/tools.json` at load time are the two exceptions, needed to make each the single owner

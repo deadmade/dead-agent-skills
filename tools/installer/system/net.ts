@@ -52,8 +52,6 @@ export async function stopLocalServer(port: number, waitMs = 2000) {
   return !(await open());
 }
 
-export type { Asset };
-
 // Downloads the release asset, checks its sha256, and moves the binary to bin (on Windows the old one is renamed aside
 // first). asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself.
 export async function downloadBin(name: string, asset: Asset, bin: string) {

@@ -28,7 +28,7 @@ export async function installAgentBrowser(binDir = BIN_DIR): Promise<{ path?: st
 // Runs `agent-browser install` (the browser download) on the copy in use, every run, so a download that failed before
 // is retried. works: web-mcp's browser window can open (windowWorks), whether or not the install succeeded (Helium on
 // PATH is enough).
-// path: a full path, npm's .cmd shim on Windows included.
+// path: our copy in the bin folder.
 function useAgentBrowser(path: string, deps: boolean) {
   const args = deps ? ['install', '--with-deps'] : ['install'];
   log('info', `Running agent-browser ${args.join(' ')}`);

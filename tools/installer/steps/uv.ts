@@ -19,7 +19,7 @@ import { log } from '../ui/ui.ts';
 import { ensureTool } from './tools.ts';
 
 export const HEADROOM_TRIM = `headroom-trim@${MARKETPLACE}`;
-const OFF = 'headroom-trim and graphify stay as they are until uv is installed';
+const OFF = 'headroom-trim and graphify stay as they are: the installer could not set up its own uv copy';
 
 // The uv path in use, or undefined (a summary line says why).
 export const installUv = async () => (await ensureTool('uv', { off: OFF }))?.path;

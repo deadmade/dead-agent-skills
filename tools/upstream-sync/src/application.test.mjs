@@ -213,7 +213,26 @@ test('a pin bump writes the new version and hashes into one entry and leaves eve
   want.tools.uv.files['win32-x64'].sha256 = 'a'.repeat(64);
   want.tools.uv.files['linux-x64'].sha256 = 'b'.repeat(64);
   assert.equal(readFileSync(join(f.repo, MANIFEST), 'utf8'), stringify(want));
-  assert.equal(f.git('diff', '--numstat', '--', MANIFEST), '3\t3\t' + MANIFEST);
+});
+
+test('an agent-browser bump strips the tag prefix, writes its own hashes and leaves uv alone', (t) => {
+  const f = fixture(t);
+  f.write(MANIFEST, stringify(manifestFixture()));
+  f.commit();
+  const runner = () =>
+    JSON.stringify({
+      tag_name: 'v1.2.3',
+      assets: [
+        { name: 'agent-browser-win32-x64.exe', digest: `sha256:${'c'.repeat(64)}` },
+        { name: 'agent-browser-linux-musl-x64', digest: `sha256:${'d'.repeat(64)}` },
+      ],
+    });
+  sync(f.repo, source(f.repo, 'agent-browser'), f.dir, undefined, runner, () => {});
+  const want = manifestFixture();
+  want.tools['agent-browser'].version = '1.2.3';
+  want.tools['agent-browser'].files['win32-x64'].sha256 = 'c'.repeat(64);
+  want.tools['agent-browser'].files['linux-x64'].sha256 = 'd'.repeat(64);
+  assert.equal(readFileSync(join(f.repo, MANIFEST), 'utf8'), stringify(want));
 });
 
 test('a missing digest still fails', (t) => {
