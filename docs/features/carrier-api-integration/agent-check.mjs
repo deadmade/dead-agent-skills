@@ -13,7 +13,14 @@ import { basename, delimiter, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
-const TOOLS = ['Read', 'Write', 'Edit', 'mcp__plugin_http-runner_http__run', 'mcp__plugin_http-runner_http__generate'];
+// The agent reads replies, which are untrusted text, so its file tools stay inside its project.
+const TOOLS = [
+  'Read(./**)',
+  'Write(./**)',
+  'Edit(./**)',
+  'mcp__plugin_http-runner_http__run',
+  'mcp__plugin_http-runner_http__generate',
+];
 const RUN_LIMIT_MS = 20 * 60 * 1000;
 const REPLIES = 'http-replies';
 // A shorter value matches by chance.
@@ -93,6 +100,8 @@ function runOne(n, options) {
     join(ROOT, '.claude-plugin/http-runner'),
     '--allowedTools',
     TOOLS.join(','),
+    '--disallowedTools',
+    `Bash,Read(/${options.store}/**),Edit(/${options.store}/**)`,
     '--output-format',
     'stream-json',
     '--verbose',
