@@ -6,11 +6,11 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { changedPaths, selectChecks } from './ci-changes.mjs';
 
-const all = ['web-mcp', 'ado-mcp'];
+const all = ['web-mcp', 'ado-mcp', 'http-runner'];
 
 test('full runs select exactly the remaining binaries and workspace packages', () => {
   assert.deepEqual(selectChecks([], true).binaries, all);
-  assert.deepEqual(selectChecks([], true).packages, ['web-mcp', 'ado-mcp']);
+  assert.deepEqual(selectChecks([], true).packages, ['web-mcp', 'ado-mcp', 'http-runner']);
 });
 
 test('an ado implementation change selects only ado checks', () => {
@@ -35,6 +35,7 @@ test('plugin changes select their native integration and Node checks', () => {
   for (const [path, crate] of [
     ['plugins/shared/web-mcp/.mcp.json', 'web-mcp'],
     ['plugins/opt-in/mcp/mcp-azure/.mcp.json', 'ado-mcp'],
+    ['plugins/opt-in/mcp/http-runner/.mcp.json', 'http-runner'],
   ]) {
     const result = selectChecks([path]);
     assert.deepEqual(result.binaries, [crate]);

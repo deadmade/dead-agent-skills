@@ -1,4 +1,4 @@
-// web-mcp and ado-mcp, the binaries of their plugins: our copy goes to ~/.claude/bin (see steps/tools.ts) and the plugin's
+// web-mcp, ado-mcp and http-runner, the binaries of their plugins: our copy goes to ~/.claude/bin (see steps/tools.ts) and the plugin's
 // userConfig key points at it.
 import { toolOfPlugin } from '../core/tools.ts';
 import { MARKETPLACE } from '../core/release.ts';
@@ -8,6 +8,7 @@ import { ensureTool } from './tools.ts';
 
 export const WEB_MCP = `web-mcp@${MARKETPLACE}`;
 export const MCP_AZURE = `mcp-azure@${MARKETPLACE}`;
+export const HTTP_RUNNER = `http-runner@${MARKETPLACE}`;
 
 // platform, arch: this machine's, passed in by tests.
 export async function applyBin(

@@ -56,7 +56,7 @@ import {
 } from './context.ts';
 import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
 import { HEADROOM_TRIM, installGraphify, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
-import { MCP_AZURE, WEB_MCP, applyBin } from './steps/binaries.ts';
+import { HTTP_RUNNER, MCP_AZURE, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
 import { applyDcg } from './steps/dcg.ts';
@@ -285,6 +285,7 @@ await applyPlugins({
   packs,
 });
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
+if (selected.includes(HTTP_RUNNER)) await applyBin('http-runner', HTTP_RUNNER, process.platform, process.arch);
 if (selected.includes(MCP_AZURE))
   await applyBin('mcp-azure', MCP_AZURE, process.platform, process.arch, selfValues[MCP_AZURE]);
 

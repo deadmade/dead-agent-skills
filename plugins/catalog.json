@@ -77,6 +77,13 @@
     "targets": ["claude-code", "codex"]
   },
   {
+    "name": "http-runner",
+    "source": "plugins/opt-in/mcp/http-runner",
+    "resources": ["skills"],
+    "dependencies": [],
+    "targets": ["claude-code", "codex"]
+  },
+  {
     "name": "atlassian",
     "description": "Atlassian MCP integration for Jira and Confluence.",
     "source": {

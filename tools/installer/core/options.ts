@@ -61,7 +61,7 @@ export const CATEGORIES: Page[] = [
     id: 'mcp',
     title: 'Integrations',
     blurb: 'MCP servers for the services you work with.',
-    keys: ['mcp-github', 'mcp-azure', 'atlassian'],
+    keys: ['mcp-github', 'mcp-azure', 'http-runner', 'atlassian'],
   },
   {
     id: 'tools',

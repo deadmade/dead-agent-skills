@@ -6,7 +6,7 @@ export interface CodexState {
   selected: string[];
   mcp: string[];
 }
-export const MCP_COMPONENTS = ['dead-skills', 'web-mcp', 'mcp-github', 'mcp-azure', 'atlassian'];
+export const MCP_COMPONENTS = ['dead-skills', 'web-mcp', 'mcp-github', 'mcp-azure', 'http-runner', 'atlassian'];
 export const mcpName = (component: string) => `dead-agent-skills-${component}`;
 
 // Recover a default Context7 entry when an earlier setup lost its ownership receipt.

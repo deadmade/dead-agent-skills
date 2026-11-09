@@ -14,6 +14,11 @@
       "plugin": "mcp-azure",
       "key": "binPath"
     },
+    "http-runner": {
+      "source": "release",
+      "plugin": "http-runner",
+      "key": "binPath"
+    },
     "agent-browser": {
       "source": "github",
       "repo": "vercel-labs/agent-browser",

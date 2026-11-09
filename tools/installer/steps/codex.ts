@@ -84,7 +84,7 @@ export async function applyCodex(io: CodexIO = {}) {
   const keys = Object.keys(current);
   const hidden = keys.filter(
     (k) =>
-      ['web-mcp', 'mcp-azure'].includes(k) &&
+      ['web-mcp', 'mcp-azure', 'http-runner'].includes(k) &&
       !resolveTool(k === 'mcp-azure' ? 'ado-mcp' : k, process.platform, process.arch, VERSION) &&
       !find(k === 'mcp-azure' ? 'ado-mcp' : k),
   );
@@ -226,6 +226,16 @@ export async function applyCodex(io: CodexIO = {}) {
       note('Codex web-mcp', [
         'Search browser is unavailable; search needs browser setup. Fetch and lookup can still work.',
       ]);
+  }
+  if (plan.wanted.includes('http-runner')) {
+    let binary = find('http-runner');
+    if (!binary) {
+      const asset = resolveTool('http-runner', process.platform, process.arch, VERSION);
+      if (!asset) throw new Error('No http-runner release for this platform');
+      binary = join(base, 'bin', VERSION, asset.exe);
+      if (!existsSync(binary)) await (io.download ?? downloadBin)('http-runner', asset, binary);
+    }
+    configure('http-runner', ['--', binary]);
   }
   if (plan.wanted.includes('mcp-github')) {
     configure('mcp-github', [

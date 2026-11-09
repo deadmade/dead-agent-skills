@@ -1,0 +1,45 @@
+[package]
+name = "http-runner"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Stdio MCP server for the http-runner plugin: runs VS Code REST Client .http files for an agent."
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64 = { workspace = true }
+encoding_rs = { workspace = true }
+getrandom = { workspace = true }
+jiff = { workspace = true }
+jsonpath-rust = { workspace = true }
+reqwest = { workspace = true, features = [
+  "rustls-no-provider",
+  "http2",
+  "gzip",
+  "brotli",
+  "charset",
+] }
+rmcp = { workspace = true, features = ["server", "transport-io", "macros"] }
+rustls = { workspace = true, features = ["ring", "std", "tls12"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_norway = { workspace = true }
+sxd-document = { workspace = true }
+sxd-xpath = { workspace = true }
+tokio = { workspace = true, features = [
+  "macros",
+  "rt-multi-thread",
+  "io-std",
+  "sync",
+  "time",
+] }
+url = { workspace = true }
+
+# Test double for the system browser; only the tests use it, the release ships `http-runner` alone.
+[[bin]]
+name = "fake-browser"
+path = "tests/bin/fake_browser.rs"
+
+[lints]
+workspace = true

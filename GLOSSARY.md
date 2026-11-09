@@ -96,7 +96,7 @@ _Avoid_: pin file, lockfile (it does not lock a tool's own dependencies)
 **Our copy**:
 The copy of a tool in the installer's bin folder (`<config>/bin`, `~/.claude/bin` by default; the Codex step uses its own
 bin folder for agent-browser) that the installer downloaded and that the plugin's settings point at. A copy elsewhere on
-PATH is never used, except by the Codex step, which looks on PATH first for web-mcp and ado-mcp, and for agent-browser
+PATH is never used, except by the Codex step, which looks on PATH first for web-mcp, ado-mcp and http-runner, and for agent-browser
 only where no build is pinned.
 _Avoid_: managed copy, local copy
 
@@ -297,3 +297,29 @@ _Avoid_: listing, record, result, ad (an ad is what a Row may describe)
 What the `shop` skill holds for one shop: the address pattern of its search and notes on reading it (which parts of the
 address are filters, what a blocked page looks like). It holds no selectors except one `item` hint where the guess ranks the wrong group.
 _Avoid_: adapter, parser, scraper
+
+## http-runner
+
+**Request file**:
+A `.http` file the agent writes in VS Code REST Client's format, holding the requests for one API.
+_Avoid_: collection, script
+
+**Chain**:
+The named requests a request refers to, which run before it on every call.
+_Avoid_: dependency, flow
+
+**Saved reply**:
+One real exchange with an API, kept in the project with its credentials masked; the only source for test fixtures.
+_Avoid_: sample, recording, cassette
+
+**Login page**:
+The local page the server opens by itself, where the user types a login. The agent never learns its address.
+_Avoid_: setup page, form
+
+**Confirmed host**:
+A host name the user has approved on the login page; http-runner sends to no other.
+_Avoid_: allowed host, sandbox URL
+
+**Typed value**:
+Something the user entered on the login page, kept for one confirmed host and masked wherever it appears.
+_Avoid_: env var, credential (a typed value can be a plain user name)

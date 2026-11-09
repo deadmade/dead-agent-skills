@@ -44,6 +44,7 @@ test('opt-ins from the real manifests', () => {
         'graphify',
         'hallmark',
         'headroom-trim',
+        'http-runner',
         'mcp-azure',
         'mcp-github',
         'md-pane',
