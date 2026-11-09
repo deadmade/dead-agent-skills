@@ -937,18 +937,59 @@ fn concurrent_searches_in_one_server_both_answer() {
 
 #[cfg(debug_assertions)]
 #[test]
-fn lock_won_late_starts_no_render() {
+fn a_search_behind_others_keeps_its_whole_deadline() {
     let (_fx, pages) = setup();
-    // Both ask at once: the winner's 8.5 s render leaves the loser under READ_MARGIN of its 10 s. Each deadline
-    // starts after its search's warm, so the window starts first: then both warms are one quick owner call.
-    let mut mcp = start(&pages, &[("FAKE_AB_DELAY_MS", "8500".to_owned())]);
+    // The last of three waits 12 s, more than the 10 s an engine gets, and the second's render wouldn't fit in what
+    // a deadline started at the call leaves it. The window starts first, so all warms are one quick owner call.
+    let mut mcp = start(&pages, &[("FAKE_AB_DELAY_MS", "6000".to_owned())]);
     mcp.call("browser", json!({"action": "snapshot", "session": "s"}));
     let q = json!({"query": "zebra", "engines": "bing"});
-    let rs = mcp.calls(vec![("search", q.clone()), ("search", q)]);
-    let (ok, lost): (Vec<_>, Vec<_>) = rs.iter().partition(|r| !is_error(r));
-    assert_eq!(ok.len(), 1, "{rs:?}");
-    assert_eq!(text(lost[0]), "No engine answered: bing: timed out");
+    for r in mcp.calls(vec![
+        ("search", q.clone()),
+        ("search", q.clone()),
+        ("search", q),
+    ]) {
+        assert!(!is_error(&r), "{r}");
+    }
+    assert_eq!(opened(&pages, "www.bing.com"), 3);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn a_captcha_ends_the_queue_behind_it() {
+    let (_fx, pages) = setup();
+    mark(&pages, "bing.blocked");
+    let mut mcp = start(&pages, &[("FAKE_AB_DELAY_MS", "1000".to_owned())]);
+    mcp.call("browser", json!({"action": "snapshot", "session": "s"}));
+    let q = json!({"query": "zebra", "engines": "bing"});
+    mcp.calls(vec![("search", q.clone()), ("search", q)]);
     assert_eq!(opened(&pages, "www.bing.com"), 1);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn a_cancelled_search_leaves_the_queue() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[("FAKE_AB_DELAY_MS", "2000".to_owned())]);
+    mcp.call("browser", json!({"action": "snapshot", "session": "s"}));
+    let q = json!({"query": "zebra", "engines": "bing"});
+    let settle = std::time::Duration::from_millis(500);
+    // One at a time from the first: requests sent together race for the turn, and a turn already held runs on.
+    let params = json!({"name": "search", "arguments": q});
+    let mut search = |id: u64| {
+        mcp.send(&json!({"jsonrpc": "2.0", "id": id, "method": "tools/call", "params": params}));
+    };
+    search(1001);
+    std::thread::sleep(settle);
+    search(1002);
+    search(1003);
+    std::thread::sleep(settle);
+    for id in [1002, 1003] {
+        mcp.send(&json!({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": id}}));
+    }
+    let r = mcp.call("search", q);
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(opened(&pages, "www.bing.com"), 2);
 }
 
 #[cfg(debug_assertions)]

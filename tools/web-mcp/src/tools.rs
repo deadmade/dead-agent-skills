@@ -2,7 +2,8 @@ use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock};
 use rmcp::schemars::{self, JsonSchema};
-use rmcp::{ServerHandler, tool, tool_handler, tool_router};
+use rmcp::service::RequestContext;
+use rmcp::{RoleServer, ServerHandler, tool, tool_handler, tool_router};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -339,14 +340,18 @@ impl Server {
         description = "Search the web through Google, Bing, DuckDuckGo and Brave, read in web-mcp's own browser; returns ranked passages and snippets with sources. With papers: true it searches OpenAlex and arXiv (Crossref for DOIs), Google Scholar and Semantic Scholar instead and recognises DOIs and arXiv ids. Optional engines and since (day, week, month, year) narrow it. For one site, put site:example.com in the query.",
         annotations(read_only_hint = true)
     )]
-    async fn search(&self, Parameters(args): Parameters<SearchArgs>) -> CallToolResult {
+    async fn search(
+        &self,
+        Parameters(args): Parameters<SearchArgs>,
+        request: RequestContext<RoleServer>,
+    ) -> CallToolResult {
         let papers = args.papers == Some(true);
         let filter = match search::filter(args.engines.as_deref(), args.since, papers) {
             Ok(f) => f,
             Err(e) => return error(e),
         };
         if papers {
-            let out = papers::search(&self.ctx, &args.query, &filter).await;
+            let out = papers::search(&self.ctx, &args.query, &filter, &request).await;
             let text = out.to_string();
             return if out.papers.is_empty() && !out.failed.is_empty() {
                 error(text)
@@ -355,14 +360,14 @@ impl Server {
             };
         }
         let n = args.max_passages.map_or(8, |n| n.clamp(1, 20)) as usize;
-        match search::web(&self.ctx, &args.query, n, &filter).await {
+        match search::web(&self.ctx, &args.query, n, &filter, &request).await {
             Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
             Err(e) => error(e.to_string()),
         }
     }
 
     #[tool(
-        description = "Fetch one http(s) page or PDF as markdown, localhost included. A long page returns its start plus an archive path under .web/ to read the rest. If the site blocks you (e.g. HTTP 403) or the content you need is loaded by JavaScript and missing, open the page with the browser tool.",
+        description = "Fetch one http(s) page, PDF or JSON document as markdown or text, localhost included. A long page returns its start plus an archive path under .web/ to read the rest. If the site blocks you (e.g. HTTP 403) or the content you need is loaded by JavaScript and missing, open the page with the browser tool.",
         annotations(read_only_hint = true)
     )]
     async fn fetch(&self, Parameters(args): Parameters<FetchArgs>) -> CallToolResult {

@@ -276,6 +276,8 @@ plugins of ours that the manifest no longer lists.
   `python3 -m unittest discover -s scripts -p 'check_cargo_workspace_test.py'` for the workspace policy.
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
   linking fails.
+- Don't share `CARGO_TARGET_DIR` between worktrees: a test binary keeps the `CARGO_MANIFEST_DIR` of the worktree that
+  built it, and web-mcp's integration tests start whichever server binary was built last.
 - ado-mcp: `cargo test --locked -p ado-mcp` from the root. CI lints with latest stable Rust and separately checks
   the workspace with its declared `rust-version` (1.97). A test that times concurrency makes one fast call
   first and bounds the slow one against it (`view_concurrent` in `tests/pr.rs`, `tests/wi.rs`): under the full

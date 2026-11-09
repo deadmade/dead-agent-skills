@@ -24,7 +24,7 @@ pub const EXTENSION_SHA256: &str =
 
 /// How long a blocked engine sits out.
 pub const REST: Duration = Duration::from_mins(30);
-/// Each engine's whole budget in a search, lock wait included.
+/// Each engine's whole budget in a search, from the moment it wins its turn.
 pub const ENGINE_DEADLINE: Duration = Duration::from_secs(10);
 /// The cookie extension download's budget.
 const DOWNLOAD: Duration = Duration::from_secs(20);
