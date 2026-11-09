@@ -6,7 +6,7 @@ use std::fs::{DirBuilder, OpenOptions};
 use std::io::{ErrorKind, Write};
 #[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// The saved logins: host, then value name, then the typed value. A host with a key is confirmed.
 type Logins = BTreeMap<String, BTreeMap<String, String>>;
@@ -77,12 +77,29 @@ impl Store {
             .unwrap_or_default())
     }
 
-    /// Confirms `host` and saves `values` for it, over any it already had. The file is read
-    /// again just before it is replaced, so another session's hosts survive.
+    /// Confirms `host` and saves `values` for it, over any it already had. A lock file held
+    /// from the read to the rename lets saves from threads or other sessions follow one
+    /// another, so none loses another's host.
     ///
     /// # Errors
     /// Returns why the saved logins cannot be read or the file cannot be written.
     pub fn save(&self, host: &str, values: &BTreeMap<String, String>) -> Result<(), String> {
+        let mut dir = DirBuilder::new();
+        dir.recursive(true);
+        #[cfg(unix)]
+        dir.mode(0o700);
+        dir.create(&self.dir)
+            .map_err(|e| format!("cannot create {}: {e}", self.dir.display()))?;
+
+        // Each call opens its own handle, which blocks while another handle, in this process
+        // or another, holds the lock. Closing the handle at the end of the call releases it.
+        let lock_path = self.dir.join("logins.lock");
+        let _lock = private()
+            .truncate(false)
+            .open(&lock_path)
+            .and_then(|lock| lock.lock().map(|()| lock))
+            .map_err(|e| format!("cannot lock {}: {e}", lock_path.display()))?;
+
         let mut logins = self.load()?;
         logins
             .entry(host.to_string())
@@ -91,19 +108,16 @@ impl Store {
         let json = serde_json::to_vec_pretty(&logins)
             .map_err(|e| format!("cannot encode the saved logins: {e}"))?;
 
-        let mut dir = DirBuilder::new();
-        dir.recursive(true);
-        #[cfg(unix)]
-        dir.mode(0o700);
-        dir.create(&self.dir)
-            .map_err(|e| format!("cannot create {}: {e}", self.dir.display()))?;
-
         // A rename in the same folder is atomic, so a reader or a crash never meets half a file.
         let file = self.file();
         let temp = self
             .dir
             .join(format!("logins.json.{}.tmp", std::process::id()));
-        let written = write_private(&temp, &json).and_then(|()| std::fs::rename(&temp, &file));
+        let written = private()
+            .truncate(true)
+            .open(&temp)
+            .and_then(|mut f| f.write_all(&json))
+            .and_then(|()| std::fs::rename(&temp, &file));
         if let Err(e) = written {
             let _ = std::fs::remove_file(&temp);
             return Err(format!("cannot write {}: {e}", file.display()));
@@ -136,12 +150,12 @@ impl Store {
 }
 
 /// On Windows the per-user data folder's own permissions keep other users out.
-fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+fn private() -> OpenOptions {
     let mut options = OpenOptions::new();
-    options.write(true).create(true).truncate(true);
+    options.write(true).create(true);
     #[cfg(unix)]
     options.mode(0o600);
-    options.open(path)?.write_all(bytes)
+    options
 }
 
 /// Never a shared folder such as the temp dir, where another user could plant a file.
@@ -241,6 +255,31 @@ mod tests {
         }
     }
 
+    #[test]
+    fn concurrent_saves_keep_every_host() {
+        use std::sync::{Arc, Barrier};
+        const THREADS: usize = 6;
+        for round in 0..10 {
+            let store = Arc::new(Store::at(scratch(&format!("concurrent-{round}"))));
+            let barrier = Arc::new(Barrier::new(THREADS));
+            let saves: Vec<_> = (0..THREADS)
+                .map(|i| {
+                    let (store, barrier) = (store.clone(), barrier.clone());
+                    std::thread::spawn(move || {
+                        barrier.wait();
+                        store.save(&format!("h{i}.example"), &typed(&[("N", "value-n")]))
+                    })
+                })
+                .collect();
+            for save in saves {
+                save.join().unwrap().unwrap();
+            }
+            for i in 0..THREADS {
+                assert!(store.is_confirmed(&format!("h{i}.example")).unwrap());
+            }
+        }
+    }
+
     #[cfg(unix)]
     #[test]
     fn written_file_is_private() {
@@ -252,8 +291,9 @@ mod tests {
         let mode = |p: &std::path::Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode(&dir), 0o700);
         assert_eq!(mode(&dir.join("logins.json")), 0o600);
-        let files: Vec<_> = std::fs::read_dir(&dir).unwrap().collect();
-        assert_eq!(files.len(), 1, "no temporary file is left behind");
+        assert_eq!(mode(&dir.join("logins.lock")), 0o600);
+        let files = std::fs::read_dir(&dir).unwrap().count();
+        assert_eq!(files, 2, "no temporary file is left behind");
     }
 
     #[test]
