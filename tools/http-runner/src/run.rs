@@ -203,19 +203,32 @@ fn hosts(chain: &[&Request]) -> Vec<HostFields> {
     hosts
 }
 
-/// Adds every saved value of `hosts` to `masker` and returns them by host.
-fn add_typed(
-    ctx: &Ctx,
-    hosts: &[HostFields],
-    masker: &mut Masker,
-) -> Result<HashMap<String, Vec<String>>, String> {
-    let mut typed = HashMap::new();
+/// The store as sending began: requests fill from this alone, so what is sent is what is masked.
+#[derive(Default)]
+struct Typed {
+    /// Every value of each host, for the check on reply values.
+    values: HashMap<String, Vec<String>>,
+    /// The value for each `(host, name)` the chain uses.
+    secrets: HashMap<(String, String), String>,
+}
+
+/// Adds every saved value of `hosts` to `masker` and returns them.
+fn add_typed(ctx: &Ctx, hosts: &[HostFields], masker: &mut Masker) -> Result<Typed, String> {
+    let mut typed = Typed::default();
     for host in hosts {
-        let values = ctx.store.values(&host.host)?;
+        let mut values = ctx.store.values(&host.host)?;
+        for secret in &host.names {
+            if let Some(value) = ctx.store.get(&host.host, secret)? {
+                values.push(value.clone());
+                typed
+                    .secrets
+                    .insert((host.host.clone(), secret.clone()), value);
+            }
+        }
         for value in &values {
             masker.add(value);
         }
-        typed.insert(host.host.clone(), values);
+        typed.values.insert(host.host.clone(), values);
     }
     Ok(typed)
 }
@@ -348,7 +361,7 @@ struct Sending<'a> {
     file: &'a Path,
     started: Instant,
     masker: &'a mut Masker,
-    typed: HashMap<String, Vec<String>>,
+    typed: Typed,
     masked: Vec<(String, Source)>,
     replies: HashMap<String, Reply>,
     ran: Vec<String>,
@@ -426,6 +439,13 @@ impl Sending<'_> {
             let password = self.fill(request, &basic.password, Place::Other)?;
             self.masker.add_basic(&user, &password);
             let token = STANDARD.encode(format!("{user}:{password}"));
+            // shortcut: noted when sent, so it misses a Basic header later in the chain; note them all before sending if a carrier ever replays stored credentials.
+            let host = request.origin.host.clone();
+            self.typed
+                .values
+                .entry(host)
+                .or_default()
+                .push(token.clone());
             headers.push(("Authorization".into(), format!("Basic {token}")));
         }
         let place = body_place(&headers);
@@ -450,9 +470,10 @@ impl Sending<'_> {
                     continue;
                 }
                 Part::Secret(secret) => self
-                    .ctx
-                    .store
-                    .get(&request.origin.host, secret)?
+                    .typed
+                    .secrets
+                    .get(&(request.origin.host.clone(), secret.clone()))
+                    .cloned()
                     .ok_or_else(|| format!("no value is saved for `{secret}`"))?,
                 Part::Reply {
                     request: from,
@@ -482,6 +503,7 @@ impl Sending<'_> {
     fn refuse_foreign(&self, request: &Request, value: &str) -> Result<(), String> {
         let others = self
             .typed
+            .values
             .iter()
             .filter(|(host, _)| **host != request.origin.host);
         for typed in others.flat_map(|(_, values)| values) {

@@ -2,8 +2,9 @@
 
 mod common;
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Barrier};
+use std::sync::{Arc, Barrier, OnceLock};
 use std::time::Duration;
 
 use base64::Engine as _;
@@ -11,6 +12,7 @@ use base64::engine::general_purpose::STANDARD;
 use common::{Seen, closed_port, ok, reply, rig, rig_with, submit};
 use http_runner::mask::{Place, escape};
 use http_runner::run::{self, RunArgs};
+use http_runner::store::Store;
 
 const CALL_AGAIN: &str = "call `run` again";
 const LOCAL: common::Confirmed = &[("localhost", &[]), ("127.0.0.1", &[])];
@@ -475,6 +477,67 @@ async fn reply_value_equal_to_another_hosts_login_is_not_sent() {
         says(&result, line);
         never(&result, "typed-for-local");
     }
+    assert!(
+        rig.carrier
+            .seen()
+            .iter()
+            .all(|s| s.host().starts_with("localhost"))
+    );
+}
+
+#[tokio::test]
+async fn value_saved_mid_run_is_not_sent() {
+    let slot: Arc<OnceLock<Arc<Store>>> = Arc::default();
+    let store = slot.clone();
+    let rig = rig(
+        "mid-run",
+        &[("localhost", &[("KEY", "first-typed-key")])],
+        move |s: &Seen| {
+            if s.path == "/login" {
+                let retyped = BTreeMap::from([("KEY".to_string(), "second-typed-key".to_string())]);
+                store.get().unwrap().save("localhost", &retyped).unwrap();
+            }
+            let echo = s.header("x-key").unwrap_or_default();
+            ok(&serde_json::json!({"id": "seen", "echo": echo}).to_string())
+        },
+    );
+    slot.set(rig.store.clone()).unwrap();
+    let file = rig.file(
+        "# @name login\nGET http://localhost:PORT/login\nX-Key: {{$dotenv KEY}}\n\n###\n# @name use\nGET http://localhost:PORT/use/{{login.response.body.$.id}}\nX-Key: {{$dotenv KEY}}\n",
+    );
+    let result = rig.run(&file, "use").await;
+    assert_eq!(
+        rig.carrier.seen()[1].header("x-key"),
+        Some("first-typed-key")
+    );
+    never(&result, "first-typed-key");
+    absent_from_saved(&rig, "first-typed-key");
+    says(&rig.saved_for("use")[0], "***");
+}
+
+#[tokio::test]
+async fn reply_echoing_another_hosts_basic_is_refused() {
+    let rig = rig(
+        "foreign-basic",
+        &[
+            (
+                "localhost",
+                &[("USER", "basic-user-1"), ("PASS", "basic-pass-1")],
+            ),
+            ("127.0.0.1", &[]),
+        ],
+        |s: &Seen| {
+            let sent = s.header("authorization").unwrap_or_default();
+            let token = sent.trim_start_matches("Basic ");
+            ok(&serde_json::json!({"echo": token}).to_string())
+        },
+    );
+    let file = rig.file(
+        "# @name login\nGET http://localhost:PORT/login\nAuthorization: Basic {{$dotenv USER}} {{$dotenv PASS}}\n\n###\n# @name steal\nPOST http://127.0.0.1:PORT/steal\n\n{{login.response.body.$.echo}}\n",
+    );
+    let result = rig.run(&file, "steal").await;
+    says(&result, "`steal`");
+    says(&result, "line 7");
     assert!(
         rig.carrier
             .seen()
