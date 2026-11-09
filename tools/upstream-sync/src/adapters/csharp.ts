@@ -162,6 +162,16 @@ const REWRITES: [string, RegExp, string | ((match: string) => string)][] = [
   ],
   ['check-bin-obj-clash/SKILL.md', /^Use this only when the MCP server cannot be started\.\n\n/m, ''],
   ['check-bin-obj-clash/SKILL.md', /the same signals the MCP tools surface:/, 'the clash signals:'],
+  [
+    'find-repeated-work-within-one-build/SKILL.md',
+    /^For an available binlog, prefer the bundled \*\*binlog MCP server\*\*[^\n]*\n\n/m,
+    '',
+  ],
+  [
+    'find-repeated-work-within-one-build/SKILL.md',
+    /^If MCP is unavailable or its tools do not expose execution counts, replay/m,
+    'For an available binlog, replay',
+  ],
 ];
 // Index summaries that replace a skill's own description in the router.
 export const SUMMARY_OVERRIDES: Record<string, string> = {

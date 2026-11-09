@@ -46,7 +46,7 @@ reopening is appended as `Reopened <date>: <why>`. -->
 
 ## Evidence
 
-<!-- The evidence table (E1, E2, …) from papers and engineering sources, agreements, conflicts, gaps. -->
+<!-- The evidence table (E1, E2, …), with its `checked` column, from papers and engineering sources, agreements, conflicts, gaps; then the **Didn't survive** list. -->
 
 ## Options
 

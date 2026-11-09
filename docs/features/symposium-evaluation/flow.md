@@ -1,6 +1,7 @@
 ---
 flow: feature
-phase: brainstorm
+phase: done
+now: 'abandoned: /evaluate answered it (try, 2026-11-09).'
 ---
 
 # Symposium evaluation: flow
@@ -99,13 +100,13 @@ issues: #290, #291, #369. Session-start sync race: #344.
 
 **Overlap with us.**
 
-| Area                  | Symposium                                          | Us                                           | Verdict                                              |
-| --------------------- | -------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------- |
-| Packaging             | loose files per host, no authored-once packages    | neutral `plugins/` compiled to native packs  | ignore; its RFD proposes compiling, not begun        |
-| Selection             | core strength: dependency-graph predicates         | prose Stack packs table, repo-root files    | borrow the predicate idea; consuming it is Rust-only |
-| Hooks                 | one binary translates 5 events at runtime          | compile-time event map                       | borrow its host delivery table as a check            |
-| MCP                   | predicate-gated, written to host config            | in packages or by the installer              | ignore                                               |
-| Host setup            | `init` writes global hooks                         | npx installer owns settings, plugins, MCP    | do not run both: both write host settings            |
+| Area       | Symposium                                       | Us                                          | Verdict                                              |
+| ---------- | ----------------------------------------------- | ------------------------------------------- | ---------------------------------------------------- |
+| Packaging  | loose files per host, no authored-once packages | neutral `plugins/` compiled to native packs | ignore; its RFD proposes compiling, not begun        |
+| Selection  | core strength: dependency-graph predicates      | prose Stack packs table, repo-root files    | borrow the predicate idea; consuming it is Rust-only |
+| Hooks      | one binary translates 5 events at runtime       | compile-time event map                      | borrow its host delivery table as a check            |
+| MCP        | predicate-gated, written to host config         | in packages or by the installer             | ignore                                               |
+| Host setup | `init` writes global hooks                      | npx installer owns settings, plugins, MCP   | do not run both: both write host settings            |
 
 **Comparables.**
 

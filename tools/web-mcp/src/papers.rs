@@ -5,6 +5,8 @@ use std::fmt::{self, Write as _};
 
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
+use rmcp::RoleServer;
+use rmcp::service::RequestContext;
 use serde_json::{Map, Value, json};
 use url::Url;
 
@@ -623,9 +625,14 @@ fn engine_paper(e: Engine, f: &Found) -> Paper {
 
 type Engines = Vec<(Engine, Result<Vec<Found>, String>)>;
 
-/// The browser engines for a phrase query, all under the papers deadline; a browser problem is an engine's
-/// `Err`, never the call's.
-async fn engines(ctx: &Ctx, query: &str, f: &Filter) -> Engines {
+/// The browser engines for a phrase query, each with the papers deadline from its turn on; a browser problem is an
+/// engine's `Err`, never the call's.
+async fn engines(
+    ctx: &Ctx,
+    query: &str,
+    f: &Filter,
+    request: &RequestContext<RoleServer>,
+) -> Engines {
     let asked: Vec<Engine> = if f.engines.is_empty() {
         Engine::ALL.into_iter().filter(|e| e.papers()).collect()
     } else {
@@ -646,10 +653,11 @@ async fn engines(ctx: &Ctx, query: &str, f: &Filter) -> Engines {
     // The window starts before the engines' deadline; the API sources don't wait for it.
     match ctx.browser.warm().await {
         Ok(()) => {
-            let deadline = std::time::Instant::now() + ctx.cfg.papers_deadline;
             out.extend(
                 futures::future::join_all(run.into_iter().map(|e| async move {
-                    (e, run_engine(ctx, e, query, f.since, deadline).await)
+                    let got =
+                        run_engine(ctx, e, query, f.since, ctx.cfg.papers_deadline, request).await;
+                    (e, got)
                 }))
                 .await,
             );
@@ -662,7 +670,12 @@ async fn engines(ctx: &Ctx, query: &str, f: &Filter) -> Engines {
 /// Looks `query` up in the paper APIs (and, for a phrase, the browser engines), indexes every abstract and
 /// archives the records.
 #[allow(clippy::too_many_lines)] // one pass: sources, merge, record, index
-pub async fn search(ctx: &Ctx, query: &str, f: &Filter) -> PapersOutput {
+pub async fn search(
+    ctx: &Ctx,
+    query: &str,
+    f: &Filter,
+    request: &RequestContext<RoleServer>,
+) -> PapersOutput {
     let ask_for = classify(query);
     let urls = &ctx.cfg.papers;
     let since = f.since;
@@ -716,7 +729,7 @@ pub async fn search(ctx: &Ctx, query: &str, f: &Filter) -> PapersOutput {
                     arxiv_url(&urls.arxiv, &ask_for, since),
                     parse_arxiv_atom
                 ),
-                engines(ctx, query, f),
+                engines(ctx, query, f, request),
             );
             found = c;
             (vec![a, b], vec!["OpenAlex", "arXiv"])

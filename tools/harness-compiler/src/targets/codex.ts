@@ -14,7 +14,7 @@ const DESCRIPTIONS: Record<string, string> = {
   'dead-skills': 'Shared coding conventions, desktop notifications and Context7 setup for Codex.',
   graphify: 'Graphify skills for querying a codebase knowledge graph. Requires the graphify CLI.',
   flows:
-    'Portable conductor skills with approval gates and resumable flow documents. Install the companion plugins listed in README.md from the same marketplace.',
+    'Portable conductor skills, most with approval gates and resumable flow documents. Install the companion plugins listed in README.md from the same marketplace.',
 };
 
 export const codex: Target = {

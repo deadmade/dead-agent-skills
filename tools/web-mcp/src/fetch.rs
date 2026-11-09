@@ -240,6 +240,7 @@ enum Kind {
     Html,
     Markdown,
     Text,
+    Json,
     Pdf,
 }
 
@@ -254,6 +255,9 @@ fn classify(headers: &HeaderMap) -> Result<Kind, FetchError> {
         "text/markdown" | "text/x-markdown" => Ok(Kind::Markdown),
         "application/pdf" => Ok(Kind::Pdf),
         m if m.starts_with("text/") => Ok(Kind::Text),
+        m if m == "application/json" || (m.starts_with("application/") && m.ends_with("+json")) => {
+            Ok(Kind::Json)
+        }
         "" => Err(FetchError::UnsupportedType("none given".into())),
         m => Err(FetchError::UnsupportedType(m.to_owned())),
     }
@@ -351,7 +355,8 @@ async fn run(
                 rendered,
                 markdown: page.markdown.clone(),
                 images,
-                cache: !private,
+                // JSON is often a status polled for its next answer.
+                cache: !private && !matches!(kind, Kind::Json),
             };
             (page, item)
         }
@@ -444,7 +449,7 @@ async fn download(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<Download,
 async fn send(
     ctx: &Ctx,
     url: &Url,
-    allow_private: bool,
+    mut allow_private: bool,
 ) -> Result<(reqwest::Response, Url, bool, HostPermit), FetchError> {
     let proxy = proxied();
     let (mut url, mut private) = (url.clone(), false);
@@ -489,6 +494,8 @@ async fn send(
             return Err(FetchError::Blocked(url.to_string()));
         }
         private |= hop_private;
+        // A public address must not hand the fetch to a private one the caller never named.
+        allow_private &= hop_private;
         match location(&resp, &url) {
             Some(n) => url = n,
             None => return Ok((resp, url, private, permit)),

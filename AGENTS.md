@@ -63,7 +63,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   hand.
 - `plugins/opt-in/mcp/mcp-github/`: an MCP server config only.
 - `plugins/flows/`: the conductor skills (`/build-feature`, `/research-feature`, `/implement`, `/fix`, `/upgrade`,
-  `/refactor`, `/review-code`, `/understand`, `/learn`). Each runs other plugins' skills in order;
+  `/refactor`, `/review-code`, `/understand`, `/learn`, `/evaluate`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
   plugin) live once in `plugins/flows/steps/*.toml`, composed into each conductor at build time (`docs/adr/0009-conductors-composed-from-flow-steps.md`), so a
   SKILL.md says what it runs and names its steps (`[step: <name>]`). Compose (`tools/harness-compiler/src/flows/compose.ts`)
@@ -73,7 +73,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   makes sense, each on a model that fits its job (`docs/adr/0005-agent-limits-and-models.md`). The installer's only part is
   `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` (`mergeSettings`); it never writes `CLAUDE_CODE_SUBAGENT_MODEL`.
   Conductors call each other by reading the callee's SKILL.md (`/fix` → `/review-code`). Each
-  conductor's `uses:` frontmatter, plus its steps' and host wording's `uses`, lists what it runs;
+  conductor's `uses:` frontmatter, plus its steps' and host wording's `uses`, names what it may run;
   `scripts/flows-uses.mjs` generates flows' `dependencies` and the README tree from them, and check-repo fails when a
   listed skill is gone or the generated parts are stale. `/review-code`
   replaced `/test-audit`, `/doc-audit`, `/harden`, `/self-review` and `/verify` (their method text is in its
@@ -117,7 +117,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   host, `<last path segment of the URL>.html`; `WEB_MCP_TEST_PUBLIC_IP` treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS`,
   `WEB_MCP_PAPERS_MS` and `WEB_MCP_LOOKUP_MS` shorten the fetch fallback's, each paper source's and each lookup
   source's deadline. Env knobs: `WEB_MCP_CHROME` picks the browser binary; `WEB_MCP_SEARCH_DIR` picks where profile
-  slots live (no temp fallback).
+  slots live (no temp fallback). `fetch` runs with `allow_private: true` (`tools.rs`, for the user's own localhost
+  sites), so a conductor that follows links from untrusted pages, as /evaluate does, has only a text rule on the URL:
+  a hostname resolving to a private address gets through, though a public URL's redirect onto one is refused.
 - `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
   `tools/upstream-sync/src/adapters/*.ts`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
   plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
@@ -126,9 +128,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `technical-writing` and `unslop` (flows' `writing` replaces them, and the sync rewrites the lines that named them);
   `npm run sync -- apply pstack-picks --ref <hash>` syncs one commit, given as a full 40-character hash, instead of upstream's default
   branch; its entry in `tools/upstream-sync/src/sources.ts` checks the number of vendored skills (16), so change that count
-  whenever you change `SKILLS`. pstack-picks' `UPSTREAM`
-  stays at `519d36a` on purpose: upstream's newer commits fail the sync's `GUARD`, so its weekly `sync.yml` job
-  (no `--ref`) fails until a PR adapts the rewrites; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
+  whenever you change `SKILLS`. When upstream's text gets past the rewrites, the sync's `GUARD` fails its weekly `sync.yml` job
+  until a PR adapts them; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
   `plugins/flows/agents/spec-compliance-checker.md` (vendored by the `tob` sync adapter), because a pack's agents don't load.
   Where a conductor or step changes a pack's rule, or pastes a section of one, it quotes each sentence in an
   `<!-- overrides <pack>/<path>: "..." -->` marker in flows' own `.md` and `steps/*.toml` files (the build strips
@@ -218,6 +219,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `tools/upstream-sync/`: private TypeScript workspace for upstream vendoring, run directly on Node 26.
   `npm run sync -- list` lists sources; `preview <source>` shows changes from committed HEAD in an isolated
   worktree; `apply <source>` updates a clean destination and writes a structured result under the runner temp directory.
+  A failed `apply` can leave its destination half-written, which breaks the build for the next source in that checkout.
   The registry owns source checks and PR metadata; adapters export `run(context)` and have no import-time effects.
   Context supplies the checkout, Git/GitHub access, temporary directories and result collection. Tests use local
   upstreams and fake GitHub responses. Historical generated-file ownership stamps retain their original script names.
@@ -287,6 +289,8 @@ plugins of ours that the manifest no longer lists.
   `python3 -m unittest discover -s scripts -p 'check_cargo_workspace_test.py'` for the workspace policy.
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
   linking fails.
+- Don't share `CARGO_TARGET_DIR` between worktrees: a test binary keeps the `CARGO_MANIFEST_DIR` of the worktree that
+  built it, and web-mcp's integration tests start whichever server binary was built last.
 - ado-mcp: `cargo test --locked -p ado-mcp` from the root. CI lints with latest stable Rust and separately checks
   the workspace with its declared `rust-version` (1.97). A test that times concurrency makes one fast call
   first and bounds the slow one against it (`view_concurrent` in `tests/pr.rs`, `tests/wi.rs`): under the full
@@ -298,7 +302,8 @@ plugins of ours that the manifest no longer lists.
   `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
   writes them when it loads the mod).
 - The quote check: `npm test` (check-repo) fails when a sentence an `overrides` marker quotes is gone from its pack.
-  Run it after a pack sync and fix the marker or the conductor text in the same PR.
+  Run it after a pack sync and fix the marker or the conductor text in the same PR. It sees only quoted sentences, so also
+  read a superpowers sync's `brainstorming` diff against `build-feature`: v7.0.2 added a chat approval that would bypass its Gate 1, and no quote covered it.
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded). Enter it from the repo root only:
   started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or

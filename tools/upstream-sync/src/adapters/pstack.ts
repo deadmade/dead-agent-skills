@@ -75,7 +75,7 @@ const SKIPPED = [
 // Cursor-isms that must not survive the rewrite, checked per line (case-sensitive; "cursor location" in prose is fine).
 // `unslop` and `technical-writing` are retired names: a new reference to either needs a rewrite to flows' `writing` skill.
 const GUARD =
-  /\bunslop\b|\btechnical-writing\b|\.cursor|Cursor|\bTask\b|AskQuestion|generalPurpose|[Rr]eadonly|environment: "|cloud_base_branch|agent-transcripts|mcps\/|todolist|grok-|gpt-5|sol-max|-thinking-|pstack-models|poteto-mode|subagent_type: "Comment Sicko"|^name: Comment Sicko/;
+  /\bunslop\b|\btechnical-writing\b|\.cursor|Cursor|\bTask\b|AskQuestion|generalPurpose|[Rr]eadonly|environment: "|cloud_base_branch|agent-transcripts|mcps\/|todolist|grok-|gpt-5|sol-max|-thinking-|pstack-models|interrogate reviewers|poteto-mode|subagent_type: "Comment Sicko"|^name: Comment Sicko/;
 
 // --- Cursor -> Claude Code rewrites -------------------------------------------------------------
 // Applied in order to each whole .md file. Rules match content, never line numbers. Anything they miss is caught by GUARD.
@@ -102,32 +102,21 @@ const REWRITES: [RegExp, string][] = [
   [/the `(how explainer|why synthesizer)` line, default `[^`]+`/g, '`fable`'],
   [/Take the runners from the `architect runners` line[^\n]*/g, `Use one runner per model: ${CLAUDE_MODELS}.`],
   [
-    /Use the `arena runners` line in `~\/\.cursor\/rules\/pstack-models\.mdc`\..*?from its error message\./g,
+    /Use the `arena runners` line in `~\/\.cursor\/rules\/pstack-models\.mdc`\..*?runs on the parent model when none remain, and say so\./g,
     `Default to one each on ${CLAUDE_MODELS}.`,
   ],
   [
-    /choose one model from the `arena cross-judge pool` line[^\n]*?Prefer a different model family from the parent's\./g,
-    `choose one model from ${CLAUDE_MODELS}. Prefer a different model from the parent's.`,
+    /choose one model from the `arena cross-judge pool` line[^\n]*?say that the family check did not run\./g,
+    `choose one model from ${CLAUDE_MODELS}. Prefer a different model from the parent's. Spawn one read-only judge subagent (\`subagent_type\`: \`Explore\`) on that model.`,
   ],
-  [/Spawn one readonly judge subagent/g, 'Spawn one read-only judge subagent (`subagent_type`: `Explore`)'],
 
   [
-    /, one per entry on the `interrogate reviewers` line in `~\/\.cursor\/rules\/pstack-models\.mdc`[^\n]*/g,
-    ', one per row of the table below.',
+    /Read the `interrogate reviewers` line in place of `arena runners`\./g,
+    `Run one reviewer on each of ${CLAUDE_MODELS}.`,
   ],
-  [/\| Reviewer A \| `[^`]+` \|/g, '| Reviewer A | `fable` |'],
-  [/\| Reviewer B \| `[^`]+` \|/g, '| Reviewer B | `opus` |'],
-  [/\| Reviewer C \| `[^`]+` \|/g, '| Reviewer C | `sonnet` |'],
-  [/\| Reviewer D \| `[^`]+` \|/g, '| Reviewer D | `haiku` |'],
-  [/\| Subagent \| Default model \|/g, '| Subagent | Model |'],
-  [
-    /Each reviewer gets `subagent_type: generalPurpose`, `readonly: true`, and `model` set to[^\n]*/g,
-    "Each reviewer gets `subagent_type: Explore` and `model` set to the reviewer's model from the table.",
-  ],
-  [
-    /If the Task tool rejects a configured entry, run that reviewer[^\n]*\n/g,
-    `Valid \`model\` values for the Agent tool are ${CLAUDE_MODELS}.\n`,
-  ],
+  [/Spawn each adversary as `generalPurpose`\./g, 'Spawn each adversary as `general-purpose`.'],
+  // in-your-own-words isn't vendored (SKIPPED)
+  [/State the intent with the \*\*in-your-own-words\*\* skill, from/g, 'State the intent in your own words, from'],
 
   // poteto-mode (not vendored) tunes Cursor model slugs per spawn; the Agent tool's models carry no level or speed
   [/ ?Pick each subagent's reasoning level and fast or standard speed[^\n]*?\*\*poteto-mode\*\* skill\./g, ''],

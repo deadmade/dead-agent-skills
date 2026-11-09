@@ -64,7 +64,7 @@ passive lookups and a browser with an archive of everything it pulled, and
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/build-feature`,
 `/fix`, `/review-code`, `/learn` and more) that run the other plugins' skills in order,
-with approval gates. Build and research flows keep a flow.md to resume from; /review-code keeps an audit file.
+most with approval gates. Build and research flows keep a flow.md to resume from; /review-code keeps an audit file.
 They keep the number of agents small, ultracode included, and run each on a model suited to its job rather than the one you picked. Picking flows installs every plugin its conductors use.
 flows also sets the house standard for prose. A `writing` skill states Williams and Bizup's _Style_ in our own words.
 A code-only check on each Write or Edit of a Markdown file flags conversation shorthand such as `Q11` or `round 2`
