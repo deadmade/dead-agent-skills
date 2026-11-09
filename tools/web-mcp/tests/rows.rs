@@ -113,6 +113,15 @@ fn rows_group_and_limit() {
 }
 
 #[test]
+fn rows_limit_defaults_to_30() {
+    let (mut mcp, _) = start(&[("forty.html", page("Forty", &list("ad", 40, "some words")))]);
+    let r = mcp.call("rows", json!({"url": url("forty")}));
+    let t = text(&r);
+    assert_eq!(numbered(t), 30, "{t}");
+    assert!(t.contains("Showing 30 of 40."), "{t}");
+}
+
+#[test]
 fn rows_budget_keeps_whole_rows() {
     let long = "words that make the row long enough to be cut ".repeat(8);
     let (mut mcp, _) = start(&[("many.html", page("Many", &list("ad", 400, &long)))]);

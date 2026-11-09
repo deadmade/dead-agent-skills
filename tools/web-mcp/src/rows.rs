@@ -406,15 +406,17 @@ mod tests {
     }
 
     #[test]
-    fn nav_and_footer_are_skipped() {
-        let html = format!(
-            "<nav>{}</nav><main><ul>{}</ul></main>",
-            items("a", "l", 10).replace("<a ", "<a href=\"/x\" "),
-            items("li", "", 6)
-        );
-        let found = groups(&html);
-        assert_eq!(found.len(), 1);
-        assert!(found[0].kind.starts_with("LI"));
+    fn nav_header_and_footer_are_skipped() {
+        for tag in ["nav", "header", "footer"] {
+            let html = format!(
+                "<{tag}>{}</{tag}><main><ul>{}</ul></main>",
+                items("a", "l", 10).replace("<a ", "<a href=\"/x\" "),
+                items("li", "", 6)
+            );
+            let found = groups(&html);
+            assert_eq!(found.len(), 1, "{tag}");
+            assert!(found[0].kind.starts_with("LI"), "{tag}");
+        }
     }
 
     /// `n` `li`s, each a link with text of the given length plus `inner` HTML after it.
@@ -428,20 +430,46 @@ mod tests {
     }
 
     #[test]
-    fn nested_group_is_dropped() {
-        let inner = format!("<ul>{}</ul>", linked(6, 20, ""));
-        let found = groups(&format!("<ul>{}</ul>", linked(6, 20, &inner)));
-        assert_eq!(found.len(), 1);
-        assert_eq!(found[0].rows.len(), 6);
-    }
-
-    #[test]
     fn inner_group_with_a_lower_score_is_dropped() {
         // each outer item holds its own long text and a shorter inner list, so its group scores higher
         let inner = format!("<ul>{}</ul>", linked(6, 20, ""));
         let found = groups(&format!("<ul>{}</ul>", linked(6, 60, &inner)));
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].rows.len(), 6);
+    }
+
+    #[test]
+    fn inner_group_that_outscores_its_wrapper_survives() {
+        // one outer item holds a list of ten long linked items; the outer group's text is cut at the cap
+        let big = format!("<ul>{}</ul>", linked(10, 400, ""));
+        let first = format!("<li><a href=\"/o/0\">{}</a>{big}</li>", "w".repeat(20));
+        let found = groups(&format!("<ul>{first}{}</ul>", linked(5, 20, "")));
+        let sizes: Vec<usize> = found.iter().map(|g| g.rows.len()).collect();
+        assert_eq!(sizes, [10, 6]);
+    }
+
+    #[test]
+    fn a_javascript_or_mailto_link_is_not_the_row_link() {
+        let item = "<li><a href=\"javascript:void(0)\">fav</a><a href=\"mailto:a@shop.example\">mail</a><a href=\"/p/1\">Title of the product</a></li>";
+        let found = groups(&format!("<ul>{}</ul>", item.repeat(6)));
+        assert_eq!(
+            found[0].rows[0].link.as_ref().unwrap().as_str(),
+            "https://shop.example/p/1"
+        );
+    }
+
+    #[test]
+    fn an_item_that_is_a_link_has_its_own_link() {
+        let found = groups(&format!(
+            "<div>{}</div>",
+            many(6, |i| format!(
+                "<a href=\"/p/{i}\">product number {i} with text</a>"
+            ))
+        ));
+        assert_eq!(
+            found[0].rows[0].link.as_ref().unwrap().as_str(),
+            "https://shop.example/p/0"
+        );
     }
 
     #[test]
@@ -563,7 +591,7 @@ mod tests {
         );
         assert!(both.contains("Showing 3 of 10."));
         let second = render(&all, Some(2), 3, 10_000);
-        assert!(second.starts_with("Group 2: 7 items"));
+        assert!(second.starts_with("Group 2: 7 items (LI)\n"));
         assert!(!second.contains("Group 1"));
     }
 
