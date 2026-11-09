@@ -449,13 +449,11 @@ async fn download(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<Download,
 async fn send(
     ctx: &Ctx,
     url: &Url,
-    allow_private: bool,
+    mut allow_private: bool,
 ) -> Result<(reqwest::Response, Url, bool, HostPermit), FetchError> {
     let proxy = proxied();
     let (mut url, mut private) = (url.clone(), false);
-    for hop in 0..=MAX_REDIRECTS {
-        // A public address must not hand the fetch to a private one the caller never named.
-        let allow_private = allow_private && (hop == 0 || private);
+    for _ in 0..=MAX_REDIRECTS {
         if !matches!(url.scheme(), "http" | "https") {
             return Err(net(format!("refusing to follow a redirect to {url}")));
         }
@@ -496,6 +494,8 @@ async fn send(
             return Err(FetchError::Blocked(url.to_string()));
         }
         private |= hop_private;
+        // A public address must not hand the fetch to a private one the caller never named.
+        allow_private &= hop_private;
         match location(&resp, &url) {
             Some(n) => url = n,
             None => return Ok((resp, url, private, permit)),

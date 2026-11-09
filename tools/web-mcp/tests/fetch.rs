@@ -148,6 +148,20 @@ fn public_redirect_onto_private_is_refused() {
 }
 
 #[test]
+fn private_start_cannot_return_to_private_through_a_public_hop() {
+    let start = Fixture::start("127.0.0.1");
+    let public = Fixture::start(PUBLIC);
+    let target = Fixture::start("127.0.0.1");
+    start.route("/start", vec![Resp::redirect(&public.url("/hop"))]);
+    public.route("/hop", vec![Resp::redirect(&target.url("/article.html"))]);
+    let mut mcp = Mcp::start();
+    let r = fetch(&mut mcp, &start.url("/start"));
+    assert!(is_error(&r), "{}", text(&r));
+    assert_eq!(public.hits("/hop"), 1);
+    assert_eq!(target.hits("/article.html"), 0);
+}
+
+#[test]
 fn redirect_resolves_images_against_final_url() {
     let fx = Fixture::start(PUBLIC);
     fx.route("/old", vec![Resp::redirect("/new/dir/page.html")]);
