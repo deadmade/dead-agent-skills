@@ -35,17 +35,17 @@
       "source": "github",
       "repo": "astral-sh/uv",
       "tagPrefix": "",
-      "version": "0.13.6",
+      "version": "0.13.7",
       "files": {
         "win32-x64": {
           "file": "uv-x86_64-pc-windows-msvc.zip",
           "inner": "uv.exe",
-          "sha256": "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f"
+          "sha256": "0cdc5b38fe5a8168ed6a25814f5ba43c21d313dd3187314fccb37b7cec46e021"
         },
         "linux-x64": {
           "file": "uv-x86_64-unknown-linux-musl.tar.gz",
           "inner": "uv-x86_64-unknown-linux-musl/uv",
-          "sha256": "5d61f26b6c7213779eda90edc6971ea6b0b796bfb8d49a574c8ad69b59838548"
+          "sha256": "287491da03f2a785c70fa75b13e1f849918c2f2b5415fe84876b8214eeb792f9"
         }
       }
     },
