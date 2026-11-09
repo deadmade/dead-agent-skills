@@ -109,7 +109,7 @@ file, an evaluation page, the chat).
 _Avoid_: workflow, flow (alone; one execution of a flow is a run)
 
 **Evaluation page**:
-The one page /evaluate writes, ending in an adoption verdict; it is that run's whole record.
+The one page /evaluate writes, ending in an adoption verdict; with the `prior-art.md` beside it, it is that run's whole record.
 _Avoid_: report, radar entry
 
 **Adoption verdict**:

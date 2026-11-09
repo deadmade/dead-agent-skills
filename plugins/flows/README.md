@@ -25,7 +25,7 @@ it; `all` audits the whole repo, vendored content skipped.
 ## What each conductor uses
 
 Generated from each conductor's `uses:` line, its steps' and its host wording's by `node scripts/flows-uses.mjs`;
-`npm test` fails when it is stale.
+`npm test` fails when it is stale. The tree names what a conductor may run: a run can skip one, as /evaluate skips `why`.
 Installing flows installs every plugin below; the packs ship inside flows itself.
 
 <!-- uses:start -->
