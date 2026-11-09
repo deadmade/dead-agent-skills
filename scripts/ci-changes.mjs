@@ -22,13 +22,8 @@ export function selectChecks(paths, all = false) {
     const crate = crates.find((c) => roots[c].some((root) => path.startsWith(root)));
     if (crate) {
       selected.add(crate);
-      // Manifests and hand-typed palette copies participate in repository consistency checks.
-      if (
-        path.startsWith('plugins/') ||
-        path.endsWith('/Cargo.toml') ||
-        path === 'tools/ado-mcp/src/bin/timetrack/ui.rs' ||
-        path === 'tools/web-mcp/src/api.rs'
-      )
+      // Manifests and the hand-typed repository slug participate in repository consistency checks.
+      if (path.startsWith('plugins/') || path.endsWith('/Cargo.toml') || path === 'tools/web-mcp/src/api.rs')
         node = true;
       if (path.startsWith('plugins/')) skills = true;
       continue;
