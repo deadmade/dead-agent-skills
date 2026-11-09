@@ -4,17 +4,29 @@
 //! digits, `_` and `-`, or as a path, media type, base URL or body that passed a check; whatever fails one is left out,
 //! with a comment saying why. `body_problem` mirrors what `parse` does with a body line, so change them together.
 
+use std::cell::Cell;
 use std::collections::HashSet;
+use std::fmt;
 use std::fs::{self, OpenOptions};
-use std::io::{ErrorKind, Write};
+use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
+use serde::de::{
+    self, DeserializeSeed, Deserializer, EnumAccess, IgnoredAny, MapAccess, SeqAccess,
+    VariantAccess, Visitor,
+};
 use serde_norway::Value;
 use url::Url;
 
 const METHODS: [&str; 7] = ["get", "put", "post", "delete", "options", "head", "patch"];
 const MAX_REF_STEPS: usize = 32;
-const MAX_SPEC_BYTES: u64 = 32 << 20;
+/// The most a spec file, the file written and any one body may hold.
+const MAX_SPEC_BYTES: usize = 32 << 20;
+/// libyaml scans flow nesting in quadratic time before the reader's own limit of 128 applies.
+const MAX_DEPTH: usize = 128;
+/// What one YAML node is counted as, beside its text: the limit comes to five million nodes.
+const NODE_COST: usize = 64;
+const MAX_EXPANDED: usize = 5_000_000 * NODE_COST;
 const HINT: &str = "You can write the .http file yourself instead";
 
 #[derive(Debug)]
@@ -57,7 +69,7 @@ fn write(spec: &Path, output: &Path, base_url: Option<&str>) -> Result<Generated
     let name = spec
         .file_name()
         .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
-    let (text, requests, with_body) = render(&doc, &name, &base);
+    let (text, requests, with_body) = render(&doc, &name, &base)?;
     let mut file_name = spec.file_stem().unwrap_or_default().to_owned();
     file_name.push(".http");
     let path = output.join(file_name);
@@ -88,7 +100,7 @@ fn read_spec(spec: &Path) -> Result<Value, String> {
     if !meta.is_file() {
         return Err(format!("{} is not a file", spec.display()));
     }
-    if meta.len() > MAX_SPEC_BYTES {
+    if meta.len() > MAX_SPEC_BYTES as u64 {
         return Err(format!(
             "{} is larger than {MAX_SPEC_BYTES} bytes",
             spec.display()
@@ -100,7 +112,7 @@ fn read_spec(spec: &Path) -> Result<Value, String> {
     let doc: Value = if text.trim_start().starts_with('{') {
         serde_json::from_str(text).map_err(|e| format!("the spec is not valid JSON: {e}"))?
     } else {
-        serde_norway::from_str(text).map_err(|e| format!("the spec is not valid YAML: {e}"))?
+        yaml(text)?
     };
     let version = match doc.get("openapi") {
         Some(Value::String(s)) => s.clone(),
@@ -118,6 +130,114 @@ fn read_spec(spec: &Path) -> Result<Value, String> {
         ));
     }
     Ok(doc)
+}
+
+/// Reads YAML after two cheap refusals, since a small file can otherwise stall the reader or exhaust memory:
+/// deep flow nesting, and aliases, which `Value` would keep a copy of at every use.
+fn yaml(text: &str) -> Result<Value, String> {
+    let mut depth = 0_usize;
+    for b in text.bytes() {
+        match b {
+            b'[' | b'{' => depth += 1,
+            b']' | b'}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+        if depth > MAX_DEPTH {
+            return Err(format!("the spec nests brackets deeper than {MAX_DEPTH}"));
+        }
+    }
+    let cost = Cell::new(0);
+    let counted = Cost(&cost).deserialize(serde_norway::Deserializer::from_str(text));
+    if cost.get() > MAX_EXPANDED {
+        return Err(format!(
+            "the spec expands to more than {} YAML nodes once its aliases are replayed",
+            MAX_EXPANDED / NODE_COST
+        ));
+    }
+    counted.map_err(|e| format!("the spec is not valid YAML: {e}"))?;
+    serde_norway::from_str(text).map_err(|e| format!("the spec is not valid YAML: {e}"))
+}
+
+/// Adds up what a YAML document expands to, aliases replayed, and keeps none of it.
+#[derive(Clone, Copy)]
+struct Cost<'a>(&'a Cell<usize>);
+
+impl Cost<'_> {
+    fn add<E: de::Error>(self, n: usize) -> Result<(), E> {
+        let total = self.0.get().saturating_add(n);
+        self.0.set(total);
+        if total > MAX_EXPANDED {
+            return Err(E::custom("the document is too large once expanded"));
+        }
+        Ok(())
+    }
+}
+
+impl<'de> DeserializeSeed<'de> for Cost<'_> {
+    type Value = ();
+
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
+        self.add(NODE_COST)?;
+        d.deserialize_any(self)
+    }
+}
+
+/// Visits the kinds of node `Value` does, so a document `Value` reads is one this reads.
+impl<'de> Visitor<'de> for Cost<'_> {
+    type Value = ();
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a YAML value")
+    }
+
+    fn visit_bool<E>(self, _: bool) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_i64<E>(self, _: i64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_u64<E>(self, _: u64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_f64<E>(self, _: f64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_unit<E>(self) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_none<E>(self) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_str<E: de::Error>(self, s: &str) -> Result<(), E> {
+        self.add(s.len())
+    }
+
+    fn visit_some<D: Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
+        self.deserialize(d)
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<(), A::Error> {
+        while seq.next_element_seed(self)?.is_some() {}
+        Ok(())
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<(), A::Error> {
+        while map.next_key_seed(self)?.is_some() {
+            map.next_value_seed(self)?;
+        }
+        Ok(())
+    }
+
+    fn visit_enum<A: EnumAccess<'de>>(self, data: A) -> Result<(), A::Error> {
+        let (IgnoredAny, tagged) = data.variant()?;
+        tagged.newtype_variant_seed(self)
+    }
 }
 
 /// `base_url`, else the spec's only server: a spec's first server is often production.
@@ -179,28 +299,31 @@ fn check_base(url: &str) -> Result<String, String> {
 }
 
 /// The file's text, how many requests it holds and how many of them carry a body.
-fn render(doc: &Value, spec_name: &str, base: &str) -> (String, usize, usize) {
-    let mut lines = vec![
+fn render(doc: &Value, spec_name: &str, base: &str) -> Result<(String, usize, usize), String> {
+    let (mut lines, mut size) = (Vec::new(), 0);
+    let header = [
         format!("# Generated from {} by http-runner", one_line(spec_name)),
         format!("@baseUrl = {base}"),
     ];
+    append(&mut lines, &mut size, header)?;
     let (mut requests, mut with_body) = (0, 0);
     let mut names = HashSet::new();
     let paths = doc.get("paths").and_then(Value::as_mapping);
     for (key, item) in paths.into_iter().flatten() {
         let Some(path) = key.as_str() else {
-            lines.extend(skipped("a path that is not text", "paths are read as text"));
+            let block = skipped("a path that is not text", "paths are read as text");
+            append(&mut lines, &mut size, block)?;
             continue;
         };
         let item = match resolve(doc, item) {
             Ok(item) => item,
             Err(why) => {
-                lines.extend(skipped(path, &why));
+                append(&mut lines, &mut size, skipped(path, &why))?;
                 continue;
             }
         };
         if let Some(why) = path_problem(path) {
-            lines.extend(skipped(path, why));
+            append(&mut lines, &mut size, skipped(path, why))?;
             continue;
         }
         for method in METHODS {
@@ -210,13 +333,32 @@ fn render(doc: &Value, spec_name: &str, base: &str) -> (String, usize, usize) {
             let name = unique(&mut names, &operation_name(op, method, path));
             let (block, has_body) =
                 operation(doc, item, op, &method.to_ascii_uppercase(), path, &name);
-            lines.extend(block);
+            append(&mut lines, &mut size, block)?;
             requests += 1;
             with_body += usize::from(has_body);
         }
     }
     lines.push(String::new());
-    (lines.join("\n"), requests, with_body)
+    Ok((lines.join("\n"), requests, with_body))
+}
+
+/// Adds `block` to the file and refuses once it passes `MAX_SPEC_BYTES`: the spec holds a `$ref`'d example once,
+/// but the file repeats it for every operation that uses it.
+fn append(
+    lines: &mut Vec<String>,
+    size: &mut usize,
+    block: impl IntoIterator<Item = String>,
+) -> Result<(), String> {
+    for line in block {
+        *size += line.len() + 1;
+        lines.push(line);
+    }
+    if *size > MAX_SPEC_BYTES {
+        return Err(format!(
+            "the file would pass {MAX_SPEC_BYTES} bytes, because the spec repeats large examples"
+        ));
+    }
+    Ok(())
 }
 
 /// A block that holds a comment and no request, for what the file cannot carry.
@@ -312,9 +454,9 @@ fn request_body_of(doc: &Value, request_body: &Value) -> Result<Body, String> {
         .ok_or_else(|| format!("the media type {media} is not a plain type/subtype"))?;
     let (value, others) = example(doc, entry)?;
     let text = match value {
+        Value::String(s) if s.len() > MAX_SPEC_BYTES => return Err(too_large()),
         Value::String(s) => s.clone(),
-        v if is_json(essence) => serde_json::to_string_pretty(v)
-            .map_err(|e| format!("the example cannot be written as JSON: {e}"))?,
+        v if is_json(essence) => pretty(v)?,
         _ => {
             return Err(format!(
                 "the example is structured and {essence} is not JSON, so it is not converted"
@@ -329,6 +471,39 @@ fn request_body_of(doc: &Value, request_body: &Value) -> Result<Body, String> {
         text,
         others,
     })
+}
+
+fn too_large() -> String {
+    format!("the example is larger than {MAX_SPEC_BYTES} bytes")
+}
+
+/// An example as pretty JSON, stopped at `MAX_SPEC_BYTES`: indentation makes a deeply nested one far larger than its source.
+fn pretty(value: &Value) -> Result<String, String> {
+    struct Capped(Vec<u8>);
+
+    impl Write for Capped {
+        fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+            if self.0.len() + data.len() > MAX_SPEC_BYTES {
+                return Err(io::Error::other("over the limit"));
+            }
+            self.0.extend_from_slice(data);
+            Ok(data.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut out = Capped(Vec::new());
+    serde_json::to_writer_pretty(&mut out, value).map_err(|e| {
+        if e.is_io() {
+            too_large()
+        } else {
+            format!("the example cannot be written as JSON: {e}")
+        }
+    })?;
+    Ok(String::from_utf8_lossy(&out.0).into_owned())
 }
 
 /// The media-level `example`, else the first of `examples`, else the schema's `example`, with the names of the other examples.
@@ -515,7 +690,9 @@ mod tests {
     }
 
     fn refused(tag: &str, rest: &str, base: Option<&str>) -> String {
-        let err = gen_file(tag, "api.yaml", &format!("{HEAD}{rest}"), base).unwrap_err();
+        let Err(err) = gen_file(tag, "api.yaml", &format!("{HEAD}{rest}"), base) else {
+            panic!("expected a refusal");
+        };
         assert!(!scratch_out(tag).exists(), "a refusal writes nothing");
         err
     }
@@ -1048,5 +1225,61 @@ paths:
             text.lines().nth(1),
             Some("@baseUrl = https://sandbox.example")
         );
+    }
+
+    #[test]
+    fn alias_bomb_is_refused() {
+        // 60 KB that expands to 100 million nodes; serde_norway's own limit counts the 5,000 jumps, not these.
+        let bomb = format!(
+            "a: &a [{}]\nb: [{}]\n",
+            "1, ".repeat(20_000),
+            "*a, ".repeat(5_000)
+        );
+        let err = refused("alias-bomb", &bomb, Some(BASE));
+        assert!(err.contains("aliases are replayed"), "{err}");
+    }
+
+    #[test]
+    fn deep_flow_nesting_is_refused_quickly() {
+        let started = std::time::Instant::now();
+        let err = refused("deep", &format!("x: {}\n", "[".repeat(40_000)), Some(BASE));
+        assert!(err.contains("nests brackets"), "{err}");
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
+
+    #[test]
+    fn rendered_output_is_capped() {
+        // 1 MiB of text in the spec, used by 40 operations: 40 MiB in the file.
+        let uses = (0..40)
+            .map(|i| format!("  /p{i}: {{post: {{operationId: p{i}, requestBody: {{$ref: '#/components/requestBodies/Big'}}}}}}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let big = "x".repeat(1 << 20);
+        let spec = format!(
+            "paths:\n{uses}\ncomponents:\n  requestBodies:\n    Big:\n      content:\n        text/plain:\n          example: {big}\n"
+        );
+        let err = refused("output-cap", &spec, Some(BASE));
+        assert!(err.contains("would pass"), "{err}");
+    }
+
+    #[test]
+    fn ordinary_aliases_still_read() {
+        let (made, _, file) = ok(
+            "aliases",
+            r"
+paths:
+  /a:
+    post:
+      operationId: a
+      requestBody: {content: {application/json: {example: &shared {id: 7, tags: [x, y]}}}}
+  /b:
+    post:
+      operationId: b
+      x-note: !custom [1, 2]
+      requestBody: {content: {application/json: {example: *shared}}}
+",
+        );
+        assert_eq!(made.with_body, 2);
+        assert_eq!(body(&file.requests[0]), body(&file.requests[1]));
     }
 }
