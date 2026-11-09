@@ -46,3 +46,6 @@ block, gave typed keys with an editor schema, and built the same skills. Steps a
 keys and near-miss `[step:` lines are checked; those checks would have worked on Markdown too, so the format itself
 buys editor completion and typed values, at the cost of the compiler's first runtime dependency: every job that runs
 the build installs packages first.
+
+Conductors stay skills, not Workflows: a Workflow can't take user input mid-run, and the conductors have gates. This was
+recorded during the `skill-composition` feature and not re-tested.

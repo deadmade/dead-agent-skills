@@ -19,6 +19,10 @@ captured pages in `tests/fixtures/rows/` (`docs/adr/0013-rows-tool-and-shop-skil
 visit budget that charges text by bytes, because a hostile page can hide a huge text node under thousands of nested
 parents (`docs/solutions/rows-walk-budget-counts-bytes-not-nodes.md`).
 
+Claude Code overlaps several MCP calls from one message only when the tool has `read_only_hint`; a call without it runs
+alone and delays those after it (measured on 2.1.301). `browser` goes without on purpose, so calls that steer one tab
+stay in order. Adding the hint would reorder them.
+
 ## Contributor rules
 
 Contributor rules: tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`;

@@ -28,7 +28,8 @@ Measured on real sessions, it saves 7.0% of tool-result tokens.
 - A result that waited more than about 4 s behind larger ones goes to Claude untrimmed, so no tool call outlives the
   hook's 5 s timeout.
 - Cut results are final. headroom's `Retrieve more: hash=…` note is common on cut logs and can't be followed: re-run
-  the command for the full output.
+  the command for the full output. headroom's lossless `mode="agent"` saved 0.0% over 2,498 replayed results, against
+  7.0% for lossy (measured 2026-10-30), which is why cuts are final.
 
 ## When nothing is trimmed
 

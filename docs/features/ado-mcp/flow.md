@@ -1,5 +1,5 @@
 ---
-phase: execute
+phase: done
 ---
 
 # ado MCP server: flow

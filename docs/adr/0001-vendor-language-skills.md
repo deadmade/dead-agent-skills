@@ -12,3 +12,7 @@ and a weekly PR. We pay it because a direct `url`-sourced entry can't do either 
 
 Re-check this decision if Claude Code starts honoring `paths` for plugin skills, or if upstream ships an LSP-free
 plugin. Either could make the routers, or the vendoring itself, unnecessary.
+
+The 12 evals in `{rust,csharp}-skills/evals/` don't show that the plugins help, so don't read a pass as a reason to keep
+them. In their one run every question got full marks without the skills (0 of 12 qualified), the judge compared only
+headline recommendations, and the skills didn't fire in every run.
