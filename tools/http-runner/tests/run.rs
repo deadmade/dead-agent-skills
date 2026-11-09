@@ -928,6 +928,28 @@ async fn digit_value_joined_to_a_literal_digit_is_masked_as_one_run() {
 }
 
 #[tokio::test]
+async fn masked_digit_reply_value_joined_to_a_literal_digit_is_masked_as_one_run() {
+    let rig = rig("joined-reply", LOCAL, |s: &Seen| {
+        if s.path == "/login" {
+            ok(r#"{"sessionId":"55555555"}"#)
+        } else {
+            echo(s)
+        }
+    });
+    let file = rig.file(
+        "# @name login\nGET http://localhost:PORT/login\n\n###\n# @name use\nGET http://localhost:PORT/use/{{login.response.body.$.sessionId}}7\nX-Acct: {{login.response.body.$.sessionId}}7\n",
+    );
+    let result = rig.run(&file, "use").await;
+    let sent = &rig.carrier.seen()[1];
+    assert_eq!(sent.path, "/use/555555557");
+    assert_eq!(sent.header("x-acct"), Some("555555557"));
+    says(&result, "echo /use/999999999 999999999");
+    never(&result, "55555555");
+    absent_from_saved(&rig, "55555555");
+    says(&rig.saved_for("use")[0], "/use/999999999");
+}
+
+#[tokio::test]
 async fn digit_values_joined_to_each_other_are_masked_as_one_run() {
     let rig = rig(
         "joined-values",

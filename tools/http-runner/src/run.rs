@@ -523,10 +523,12 @@ impl Sending<'_> {
                     .to_string(),
                 Part::Timestamp => jiff::Timestamp::now().as_second().to_string(),
             };
-            if matches!(part, Part::Secret(_))
-                && maskable(&value)
-                && value.bytes().all(|b| b.is_ascii_digit())
-            {
+            let masked = match part {
+                Part::Secret(_) => true,
+                Part::Reply { .. } => self.masker.holds(&value),
+                _ => false,
+            };
+            if masked && maskable(&value) && value.bytes().all(|b| b.is_ascii_digit()) {
                 digit_values.push(out.len()..out.len() + value.len());
             }
             out.push_str(&escape(&value, place));
