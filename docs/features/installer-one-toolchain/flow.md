@@ -1,7 +1,7 @@
 ---
 flow: feature
-phase: finish
-now: Finish, Decide next: the review fixes are committed and checked; the verdict table, the rulings and the commits wait for you.
+phase: done
+now: Done: the branch is pushed for a pull request; the user runs the push and `gh pr create`.
 ---
 
 # Installer: one toolchain: flow
