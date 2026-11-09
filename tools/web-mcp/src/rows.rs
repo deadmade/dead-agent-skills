@@ -19,6 +19,7 @@ const MIN_TEXT: usize = 16;
 /// Each item's text is counted up to this many characters; collecting it stops there.
 const SCORE_CAP: usize = 400;
 const ROW_CHARS: usize = 200;
+const KIND_CHARS: usize = 80;
 const GROUPS_RETURNED: usize = 2;
 /// The reply stays near this many characters: the source line, the rows and, in `FRAME`, the lines around them.
 const REPLY_CHARS: usize = 12_000;
@@ -184,7 +185,9 @@ pub fn render(groups: &[Group], pick: Option<usize>, limit: usize, budget: usize
         .enumerate()
         .filter(|(i, _)| pick.is_none_or(|p| p == i + 1));
     for (i, g) in shown {
-        let head = format!("Group {}: {} items ({})\n", i + 1, g.rows.len(), g.kind);
+        // a page picks the class names, so the kind is cut
+        let kind: String = g.kind.chars().take(KIND_CHARS).collect();
+        let head = format!("Group {}: {} items ({kind})\n", i + 1, g.rows.len());
         let mut body = String::new();
         let mut printed = 0;
         for (n, row) in g.rows.iter().take(limit).enumerate() {
@@ -587,6 +590,15 @@ mod tests {
         };
         let out = render(&[group], None, 5, 1000);
         assert!(out.contains("1. Title | https://shop.example/p/1\n"));
+    }
+
+    #[test]
+    fn render_cuts_a_hostile_kind() {
+        let mut group = rows(1, 20);
+        group.kind = "x".repeat(10_000);
+        let out = render(&[group], None, 5, 1000);
+        let head = out.lines().next().unwrap();
+        assert_eq!(head, format!("Group 1: 1 items ({})", "x".repeat(80)));
     }
 
     #[test]
