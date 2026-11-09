@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::time::Duration;
 
-use dom_query::{Document, Matcher, NodeId, NodeRef};
+use dom_query::{Document, Matcher, NodeData, NodeId, NodeRef};
 use url::Url;
 
 use crate::Ctx;
@@ -268,35 +268,55 @@ fn kind_of(node: &NodeRef) -> String {
 
 /// Takes one visit from `budget`; false once it is spent.
 fn spend(budget: &mut usize) -> bool {
-    *budget = budget.saturating_sub(1);
+    spend_n(budget, 1)
+}
+
+fn spend_n(budget: &mut usize, n: usize) -> bool {
+    *budget = budget.saturating_sub(n);
     *budget > 0
 }
 
+/// Adds the words of `text` to `out` (`len` characters long) until `SCORE_CAP`; true once it is full.
+fn push_words(text: &str, out: &mut String, len: &mut usize) -> bool {
+    for word in text.split_whitespace() {
+        // the separator is only worth pushing when a character can follow it
+        if *len > 0 {
+            if *len + 1 >= SCORE_CAP {
+                return true;
+            }
+            out.push(' ');
+            *len += 1;
+        }
+        for c in word.chars() {
+            if *len >= SCORE_CAP {
+                return true;
+            }
+            out.push(c);
+            *len += 1;
+        }
+    }
+    false
+}
+
 /// The text under `node`, whitespace-collapsed to one line and cut at `SCORE_CAP` characters while it is collected,
-/// so a deeply nested hostile page costs bounded memory and time. The walk stops when `budget` is spent.
+/// so a deeply nested hostile page costs bounded memory and time. The walk stops when `budget` is spent: a node
+/// costs one visit and a text node 1 more per 8 bytes, as scanning its whitespace costs time without yielding text.
 fn text_of(node: &NodeRef, budget: &mut usize) -> String {
     let mut out = String::new();
     let mut len = 0;
-    'collect: for t in node.descendants_it().take_while(|_| spend(budget)) {
-        if !t.is_text() {
-            continue;
+    for t in node.descendants_it() {
+        if !spend(budget) {
+            break;
         }
-        for word in t.text().split_whitespace() {
-            // the separator is only worth pushing when a character can follow it
-            if len > 0 {
-                if len + 1 >= SCORE_CAP {
-                    break 'collect;
-                }
-                out.push(' ');
-                len += 1;
+        let stop = t.query(|n| match &n.data {
+            NodeData::Text { contents } => {
+                let text: &str = contents;
+                !spend_n(budget, text.len() / 8) || push_words(text, &mut out, &mut len)
             }
-            for c in word.chars() {
-                if len >= SCORE_CAP {
-                    break 'collect;
-                }
-                out.push(c);
-                len += 1;
-            }
+            _ => false,
+        });
+        if stop == Some(true) {
+            break;
         }
     }
     out
@@ -645,12 +665,35 @@ mod tests {
         assert!(out.contains("1. Title | https://shop.example/p/1\n"));
     }
 
+    /// The text of a `<p>` holding `inside`.
+    fn capped(inside: &str) -> String {
+        let doc = Document::from(format!("<p>{inside}</p>").as_str());
+        text_of(&doc.select("p").nodes()[0], &mut 1000)
+    }
+
     #[test]
     fn text_stops_at_the_cap_after_a_word_that_ends_on_it() {
-        let html = format!("<p>{} more words</p>", "w".repeat(SCORE_CAP));
-        let doc = Document::from(html.as_str());
-        let text = text_of(&doc.select("p").nodes()[0], &mut 1000);
+        let word = "w".repeat(SCORE_CAP);
+        assert_eq!(capped(&format!("{word} more words")), word);
+    }
+
+    #[test]
+    fn text_cuts_one_long_word_at_the_cap() {
+        let text = capped(&"w".repeat(SCORE_CAP + 100));
         assert_eq!(text.chars().count(), SCORE_CAP);
+    }
+
+    #[test]
+    fn text_keeps_a_separator_and_word_that_reach_the_cap_exactly() {
+        let text = capped(&format!("{} b more", "w".repeat(SCORE_CAP - 2)));
+        assert_eq!(text.chars().count(), SCORE_CAP);
+        assert!(text.ends_with(" b"), "{text}");
+    }
+
+    #[test]
+    fn text_drops_a_separator_with_no_room_for_a_character() {
+        let word = "w".repeat(SCORE_CAP - 1);
+        assert_eq!(capped(&format!("{word} more")), word);
     }
 
     #[test]

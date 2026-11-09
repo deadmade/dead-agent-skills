@@ -324,10 +324,10 @@ fn rows_deeply_nested_hostile_page_returns_in_bounded_time() {
     );
 }
 
-/// A page of 3,000 nested levels must get its answer within a few seconds. Deeper only slows the test: the HTML
-/// parser alone takes 30 s on 20,000 levels in a debug build.
-fn nested_page_returns_in_bounded_time(open: &str, close: &str) {
-    let html = format!("{}{}", open.repeat(3_000), close.repeat(3_000));
+/// A page of 3,000 nested levels around `inside` must get its answer within a few seconds. Deeper only slows the
+/// test: the HTML parser alone takes 30 s on 20,000 levels in a debug build.
+fn nested_page_returns_in_bounded_time(open: &str, inside: &str, close: &str) {
+    let html = format!("{}{inside}{}", open.repeat(3_000), close.repeat(3_000));
     let (mut mcp, _) = start(&[("nest.html", html)]);
     let started = Instant::now();
     let r = mcp.call("rows", json!({"url": url("nest")}));
@@ -338,12 +338,27 @@ fn nested_page_returns_in_bounded_time(open: &str, close: &str) {
 
 #[test]
 fn rows_deep_element_only_nesting_returns_in_bounded_time() {
-    nested_page_returns_in_bounded_time("<div>", "</div>");
+    nested_page_returns_in_bounded_time("<div>", "", "</div>");
 }
 
 #[test]
 fn rows_deep_whitespace_only_nesting_returns_in_bounded_time() {
-    nested_page_returns_in_bounded_time("<div> ", "</div> ");
+    nested_page_returns_in_bounded_time("<div> ", "", "</div> ");
+}
+
+#[test]
+fn rows_deep_nesting_around_one_huge_space_text_returns_in_bounded_time() {
+    nested_page_returns_in_bounded_time("<div>", &" ".repeat(3_900_000), "</div>");
+}
+
+#[test]
+fn rows_deep_nesting_around_one_huge_word_returns_in_bounded_time() {
+    nested_page_returns_in_bounded_time("<div>", &"w".repeat(3_900_000), "</div>");
+}
+
+#[test]
+fn rows_deep_nesting_around_one_huge_newline_text_returns_in_bounded_time() {
+    nested_page_returns_in_bounded_time("<div>", &"\n".repeat(250_000), "</div>");
 }
 
 #[test]
