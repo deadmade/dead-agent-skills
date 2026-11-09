@@ -3,10 +3,11 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-const crates = ['web-mcp', 'ado-mcp'];
+const crates = ['web-mcp', 'ado-mcp', 'http-runner'];
 const roots = {
   'web-mcp': ['tools/web-mcp/', 'plugins/shared/web-mcp/'],
   'ado-mcp': ['tools/ado-mcp/', 'plugins/opt-in/mcp/mcp-azure/'],
+  'http-runner': ['tools/http-runner/', 'plugins/opt-in/mcp/http-runner/'],
 };
 
 export function selectChecks(paths, all = false) {
