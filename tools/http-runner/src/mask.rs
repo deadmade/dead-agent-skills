@@ -108,6 +108,19 @@ fn spellings(c: char) -> Vec<String> {
     all
 }
 
+/// Whether `s` ends in a percent escape or a JSON unicode escape, whose last digit belongs to
+/// the escape and so does not run into a number that follows it.
+fn ends_with_escape(s: &str) -> bool {
+    let b = s.as_bytes();
+    let escape = |lead: &[u8], hex: usize| {
+        b.len() >= lead.len() + hex && {
+            let (head, digits) = b[b.len() - lead.len() - hex..].split_at(lead.len());
+            head == lead && digits.iter().all(u8::is_ascii_hexdigit)
+        }
+    };
+    escape(b"%", 2) || escape(b"\\u", 4)
+}
+
 /// One value to remove, as the spellings of each of its characters.
 #[derive(PartialEq)]
 struct Secret {
@@ -148,7 +161,9 @@ impl Secret {
         }
         let end = *ends.last()?;
         let digit = |c: char| c.is_ascii_digit();
-        let inside_number = text[..start].ends_with(digit) || text[end..].starts_with(digit);
+        let before = &text[..start];
+        let inside_number = (before.ends_with(digit) && !ends_with_escape(before))
+            || text[end..].starts_with(digit);
         (!(self.digits && inside_number)).then_some(end)
     }
 }
@@ -287,6 +302,18 @@ mod tests {
     fn digit_value_matches_on_digit_boundaries() {
         assert_eq!(masked(&["1234"], "912345"), "912345");
         assert_eq!(masked(&["1234"], "a1234b"), "a9999b");
+    }
+
+    #[test]
+    fn digit_value_after_an_escape_is_masked() {
+        for (text, want) in [
+            ("%221234%22", "%229999%22"),
+            ("%201234", "%209999"),
+            ("\\u00221234", "\\u00229999"),
+            ("912345", "912345"),
+        ] {
+            assert_eq!(masked(&["1234"], text), want, "{text}");
+        }
     }
 
     #[test]
