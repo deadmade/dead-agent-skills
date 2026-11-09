@@ -1,7 +1,10 @@
 //! Reads one value out of a JSON or XML reply, for `{{name.response.body.<path>}}`.
 
 use jsonpath_rust::JsonPath;
+use jsonpath_rust::parser::model::{Segment, Selector};
+use jsonpath_rust::parser::parse_json_path;
 use serde_json::Value as Json;
+use sxd_document::dom::Document;
 use sxd_xpath::Value as Xml;
 
 use crate::mask::maskable;
@@ -10,9 +13,28 @@ use crate::mask::maskable;
 const MAX_VALUES: usize = 256;
 const MAX_VALUE_BYTES: usize = 64 * 1024;
 
-/// A path starting with `$` is `JSONPath`; any other is `XPath` 1.0 with no namespace map. The first
-/// match wins: a JSON string yields its content, any other JSON value its JSON text; an `XPath`
-/// node its text content (an attribute its value), anything else its text.
+/// Evaluating a path over deeper XML can exhaust the stack.
+const MAX_DEPTH: usize = 256;
+
+/// What may precede a `(` in a reference: node tests, the two name functions, and operators.
+const SELECTING: [&str; 10] = [
+    "local-name",
+    "name",
+    "text",
+    "node",
+    "comment",
+    "processing-instruction",
+    "and",
+    "or",
+    "div",
+    "mod",
+];
+
+/// A path starting with `$` is `JSONPath`; any other is `XPath` 1.0 with no namespace map. A path
+/// selects and never computes, so a `JSONPath` filter and any `XPath` function but `local-name`
+/// and `name` are refused. The first match wins: a JSON string yields its content, any other JSON
+/// value its JSON text; an `XPath` node its text content (an attribute its value), anything else
+/// its text.
 ///
 /// # Errors
 ///
@@ -26,6 +48,12 @@ pub fn from_body(body: &str, path: &str) -> Result<String, String> {
 }
 
 fn from_json(body: &str, path: &str) -> Result<String, String> {
+    if parse_json_path(path).is_ok_and(|query| query.segments.iter().any(has_filter)) {
+        return Err(format!(
+            "JSONPath `{path}` has a `?` filter, but a reference selects a value and never computes one; \
+             use the plain path, as in $.items[0].id"
+        ));
+    }
     let json: Json =
         serde_json::from_str(body).map_err(|e| format!("the reply is not valid JSON: {e}"))?;
     let found = json
@@ -45,9 +73,20 @@ fn from_xml(body: &str, path: &str) -> Result<String, String> {
              match by local name instead, as in //*[local-name()='name']"
         ));
     }
+    if let Some(call) = computing_call(path) {
+        return Err(format!(
+            "XPath `{path}` calls `{call}()`, but a reference selects a value and never computes one; \
+             use the plain path, where only local-name() and name() are allowed"
+        ));
+    }
     let package = sxd_document::parser::parse(body)
         .map_err(|e| format!("the reply is not valid XML: {e}"))?;
     let document = package.as_document();
+    if too_deep(document) {
+        return Err(format!(
+            "the reply is nested deeper than {MAX_DEPTH} levels, so a reference cannot be read from it"
+        ));
+    }
     match sxd_xpath::evaluate_xpath(&document, path) {
         Err(e) => Err(format!("cannot use XPath `{path}`: {e}")),
         Ok(Xml::Nodeset(nodes)) if nodes.size() == 0 => {
@@ -55,6 +94,61 @@ fn from_xml(body: &str, path: &str) -> Result<String, String> {
         }
         Ok(value) => Ok(value.into_string()),
     }
+}
+
+fn has_filter(segment: &Segment) -> bool {
+    match segment {
+        Segment::Descendant(inner) => has_filter(inner),
+        Segment::Selector(selector) => matches!(selector, Selector::Filter(_)),
+        Segment::Selectors(selectors) => selectors.iter().any(|s| matches!(s, Selector::Filter(_))),
+    }
+}
+
+/// The first name before a `(` outside quotes that is a function other than those in `SELECTING`.
+fn computing_call(path: &str) -> Option<&str> {
+    let starts_name = |c: char| c.is_alphabetic() || c == '_';
+    let mut quote = None;
+    for (i, c) in path.char_indices() {
+        match quote {
+            Some(q) if c == q => quote = None,
+            None if c == '"' || c == '\'' => quote = Some(c),
+            None if c == '(' => {
+                let name = path[..i]
+                    .trim_end()
+                    .rsplit(|c: char| !(c.is_alphanumeric() || matches!(c, '-' | '_' | '.')))
+                    .next()
+                    .unwrap_or_default()
+                    // In `1-substring(` the `-` is an operator, not part of the name.
+                    .trim_start_matches(|c| !starts_name(c));
+                if !name.is_empty() && !SELECTING.contains(&name) {
+                    return Some(name);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Whether any element of `document` sits deeper than `MAX_DEPTH`; a list, as depth is the danger.
+fn too_deep(document: Document) -> bool {
+    let roots = document.root().children();
+    let mut todo: Vec<_> = roots
+        .iter()
+        .filter_map(|c| c.element().map(|e| (e, 1)))
+        .collect();
+    while let Some((element, depth)) = todo.pop() {
+        if depth > MAX_DEPTH {
+            return true;
+        }
+        let children = element.children();
+        todo.extend(
+            children
+                .iter()
+                .filter_map(|c| c.element().map(|e| (e, depth + 1))),
+        );
+    }
+    false
 }
 
 /// Whether a JSON key, XML element or response header is named like a credential, ignoring case,
@@ -228,9 +322,76 @@ mod tests {
     }
 
     #[test]
-    fn xpath_number_and_boolean_yield_their_text() {
-        assert_eq!(from_body(SOAP, "count(//authToken)"), Ok("1".into()));
-        assert_eq!(from_body(SOAP, "boolean(//authToken)"), Ok("true".into()));
+    fn xpath_functions_that_compute_are_refused() {
+        for path in [
+            "substring(//authToken,1,2)",
+            "translate(//authToken,'T','X')",
+            "concat(//authToken,'x')",
+            "count(//authToken)",
+            "boolean(//authToken)",
+            "//authToken[contains(.,'T')]",
+            "//authToken[ starts-with (.,'T') ]",
+            "-string-length(//authToken)",
+            "1-substring(//authToken,2)",
+        ] {
+            let err = from_body(SOAP, path).unwrap_err();
+            assert!(err.contains("selects a value"), "{path}: {err}");
+        }
+    }
+
+    #[test]
+    fn xpath_paths_that_only_select_still_work() {
+        let xml = "<a x=\"f(y)\"><b>1</b><b>2</b></a>";
+        for (path, want) in [
+            ("//*[local-name()='authToken']", "T1"),
+            ("//*[name()='authToken']", "T1"),
+            ("//authToken/text()", "T1"),
+            ("(//authToken)[1]", "T1"),
+            ("//return[authToken or (x)]/authToken", "T1"),
+        ] {
+            assert_eq!(from_body(SOAP, path), Ok(want.into()), "{path}");
+        }
+        assert_eq!(from_body(xml, "//a[@x='f(y)']/@x"), Ok("f(y)".into()));
+        assert_eq!(from_body(xml, "//a[@x=\"f(y)\"]/b[2]"), Ok("2".into()));
+    }
+
+    #[test]
+    fn jsonpath_filter_is_refused() {
+        let body = r#"{"a":[{"b":"c"}]}"#;
+        for path in ["$.a[?@.b=='c']", "$..[?@.b]", "$.a[0,?@.b]"] {
+            let err = from_body(body, path).unwrap_err();
+            assert!(err.contains("selects a value"), "{path}: {err}");
+        }
+    }
+
+    #[test]
+    fn jsonpath_question_mark_in_a_quoted_name_is_not_a_filter() {
+        assert_eq!(from_body(r#"{"a?b":"c"}"#, "$['a?b']"), Ok("c".into()));
+    }
+
+    fn on_a_small_stack(xml: String, path: &'static str) -> Result<String, String> {
+        std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(move || from_body(&xml, path))
+            .unwrap()
+            .join()
+            .unwrap()
+    }
+
+    fn nested(levels: usize) -> String {
+        format!("{}x{}", "<a>".repeat(levels), "</a>".repeat(levels))
+    }
+
+    #[test]
+    fn xml_nested_past_the_limit_is_refused_without_aborting() {
+        let err = on_a_small_stack(nested(20_000), "/a").unwrap_err();
+        assert!(err.contains("256"), "{err}");
+    }
+
+    #[test]
+    fn xml_at_the_nesting_limit_is_read() {
+        assert_eq!(on_a_small_stack(nested(256), "/a"), Ok("x".into()));
+        assert!(on_a_small_stack(nested(257), "/a").is_err());
     }
 
     #[test]
