@@ -26,8 +26,8 @@ they pull is archived in `.web/` in the project before Claude sees it.
   read with `item`. `limit` is 1 to 200 (default 30); the reply is capped at about 12,000 characters, never cuts a row
   in half, and ends each group with `Showing <k> of <total>.`. It reads what has loaded, with no scrolling and no
   pagination, and keeps a 1 s gap between its pages to one host (a `fetch` to that host right after it waits for the
-  rest). The page is archived under `.web/`. With no group found it gives the title, the text length and two hints:
-  try `item`, or the page may still be loading. It does not detect bot walls. Detection is tested on captured pages
+  rest). The page is archived under `.web/`. With no group found it gives the first heading, the text length and two
+  hints: try `item`, or the page may still be loading. It does not detect bot walls. Detection is tested on captured pages
   in `tools/web-mcp/tests/fixtures/rows/`.
 - `lookup { kind, target, record?, at?, ecosystem? }`: one record about a target from public sources, each reply kept
   as the source sent it. `dns`: Cloudflare DNS over HTTPS (`record` such as MX or TXT; default A, AAAA, CNAME, MX, NS and

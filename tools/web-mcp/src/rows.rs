@@ -102,23 +102,27 @@ pub async fn run(
     if groups.is_empty() {
         let doc = Document::from(html.as_str());
         doc.select(NOT_SHOWN).remove();
-        let title = doc.select("head > title").text();
-        let title = match collapse(&title) {
-            t if !t.is_empty() => t,
-            _ => doc
-                .select("h1")
-                .nodes()
-                .first()
-                .map(|h| collapse(&h.text()))
-                .unwrap_or_default(),
+        // The browser read is the body, so a page has no `<title>` here: the first heading names it.
+        let heading: String = doc
+            .select("h1")
+            .nodes()
+            .first()
+            .map(|h| collapse(&h.text()))
+            .unwrap_or_default()
+            .chars()
+            .take(ROW_CHARS)
+            .collect();
+        let heading = if heading.is_empty() {
+            "No heading".to_owned()
+        } else {
+            format!("Heading: {heading:?}")
         };
-        let title: String = title.chars().take(ROW_CHARS).collect();
         let hint = match item {
             Some(sel) => format!("Your `item` selector {sel:?} matched nothing; check it, and whether the page is still loading."),
             None => "Try `item`, a CSS selector for the repeating element, or check whether the page is still loading.".into(),
         };
         return Ok(format!(
-            "{source}\n\nNo repeating group found. Title: {title:?}. Page text: {} characters. {hint}",
+            "{source}\n\nNo repeating group found. {heading}. Page text: {} characters. {hint}",
             collapse(&doc.select("body").text()).chars().count()
         ));
     }

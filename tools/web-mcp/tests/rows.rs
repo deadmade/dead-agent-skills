@@ -137,16 +137,23 @@ fn rows_budget_keeps_whole_rows() {
 }
 
 #[test]
-fn rows_no_group_names_the_title_and_the_hints() {
-    let (mut mcp, _) = start(&[(
-        "few.html",
-        page("Odd Page Title", &list("ad", 3, "some text")),
-    )]);
+fn rows_no_group_names_the_heading_and_the_hints() {
+    let body = format!("<h1>Odd Heading</h1>{}", list("ad", 3, "some text"));
+    let (mut mcp, _) = start(&[("few.html", body)]);
     let r = mcp.call("rows", json!({"url": url("few")}));
     let t = text(&r);
-    assert!(t.contains("Odd Page Title"), "{t}");
+    assert!(t.contains("Heading: \"Odd Heading\""), "{t}");
     assert!(t.contains("`item`"), "{t}");
     assert!(t.contains("still loading"), "{t}");
+}
+
+#[test]
+fn rows_no_group_without_a_heading_says_so() {
+    let (mut mcp, _) = start(&[("few.html", page("Not Used", &list("ad", 3, "some text")))]);
+    let r = mcp.call("rows", json!({"url": url("few")}));
+    let t = text(&r);
+    assert!(t.contains("No heading."), "{t}");
+    assert!(!t.contains("Not Used"), "{t}");
 }
 
 #[test]
@@ -264,7 +271,10 @@ fn rows_no_group_on_a_body_only_page_uses_the_h1_and_cuts_it() {
     let r = mcp.call("rows", json!({"url": url("bare")}));
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
-    assert!(t.contains(&format!("\"{}\"", "A".repeat(200))), "{t}");
+    assert!(
+        t.contains(&format!("Heading: \"{}\"", "A".repeat(200))),
+        "{t}"
+    );
     assert!(
         t.lines()
             .next()
