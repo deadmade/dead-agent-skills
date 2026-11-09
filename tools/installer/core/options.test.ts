@@ -74,3 +74,10 @@ test('options hidden per platform', () => {
   assert.equal(unavailable(`headroom-trim@${M}`, 'win32', 'x64', '1.0.0'), undefined);
   assert.equal(unavailable(`headroom-trim@${M}`, 'linux', 'x64', '1.0.0'), undefined);
 });
+
+test('unavailable names the missing build', () => {
+  assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0')!, /no web-mcp build for linux-ia32/);
+  assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
+  assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0')!, /no web-mcp build for darwin-arm64/);
+  assert.match(unavailable('headroom-trim', 'freebsd', 'x64', '1.0.0')!, /no uv build for freebsd-x64/);
+});

@@ -1,7 +1,0 @@
-{
-  "upstream": "0.41.1",
-  "sha256": {
-    "win32-x64": "ddab45e8bae84e5bc6aa1b084bceca9b579aff2e8272474d7d26953cf10965ee",
-    "linux-x64": "951c795e21fddab1d4091ad2ca4f0e69f1eea6534288e6a251598df11ca8e9af"
-  }
-}

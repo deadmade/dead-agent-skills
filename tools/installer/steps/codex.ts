@@ -17,7 +17,7 @@ import {
   mcpName,
   mcpEnvironment,
 } from '../core/codex.ts';
-import { binAsset } from '../core/binaries.ts';
+import { resolveTool } from '../core/tools.ts';
 import { categorize } from '../core/options.ts';
 import { PKG, VERSION, ask, done, failures, tryJson } from '../context.ts';
 import { writeAtomic } from '../system/files.ts';
@@ -85,7 +85,7 @@ export async function applyCodex(io: CodexIO = {}) {
   const hidden = keys.filter(
     (k) =>
       ['web-mcp', 'mcp-azure'].includes(k) &&
-      !binAsset(k === 'mcp-azure' ? 'ado-mcp' : k, process.platform, process.arch, VERSION) &&
+      !resolveTool(k === 'mcp-azure' ? 'ado-mcp' : k, process.platform, process.arch, VERSION) &&
       !find(k === 'mcp-azure' ? 'ado-mcp' : k),
   );
   const data: Data = {
@@ -206,12 +206,15 @@ export async function applyCodex(io: CodexIO = {}) {
   if (plan.wanted.includes('web-mcp')) {
     let binary = find('web-mcp');
     if (!binary) {
-      const asset = binAsset('web-mcp', process.platform, process.arch, VERSION);
+      const asset = resolveTool('web-mcp', process.platform, process.arch, VERSION);
       if (!asset) throw new Error('No web-mcp release for this platform');
       binary = join(base, 'bin', VERSION, asset.exe);
       if (!existsSync(binary)) await (io.download ?? downloadBin)('web-mcp', asset, binary);
     }
-    const browser = await (io.browser ?? installAgentBrowser)(join(base, 'bin'));
+    // With no pinned agent-browser build here, keep the one on PATH, as web-mcp itself falls back to it.
+    const browser = resolveTool('agent-browser', process.platform, process.arch, VERSION)
+      ? await (io.browser ?? installAgentBrowser)(join(base, 'bin'))
+      : { path: find('agent-browser'), works: !!find('agent-browser') };
     configure('web-mcp', [...(browser.path ? ['--env', `WEB_MCP_AGENT_BROWSER=${browser.path}`] : []), '--', binary]);
     if (!browser.works)
       note('Codex web-mcp', [
@@ -234,7 +237,7 @@ export async function applyCodex(io: CodexIO = {}) {
   if (plan.wanted.includes('mcp-azure')) {
     let binary = find('ado-mcp');
     if (!binary) {
-      const asset = binAsset('ado-mcp', process.platform, process.arch, VERSION);
+      const asset = resolveTool('ado-mcp', process.platform, process.arch, VERSION);
       if (!asset) throw new Error('No ado-mcp release for this platform');
       binary = join(base, 'bin', VERSION, asset.exe);
       if (!existsSync(binary)) await (io.download ?? downloadBin)('ado-mcp', asset, binary);

@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import tls from 'node:tls';
 import { WIN } from '../context.ts';
 import { sha256Matches, sha256Of } from '../core/binaries.ts';
+import type { Asset } from '../core/tools.ts';
 import { replaceBin } from './files.ts';
 import { which } from './proc.ts';
 
@@ -53,14 +54,6 @@ export async function stopLocalServer(port: number, waitMs = 2000) {
 
 // Downloads the release asset, checks its sha256, and moves the binary to bin (on Windows the old one is renamed aside
 // first). asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself.
-export type Asset = {
-  file: string;
-  url: string;
-  exe: string;
-  sha256?: string;
-  digest?: string;
-  raw?: boolean;
-};
 export async function downloadBin(name: string, asset: Asset, bin: string) {
   const [archive, want] = await Promise.all([
     fetchOk(asset.url).then((r) => r.arrayBuffer()),

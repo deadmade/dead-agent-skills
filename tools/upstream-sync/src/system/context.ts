@@ -87,12 +87,21 @@ export function createContext(
         log(`new upstream skill: ${name}: ${description}`);
       }
     },
-    syncPin: ({ repo, files, out, tagPattern }) => {
-      const pin = pinFrom(JSON.parse(ctx.gh('api', `repos/${repo}/releases/latest`)), files, tagPattern);
-      writeFileSync(join(root, out), JSON.stringify(pin, null, 2) + '\n');
+    syncPin: ({ manifest, tool }) => {
+      const path = join(root, manifest);
+      const parsed = JSON.parse(readFileSync(path, 'utf8'));
+      const entry = parsed.tools[tool];
+      const names = Object.fromEntries(
+        Object.entries(entry.files).map(([key, { file }]: [string, any]) => [key, file]),
+      );
+      const tagPattern = new RegExp(`^${entry.tagPrefix}(\\d+\\.\\d+\\.\\d+)$`);
+      const pin = pinFrom(JSON.parse(ctx.gh('api', `repos/${entry.repo}/releases/latest`)), names, tagPattern);
+      entry.version = pin.upstream;
+      for (const [key, sha256] of Object.entries(pin.sha256)) entry.files[key].sha256 = sha256;
+      writeFileSync(path, JSON.stringify(parsed, null, 2) + '\n');
       ctx.result.values.tag = pin.upstream;
-      ctx.result.revisions.push({ label: repo, sha: pin.upstream });
-      log(`${repo} pinned to ${pin.upstream}`);
+      ctx.result.revisions.push({ label: entry.repo, sha: pin.upstream });
+      log(`${entry.repo} pinned to ${pin.upstream}`);
     },
   };
   return ctx;

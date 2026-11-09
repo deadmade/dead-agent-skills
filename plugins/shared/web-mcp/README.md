@@ -102,14 +102,15 @@ Pick it in the installer (see the [main README](../../../README.md)).
 
 The installer downloads the `web-mcp` binary from the release and sets `binPath`. By hand, build it with
 `cargo build --release --locked -p web-mcp --bin web-mcp` (or `nix build .#web-mcp`) and put it on PATH
-or set its path with `/plugin configure web-mcp`.
+or set its path with `/plugin configure web-mcp`. The installer always points `binPath` at its own copy in its `bin` folder,
+so a hand-built binary only sticks if you do not rerun the installer.
 
 - **A browser**: found as described above; the installer needs no Docker. If you accept the `web-builtins-off`
   toggle, WebSearch and WebFetch are denied, but only once the window can open (see above).
-- **agent-browser** (for `browser` and `fetch`'s fallback): a current one on PATH is used as is. Otherwise the
-  installer keeps its own copy in its `bin` folder: upstream's release binary for the version pinned in
-  `tools/installer/assets/agent-browser.json` (checked against the sha256 pinned there; the weekly `sync.yml` bumps both),
-  downloaded when missing or older (on Linux a download also offers `--with-deps`, which runs sudo). Either way it runs
+- **agent-browser** (for `browser` and `fetch`'s fallback): the installer keeps its own copy in its `bin` folder
+  (one on PATH is ignored): upstream's release binary for the version pinned in
+  `tools/installer/assets/tools.json` (checked against the sha256 pinned there; the weekly `sync.yml` bumps both),
+  downloaded when missing or older (on Linux a download also offers `--with-deps`, which runs sudo). It runs
   `agent-browser install` for the browser on every run, so a failed browser download is retried, and `agentBrowserPath`
   names the one in use. No Node or npm needed. Without it, `browser` and the fallback fail with an install hint; plain
   `fetch` still works.
