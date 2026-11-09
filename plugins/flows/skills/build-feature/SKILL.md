@@ -63,14 +63,21 @@ change it:
 
 - The approaches message (**Options**, below) names the seam of each cross-cutting concern, so the user picks it with
   the approach.
-- **Recon.** It doesn't need to offer recon of the codebase, and the web recon is already running (or done, from a
-  research run).
-  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "Offer recon. Once you have a bit of grounding and looking further would help, offer to go look:" -->
-- **Options.** Brainstorming wants the user describing before seeing options; keep that. Once the "how it gets made"
-  question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
-  it this way (links), trade-offs for _this_ codebase, rough effort. End with your recommendation and why. The user
-  picks; record the choice and the rejected options in flow.md under **Options**, one `### <decision>` with
-  `Picked: <the choice in plain words>`.
+- **First message.** It ends with a question, never with the short design, even when nothing looks open: the report
+  needs the time, and the approaches come from it. Approving a design in chat isn't Gate 1, which is the user's review
+  of the written spec.
+  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "If nothing is open when you write your first message and there's one sensible way, steps 1 to 3 happen in that message (see Your First Message)." -->
+  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "Their approval covers the approach and the design: write the short design doc as approved and go on to the plan." -->
+- **Recon.** It may look further in the codebase when the grounding leaves a gap. It doesn't search the web: the web
+  recon is already running (or done, from a research run), with its source check.
+  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "Do recon. Once you have a bit of grounding and looking further would help, go look:" -->
+- **Options.** Brainstorming wants the user describing before seeing options; keep that. Once you know why they want
+  it, present the approaches from the prior-art report, also when the user talks only about outcomes: per option, the
+  shape in two lines, who does it this way (links), trade-offs for _this_ codebase, rough effort. End with your
+  recommendation and why. The user picks; record the choice and the rejected options in flow.md under **Options**, one
+  `### <decision>` with `Picked: <the choice in plain words>`.
+  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "Recommend one and say why, then ask which way they want to go; if they've handed you the how, say you'll go with your pick instead." -->
+  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "Someone who talks about outcomes is handing you the how: make those calls and state each in a line." -->
 
 [step: smallest-option]
 
