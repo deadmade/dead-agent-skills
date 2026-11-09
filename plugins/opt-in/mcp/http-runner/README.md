@@ -44,5 +44,12 @@ A real field with a credential-like name shows as `***` in the saved reply, or a
 masked value is replaced everywhere in that run, not only in its own field: a `token_type` of `Bearer` also hides the
 word `Bearer` in every other place it appears.
 
-One reply can add at most 256 such values, 64 KiB in all. A reply over either limit is withheld: the result and the
-saved file keep its status and say why, hold none of its body or headers, and the chain stops there.
+One reply can add at most 256 such values, 64 KiB in all, counting the values a file takes from it by reference. A reply
+over either limit is withheld, and so is a reply over 32 MiB once decompressed or one whose masking cannot finish before
+the call's deadline. The result and the saved file keep its status, say why and that the request completed at the
+carrier, hold none of its body or headers, and the chain stops there. A reply withheld for masking time also saves none
+of the request's text.
+
+A reference selects a value and never computes one: an XPath function other than `local-name()` and `name()`, or a
+JSONPath `?` filter, is refused, because a changed copy of a value gets past masking. A reference into XML nested deeper
+than 256 levels is refused too.
