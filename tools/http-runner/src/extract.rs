@@ -178,7 +178,7 @@ fn cookie_value(header: &str) -> &str {
 ///
 /// # Errors
 ///
-/// Returns the note that replaces the reply when it holds more than one reply may add to the mask.
+/// Returns why the reply is withheld when it holds more than one reply may add to the mask.
 pub fn credential_values(headers: &[(String, String)], body: &str) -> Result<Vec<String>, String> {
     let mut found: Vec<String> = headers
         .iter()
@@ -191,24 +191,31 @@ pub fn credential_values(headers: &[(String, String)], body: &str) -> Result<Vec
             }
         })
         .collect();
-    // A .NET service commonly starts its XML with a byte order mark, which neither parser takes.
-    let body = body.trim_start_matches('\u{feff}');
     if let Ok(json) = serde_json::from_str::<Json>(body) {
         json_credentials(&json, &mut found);
     } else {
         xml_credentials(body, &mut found);
     }
-    found.retain(|value| maskable(value));
-    found.sort_unstable();
-    found.dedup();
-    let bytes: usize = found.iter().map(String::len).sum();
-    if found.len() > MAX_VALUES || bytes > MAX_VALUE_BYTES {
+    within_limits(found)
+}
+
+/// `values` once each, without those too short to mask.
+///
+/// # Errors
+///
+/// Returns why the reply is withheld when `values` is more than one reply may add to the mask.
+pub(crate) fn within_limits(mut values: Vec<String>) -> Result<Vec<String>, String> {
+    values.retain(|value| maskable(value));
+    values.sort_unstable();
+    values.dedup();
+    let bytes: usize = values.iter().map(String::len).sum();
+    if values.len() > MAX_VALUES || bytes > MAX_VALUE_BYTES {
         return Err(format!(
-            "Withheld: this reply holds {} values named like credentials, {bytes} bytes in all. One reply may add at most {MAX_VALUES} values and {MAX_VALUE_BYTES} bytes to the mask, because masking time grows with their number. Its body and headers were not kept.",
-            found.len()
+            "this reply holds {} values to mask, {bytes} bytes in all. One reply may add at most {MAX_VALUES} values and {MAX_VALUE_BYTES} bytes to the mask, because masking time grows with their number.",
+            values.len()
         ));
     }
-    Ok(found)
+    Ok(values)
 }
 
 /// Walks with a list, not recursion, as a reply decides how deep it goes.
@@ -469,14 +476,6 @@ mod tests {
     fn xml_elements_match_by_local_name_and_lose_outer_space() {
         let body = "<a xmlns:n=\"urn:n\"><n:authToken>\n  TOK1\n</n:authToken><id>keep</id></a>";
         assert_eq!(credentials(body), ["TOK1"]);
-    }
-
-    #[test]
-    fn a_byte_order_mark_does_not_hide_a_credential() {
-        assert_eq!(
-            credentials("\u{feff}<a><authToken>TOK1</authToken></a>"),
-            ["TOK1"]
-        );
     }
 
     #[test]

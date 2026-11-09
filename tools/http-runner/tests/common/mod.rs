@@ -41,14 +41,22 @@ impl Seen {
 
 /// A raw HTTP response for a handler to return.
 pub fn reply(status: &str, headers: &[(&str, &str)], body: &str) -> String {
-    let mut lines = String::new();
+    String::from_utf8(reply_bytes(status, headers, body.as_bytes())).unwrap()
+}
+
+/// `reply` for a body that is not UTF-8.
+pub fn reply_bytes(status: &str, headers: &[(&str, &str)], body: &[u8]) -> Vec<u8> {
+    let mut head = String::new();
     for (k, v) in headers {
-        write!(lines, "{k}: {v}\r\n").unwrap();
+        write!(head, "{k}: {v}\r\n").unwrap();
     }
-    format!(
-        "HTTP/1.1 {status}\r\n{lines}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+    let mut raw = format!(
+        "HTTP/1.1 {status}\r\n{head}Content-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     )
+    .into_bytes();
+    raw.extend_from_slice(body);
+    raw
 }
 
 pub fn ok(body: &str) -> String {
@@ -63,12 +71,13 @@ pub struct Carrier {
 }
 
 impl Carrier {
-    pub fn start(handler: impl Fn(&Seen) -> String + Send + Sync + 'static) -> Self {
+    pub fn start<R: Into<Vec<u8>>>(handler: impl Fn(&Seen) -> R + Send + Sync + 'static) -> Self {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
         let seen = Arc::new(Mutex::new(Vec::new()));
         let connections = Arc::new(AtomicUsize::new(0));
-        let (log, count, handler) = (seen.clone(), connections.clone(), Arc::new(handler));
+        let handler = Arc::new(move |s: &Seen| -> Vec<u8> { handler(s).into() });
+        let (log, count) = (seen.clone(), connections.clone());
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
                 count.fetch_add(1, Ordering::SeqCst);
@@ -96,12 +105,12 @@ impl Carrier {
     }
 }
 
-fn answer(mut stream: TcpStream, log: &Mutex<Vec<Seen>>, handler: &dyn Fn(&Seen) -> String) {
+fn answer(mut stream: TcpStream, log: &Mutex<Vec<Seen>>, handler: &dyn Fn(&Seen) -> Vec<u8>) {
     let Some(request) = read(&mut stream) else {
         return;
     };
     log.lock().unwrap().push(request.clone());
-    let _ = stream.write_all(handler(&request).as_bytes());
+    let _ = stream.write_all(&handler(&request));
 }
 
 fn read(stream: &mut TcpStream) -> Option<Seen> {
@@ -189,19 +198,19 @@ pub struct Rig {
     out: PathBuf,
 }
 
-pub fn rig(
+pub fn rig<R: Into<Vec<u8>>>(
     tag: &str,
     confirmed: Confirmed,
-    handler: impl Fn(&Seen) -> String + Send + Sync + 'static,
+    handler: impl Fn(&Seen) -> R + Send + Sync + 'static,
 ) -> Rig {
     rig_with(tag, &[], confirmed, handler)
 }
 
-pub fn rig_with(
+pub fn rig_with<R: Into<Vec<u8>>>(
     tag: &str,
     browser_flags: &[&str],
     confirmed: Confirmed,
-    handler: impl Fn(&Seen) -> String + Send + Sync + 'static,
+    handler: impl Fn(&Seen) -> R + Send + Sync + 'static,
 ) -> Rig {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let dir = tempdir(&format!("run-{tag}"));

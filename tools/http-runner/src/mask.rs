@@ -4,6 +4,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use std::collections::HashSet;
 use std::fmt::Write as _;
+use std::time::Instant;
 
 /// A shorter value is left alone: masking it would rewrite unrelated text.
 const MIN_CHARS: usize = 4;
@@ -133,6 +134,7 @@ pub fn maskable(value: &str) -> bool {
 }
 
 /// One value to remove, as the spellings of each of its characters.
+#[derive(Clone)]
 struct Secret {
     chars: Vec<Vec<String>>,
     mask: String,
@@ -179,7 +181,7 @@ impl Secret {
 }
 
 /// The secrets to remove from text.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Masker {
     secrets: Vec<Secret>,
     /// The values in `secrets`, so a duplicate costs no walk over them.
@@ -236,9 +238,24 @@ impl Masker {
     /// `text` with every added value replaced; where two start at one place, the longer wins.
     #[must_use]
     pub fn apply(&self, text: &str) -> String {
+        self.walk(text, None).unwrap_or_default()
+    }
+
+    /// `apply`, giving up with `None` once `until` passes, so masking leaves no thread running.
+    pub(crate) fn apply_until(&self, text: &str, until: Instant) -> Option<String> {
+        self.walk(text, Some(until))
+    }
+
+    fn walk(&self, text: &str, until: Option<Instant>) -> Option<String> {
         let mut out = String::with_capacity(text.len());
         let mut i = 0;
+        let mut steps = 0_u32;
         while let Some(c) = text[i..].chars().next() {
+            // One position can cost milliseconds against many long values that share a prefix.
+            if steps.is_multiple_of(16) && until.is_some_and(|until| Instant::now() >= until) {
+                return None;
+            }
+            steps = steps.wrapping_add(1);
             let longest = self
                 .secrets
                 .iter()
@@ -252,7 +269,7 @@ impl Masker {
                 i += c.len_utf8();
             }
         }
-        out
+        Some(out)
     }
 }
 
@@ -352,6 +369,18 @@ mod tests {
     #[test]
     fn other_values_become_stars() {
         assert_eq!(masked(&["secret"], "a secret b"), "a *** b");
+    }
+
+    #[test]
+    fn apply_until_gives_up_once_the_time_has_passed() {
+        let mut m = Masker::new();
+        m.add("secret");
+        let later = Instant::now() + std::time::Duration::from_secs(60);
+        assert_eq!(
+            m.apply_until("a secret b", later),
+            Some("a *** b".to_string())
+        );
+        assert_eq!(m.apply_until("a secret b", Instant::now()), None);
     }
 
     #[test]

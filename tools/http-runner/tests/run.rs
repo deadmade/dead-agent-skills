@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use common::{Seen, closed_port, ok, reply, rig, rig_with, submit};
+use common::{Seen, closed_port, ok, reply, reply_bytes, rig, rig_with, submit};
 use http_runner::mask::{Place, escape};
 use http_runner::run::{self, RunArgs};
 use http_runner::store::Store;
@@ -632,6 +632,132 @@ async fn chain_stops_at_a_withheld_reply() {
     says(&result, "Not sent");
     says(&result, "`use`");
     assert_eq!(rig.carrier.paths(), ["/login"]);
+}
+
+const COMPLETED: &str = "completed at the carrier";
+const LOGIN_ONLY: &str = "# @name login\nGET http://localhost:PORT/login\n";
+
+#[tokio::test]
+async fn reply_over_the_size_cap_is_withheld() {
+    let rig = rig("over-cap", LOCAL, |_| {
+        let body = format!("body-marker{}", "x".repeat(32 * 1024 * 1024));
+        reply("201 Created", &[("X-Marker", "head-marker")], &body)
+    });
+    let file = rig.file(LOGIN_ONLY);
+    let result = rig.run(&file, "login").await;
+    assert_withheld(&rig, &result, "xxxx");
+    says(&result, COMPLETED);
+    says(&rig.saved_for("login")[0], COMPLETED);
+}
+
+#[tokio::test]
+async fn reply_whose_masking_cannot_finish_in_the_deadline_is_withheld() {
+    // Values sharing a long prefix make each position of the padding slow to rule out.
+    let tokens: Vec<_> = (0..256)
+        .map(|n| format!("{}{n:04}", "a".repeat(252)))
+        .collect();
+    let items: Vec<_> = tokens
+        .iter()
+        .map(|t| serde_json::json!({ "token": t }))
+        .collect();
+    let body = serde_json::json!({
+        "items": items,
+        "marker": "body-marker",
+        "padding": "a".repeat(256 * 1024),
+    })
+    .to_string();
+    let rig = rig("mask-deadline", TYPED_KEY, move |_| {
+        reply("201 Created", &[("X-Marker", "head-marker")], &body)
+    })
+    .deadline(Duration::from_secs(2));
+    let file = rig.file(TYPED_LOGIN);
+    let result = rig.run(&file, "login").await;
+    assert_withheld(&rig, &result, "aaaa");
+    says(&result, COMPLETED);
+    says(&rig.saved_for("login")[0], COMPLETED);
+    never(&result, "typed-key-value");
+    absent_from_saved(&rig, "typed-key-value");
+}
+
+/// A file whose `use` request sends `$.<path>` of the login reply in a header, once per path.
+fn file_referencing(paths: impl Iterator<Item = String>) -> String {
+    let headers: Vec<String> = paths
+        .enumerate()
+        .map(|(i, path)| format!("X-{i}: {{{{login.response.body.$.{path}}}}}\n"))
+        .collect();
+    format!(
+        "{LOGIN_ONLY}\n###\n# @name use\nGET http://localhost:PORT/use\n{}",
+        headers.concat()
+    )
+}
+
+#[tokio::test]
+async fn too_many_referenced_values_are_withheld() {
+    let answer = tokens_reply(&numbered_tokens(257));
+    let rig = rig("over-refs", LOCAL, move |_| answer.clone());
+    let file = rig.file(&file_referencing(
+        (0..257).map(|n| format!("items[{n}].token")),
+    ));
+    let result = rig.run(&file, "login").await;
+    assert_withheld(&rig, &result, "many-tok-");
+}
+
+#[tokio::test]
+async fn referenced_and_named_values_count_together() {
+    let named: Vec<_> = numbered_tokens(200)
+        .iter()
+        .map(|t| serde_json::json!({ "token": t }))
+        .collect();
+    let plain: Vec<_> = (0..57).map(|n| format!("plain-{n:04}")).collect();
+    let body = serde_json::json!({ "items": named, "plain": plain, "marker": "body-marker" });
+    let answer = reply(
+        "201 Created",
+        &[("X-Marker", "head-marker")],
+        &body.to_string(),
+    );
+    let rig = rig("over-both", TYPED_KEY, move |_| answer.clone());
+    let text = file_referencing((0..57).map(|n| format!("plain[{n}]"))).replace(
+        LOGIN_ONLY,
+        "# @name login\nGET http://localhost:PORT/login\nX-Key: {{$dotenv KEY}}\n",
+    );
+    let file = rig.file(&text);
+    let result = rig.run(&file, "login").await;
+    assert_withheld(&rig, &result, "many-tok-");
+    never(&result, "plain-00");
+}
+
+#[tokio::test]
+async fn reply_with_a_byte_order_mark_keeps_references_and_masking() {
+    let rig = rig("bom", TYPED_KEY, |s: &Seen| {
+        if s.path == "/login" {
+            ok("\u{feff}<r><authToken>bom-tok-1</authToken></r>")
+        } else {
+            ok("done")
+        }
+    });
+    let file = rig.file(&format!(
+        "{TYPED_LOGIN}\n###\n# @name use\nGET http://localhost:PORT/use\nX-T: {{{{login.response.body.//authToken}}}}\n"
+    ));
+    let result = rig.run(&file, "use").await;
+    says(&result, "done");
+    assert_eq!(rig.carrier.seen()[1].header("x-t"), Some("bom-tok-1"));
+    never(&result, "bom-tok-1");
+    absent_from_saved(&rig, "bom-tok-1");
+}
+
+#[tokio::test]
+async fn latin1_reply_is_decoded_by_its_charset() {
+    let rig = rig("latin1", LOCAL, |_| {
+        reply_bytes(
+            "200 OK",
+            &[("Content-Type", "text/plain; charset=ISO-8859-1")],
+            b"caf\xE9",
+        )
+    });
+    let file = rig.file("# @name a\nGET http://localhost:PORT/a\n");
+    let result = rig.run(&file, "a").await;
+    says(&result, "café");
+    says(&rig.saved_for("a")[0], "café");
 }
 
 #[tokio::test]

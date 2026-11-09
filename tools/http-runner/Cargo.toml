@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 base64 = { workspace = true }
+encoding_rs = { workspace = true }
 getrandom = { workspace = true }
 jiff = { workspace = true }
 jsonpath-rust = { workspace = true }
@@ -17,6 +18,7 @@ reqwest = { workspace = true, features = [
   "http2",
   "gzip",
   "brotli",
+  "charset",
 ] }
 rmcp = { workspace = true, features = ["server", "transport-io", "macros"] }
 rustls = { workspace = true, features = ["ring", "std", "tls12"] }

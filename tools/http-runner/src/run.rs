@@ -9,9 +9,11 @@ use std::time::{Duration, Instant};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use encoding_rs::{Encoding, UTF_8};
 use reqwest::{Client, Method, StatusCode};
+use tokio::task::spawn_blocking;
 
-use crate::extract::{credential_values, from_body};
+use crate::extract::{credential_values, from_body, within_limits};
 use crate::login_page::{Ask, HostFields, Outcome, Pages};
 use crate::mask::{Masker, Place, escape, maskable};
 use crate::parse::{ParsedFile, Part, Request, Source, Text, parse};
@@ -21,6 +23,9 @@ use crate::store::Store;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const PAGE_WAIT: Duration = Duration::from_secs(50);
 const MAX_RESULT: usize = 40_000;
+/// Compression makes a large reply cheap to send, and everything after reading it grows with its size.
+const MAX_REPLY_BYTES: usize = 32 * 1024 * 1024;
+const OUT_OF_TIME: &str = "masking this reply did not finish before the call's deadline.";
 const CALL_AGAIN: &str = "call `run` again";
 
 /// What every run shares.
@@ -397,30 +402,12 @@ impl Sending<'_> {
                 }
                 Ok(Ok(answer)) => answer,
             };
-            let (status, mut reply) = answer;
-            let found = if self.carries_masked(request) {
-                credential_values(&reply.headers, &reply.body)
-            } else {
-                Ok(Vec::new())
-            };
-            let withheld = found.is_err();
-            match found {
-                Ok(values) => values.iter().for_each(|value| self.masker.add(value)),
-                // Dropped here, so nothing later, a reference included, can reach the raw reply.
-                Err(note) => {
-                    reply = Reply {
-                        headers: Vec::new(),
-                        body: note,
-                    };
-                }
-            }
-            // A later request may use this value, so the mask must know it before anything is saved.
-            for (_, source) in self.masked.iter().filter(|(from, _)| from == name(request)) {
-                if let Ok(value) = read(&reply, source) {
-                    self.masker.add(&value);
-                }
-            }
-            let exchange = self.masked_exchange(&outgoing, status, &reply);
+            let (status, reply) = answer;
+            let Masked {
+                reply,
+                exchange,
+                withheld,
+            } = self.mask(request, outgoing, status, reply).await;
             let saved = replies::save(self.file, name(request), &exchange);
             let saved = match &saved {
                 Ok(path) => path.display().to_string(),
@@ -572,7 +559,8 @@ impl Sending<'_> {
         Ok(())
     }
 
-    async fn fetch(&self, out: &Outgoing) -> Result<(StatusCode, Reply), reqwest::Error> {
+    /// `None` for a reply over `MAX_REPLY_BYTES` once decompressed.
+    async fn fetch(&self, out: &Outgoing) -> Result<(StatusCode, Option<Reply>), reqwest::Error> {
         let mut builder = self.ctx.http.request(out.method.clone(), &out.url);
         for (key, value) in &out.headers {
             builder = builder.header(key, value);
@@ -580,9 +568,9 @@ impl Sending<'_> {
         if let Some(body) = &out.body {
             builder = builder.body(body.clone());
         }
-        let response = builder.send().await?;
+        let mut response = builder.send().await?;
         let status = response.status();
-        let headers = response
+        let headers: Vec<(String, String)> = response
             .headers()
             .iter()
             .map(|(k, v)| {
@@ -592,23 +580,61 @@ impl Sending<'_> {
                 )
             })
             .collect();
-        let body = response.text().await?;
-        Ok((status, Reply { headers, body }))
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            if bytes.len() + chunk.len() > MAX_REPLY_BYTES {
+                return Ok((status, None));
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        let body = decode(&headers, &bytes);
+        Ok((status, Some(Reply { headers, body })))
     }
 
-    fn masked_exchange(&self, out: &Outgoing, status: StatusCode, reply: &Reply) -> Exchange {
-        let m = &*self.masker;
-        let pairs = |list: &[(String, String)]| -> Vec<(String, String)> {
-            list.iter().map(|(k, v)| (m.apply(k), m.apply(v))).collect()
+    /// Masks a finished exchange on a blocking thread, under what remains of the deadline.
+    async fn mask(
+        &mut self,
+        request: &Request,
+        outgoing: Outgoing,
+        status: StatusCode,
+        reply: Option<Reply>,
+    ) -> Masked {
+        let method = outgoing.method.to_string();
+        let job = MaskJob {
+            masker: self.masker.clone(),
+            outgoing,
+            status,
+            reply,
+            sources: self
+                .masked
+                .iter()
+                .filter(|(from, _)| from == name(request))
+                .map(|(_, source)| source.clone())
+                .collect(),
+            scan: self.carries_masked(request),
+            until: self.started + self.ctx.deadline,
         };
-        Exchange {
-            method: out.method.to_string(),
-            url: m.apply(&out.url),
-            request_headers: pairs(&out.headers),
-            request_body: out.body.as_deref().map(|b| m.apply(b)),
+        let remaining = self.ctx.deadline.saturating_sub(self.started.elapsed());
+        let done = tokio::time::timeout(remaining, spawn_blocking(move || job.run())).await;
+        if let Ok(Ok(Some((masker, masked)))) = done {
+            *self.masker = masker;
+            return masked;
+        }
+        let reply = withheld_reply(OUT_OF_TIME);
+        // The request's own text is left out too: masking it is what ran out of time.
+        let exchange = Exchange {
+            method,
+            url: "(not kept: masking ran out of time)".into(),
+            request_headers: Vec::new(),
+            request_body: None,
             status: status.as_u16(),
-            response_headers: pairs(&reply.headers),
-            response_body: m.apply(&reply.body),
+            response_headers: Vec::new(),
+            response_body: reply.body.clone(),
+        };
+        Masked {
+            reply,
+            exchange,
+            withheld: true,
         }
     }
 
@@ -677,6 +703,150 @@ impl Sending<'_> {
         }
         text
     }
+}
+
+/// A finished exchange, owning what masking it needs, since a blocking thread can hold no borrow.
+struct MaskJob {
+    masker: Masker,
+    outgoing: Outgoing,
+    status: StatusCode,
+    /// `None` for a reply over `MAX_REPLY_BYTES`.
+    reply: Option<Reply>,
+    /// Where this reply's values that go out in a header are, so the mask knows them before saving.
+    sources: Vec<Source>,
+    /// Whether to look for values named like credentials.
+    scan: bool,
+    until: Instant,
+}
+
+/// A reply and its exchange as they may be kept.
+struct Masked {
+    /// With the body replaced when `withheld`, so nothing later, a reference included, reaches the raw reply.
+    reply: Reply,
+    exchange: Exchange,
+    withheld: bool,
+}
+
+impl MaskJob {
+    /// `None` when masking ran out of time; the masker holds this reply's values on `Some`.
+    fn run(self) -> Option<(Masker, Masked)> {
+        let Self {
+            mut masker,
+            outgoing,
+            status,
+            reply,
+            sources,
+            scan,
+            until,
+        } = self;
+        let outcome = match reply {
+            None => Err(format!(
+                "this reply is over {} MiB once decompressed.",
+                MAX_REPLY_BYTES / (1024 * 1024)
+            )),
+            Some(reply) => {
+                reply_values(&reply, &sources, scan, until).map(|values| (reply, values))
+            }
+        };
+        let (reply, withheld) = match outcome {
+            Ok((reply, values)) => {
+                for value in &values {
+                    masker.add(value);
+                }
+                (reply, false)
+            }
+            Err(why) => (withheld_reply(&why), true),
+        };
+        let exchange = masked_exchange(&masker, &outgoing, status, &reply, until)?;
+        Some((
+            masker,
+            Masked {
+                reply,
+                exchange,
+                withheld,
+            },
+        ))
+    }
+}
+
+/// The values of `reply` the mask must learn, or why the reply is withheld.
+fn reply_values(
+    reply: &Reply,
+    sources: &[Source],
+    scan: bool,
+    until: Instant,
+) -> Result<Vec<String>, String> {
+    let mut values = if scan {
+        credential_values(&reply.headers, &reply.body)?
+    } else {
+        Vec::new()
+    };
+    for source in sources {
+        if Instant::now() >= until {
+            return Err(OUT_OF_TIME.to_string());
+        }
+        if let Ok(value) = read(reply, source) {
+            values.push(value);
+        }
+    }
+    within_limits(values)
+}
+
+fn withheld_reply(why: &str) -> Reply {
+    Reply {
+        headers: Vec::new(),
+        body: format!(
+            "Withheld: {why} The request completed at the carrier, so do not repeat it. Its body and headers were not kept."
+        ),
+    }
+}
+
+/// `None` when `until` passes first.
+fn masked_exchange(
+    masker: &Masker,
+    out: &Outgoing,
+    status: StatusCode,
+    reply: &Reply,
+    until: Instant,
+) -> Option<Exchange> {
+    let mask = |text: &str| masker.apply_until(text, until);
+    let pairs = |list: &[(String, String)]| -> Option<Vec<(String, String)>> {
+        list.iter()
+            .map(|(k, v)| Some((mask(k)?, mask(v)?)))
+            .collect()
+    };
+    Some(Exchange {
+        method: out.method.to_string(),
+        url: mask(&out.url)?,
+        request_headers: pairs(&out.headers)?,
+        request_body: match out.body.as_deref() {
+            Some(body) => Some(mask(body)?),
+            None => None,
+        },
+        status: status.as_u16(),
+        response_headers: pairs(&reply.headers)?,
+        response_body: mask(&reply.body)?,
+    })
+}
+
+/// Decodes as `reqwest`'s `Response::text` does: by the `Content-Type` charset, else UTF-8, a byte
+/// order mark deciding over both and left out of the text.
+fn decode(headers: &[(String, String)], bytes: &[u8]) -> String {
+    let charset = headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("content-type"))
+        .and_then(|(_, v)| {
+            v.split(';').skip(1).find_map(|param| {
+                let (key, value) = param.split_once('=')?;
+                key.trim()
+                    .eq_ignore_ascii_case("charset")
+                    .then(|| value.trim().trim_matches('"'))
+            })
+        });
+    let encoding = charset
+        .and_then(|label| Encoding::for_label(label.as_bytes()))
+        .unwrap_or(UTF_8);
+    encoding.decode(bytes).0.into_owned()
 }
 
 /// The maximal run of digits around `span`, which holds only digits.
