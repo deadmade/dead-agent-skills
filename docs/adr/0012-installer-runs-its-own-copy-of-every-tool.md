@@ -23,3 +23,5 @@ function, driven by the tool manifest (`tools/installer/assets/tools.json`).
 - A NixOS user who packages web-mcp themselves must tell the installer to skip it, or accept our static musl build.
 - The "using the one on PATH" summary line goes away.
 - The Codex step keeps its own PATH-first lookup and versioned folder; only its asset lookup uses the manifest.
+  That PATH-first lookup covers only web-mcp and ado-mcp; agent-browser under Codex follows the one rule (ours, in the
+  bin folder it is given).

@@ -102,7 +102,8 @@ Pick it in the installer (see the [main README](../../../README.md)).
 
 The installer downloads the `web-mcp` binary from the release and sets `binPath`. By hand, build it with
 `cargo build --release --locked -p web-mcp --bin web-mcp` (or `nix build .#web-mcp`) and put it on PATH
-or set its path with `/plugin configure web-mcp`.
+or set its path with `/plugin configure web-mcp`. The installer always points `binPath` at its own copy in `~/.claude/bin`,
+so a hand-built binary only sticks if you do not rerun the installer.
 
 - **A browser**: found as described above; the installer needs no Docker. If you accept the `web-builtins-off`
   toggle, WebSearch and WebFetch are denied, but only once the window can open (see above).

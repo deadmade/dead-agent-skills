@@ -17,6 +17,8 @@ test('missing binaries per OS', () => {
   const nix = missingBinaries('linux', ['nix-lsp', 'graphify'], none);
   assert.ok(nix.some((r) => r.binary === 'nixd' && /nixd/.test(r.command)));
   assert.ok(nix.some((r) => r.binary === 'graphify'));
+  assert.ok(!missingBinaries('linux', ['headroom-trim'], none).some((r) => r.binary === 'uv'));
+  assert.ok(!missingBinaries('linux', ['web-mcp'], none).some((r) => r.binary === 'agent-browser'));
   assert.deepEqual(
     missingBinaries('linux', ['dead-skills'], () => true),
     [],

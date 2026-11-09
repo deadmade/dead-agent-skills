@@ -91,7 +91,8 @@ By hand:
     /plugin configure mcp-azure
 
 Build the binary with `cargo build --release` in `tools/ado-mcp` (or `nix build .#ado-mcp`), then put it on PATH or
-set `binPath` to it.
+set `binPath` to it. The installer always points `binPath` at its own copy in `~/.claude/bin`, so a hand-built binary only
+sticks if you do not rerun the installer.
 
 The PAT needs Code (Read & Write), Work Items (Read & Write), Build (Read & Execute), Project and Team (Read), Wiki
 (Read) and Test Management (Read). `search` uses the Code, Work Items and Wiki scopes. The PAT is stored as a

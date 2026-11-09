@@ -120,7 +120,7 @@ test('the binaries report the release version the installer fetches', () => {
 });
 
 test('the shipped manifest is complete', () => {
-  const raw = readFileSync(new URL('../assets/tools.json', import.meta.url), 'utf8');
+  const raw = readFileSync(new URL('../assets/tools.json', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   assert.equal(JSON.stringify(JSON.parse(raw), null, 2) + '\n', raw);
   const platforms = Object.keys(TOOLS.targets);
   for (const [name, t] of Object.entries(TOOLS.tools))

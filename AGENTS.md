@@ -17,7 +17,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   applies; `ui/` the screens; `assets/` the shipped configs and `tools.json`, the manifest of every tool the installer downloads (`core/tools.ts` resolves it; bump a pin with `npm run sync -- apply uv|agent-browser`). No runtime npm dependencies: Node's standard library
   only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
   `core/` or `system/` with a test next to it, not into `install.ts` or a step. `core/release.ts` reading `package.json`
-  at load time is the one exception, needed to make it the single owner of the repository slug. Programs start through `system/proc.ts`
+  and `core/tools.ts` reading `assets/tools.json` at load time are the two exceptions, needed to make each the single owner
+  of the repository slug and of the tool pins. Programs start through `system/proc.ts`
   (`which`, `start`/`startSync`), never by bare name: on Windows that searches the current folder first, and a `.cmd`
   shim needs cmd.exe. Node runs the `.ts` files as they are
   (type stripping; Node 26+, `engines`), so only erasable syntax: no `enum`, `namespace` or parameter properties
