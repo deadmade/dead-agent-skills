@@ -12,15 +12,15 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 
 - `tools/installer/`: TypeScript, by layer. `install.ts` is the entry point and only runs the flow (read state, screens, steps,
   summary); `context.ts` holds the shared paths, version and summary lines; `core/` the pure decisions by topic
-  (`settings`, `plugins`, `binaries`, `options`, `release`, `tools`: pins and what to download); `system/` everything that touches the OS (file writes and
+  (`settings`, `plugins`, `binaries`, `options`, `config`, `catalog`, `agents`, `codex`, `rules-migration`, `release`, `tools`: pins and what to download); `system/` everything that touches the OS (file writes and
   clean-slate backup/delete, processes, downloads); `steps/` one file per thing the installer
-  applies; `ui/` the screens; `assets/` the shipped configs and `tools.json`, the manifest of every tool the installer downloads (`core/tools.ts` resolves it; bump a pin with `npm run sync -- apply uv|agent-browser`, one at a time and committed in between, as both write `tools.json`). No runtime npm dependencies: Node's standard library
+  applies; `ui/` the screens; `assets/` the shipped configs and `tools.json`, the manifest of every tool the installer downloads itself (dcg comes from its own upstream install script, `dcgCommand` in `core/options.ts`; `core/tools.ts` resolves the manifest; bump a pin with `npm run sync -- apply uv|agent-browser`, one at a time and committed in between, as both write `tools.json`). No runtime npm dependencies: Node's standard library
   only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
   `core/` or `system/` with a test next to it, not into `install.ts` or a step. `core/release.ts` reading `package.json`
   and `core/tools.ts` reading `assets/tools.json` at load time are the two exceptions, needed to make each the single owner
   of the repository slug and of the tool pins. Programs start through `system/proc.ts`
   (`which`, `start`/`startSync`), never by bare name: on Windows that searches the current folder first, and a `.cmd`
-  shim needs cmd.exe. Node runs the `.ts` files as they are
+  shim needs cmd.exe. The one exception is `system/net.ts`'s `tar` (System32's on Windows, elsewhere `which` with a bare `tar` as the fallback). Node runs the `.ts` files as they are
   (type stripping; Node 26+, `engines`), so only erasable syntax: no `enum`, `namespace` or parameter properties
   (`erasableSyntaxOnly`), and imports name the `.ts` file. Node won't strip types under `node_modules`, so npx can't run them: `release.yml` packs the installer
   (`npm pack`, whose `prepack` builds the native distributions and runs `tsc` and writes `tools/installer/**/*.js`, gitignored) as `installer.tgz` on the release, and
@@ -28,14 +28,14 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   flag). npx caches by URL and keeps running the first installer it fetched (`--prefer-online` too), so each run reads
   the tag `latest/` redirects to and, when it is newer, hands over to that release's versioned URL (`newerInstaller`).
 - `plugins/` is grouped by how a plugin gets installed: `default/` (the bundle, dead-skills, on every machine),
-  `flows` (the conductors), both plain plugins at the top, then `shared/` (what flows pulls in) and `opt-in/` (extras
+  `flows` (the conductors), both plain plugins at the top, then `shared/` (what flows or the dead-skills bundle pulls in) and `opt-in/` (extras
   nothing else depends on; `opt-in/mcp/` holds the MCP configs, `opt-in/implementation/` the language, database and LSP
   plugins). `shared`, `opt-in` and its two subfolders are `GROUPS` folders (`scripts/plugin-dirs.mjs`, which nests them):
   each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; web-mcp
   is also offered on its own but lives in `shared/`. Moving a folder doesn't touch installs (they key on the
   plugin `name`); renaming a plugin does.
-- `tools/`: three Rust packages in one root Cargo workspace: `web-mcp`,
-  `ado-mcp` and `http-runner`. The root `Cargo.toml` owns all dependency versions,
+- `tools/`: the installer, the harness compiler, upstream-sync and three Rust packages in one root Cargo workspace:
+  `web-mcp`, `ado-mcp` and `http-runner`. The root `Cargo.toml` owns all dependency versions,
   package metadata, Clippy settings and the release profile; members inherit them and select their own features.
   There is one root `Cargo.lock` and `target/`. Use `-p <package>` to build or test one member. Nothing in the
   plugins reaches into the crates at runtime. `scripts/check_cargo_workspace.py` (Python 3.11+) rejects local
@@ -43,12 +43,12 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   may coexist; direct dependency versions must be declared only in `[workspace.dependencies]`.
 - `tools/ado-mcp/`: the mcp-azure server (`plugins/opt-in/mcp/mcp-azure/`, below).
 - `plugins/default/`: the dead-skills bundle. Its `dependencies` are the core plugins; itself it carries the global rules
-  (`rules.md`, a SessionStart hook), Context7 (`.mcp.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
+  (`rules.md`, a SessionStart hook), Context7 (`mcpServers` in `plugin.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
   their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id
   (`custom:dead-skills:night-city`: a plugin theme's id carries the plugin name).
 - Night City (`plugins/default/`): a theme (`themes/palette.json`) plus a mod (`hooks/`). It is the house
-  look: notify's wording and the installer's `paint` (`ui/view.ts`) use its palette, with no
-  stock fallback. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
+  look: the notifications use Night City wording and the Onibi icon, and the installer's `paint` (`ui/view.ts`) maps
+  named colours to its palette where the terminal has 24-bit colour, leaving the rest to `styleText`. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
   highlighting off. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
   Code otherwise draws in 256 colours and the theme's indigos turn grey.
   The installer always sets `outputStyle: "concise"` unless the user chose a style, and `steps/output-style.ts` writes
@@ -59,13 +59,30 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   Powerline (needs a Nerd Font), and since Powerline mode draws a gradient in its first colour only, the ナイトシティ
   sign is one widget per glyph. Nothing draws above the prompt now: ponytail's band is vendored but never loads, and the flows band and
   Onibi's visits were removed in commit c2032c1, "Vendor ponytail v5 and make its band the only one
-  above the prompt (#66)" (revert it to bring them back; its CLAUDE.md and README edits will conflict). Its mascot PNGs (`assets/`) are generated by `scripts/draw-mascot.mjs`; never edit them by
+  above the prompt (#66)". A revert no longer applies, because the manifests and the ponytail pack have moved since; to
+  bring them back, take `plugins/flows/hooks/flow.ts`, `plugins/flows/hooks/register.tsx` and `plugins/default/hooks/onibi.ts`
+  from that commit's parent and declare them as an `extensions` entry. Its mascot PNGs (`assets/`) are generated by `scripts/draw-mascot.mjs`; never edit them by
   hand.
 - `plugins/opt-in/mcp/mcp-github/`: an MCP server config only.
+- `plugins/shared/graphify/`: vendored knowledge-graph skill and `tool.starting` hooks that nudge towards `graphify-out/`, on both
+  harnesses. flows pulls it in (on Codex flows also embeds its skills); the installer's Tools page offers it and runs
+  `uv tool install` for its CLI.
+- `plugins/shared/agent-review/`: vendored skill that checks agent work at three levels, Claude Code only. The dead-skills
+  bundle pulls it in.
+- `plugins/opt-in/hallmark/`: vendored frontend-design skill, on both harnesses. Nothing pulls it in.
+- `plugins/opt-in/shop/`: a text-only skill for buying decisions and price checks on Kleinanzeigen and Geizhals through
+  web-mcp's `rows`, on both harnesses. Picking it brings web-mcp.
+- `plugins/opt-in/implementation/nix-lsp/`: an LSP config for `nixd` on `.nix` files, Claude Code only; the installer doesn't
+  offer it on Windows.
+- Atlassian (a `plugins/catalog.json` entry with no folder) is Codex-only (`targets: ["codex"]`): its upstream repo ships most
+  skills twice (`skills/` and `skills/v1/`), which the Claude marketplace rejects as duplicate names. Claude Code users
+  connect Atlassian through the official connector. It is the only url-sourced entry, deliberately unpinned; being
+  Codex-only it never reaches `shippedVersions`, which reads a pinned url entry's version from its `ref` for the Claude
+  marketplace only.
 - `plugins/flows/`: the conductor skills (`/build-feature`, `/research-feature`, `/implement`, `/fix`, `/upgrade`,
   `/refactor`, `/review-code`, `/understand`, `/learn`, `/evaluate`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
-  plugin) live once in `plugins/flows/steps/*.toml`, composed into each conductor at build time (`docs/adr/0009-conductors-composed-from-flow-steps.md`), so a
+  plugin) live once in `plugins/flows/steps/*.toml`, composed into each conductor at build time (`docs/adr/0011-conductors-composed-from-flow-steps.md`), so a
   SKILL.md says what it runs and names its steps (`[step: <name>]`). Compose (`tools/harness-compiler/src/flows/compose.ts`)
   stops the build on a broken step and fails the build (and check-repo) on built text that doesn't hold; host wording comes from
   `src/templates/hosts/<target>.ts`, and `harness-compiler lint`'s flows phrase list (`CLAUDE_ONLY`) keeps Claude-only
@@ -77,9 +94,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `scripts/flows-uses.mjs` generates flows' `dependencies` and the README tree from them, and check-repo fails when a
   listed skill is gone or the generated parts are stale. `/review-code`
   replaced `/test-audit`, `/doc-audit`, `/harden`, `/self-review` and `/verify` (their method text is in its
-  `references/`); on Claude Code its correctness lens is the built-in `code-review` (the host adapter template), and
+  `references/`); on Claude Code its correctness lens is the built-in `code-review` for a `branch` review against the default branch on a clean tree
+  (the host adapter template) and otherwise ponytail-review's brief (`references/lenses.md`), and
   the one agent it vendors is `flows:pr-test-analyzer`, next to tob's checker in `agents/`. `/self-review` was a plugin
-  of its own until 0.5.0, so the installer keeps flows on a machine that had it.
+  of its own through 0.5.0, so the installer keeps flows on a machine that had it.
   flows also owns the prose standard: `skills/writing/` is one of the two skills in it Claude may load on its own
   (`flows:writing`; the other, `flows:diagrams`, is described below). `flows-uses.mjs` treats only
   `disable-model-invocation: true` skills as conductors, so a `uses:` line may list either. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
@@ -101,31 +119,31 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   built for Windows and Linux x64 only (`crates-build.yml`, `targets` in `assets/tools.json`; no macOS or ARM builds); the
   installer downloads it and sets `binPath`. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4` feature)
   showed embeddings don't lift recall over BM25 on BEIR, so none ship. One browser window per server, every engine,
-  `browser` session and fetch fallback attached to it as a tab (`docs/adr/0007-one-browser-window.md`); its daemon and tab-raising behaviour is
-  recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in
+  `browser` session and fetch fallback attached to it as a tab (`docs/adr/0007-one-browser-window.md`); its daemon behaviour is
+  recorded in `docs/features/web-mcp-one-window/findings.md`, tab raising in
+  `docs/solutions/click-and-press-reach-nothing-in-a-hidden-tab.md`, the engine and daemon timings in
   `docs/features/web-mcp-search/findings.md`, and specific bugs in `docs/solutions/` (Google's `/goto` links, a hidden
   tab's `click`/`press`, agent-browser's install and a Windows Chrome quirk).
   `rows` opens its pages as a tab of that window too, holds a 1 s gap per host, and its group detection is tested on
-  captured pages in `tests/fixtures/rows/` (`docs/adr/0012-rows-tool-and-shop-skill.md`). Its tree walk is bounded by
+  captured pages in `tests/fixtures/rows/` (`docs/adr/0013-rows-tool-and-shop-skill.md`). Its tree walk is bounded by
   a visit budget that charges text by bytes, because a hostile page can hide a huge text node under thousands of
   nested parents (`docs/solutions/rows-walk-budget-counts-bytes-not-nodes.md`).
   Contributor rules: tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`;
   `cargo build --locked -p web-mcp --bin fake-agent-browser` before the unit tests), which changes with any
   agent-browser answer web-mcp reads and doesn't model every upstream quirk
-  (`docs/solutions/click-and-press-reach-nothing-in-a-hidden-tab.md`). Test-only hooks (debug builds or the
-  `test-hooks` feature): the fake's `$FAKE_AB_PAGES` folder serves a result page for an engine host and, for any other
-  host, `<last path segment of the URL>.html`; `WEB_MCP_TEST_PUBLIC_IP` treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS`,
-  `WEB_MCP_PAPERS_MS` and `WEB_MCP_LOOKUP_MS` shorten the fetch fallback's, each paper source's and each lookup
+  (`docs/solutions/click-and-press-reach-nothing-in-a-hidden-tab.md`). Test-only hooks: the fake's `$FAKE_AB_PAGES` folder serves a result page for an engine host and, for any other
+  host, `<last path segment of the URL>.html`; `WEB_MCP_TEST_PUBLIC_IP` (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public;
+  `WEB_MCP_FALLBACK_MS`, `WEB_MCP_PAPERS_MS` and `WEB_MCP_LOOKUP_MS` (read in every build, release included) shorten the fetch fallback's, each paper source's and each lookup
   source's deadline. Env knobs: `WEB_MCP_CHROME` picks the browser binary; `WEB_MCP_SEARCH_DIR` picks where profile
   slots live (no temp fallback). `fetch` runs with `allow_private: true` (`tools.rs`, for the user's own localhost
   sites), so a conductor that follows links from untrusted pages, as /evaluate does, has only a text rule on the URL:
   a hostname resolving to a private address gets through, though a public URL's redirect onto one is refused.
 - `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
-  `tools/upstream-sync/src/adapters/*.ts`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
-  plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
-  (`${CLAUDE_PLUGIN_ROOT}/packs`), and the installer retires old installs of them and checks none remains
+  `tools/upstream-sync/src/adapters/*.ts`. They are not marketplace plugins and nothing there loads on its own (Claude Code loads components only from a
+  plugin's root, such as `skills/`, `agents/` and `hooks/hooks.json`, never from a folder like `packs/`); conductors read a pack's skills by path
+  (`<flow-root>/packs`, written `<packs>`), and the installer retires old installs of them and checks none remains
   (`stillInstalled`). The folder list is the source of truth, not this file. pstack-picks leaves out pstack's
-  `technical-writing` and `unslop` (flows' `writing` replaces them, and the sync rewrites the lines that named them);
+  `technical-writing` and `unslop` (flows' `writing` replaces them; the sync rewrites the lines that name `unslop`, and `GUARD` fails on a new mention of either);
   `npm run sync -- apply pstack-picks --ref <hash>` syncs one commit, given as a full 40-character hash, instead of upstream's default
   branch; its entry in `tools/upstream-sync/src/sources.ts` checks the number of vendored skills (16), so change that count
   whenever you change `SKILLS`. When upstream's text gets past the rewrites, the sync's `GUARD` fails its weekly `sync.yml` job
@@ -141,7 +159,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `run-hook.cmd` and `session-start` stay LF via `.gitattributes`). Other hosts' adapters are left out. The sync PR
   carries upstream's release notes, and the sync fails on a `plugin.json` component or default folder it doesn't know.
 
-- `plugins/opt-in/mcp/mcp-azure/`: `.mcp.json` and settings for `ado-mcp` (Rust, `tools/ado-mcp/`), a stdio MCP server
+- `plugins/opt-in/mcp/mcp-azure/`: `plugin.json` (`mcpServers` and `config`) for `ado-mcp` (Rust, `tools/ado-mcp/`), a stdio MCP server
   for one Azure DevOps Server collection and PAT: `pr_*`, `wi_*`, `pipeline_*`, `repo_list` and `project_list` (both
   in `pipeline.rs`; no default project: outside an Azure DevOps clone the model passes `project`, but `search`
   without one searches the whole collection), `search` (`search.rs`), `repo_file` (`file.rs`) and `wiki`
@@ -160,7 +178,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
     live answers; the fix is the D1 fallback.
   - Where the crate falls short a call is sent or read by hand (`pr_list status=all`, `pr_threads`, the work-item
     batch, work-item comments, build log text, `pipeline_cancel`, `/vsts/info`, `connectionData`, `repo_file`'s items
-    GET); why each is in `docs/features/ado-mcp/flow.md` (D1-D5, D7), and for `repo_file` in `file.rs` (the crate
+    GET); why each is in `docs/features/ado-mcp/flow.md` (D2, D3, D5, D7), for `/vsts/info` and `connectionData` in `api.rs`
+    (the crate doesn't cover them), and for `repo_file` in `file.rs` (the crate
     puts `path` into the URL twice). `pr_update` has no draft flag and `pr_complete` sends no `lastMergeSourceCommit`,
     because the crate's model carries neither.
   - The PAT goes only to `ADO_ORG_URL`: crate calls pass the `Guard` policy, hand-sent ones `Api::url`'s check
@@ -171,8 +190,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
     `tests/fixtures.rs` maps each fixture to the crate model its route returns, so every fixture must fit that model;
     fixtures no crate model reads are listed apart, in `HAND_WRITTEN`. Fitting the model doesn't prove the server's
     shape: build fixtures from real answers or the Server docs' samples (the comments fixture carried a `url` the
-    server leaves out of mentions, D7). The fixtures' ids (`p1`) aren't GUIDs, so a test that a reply prints no GUID
-    needs a GUID-shaped id in its fixture, or a leak passes unseen.
+    server leaves out of mentions, D7). The inline answers in `tests/api.rs` use a non-GUID project id (`p1`), unlike the files in
+    `tests/fixtures/`, so a test that a reply prints no GUID needs a GUID-shaped id, or a leak passes unseen.
     Test-only hook: `ADO_TIMEOUT_MS` (debug builds) replaces the 60 s request timeout.
 - `plugins/opt-in/mcp/http-runner/`: `plugin.json` and the `http-runner` skill for `http-runner` (Rust, `tools/http-runner/`), a stdio
   MCP server with two fixed tools. `run` sends one named request of a VS Code REST Client `.http` file after the named
@@ -193,9 +212,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (`guard.py`) and sets telemetry off before importing headroom, and writes everything (venv, log, headroom's workspace,
   `TIKTOKEN_CACHE_DIR`) under the plugin data dir, never `~` (only uv's own download cache and managed Python live in
   uv's folders); `PYTHONDONTWRITEBYTECODE=1` keeps `__pycache__` out of the install folder. A SessionStart launcher
-  (`hooks/launcher.mjs`) finds uv (`<CONFIG>/bin`, then an absolute PATH entry; never a bare name), starts `uv run
---locked` detached with cwd = the data dir, output to `server.log`, and without the session's `UV_*`, `PYTHON*` and
-  `VIRTUAL_ENV` (the installer drops them too, `trimServerEnv`), and returns within about 300 ms. `/health` reports the
+  (`hooks/launcher.mjs`) finds uv (`<CONFIG>/bin`, then an absolute PATH entry; never a bare name), starts `uv run --locked` (detached except on Windows) with cwd = the data dir, output to `server.log`, and without the session's `UV_*`, `PYTHON*` and
+  `VIRTUAL_ENV` (the installer drops them too, `trimServerEnv`), and returns within about 300 ms, or about 1.3 s when it replaces a server. `/health` reports the
   server's identity (a hash of `uv.lock`, `pyproject.toml` and `server/*.py`) and plugin version; a launcher replaces a
   server of another identity unless that server's version is newer. A PostToolUse `http` hook posts to 127.0.0.1:47811;
   that port is written only in `hooks/hooks.json` and the installer reads it from there (`hookPort`), to stop the server
@@ -205,17 +223,21 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   PATH is ignored (`ensureTool` in `steps/tools.ts`). It then runs `uv sync --locked`
   and fetches tiktoken's vocabulary (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0008-python-through-installer-uv.md`. Dependabot's `uv`
   entry keeps `uv.lock` current.
-- Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
-  on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
-  talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
-  sets `preferredNotifChannel: "notifications_disabled"`.
+- Notifications (`plugins/default/`, formerly the notify plugin): the neutral `hooks/hooks.json` entries (`turn.finished`,
+  `permission.requested`, `question.asked`, `notification.received`, all `background`) run the shared
+  `hooks/runtime/run.mjs` the compiler packages, which calls `main` in `hooks/lib.mjs` (Node standard library only; tests
+  in `hooks/lib.test.mjs`). On Claude Code they compile to Stop, Notification (`permission_prompt`, `elicitation_dialog`)
+  and PreToolUse on AskUserQuestion; on Codex to Stop, PermissionRequest and PreToolUse on `request_user_input`
+  (`notification.received` has no Codex event). Linux talks D-Bus via `busctl`, falling back to `notify-send`; Windows runs
+  an inline PowerShell WinRT toast. Focus comes from tmux when `$TMUX_PANE` is set (not on Windows), and on Windows from the
+  foreground process. The installer always sets `preferredNotifChannel: "notifications_disabled"`.
 - `plugins/opt-in/implementation/rust-skills/`, `plugins/opt-in/implementation/csharp-skills/`: vendored (`tools/upstream-sync/src/adapters/simple.ts`, `tools/upstream-sync/src/adapters/csharp.ts`). `paths:` frontmatter doesn't
   gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an
   unscanned `library/`, with upstream's binlog MCP workflows cut (the server isn't vendored); the router reads library files via the installer's `Read(~/.claude/plugins/**)` rule (without
   the installer users get a permission prompt).
 - `plugins/opt-in/implementation/postgres/`: a database plugin. It vendors
   Neon's and Timescale's Postgres skills from two upstreams (`tools/upstream-sync/src/adapters/simple.ts`), so each skill folder carries its
-  own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
+  own LICENSE and UPSTREAM (the Timescale one a NOTICE too) instead of one set at the plugin root.
 - `tools/upstream-sync/`: private TypeScript workspace for upstream vendoring, run directly on Node 26.
   `npm run sync -- list` lists sources; `preview <source>` shows changes from committed HEAD in an isolated
   worktree; `apply <source>` updates a clean destination and writes a structured result under the runner temp directory.
@@ -225,18 +247,14 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   upstreams and fake GitHub responses. Historical generated-file ownership stamps retain their original script names.
 - `scripts/`: repository validation, releases, flow dependency generation and mascot artwork; upstream syncing lives
   in `tools/upstream-sync/`.
-  Atlassian is Codex-only (`targets: ["codex"]` in `plugins/catalog.json`): its upstream repo ships every skill twice
-  (`skills/` and `skills/v1/`), which the Claude marketplace rejects as duplicate names. Claude Code users connect Atlassian
-  through the official connector. It is the only url-sourced entry, deliberately unpinned; the installer would read a
-  pinned url entry's version from its `ref` (`shippedVersions`).
 
 ## Vendored content: don't edit
 
 `treefmt.toml`'s `excludes` lists every vendored path (`docs/vendor-a-pack.md` is the checklist for adding one). These are
 copied from upstream by `tools/upstream-sync/src/adapters/*.ts` and `sources.ts` (the weekly `sync.yml` opens the PRs)
 and overwritten on every sync; to change one, change its sync script's transform, not the vendored files. Hand-written
-exceptions a sync still skips: `plugin.json` for pstack-picks and the `*-skills` and postgres packs (and their
-`evals/`). ponytail and superpowers vendor no manifest at all (a pack is a plain resource folder; the compiler never
+exceptions a sync still skips: `plugin.json` for csharp-skills, rust-skills, postgres, hallmark, graphify and agent-review, and the
+`*-skills` plugins' `evals/`. ponytail and superpowers vendor no manifest at all (a pack is a plain resource folder; the compiler never
 loads one as a plugin). `tob-picks` is CC BY-SA 4.0; THIRD_PARTY.md has every pack's actual license.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
@@ -262,8 +280,8 @@ A release you choose:
 
 Either way the merge's run packs the installer (`installer.tgz`), builds web-mcp, ado-mcp and http-runner from the tag and
 publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back):
-the tag plus one `Distribution vX.Y.Z` commit holding the native distributions that `publish` built (the job that holds
-the write token runs no `npm ci`, so it gets them as the `native` artifact). Tags carry sources only.
+the tag plus one `Distribution vX.Y.Z` commit holding the native distributions that `publish` built (`release-branch`, whose
+checkout keeps the write token, runs no `npm ci`, so it gets them as the `native` artifact). Tags carry sources only.
 The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so Claude Code's
 marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
@@ -272,12 +290,12 @@ plugins of ours that the manifest no longer lists.
 
 - A fresh clone runs `npm ci` before committing: check-repo and the compiler, which the pre-commit hook runs, import `smol-toml`.
 - `npm test` is the one list of what runs (`package.json`'s `test` script): `scripts/check-repo.mjs`, then all
-  `tools/installer/**/*.test.ts` under a line-coverage floor, then the harness-compiler's and upstream-sync's own test
-  suites (each its own `npm test --workspace=...`, so a test file only one of them runs still runs), then
-  `scripts/*.test.mjs`, `plugins/flows/skills/{writing,build-feature,diagrams}/tests/*.test.mjs`, `plugins/default/hooks/*.test.mjs`,
-  `plugins/flows/hooks/*.test.mjs` and `plugins/opt-in/headroom-trim/hooks/*.test.mjs` (`claude plugin validate`, inside `check-repo.mjs`, is skipped when
+  `tools/installer/**/*.test.ts` under a line-coverage floor, then the harness-compiler's own test
+  suite, then `scripts/*.test.mjs`, `plugins/flows/skills/{writing,build-feature,diagrams}/tests/*.test.mjs`, `plugins/default/hooks/*.test.mjs`,
+  `plugins/flows/hooks/*.test.mjs` and `plugins/opt-in/headroom-trim/hooks/*.test.mjs`, then upstream-sync's own test suite (each suite is its own
+  `npm test --workspace=...`, so a test file only one of them runs still runs; `claude plugin validate`, inside `check-repo.mjs`, is skipped when
   `claude` isn't on PATH). The installer tests run with a line-coverage floor
-  (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `tools/installer/modules.test.ts`
+  (`--test-coverage-lines` in `package.json`'s `test` script; raise it, never lower it), and `tools/installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
 - `npm ci` once, then `npm run typecheck`, also one list: `tsc --noEmit` over `tools/installer/` (sources and tests,
@@ -292,15 +310,16 @@ plugins of ours that the manifest no longer lists.
 - Don't share `CARGO_TARGET_DIR` between worktrees: a test binary keeps the `CARGO_MANIFEST_DIR` of the worktree that
   built it, and web-mcp's integration tests start whichever server binary was built last.
 - ado-mcp: `cargo test --locked -p ado-mcp` from the root. CI lints with latest stable Rust and separately checks
-  the workspace with its declared `rust-version` (1.97). A test that times concurrency makes one fast call
+  the selected packages with the workspace's declared `rust-version` (1.97). A test that times concurrency makes one fast call
   first and bounds the slow one against it (`view_concurrent` in `tests/pr.rs`, `tests/wi.rs`): under the full
   parallel run on Windows, process start and git subprocesses outweigh a fixed wall-clock bound.
 - headroom-trim server: `uv run --locked python -m unittest discover -s tests` in `plugins/opt-in/headroom-trim/server`,
   with `UV_PROJECT_ENVIRONMENT` set to a folder outside the repo (the default `.venv` lands in the tree). One test fills a
   tiktoken cache over the network.
-- mod tests: `claude plugin test .` in `plugins/default` and `plugins/opt-in/md-pane`.
-  `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
-  writes them when it loads the mod).
+- mod tests: after a build, copy each plugin's `hooks/*.test.*` into its generated package and run `claude plugin test .`
+  in `.claude-plugin/dead-skills` and `.claude-plugin/md-pane`, as `test.yml` does (in `plugins/` it fails: those folders
+  hold neutral manifests). `tsc -p .` in `plugins/default` and `plugins/opt-in/md-pane` needs the engine's typings in
+  `.claude-plugin/types/` (gitignored); `claude plugin test` doesn't write them and CI doesn't run this.
 - The quote check: `npm test` (check-repo) fails when a sentence an `overrides` marker quotes is gone from its pack.
   Run it after a pack sync and fix the marker or the conductor text in the same PR. It sees only quoted sentences, so also
   read a superpowers sync's `brainstorming` diff against `build-feature`: v7.0.2 added a chat approval that would bypass its Gate 1, and no quote covered it.
@@ -315,12 +334,12 @@ plugins of ours that the manifest no longer lists.
   Formatter options live in `treefmt.toml`; flow steps use `#:schema ./step.schema.json` for editor validation.
 - `npm run scan-skills` (needs `pipx`): Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`
   and the composed flows conductors in `.claude-plugin/flows/skills/`; it fails on a high or critical finding. A
-  finding judged benign gets a scoped suppression with its reason in `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.
+  finding judged benign gets a scoped suppression with its reason in `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR except the `uv` and `agent-browser` pin bumps (`scan: false` in `sources.ts`).
 
 CI: `changes.yml` uses `scripts/ci-changes.mjs` to route checks from the complete Git diff (PR merge base or push
 range, including deleted and renamed paths). `test.yml` runs Node/plugin checks and skill scanning when their inputs
 change; its two OS matrix jobs retain their required check names even when their steps skip. A detection failure fails
-those jobs. `crates.yml` tests and lints selected Rust packages together and independently on Linux and Windows,
+those jobs. `crates.yml` tests selected Rust packages together and independently on Linux and Windows, lints them together,
 checks their minimum Rust version and Nix packages.
 Root Cargo, Nix and npm dependencies, CI changes and unknown paths select all checks; docs/ changes select none.
 Manual runs select everything. `crates-build.yml` builds only selected binaries on PRs, but release calls always build
@@ -333,14 +352,14 @@ releases only come from a push to main: `release.yml` has no tag trigger, so a t
 nothing. Renaming a `test.yml` job or matrix entry changes its check name: update the main ruleset's required checks.
 
 `sync.yml` opens its PRs with the workflow's own token, which starts no other workflow, so `test.yml` doesn't
-run on a sync PR: each job runs check-repo and the skill scan itself, and their PRs are merged past the main ruleset's
+run on a sync PR: each job runs check-repo and, except for the two pin bumps, the skill scan itself, and their PRs are merged past the main ruleset's
 required checks with the admin bypass.
 
 ## Multiple agents
 
 `plugins/` is agent-neutral: no `.claude-plugin`, `.codex-plugin`, `.mcp.json`, native hook files, install instructions
-or harness paths. Each plugin has a neutral `plugin.json` (description, author, dependencies, `config`, `mcpServers`,
-`lsp`, `themes`, `extensions`, `hooks`) and a neutral `hooks/hooks.json` (events such as `session.started`,
+or harness paths. Each local plugin has a neutral `plugin.json` (description, author, dependencies, `config`, `mcpServers`,
+`lsp`, `themes`, `extensions`, `instructions`, `embeds`, `hooks`) and, if it has hooks, a neutral `hooks/hooks.json` (events such as `session.started`,
 `tool.completed`; tools such as `file.write`). `plugins/catalog.json` lists the plugins, their source, resources,
 dependencies and targets. UI mods (TypeScript against Claude's UI engine) stay in their plugin and are declared in `plugin.json` as an
 `extensions` entry; a harness that cannot run them gets a build warning and the mod is left out of its package.
@@ -362,7 +381,8 @@ the installer's catalog test compiles the compiler with `tsc --outDir`, which em
 `tools/installer/core/agents.ts` holds host metadata for the installer; `tools/installer/steps/codex.ts` uses Codex's
 native plugin and MCP commands, respecting CODEX_HOME.
 Keep Claude marketplace IDs and the legacy executable alias stable even though the GitHub repository has moved to a
-new slug: `package.json`'s `repository` is its one owner (see Versions and releases).
+new slug: `package.json`'s `repository` is its owner for the installer and the build; `LOOKUP_UA` in
+`tools/web-mcp/src/api.rs` and README.md repeat it by hand.
 Flow behavior is shared; each built conductor carries its host's wording through the `{{adapter}}` and other tokens in
 `tools/harness-compiler/src/templates/hosts/`.
 Without subagents the main session does delegated work (searching, exploring) itself; independent checks are skipped and

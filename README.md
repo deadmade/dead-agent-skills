@@ -96,9 +96,3 @@ are respected, and changed blocks or paths are preserved.
 Run the packaged `setup-night-city` skill in Codex: it copies the shipped `.tmTheme` under `$CODEX_HOME/themes/`
 (default `~/.codex/themes/`) without overwriting a differing file, then guides selection with native `/theme`.
 Claude keeps its theme and native UI mod. Codex setup does not change the terminal palette, spinner words or status line.
-
-Validation evidence on Linux: Codex 0.166.0 accepted the native marketplace/package; Claude Code 2.1.316 validated
-native manifests. Fixtures are pinned to Claude 2.1.314 and Codex 0.166.0 with per-fixture provenance; most lifecycle
-examples are documentation-derived, not captured events. These are tested baselines, not a claim of a verified minimum
-version. Authenticated hook trust/execution, missing-Node interpretation, native theme visuals and Windows acceptance
-remain pending. See [the feature validation record](docs/features/harness-independent-plugins/flow.md).

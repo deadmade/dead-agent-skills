@@ -1,6 +1,7 @@
 # shopping-search Implementation Plan
 
 <!-- glance -->
+
 ```
 Plan: shopping-search · 7 tasks · ~2770 lines · 35 files
  1  [1 A chosen gap per host]  [2 Captured pages]
@@ -15,10 +16,11 @@ Plan: shopping-search · 7 tasks · ~2770 lines · 35 files
 2  Saves three real result pages as test fixtures, scrubbed of…  4      nothing new                     ~1500
 3  Turns a rendered page's HTML into the page's repeating grou…  3      `src/rows.rs` with `Group`, `…  ~420
 4  Makes `rows` a callable tool: it opens the page, spaces its…  5      `RowsArgs`, `Server::rows`, `…  ~280
-5  Brings every place that lists web-mcp's tools or says which…  10     `docs/adr/0012-rows-tool-and-…  ~160
+5  Brings every place that lists web-mcp's tools or says which…  10     `docs/adr/0013-rows-tool-and-…  ~160
 6  Ships the opt-in skill that tells an agent where to point `…  8      the plugin `shop` (`plugins/o…  ~220
 7  Runs the finished tool and skill against the real pages and…  3      nothing new                     ~150
 ```
+
 <!-- /glance -->
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -72,10 +74,12 @@ Plan: shopping-search · 7 tasks · ~2770 lines · 35 files
 **Size:** ~40
 
 **Files:**
+
 - Modify: `tools/web-mcp/src/limits.rs`
 - Test: `tools/web-mcp/src/limits.rs` (its `mod tests`)
 
 **Interfaces:**
+
 - Consumes: `HostLimits::acquire`, the private `interval(url)`.
 - Produces: `pub async fn acquire_with(&self, url: &Url, gap: Duration) -> HostPermit`. `acquire(url)` becomes `self.acquire_with(url, interval(url))`. Because the next-start time is shared per host (`limits.rs:48-53`), the gap applies to whatever request to that host comes next, from any caller: a `fetch` right after a `rows` call to the same host waits up to the gap. The doc comment must say so.
 
@@ -95,12 +99,14 @@ Plan: shopping-search · 7 tasks · ~2770 lines · 35 files
 **Size:** ~1500
 
 **Files:**
+
 - Create: `tools/web-mcp/tests/fixtures/rows/ads_page.html`
 - Create: `tools/web-mcp/tests/fixtures/rows/product_cards_page.html`
 - Create: `tools/web-mcp/tests/fixtures/rows/tiles_page.html`
 - Create: `tools/web-mcp/tests/fixtures/rows/README.md`
 
 **Interfaces:**
+
 - Produces: three files, each the `get html body` of a rendered page. Task 3 reads them with `include_str!`.
 
 - [ ] **Step 1: Capture each page once**, with one page load per site, through the same browser window web-mcp uses, not a browser the CLI starts on its own (the CLI's Chrome for Testing may not start here, and it differs from the window: it has no cookie extension and another profile). Use the installer's CLI at `~/.claude/bin/agent-browser`, attached to the running window's debug port (`connect <port>`, then `get html body`, with the output redirected to the file). The pages: `https://www.kleinanzeigen.de/s-serverschrank-19-zoll/k0` (as `ads_page`), `https://geizhals.de/?cat=monlcd19wide&xf=18036_IPS~18315_ab+2560x1440&pagesize=30&promode=false` (as `product_cards_page`), and `https://www.galaxus.de/de/s1/producttype/monitor-31` (as `tiles_page`; its search path is disallowed). If the window cannot be attached, report `NEEDS_CONTEXT` with the fallback: capture the pages after Task 4 from the `raw.html` that `rows` itself archives, and move the Task 3 tests after Task 4. Do not retry a capture in a loop.
@@ -118,11 +124,13 @@ Plan: shopping-search · 7 tasks · ~2770 lines · 35 files
 **Size:** ~420
 
 **Files:**
+
 - Create: `tools/web-mcp/src/rows.rs`
 - Modify: `tools/web-mcp/src/main.rs`
 - Test: `tools/web-mcp/src/rows.rs` (its `mod tests`)
 
 **Interfaces:**
+
 - Consumes: the three fixtures from Task 2; `dom_query` (as in `src/extract.rs:35-40` and `src/engines/duckduckgo.rs:37-50`).
 - Produces, for Task 4:
   ```rust
@@ -174,6 +182,7 @@ How `find_groups` decides (the spec's rule, with the review's two refinements):
 **Size:** ~280
 
 **Files:**
+
 - Modify: `tools/web-mcp/src/rows.rs`
 - Modify: `tools/web-mcp/src/tools.rs`
 - Modify: `tools/web-mcp/tests/bin/fake_agent_browser.rs`
@@ -181,6 +190,7 @@ How `find_groups` decides (the spec's rule, with the review's two refinements):
 - Modify: `tools/web-mcp/tests/mcp.rs`
 
 **Interfaces:**
+
 - Consumes: `Browser::rendered_html(&self, url: &Url) -> Result<(String, Url), BrowserError>` (`src/browser.rs:800`); `HostLimits::acquire_with` (Task 1); `archive::Item::Page` as used by `keep_page` (`src/search.rs:412-427`); `fetch::slash` (`src/fetch.rs:621`, already `pub(crate)`); `error(msg)` (`src/tools.rs:109`); `find_groups` and `render` (Task 3).
 - Produces:
   ```rust
@@ -220,10 +230,11 @@ Behaviour of `run`, from the spec:
 
 **Does:** Brings every place that lists web-mcp's tools or says which of them need the browser window up to date, and records why the design looks as it does.
 **Depends on:** Task 4
-**Adds:** `docs/adr/0012-rows-tool-and-shop-skill.md`
+**Adds:** `docs/adr/0013-rows-tool-and-shop-skill.md`
 **Size:** ~160
 
 **Files:**
+
 - Modify: `tools/web-mcp/Cargo.toml`
 - Modify: `plugins/shared/web-mcp/plugin.json`
 - Modify: `plugins/shared/web-mcp/README.md`
@@ -233,9 +244,10 @@ Behaviour of `run`, from the spec:
 - Modify: `tools/installer/core/binaries.test.ts`
 - Modify: `tools/harness-compiler/src/templates/codex.ts`
 - Modify: `tools/web-mcp/src/main.rs`
-- Create: `docs/adr/0012-rows-tool-and-shop-skill.md`
+- Create: `docs/adr/0013-rows-tool-and-shop-skill.md`
 
 **Interfaces:**
+
 - Consumes: the finished tool from Task 4.
 
 - [ ] **Step 1: Update the tool lists and the window text.** The places: the `Cargo.toml` description; the `plugin.json` description; the plugin README ("with five tools", a `rows` bullet, and lines 114, 116 and 139, which say what needs the window); the doc comment on `Ctx::profiles` in `src/main.rs:34`; the `AGENTS.md` paragraph that says "`search`, `fetch`, `browser` and `lookup`" (add `rows` and one sentence: it needs the browser window like `browser`, holds a 1 s gap per host, and its detection is tested on captured pages in `tests/fixtures/rows/`; also add `$FAKE_AB_PAGES` serving a page for a non-engine host to the list of fake knobs); `README.md` where it describes web-mcp (near line 47); the installer's warning text in `core/binaries.ts` (the lines about the window, 155-163) and its assertion in `binaries.test.ts` (near 272); and `codex.ts:15` ("browser/search tools"). Find each place with `rg -n 'fetch fallback|browser/search|search.*fetch.*browser|four tools|window|fallback fail' README.md AGENTS.md plugins/shared/web-mcp tools/web-mcp/Cargo.toml tools/web-mcp/src/main.rs tools/installer/core/binaries.ts tools/harness-compiler/src/templates/codex.ts`, and update only what names the tools or says which need the window.
@@ -253,6 +265,7 @@ Behaviour of `run`, from the spec:
 **Size:** ~220
 
 **Files:**
+
 - Create: `plugins/opt-in/shop/plugin.json`
 - Create: `plugins/opt-in/shop/skills/shop/SKILL.md`
 - Modify: `plugins/catalog.json`
@@ -263,15 +276,17 @@ Behaviour of `run`, from the spec:
 - Modify: `README.md`
 
 **Interfaces:**
+
 - Consumes: the `rows` tool's name and arguments (Task 4).
 - Produces: a catalog entry named `shop`, with source `plugins/opt-in/shop`, `resources: ["skills"]`, `dependencies: ["web-mcp"]` and both targets, shaped like `hallmark`'s entry (not `flow-cockpit`'s, which targets Claude Code only); and `'shop'` in the `workflow` keys of `CATEGORIES` in `options.ts`.
 
 The skill's content is text, with no code. It says when to use the skill (a buying decision or a price check) and gives the normal-user rules: one address per call, one shop at a time, a gap between pages, no crawling, and nothing the shops' robots.txt disallows (listed in Global Constraints). Then it has one Recipe for each shop, followed by the signs of a blocked page, the judging notes and what is not covered:
-  - Kleinanzeigen: the search address is `https://www.kleinanzeigen.de/s-<words joined by ->/k0` (observed). Rows give price, place, time, a `V` or "Direkt kaufen" flag and a link. There are no depth or spec filters, so open promising ads one at a time; accessories mix with the real items.
-  - Geizhals: the category and filters go in the address, `?cat=<category>&xf=<id>_<value>~<id>_<value>&pagesize=30&promode=false`. `rows` returns the products as group 1 and the guide text as group 2; to read the filters the agent calls `rows` again with `item` set to `div.filter-element`, and builds the next address from each filter's link, never guessed. No `?fs=` search (disallowed) and no `bpmax` or `sort`: apply price limits from the rows. How to find a category slug without a disallowed path is unverified: try the links `rows` returns on the home page `https://geizhals.de/` and on a product page's breadcrumb, skipping every `/hardware/` link (disallowed). The skill must say that this is untested until Task 7 reports; Task 7 then replaces that sentence with what it found.
-  - What a blocked or changed page looks like: "no group found", a heading naming a captcha or "Seite existiert nicht", or a group far smaller than the page.
-  - Judging: take a new-price baseline from Geizhals for the model before praising a used price; compare totals including shipping; treat pickup-only ads as local and show each ad's place; look up a named model's depth on Geizhals when the ad does not state it; and never state a price without naming its source and date.
-  - Not covered yet: Galaxus, idealo, eBay, Amazon, a price timeline.
+
+- Kleinanzeigen: the search address is `https://www.kleinanzeigen.de/s-<words joined by ->/k0` (observed). Rows give price, place, time, a `V` or "Direkt kaufen" flag and a link. There are no depth or spec filters, so open promising ads one at a time; accessories mix with the real items.
+- Geizhals: the category and filters go in the address, `?cat=<category>&xf=<id>_<value>~<id>_<value>&pagesize=30&promode=false`. `rows` returns the products as group 1 and the guide text as group 2; to read the filters the agent calls `rows` again with `item` set to `div.filter-element`, and builds the next address from each filter's link, never guessed. No `?fs=` search (disallowed) and no `bpmax` or `sort`: apply price limits from the rows. How to find a category slug without a disallowed path is unverified: try the links `rows` returns on the home page `https://geizhals.de/` and on a product page's breadcrumb, skipping every `/hardware/` link (disallowed). The skill must say that this is untested until Task 7 reports; Task 7 then replaces that sentence with what it found.
+- What a blocked or changed page looks like: "no group found", a heading naming a captcha or "Seite existiert nicht", or a group far smaller than the page.
+- Judging: take a new-price baseline from Geizhals for the model before praising a used price; compare totals including shipping; treat pickup-only ads as local and show each ad's place; look up a named model's depth on Geizhals when the ad does not state it; and never state a price without naming its source and date.
+- Not covered yet: Galaxus, idealo, eBay, Amazon, a price timeline.
 
 - [ ] **Step 1: Write the failing check.** Update `catalog.test.ts` (16 plugins becomes 17, the claude-code count 15 becomes 16, and `shop` goes in the codex name list in catalog order), `plugins.test.ts` (`shop` in the sorted opt-in list) and `steps/codex.test.ts` (where it lists plugins). Run: `npm run build:harnesses && node --test tools/installer/core/catalog.test.ts tools/installer/core/plugins.test.ts tools/installer/core/options.test.ts tools/installer/steps/codex.test.ts`. Expected: FAIL.
 - [ ] **Step 2: Create the plugin.** Write `plugin.json` like `plugins/opt-in/hallmark/plugin.json` (description, author, license, no harness fields); the `SKILL.md` with frontmatter `name: shop` and a `description` that triggers on buying decisions and price checks; the catalog entry above; `'shop'` in `options.ts`; and a line in `README.md`'s plugin list (after Task 5's edits).
@@ -288,11 +303,13 @@ The skill's content is text, with no code. It says when to use the skill (a buyi
 **Size:** ~150
 
 **Files:**
+
 - Create: `docs/features/shopping-search/live-client.mjs`
 - Modify: `docs/features/shopping-search/flow.md`
 - Modify: `plugins/opt-in/shop/skills/shop/SKILL.md`
 
 **Interfaces:**
+
 - Consumes: the built binary `target/debug/web-mcp` (or a release build) and the skill from Task 6.
 
 - [ ] **Step 1: Write a throwaway stdio client** `live-client.mjs`, kept in the flow folder rather than the scratchpad so a later phase can rerun it. It starts the built binary, sends `initialize`, then sends `tools/call` for `rows` with the url, group, item and limit given on its command line, and prints the reply. It uses the Node standard library only.

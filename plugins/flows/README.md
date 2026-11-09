@@ -26,7 +26,7 @@ it; `all` audits the whole repo, vendored content skipped.
 
 Generated from each conductor's `uses:` line, its steps' and its host wording's by `node scripts/flows-uses.mjs`;
 `npm test` fails when it is stale. The tree names what a conductor may run: a run can skip one, as /evaluate skips `why`.
-Installing flows installs every plugin below; the packs ship inside flows itself.
+Installing flows installs every plugin below except `claude-code`, which names the host's built-ins; the packs ship inside flows itself.
 
 <!-- uses:start -->
 
@@ -182,9 +182,9 @@ copyedit that revises a document by it before a gate.
 ## Packs
 
 flows carries the skill packs its conductors run, in `packs/`: superpowers, ponytail, mattpocock-picks, pstack-picks,
-tob-picks, paper-lookup and security-audit, each written there by its `tools/upstream-sync/src/adapters/*.ts`. The agent scans only a plugin's root
+tob-picks, paper-lookup and security-audit, each written there by its `tools/upstream-sync/src/adapters/*.ts`. The agent loads components only from a plugin's root, such as
 `skills/`, `agents/` and `hooks/hooks.json`, so nothing under `packs/` loads on its own; the conductors read a pack's
-skills by path (`${PLUGIN_ROOT}/packs`). tob's spec checker is flows' own agent (`agents/spec-compliance-checker.md`),
+skills by path (`<flow-root>/packs`, written `<packs>`). tob's spec checker is flows' own agent (`agents/spec-compliance-checker.md`),
 since a pack's agents don't load. `/review-code` vendors one agent too, pr-review-toolkit's `pr-test-analyzer`
 (`agents/`, written by `tools/upstream-sync/src/adapters/self-review.ts`). Where a conductor or a step overrides a
 sentence of a pack, or pastes a section of one, a marker next to it quotes each sentence:
