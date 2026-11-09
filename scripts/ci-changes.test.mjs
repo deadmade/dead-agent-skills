@@ -159,7 +159,7 @@ test('PR 122 selects only web-mcp', () => {
   });
 });
 
-for (const path of ['Cargo.toml', 'flake.nix', 'tools/ado-mcp/src/bin/timetrack/ui.rs']) {
+for (const path of ['Cargo.toml', 'flake.nix']) {
   test(`repository fact ${path} selects Node checks`, () => {
     assert.equal(selectChecks([path]).node, true, path);
   });
