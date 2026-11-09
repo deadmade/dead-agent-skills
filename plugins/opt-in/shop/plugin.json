@@ -1,1 +1,5 @@
-{"description":"Shop: a skill for buying decisions and price checks. It points web-mcp's rows tool at Kleinanzeigen and Geizhals and says how to judge what comes back.","author":{"name":"deadmade","url":"https://github.com/deadmade"},"license":"MIT"}
+{
+  "description": "Shop: a skill for buying decisions and price checks. It points web-mcp's rows tool at Kleinanzeigen and Geizhals and says how to judge what comes back.",
+  "author": { "name": "deadmade", "url": "https://github.com/deadmade" },
+  "license": "MIT"
+}
