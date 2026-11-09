@@ -87,14 +87,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(plugins/|tools/harness-compiler/|tools/(ado-mcp|web-mcp)/|scripts/check-repo\\.mjs$|Cargo\\.(toml|lock)$|package\\.json$)";
+            files = "^(plugins/|tools/harness-compiler/|tools/(ado-mcp|http-runner|web-mcp)/|scripts/check-repo\\.mjs$|Cargo\\.(toml|lock)$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|web-mcp)/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|package\\.json$)";
+            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|http-runner|web-mcp)/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|package\\.json$)";
             pass_filenames = false;
           };
         };
@@ -113,11 +113,12 @@
         in
           builtins.baseNameOf path
           != "target"
-          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["web-mcp" "ado-mcp"]);
+          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["web-mcp" "ado-mcp" "http-runner"]);
       };
       webMcp = (pkgs.lib.importTOML ./tools/web-mcp/Cargo.toml).package;
       workspace = (pkgs.lib.importTOML ./Cargo.toml).workspace.package;
       adoMcp = (pkgs.lib.importTOML ./tools/ado-mcp/Cargo.toml).package;
+      httpRunner = (pkgs.lib.importTOML ./tools/http-runner/Cargo.toml).package;
     in {
       # web-mcp, the web-mcp plugin's MCP server: `nix build .#web-mcp`.
       web-mcp = pkgs.rustPlatform.buildRustPackage {
@@ -152,6 +153,24 @@
         meta = {
           inherit (adoMcp) description;
           mainProgram = "ado-mcp";
+        };
+      };
+
+      # http-runner, the http-runner plugin's MCP server: `nix build .#http-runner`.
+      http-runner = pkgs.rustPlatform.buildRustPackage {
+        pname = httpRunner.name;
+        inherit (workspace) version;
+        src = workspaceSource;
+        cargoLock.lockFile = ./Cargo.lock;
+        cargoBuildFlags = ["-p" "http-runner" "--bin" "http-runner"];
+        cargoTestFlags = ["-p" "http-runner"];
+        # Test clients load the system trust store even when they only call the local fake server.
+        nativeCheckInputs = [pkgs.cacert];
+        # Debug checks: the HTTP_RUNNER_OPEN and HTTP_RUNNER_DEADLINE_MS hooks exist only in debug builds.
+        checkType = "debug";
+        meta = {
+          inherit (httpRunner) description;
+          mainProgram = "http-runner";
         };
       };
     });

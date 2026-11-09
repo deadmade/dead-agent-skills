@@ -18,6 +18,7 @@ export function integrationSetup(context: EmitContext) {
     'web-mcp': 'codex mcp add dead-agent-skills-web-mcp -- web-mcp',
     'mcp-github': `codex mcp add dead-agent-skills-mcp-github --url ${url} --bearer-token-env-var GITHUB_PERSONAL_ACCESS_TOKEN`,
     'mcp-azure': 'codex mcp add dead-agent-skills-mcp-azure -- ado-mcp',
+    'http-runner': 'codex mcp add dead-agent-skills-http-runner -- http-runner',
     atlassian: 'codex mcp add dead-agent-skills-atlassian --url https://mcp.atlassian.com/v1/mcp',
   };
   let setup = `Use the native Codex CLI to configure this integration; no project installer is required.\n\n\`\`\`sh\n${commands[name]}\n\`\`\`\n\nNever paste credentials into chat or package files. Preserve an existing server with this name and ask before replacing it.`;
@@ -28,6 +29,8 @@ export function integrationSetup(context: EmitContext) {
       '\n\nSet GITHUB_PERSONAL_ACCESS_TOKEN in the environment that starts Codex, then restart Codex. Do not put the token in the manifest.';
   if (name === 'mcp-azure')
     setup += `\n\nPut the ado-mcp release binary on PATH (or use its absolute path in the command). Set ADO_ORG_URL (the Azure DevOps Server collection URL) and ADO_PAT in the environment that starts Codex. In the native server table [mcp_servers.dead-agent-skills-mcp-azure], add env_vars = [${envVars.map((v) => `"${v}"`).join(', ')}]. ADO_PROJECT_DIR optionally overrides the repository used for project detection. Preserve all unrelated configuration; ask for missing non-secret preferences. Release binaries: https://github.com/${context.repository}/releases .`;
+  if (name === 'http-runner')
+    setup += `\n\nPut the http-runner release binary on PATH (or use its absolute path in the command). The user types each host's login on a page the server opens in their browser, so no credential goes in the environment, the command or the chat. Release binaries: https://github.com/${context.repository}/releases .`;
   if (name === 'atlassian')
     setup +=
       '\n\nComplete OAuth with codex mcp login dead-agent-skills-atlassian. Authentication is a separate user action.';
@@ -42,7 +45,7 @@ export function packageReadme(context: EmitContext) {
     return `# Shared coding rules, Night City and Context7\n\nRun the setup-night-city skill to copy the packaged native theme safely and select it with /theme. No installer is required.\n\nThe trusted startup hook supplies shared coding rules. Review and trust hooks in Codex, then verify a fresh session before removing any installer-managed global rules block. Existing user instructions are preserved. The project-rules skill also carries the conventions. Context7 can be configured without an installer:\n\n\`\`\`sh\ncodex mcp add dead-agent-skills-dead-skills --url ${mcpSettings(context).url}\n\`\`\`\n`;
   return `# ${name}\n\n${integrationSetup(context)}\n\nThe setup skill guides native MCP registration and authentication. Installing this setup plugin alone does not register a global MCP server.\n`;
 }
-export const INTEGRATIONS = ['web-mcp', 'mcp-github', 'mcp-azure', 'atlassian'];
+export const INTEGRATIONS = ['web-mcp', 'mcp-github', 'mcp-azure', 'http-runner', 'atlassian'];
 export const READMES = ['flows', 'dead-skills', ...INTEGRATIONS];
 export const setupSkill = (context: EmitContext) =>
   `---\nname: setup-${context.plugin.name}\ndescription: Set up the ${context.plugin.name} integration installed by dead-agent-skills.\n---\n\n${integrationSetup(context)}\n`;

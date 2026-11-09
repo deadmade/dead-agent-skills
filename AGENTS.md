@@ -34,8 +34,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; web-mcp
   is also offered on its own but lives in `shared/`. Moving a folder doesn't touch installs (they key on the
   plugin `name`); renaming a plugin does.
-- `tools/`: two Rust packages in one root Cargo workspace: `web-mcp`
-  and `ado-mcp`. The root `Cargo.toml` owns all dependency versions,
+- `tools/`: three Rust packages in one root Cargo workspace: `web-mcp`,
+  `ado-mcp` and `http-runner`. The root `Cargo.toml` owns all dependency versions,
   package metadata, Clippy settings and the release profile; members inherit them and select their own features.
   There is one root `Cargo.lock` and `target/`. Use `-p <package>` to build or test one member. Nothing in the
   plugins reaches into the crates at runtime. `scripts/check_cargo_workspace.py` (Python 3.11+) rejects local
@@ -173,6 +173,17 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
     server leaves out of mentions, D7). The fixtures' ids (`p1`) aren't GUIDs, so a test that a reply prints no GUID
     needs a GUID-shaped id in its fixture, or a leak passes unseen.
     Test-only hook: `ADO_TIMEOUT_MS` (debug builds) replaces the 60 s request timeout.
+- `plugins/opt-in/mcp/http-runner/`: `plugin.json` and the `http-runner` skill for `http-runner` (Rust, `tools/http-runner/`), a stdio
+  MCP server with two fixed tools. `run` sends one named request of a VS Code REST Client `.http` file after the named
+  requests it references, and returns the real reply, which it also saves with its secrets masked in `http-replies/` beside
+  the file; it takes only a `.http` file. `generate` writes a starting `.http` file from a local OpenAPI 3 file of at most
+  8 MiB and never replaces a file. Both take absolute paths. Built for Windows and Linux x64 only (`crates-build.yml`); the
+  installer downloads it and sets `binPath`. The user types each host's login once on a loopback page the server opens
+  (`login_page.rs`); the values live in `logins.json` in `HTTP_RUNNER_DIR`, else the per-user data folder, never in the project.
+  Tests run the binary over stdio and the library against a fake carrier (`tests/common/mod.rs`), with a fake browser
+  (`tests/bin/fake_browser.rs`, a `[[bin]]`). Test-only hooks (debug builds): `HTTP_RUNNER_OPEN` names a program that opens
+  the login page in place of the system browser, and `HTTP_RUNNER_DEADLINE_MS` replaces the 55 s call deadline. The Nix
+  package's tests therefore run with `checkType = "debug"`.
 - `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
   only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
@@ -234,7 +245,7 @@ Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps Gi
 ## Versions and releases
 
 Everything ships as one version: `package.json` and `package-lock.json`, the root `Cargo.toml` workspace version
-and both local package entries in `Cargo.lock`. The build stamps this version into the marketplaces and generated
+and all three local package entries in `Cargo.lock`. The build stamps this version into the marketplaces and generated
 plugin manifests. README.md's installer command carries no version (it names `latest/`); `newerInstaller` is how a
 stale cached run of it hands over to a newer release.
 `check-repo.mjs` fails on drift. Never bump by hand. A merge to `main` that touches `plugins/`, `tools/` or shared
@@ -247,7 +258,7 @@ A release you choose:
     npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-Either way the merge's run packs the installer (`installer.tgz`), builds web-mcp and ado-mcp from the tag and
+Either way the merge's run packs the installer (`installer.tgz`), builds web-mcp, ado-mcp and http-runner from the tag and
 publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back):
 the tag plus one `Distribution vX.Y.Z` commit holding the native distributions that `publish` built (the job that holds
 the write token runs no `npm ci`, so it gets them as the `native` artifact). Tags carry sources only.

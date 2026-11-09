@@ -77,12 +77,13 @@ test('Codex installs, repeats, updates and removes only selected managed compone
 test('Codex configures MCP using native CLI and emits environment-based authentication handoffs', async () => {
   const f = fixture();
   try {
-    f.select(['flows', 'mcp-github', 'mcp-azure', 'atlassian']);
+    f.select(['flows', 'mcp-github', 'mcp-azure', 'http-runner', 'atlassian']);
     await applyCodex(f.io);
     assert.ok(f.state().selected.includes('graphify'));
     assert.ok(f.calls.some((c) => c.includes('--bearer-token-env-var')));
     assert.ok(f.calls.some((c) => c.includes('/tools/web-mcp')));
     assert.ok(f.calls.some((c) => c.includes('/tools/ado-mcp')));
+    assert.ok(f.calls.some((c) => c.includes('/tools/http-runner')));
     assert.match(
       readFileSync(join(f.home, 'config.toml'), 'utf8'),
       /env_vars = \["ADO_ORG_URL","ADO_PAT","ADO_PROJECT_DIR"\]/,
@@ -237,6 +238,7 @@ test('Codex offers shared catalog choices and installs the flows dependency clos
         'flows',
         'graphify',
         'hallmark',
+        'http-runner',
         'mcp-azure',
         'mcp-github',
         'postgres',

@@ -34,8 +34,8 @@ Claude's marketplace/plugin identifiers remain stable for existing users.
 The native packages live under `.agents/plugins/` (Codex) and `.claude-plugin/` (Claude Code), including skill packs, reviewer briefs, C# libraries and licenses.
 They install directly from the Git marketplace. Codex does not apply Claude's plugin dependency declarations, so
 install the companion plugins shown above for flows. Flows also document fallbacks when an integration is missing.
-Standalone options include hallmark, shop (price checks on Kleinanzeigen and Geizhals through web-mcp), Rust, C# and Postgres skills, plus MCP setup plugins for GitHub, Azure and
-Atlassian. MCP setup skills provide native `codex mcp add` commands and authentication instructions; installing a
+Standalone options include hallmark, shop (price checks on Kleinanzeigen and Geizhals through web-mcp), Rust, C# and Postgres skills, plus MCP setup plugins for GitHub, Azure,
+http-runner and Atlassian. MCP setup skills provide native `codex mcp add` commands and authentication instructions; installing a
 setup skill alone does not configure a global server. No setup skill requires the project installer.
 
 Each MCP setup skill and package README carries the exact `codex mcp add` command, the release binary it needs and
@@ -55,7 +55,7 @@ For Claude Code, the default bundle, **[dead-skills](plugins/default/README.md)*
 claude-security and agent-review, and itself carries Context7, Night City (a
 toned-down synthwave theme that everything else here is painted in), desktop notifications when a turn ends or Claude
 waits for you, and my global rules. Everything else is opt-in: language
-servers, language and database skills (rust, csharp, postgres), integrations (GitHub, [Azure DevOps Server](plugins/opt-in/mcp/mcp-azure/README.md), Atlassian on Codex), skill packs
+servers, language and database skills (rust, csharp, postgres), integrations (GitHub, [Azure DevOps Server](plugins/opt-in/mcp/mcp-azure/README.md), http-runner, which runs `.http` files against an API and saves each real reply with its secrets masked, Atlassian on Codex), skill packs
 like hallmark and graphify, and tools such as
 [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
 Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search read in one browser window of its own, page fetching, a page's repeating items as numbered rows,

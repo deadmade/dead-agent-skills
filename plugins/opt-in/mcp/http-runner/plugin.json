@@ -1,0 +1,20 @@
+{
+  "description": "http-runner: runs VS Code REST Client .http files for the agent and returns the API's real reply, saved with secrets masked under http-replies/. It can write a starting .http file from a local OpenAPI file. The user types each host's login once on a local page the server opens. Needs the http-runner binary.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "config": {
+    "binPath": {
+      "type": "string",
+      "title": "http-runner binary",
+      "description": "Path to the http-runner binary. Default: http-runner on PATH.",
+      "default": "http-runner"
+    }
+  },
+  "mcpServers": {
+    "http": {
+      "command": "${config.binPath}"
+    }
+  }
+}
