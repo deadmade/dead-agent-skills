@@ -18,16 +18,16 @@
       "source": "github",
       "repo": "vercel-labs/agent-browser",
       "tagPrefix": "v",
-      "version": "0.41.1",
+      "version": "0.41.2",
       "raw": true,
       "files": {
         "win32-x64": {
           "file": "agent-browser-win32-x64.exe",
-          "sha256": "ddab45e8bae84e5bc6aa1b084bceca9b579aff2e8272474d7d26953cf10965ee"
+          "sha256": "c2eadee7b67e326dfff02d5dd51a16ce7673eb165699d134b3ea5f05b4a7a9d0"
         },
         "linux-x64": {
           "file": "agent-browser-linux-musl-x64",
-          "sha256": "951c795e21fddab1d4091ad2ca4f0e69f1eea6534288e6a251598df11ca8e9af"
+          "sha256": "5d452d57772330fe4cef9b7aeb5e7137890dde20bbb65e82b990e0bc0b35d9cd"
         }
       }
     },
