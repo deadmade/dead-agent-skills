@@ -126,9 +126,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `technical-writing` and `unslop` (flows' `writing` replaces them, and the sync rewrites the lines that named them);
   `npm run sync -- apply pstack-picks --ref <hash>` syncs one commit, given as a full 40-character hash, instead of upstream's default
   branch; its entry in `tools/upstream-sync/src/sources.ts` checks the number of vendored skills (16), so change that count
-  whenever you change `SKILLS`. pstack-picks' `UPSTREAM`
-  stays at `519d36a` on purpose: upstream's newer commits fail the sync's `GUARD`, so its weekly `sync.yml` job
-  (no `--ref`) fails until a PR adapts the rewrites; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
+  whenever you change `SKILLS`. When upstream's text gets past the rewrites, the sync's `GUARD` fails its weekly `sync.yml` job
+  until a PR adapts them; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
   `plugins/flows/agents/spec-compliance-checker.md` (vendored by the `tob` sync adapter), because a pack's agents don't load.
   Where a conductor or step changes a pack's rule, or pastes a section of one, it quotes each sentence in an
   `<!-- overrides <pack>/<path>: "..." -->` marker in flows' own `.md` and `steps/*.toml` files (the build strips
@@ -207,6 +206,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `tools/upstream-sync/`: private TypeScript workspace for upstream vendoring, run directly on Node 26.
   `npm run sync -- list` lists sources; `preview <source>` shows changes from committed HEAD in an isolated
   worktree; `apply <source>` updates a clean destination and writes a structured result under the runner temp directory.
+  A failed `apply` can leave its destination half-written, which breaks the build for the next source in that checkout.
   The registry owns source checks and PR metadata; adapters export `run(context)` and have no import-time effects.
   Context supplies the checkout, Git/GitHub access, temporary directories and result collection. Tests use local
   upstreams and fake GitHub responses. Historical generated-file ownership stamps retain their original script names.
@@ -289,7 +289,8 @@ plugins of ours that the manifest no longer lists.
   `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
   writes them when it loads the mod).
 - The quote check: `npm test` (check-repo) fails when a sentence an `overrides` marker quotes is gone from its pack.
-  Run it after a pack sync and fix the marker or the conductor text in the same PR.
+  Run it after a pack sync and fix the marker or the conductor text in the same PR. It sees only quoted sentences, so also
+  read a superpowers sync's `brainstorming` diff against `build-feature`: v7.0.2 added a chat approval that would bypass its Gate 1, and no quote covered it.
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded). Enter it from the repo root only:
   started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or
