@@ -1,7 +1,7 @@
 ---
 flow: upgrade
-phase: finish
-now: Waiting for you: pick how the branch ends.
+phase: done
+now: 'Done: PR handed over for worktree-upgrade-2026-11-09.'
 ---
 
 # Upgrade all dependencies (2026-11-09): flow
