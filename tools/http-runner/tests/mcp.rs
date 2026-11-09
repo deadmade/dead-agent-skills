@@ -172,6 +172,21 @@ fn failures_are_results_not_protocol_errors() {
 }
 
 #[test]
+fn run_refuses_a_file_that_is_not_http() {
+    let mut mcp = Mcp::start("not-http", LOCAL, &[]);
+    // A parse error quotes the line it fails on, so reading this file would show the marker.
+    let logins = mcp.dir.join("logins.json");
+    std::fs::write(
+        &logins,
+        "{\"localhost\":{\"KEY\":\"stored-marker-5e2d9\"}}\n",
+    )
+    .unwrap();
+    let result = mcp.call("run", json!({"file": logins, "request": "a"}));
+    says(&result, "must be a .http file");
+    never(&result, "stored-marker-5e2d9");
+}
+
+#[test]
 fn generate_writes_a_file_run_can_parse() {
     let carrier = Carrier::start(|_| ok("made"));
     let mut mcp = Mcp::start("generate", LOCAL, &[]);

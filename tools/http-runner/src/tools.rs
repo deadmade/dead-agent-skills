@@ -85,6 +85,17 @@ impl Server {
         description = "Run one named request of a .http file after the requests it references, and return the status, headers and body of each reply and the path of its saved copy. A login the user has not typed yet opens a page in their browser; when the result says that page is open, call run again once the user has saved. Failures come back as text to act on."
     )]
     async fn run(&self, Parameters(a): Parameters<RunParams>) -> CallToolResult {
+        // A parse error quotes the line it fails on, before any secret is known to mask: only a .http file is read.
+        if !a
+            .file
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("http"))
+        {
+            return text(format!(
+                "`file` must be a .http file, not {}",
+                a.file.display()
+            ));
+        }
         let args = RunArgs {
             file: a.file,
             request: a.request,
