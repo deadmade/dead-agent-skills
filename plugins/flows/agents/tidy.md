@@ -46,7 +46,10 @@ with a claim resting on that line, mark the claim `to verify`.
 - The exact change. For a `fix`, the old text, copied exactly, and the new text. For a `merge`, the notes it merges and
   the resulting note. For an `add`, the whole note, in the same format as the existing notes. For a `promote`, the
   destination file and the draft text.
-- The evidence: `file:line` with the line quoted exactly, a flow's `now:` line, or a transcript file with a quoted line.
+- The evidence: `file:line` with the line quoted exactly, a flow's `now:` line, or a transcript file with part of one
+  line quoted exactly as the file has it. Give a path in this repository relative to its top folder and any other file
+  (a note, a transcript, a file in a worktree) by its absolute path. Give a commit by its hash and a pull request by its
+  number alone, without `#`.
 - A status: `verified` when the evidence settles it, otherwise `to verify`.
 
 Memory actions are `fix`, `delete`, `merge` and `add`. Don't propose changes to `MEMORY.md`; the session that started

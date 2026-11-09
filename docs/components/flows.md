@@ -3,7 +3,7 @@
 `plugins/flows/`, except its packs (see [packs.md](packs.md)).
 
 `plugins/flows/`: the conductor skills (`/build-feature`, `/research-feature`, `/implement`, `/fix`, `/upgrade`,
-`/refactor`, `/review-code`, `/understand`, `/learn`, `/evaluate`, `/tidy`). Each runs other plugins' skills in order; the rules
+`/refactor`, `/review-code`, `/understand`, `/learn`, `/evaluate`, `/tidy`). Each except `/tidy` runs other plugins' skills in order; the rules
 they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing plugin) live
 once in `plugins/flows/steps/*.toml`, composed into each conductor at build time
 (`docs/adr/0011-conductors-composed-from-flow-steps.md`), so a SKILL.md says what it runs and names its steps
@@ -15,7 +15,7 @@ fits its job (`docs/adr/0005-agent-limits-and-models.md`). The installer's only 
 `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` (`mergeSettings`); it never writes `CLAUDE_CODE_SUBAGENT_MODEL`.
 
 Conductors call each other by reading the callee's SKILL.md (`/fix` → `/review-code`). Each conductor's `uses:`
-frontmatter, plus its steps' and host wording's `uses`, names what it may run; `scripts/flows-uses.mjs` generates flows'
+frontmatter (`/tidy` has none), plus its steps' and host wording's `uses`, names what it may run; `scripts/flows-uses.mjs` generates flows'
 `dependencies` and the README tree from them, and check-repo fails when a listed skill is gone or the generated parts
 are stale.
 
@@ -29,6 +29,9 @@ default branch on a clean tree (the host adapter template) and otherwise ponytai
 
 ## /tidy
 
+`/tidy` (`skills/tidy/SKILL.md`) starts the read-only `flows:tidy` agent over the memory and flow folders, checks each
+proposal itself and applies it; it runs no other plugin's skill and names no step. The agent's proposal fields and action
+names are the contract between the two files, so change them together: a renamed `promote` would stop being asked about.
 `agents/tidy.md` is hand-written, its `tools:` line is the only thing keeping it read-only, and `scripts/tidy.test.mjs`
 holds that line. `/tidy` is the one conductor without phases, because it keeps no flow.md and has no gates.
 

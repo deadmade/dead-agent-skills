@@ -23,7 +23,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (`custom:dead-skills:night-city`: a plugin theme's id carries the plugin name). Read `docs/components/night-city.md` before changing Night City or the notifications.
 - `plugins/flows/`: the conductor skills (`/build-feature`, `/research-feature`, `/implement`, `/fix`, `/upgrade`,
   `/refactor`, `/review-code`, `/understand`, `/learn`, `/evaluate`, `/tidy`), plus `flows:writing` and `flows:diagrams`, the only
-  two skills in it that load on their own. Each conductor runs other plugins' skills in order; the rules the conductors share live
+  two skills in it that load on their own. Each conductor except `/tidy` runs other plugins' skills in order; the rules the conductors share live
   once in `plugins/flows/steps/*.toml`, composed into each conductor at build time. Keep Claude-only names out of flows'
   steps, skills and references (`harness-compiler lint`). Read `docs/components/flows.md` before changing it.
 - `plugins/flows/packs/`: the vendored skill packs the conductors run, read by path; nothing there loads on its own.
