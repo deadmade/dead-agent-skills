@@ -240,6 +240,7 @@ enum Kind {
     Html,
     Markdown,
     Text,
+    Json,
     Pdf,
 }
 
@@ -254,6 +255,9 @@ fn classify(headers: &HeaderMap) -> Result<Kind, FetchError> {
         "text/markdown" | "text/x-markdown" => Ok(Kind::Markdown),
         "application/pdf" => Ok(Kind::Pdf),
         m if m.starts_with("text/") => Ok(Kind::Text),
+        m if m == "application/json" || (m.starts_with("application/") && m.ends_with("+json")) => {
+            Ok(Kind::Json)
+        }
         "" => Err(FetchError::UnsupportedType("none given".into())),
         m => Err(FetchError::UnsupportedType(m.to_owned())),
     }
@@ -351,7 +355,8 @@ async fn run(
                 rendered,
                 markdown: page.markdown.clone(),
                 images,
-                cache: !private,
+                // JSON is often a status polled for its next answer.
+                cache: !private && !matches!(kind, Kind::Json),
             };
             (page, item)
         }
@@ -448,7 +453,9 @@ async fn send(
 ) -> Result<(reqwest::Response, Url, bool, HostPermit), FetchError> {
     let proxy = proxied();
     let (mut url, mut private) = (url.clone(), false);
-    for _ in 0..=MAX_REDIRECTS {
+    for hop in 0..=MAX_REDIRECTS {
+        // A public address must not hand the fetch to a private one the caller never named.
+        let allow_private = allow_private && (hop == 0 || private);
         if !matches!(url.scheme(), "http" | "https") {
             return Err(net(format!("refusing to follow a redirect to {url}")));
         }

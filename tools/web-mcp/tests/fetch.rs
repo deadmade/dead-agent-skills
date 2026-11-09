@@ -137,15 +137,14 @@ fn localhost_is_never_cached() {
 }
 
 #[test]
-fn redirect_onto_private_is_never_cached() {
+fn public_redirect_onto_private_is_refused() {
     let public = Fixture::start(PUBLIC);
     let private = Fixture::start("127.0.0.1");
     public.route("/hop", vec![Resp::redirect(&private.url("/article.html"))]);
     let mut mcp = Mcp::start();
-    for _ in 0..2 {
-        assert!(text(&fetch(&mut mcp, &public.url("/hop"))).contains("borrow checker"));
-    }
-    assert_eq!(private.hits("/article.html"), 2);
+    let r = fetch(&mut mcp, &public.url("/hop"));
+    assert!(is_error(&r), "{}", text(&r));
+    assert_eq!(private.hits("/article.html"), 0);
 }
 
 #[test]
@@ -238,6 +237,40 @@ fn images_keep_total_under_24k_tokens() {
         .sum();
     assert!(chars / 4 + 1_600 * n < 24_000, "{chars}");
     assert!(text(&r).contains("[… truncated: the full page is at .web/"));
+}
+
+#[test]
+fn json_comes_back_as_text() {
+    let fx = Fixture::start(PUBLIC);
+    for (path, mime) in [
+        ("/plain", "application/json; charset=utf-8"),
+        ("/suffixed", "application/problem+json"),
+    ] {
+        fx.route(path, vec![Resp::new(200, mime, r#"{"zebra": 1}"#)]);
+    }
+    let mut mcp = Mcp::start();
+    for path in ["/plain", "/suffixed"] {
+        let r = fetch(&mut mcp, &fx.url(path));
+        assert!(!is_error(&r), "{}", text(&r));
+        assert!(text(&r).contains(r#"{"zebra": 1}"#), "{}", text(&r));
+    }
+}
+
+#[test]
+fn json_is_fetched_again_each_time() {
+    let fx = Fixture::start(PUBLIC);
+    let answer = |state| {
+        Resp::new(
+            200,
+            "application/json",
+            format!(r#"{{"state": "{state}"}}"#),
+        )
+    };
+    fx.route("/status", vec![answer("pending"), answer("done")]);
+    let mut mcp = Mcp::start();
+    let url = fx.url("/status");
+    assert!(text(&fetch(&mut mcp, &url)).contains("pending"));
+    assert!(text(&fetch(&mut mcp, &url)).contains("done"));
 }
 
 #[test]

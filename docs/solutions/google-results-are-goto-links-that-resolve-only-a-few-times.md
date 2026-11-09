@@ -21,3 +21,6 @@
 - **Spot it next time:** the first measurement (8 of 8 links resolved) was of a minutes-old page and was wrong for a
   fresh one. Before building on a per-link request pattern against a search engine, measure it on a fresh page, several
   searches in a row.
+- **Seen again:** 2026-11-09, on most of a day's searches, with the parser already fixed. `~/.claude/bin/web-mcp` was
+  still 0.6.19, because the marketplace updates plugins and only the installer updates this binary (ADR 0006). Before
+  reading the parser, run the current parser over the page the error names, and check the installed binary's version.

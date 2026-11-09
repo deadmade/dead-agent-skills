@@ -8,6 +8,8 @@ use std::time::{Duration, Instant};
 
 use futures::future::join_all;
 use jiff::Timestamp;
+use rmcp::RoleServer;
+use rmcp::service::RequestContext;
 use serde_json::{Map, Value, json};
 use url::Url;
 
@@ -32,6 +34,9 @@ const PAGE_DEADLINE: Duration = Duration::from_secs(30);
 /// The most a typed search's wait takes beyond the read margin: web-mcp-google-block/findings.md's slowest typed wait
 /// was 2.9 s, and a fallback load needs the rest of the deadline.
 const TYPED_WAIT: Duration = Duration::from_secs(4);
+/// The most a search waits in line for an engine's turn: six searches ahead that each use a whole `ENGINE_DEADLINE`,
+/// or about four if each render also fails (closing the tab holds the turn up to 6 s longer).
+const QUEUE_WAIT: Duration = Duration::from_mins(1);
 /// Passages BM25 hands to the final order.
 const RANKED: usize = 50;
 const WEB: [Engine; 4] = [
@@ -119,8 +124,8 @@ impl Filter {
     }
 }
 
-/// One engine's result page for `query`, read in its tab of the window before `deadline`; the caller warmed the
-/// window first.
+/// One engine's result page for `query`, read in its tab of the window within `budget` of winning the engine's turn;
+/// the caller warmed the window first.
 ///
 /// A follow-up search (see `types`) types its query into the result page the tab already holds, as a person would;
 /// when typing fails or lands on another query, the same search loads the result URL instead, and nothing rests.
@@ -130,15 +135,16 @@ impl Filter {
 /// consent page met twice in a row rests the engine.
 ///
 /// # Errors
-/// Why the engine is skipped: resting, busy, a first consent page, blocked (it then rests), an unrecognised page,
-/// the browser's error, the deadline or, for Google, result links that did not resolve or that sit on a private
-/// address.
+/// Why the engine is skipped: resting, busy (no turn within `QUEUE_WAIT`), cancelled while in line, a first consent
+/// page, blocked (it then rests), an unrecognised page, the browser's error, the deadline or, for Google, result links that did not resolve
+/// or that sit on a private address.
 pub async fn run_engine(
     ctx: &Ctx,
     e: Engine,
     query: &str,
     since: Option<Since>,
-    deadline: Instant,
+    budget: Duration,
+    request: &RequestContext<RoleServer>,
 ) -> Result<Vec<Found>, String> {
     let profiles = ctx.profiles.as_ref().map_err(Clone::clone)?;
     let resting = || {
@@ -149,17 +155,18 @@ pub async fn run_engine(
     if let Some(why) = resting() {
         return Err(why);
     }
-    let mut last = profiles.turn(e, deadline).await.ok_or("busy")?;
+    // Only the wait is raced: a turn already held ends within its budget.
+    let mut last = tokio::select! {
+        turn = profiles.turn(e, Instant::now() + QUEUE_WAIT) => turn.ok_or("busy")?,
+        () = request.ct.cancelled() => return Err("cancelled".into()),
+    };
+    // Starts with the turn, so a search behind others keeps all of it.
+    let deadline = Instant::now() + budget;
     // Put back only on results without `since`.
     let prev = last.take();
     // Another process may have rested it while we waited.
     if let Some(why) = resting() {
         return Err(why);
-    }
-    // Too little left to read a page that never gets ready (a turn won late).
-    let timed_out = || deadline.saturating_duration_since(Instant::now()) < READ_MARGIN;
-    if timed_out() {
-        return Err("timed out".into());
     }
     let session = ctx.browser.engine_session(e);
     let url = e.url(query, since);
@@ -173,13 +180,13 @@ pub async fn run_engine(
         page
     } else {
         // The tab's first search, or typing that can't be trusted: load the result URL.
-        if timed_out() {
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left < READ_MARGIN {
             return Err("timed out".into());
         }
         let run = SearchRun {
             ready_js: e.ready_js(),
         };
-        let left = deadline.saturating_duration_since(Instant::now());
         let (html, landed) = match ctx
             .browser
             .render(Some(&url), &session, Some(run), left)
@@ -335,8 +342,7 @@ async fn typed_page(
     query: &str,
     deadline: Instant,
 ) -> Option<(String, Url, Parsed)> {
-    // `None` only on clock underflow, not "no time left": `run_engine`'s `timed_out()` ran before this, and
-    // `batch_once` times out at once on a past `until`.
+    // `None` only on clock underflow, not "no time left": `batch_once` times out at once on a past `until`.
     let until = deadline.checked_sub(READ_MARGIN)?;
     let typed = ctx
         .browser
@@ -479,6 +485,7 @@ pub async fn web(
     query: &str,
     max_passages: usize,
     f: &Filter,
+    request: &RequestContext<RoleServer>,
 ) -> Result<String, SearchError> {
     let asked = if f.engines.is_empty() {
         WEB.to_vec()
@@ -501,11 +508,10 @@ pub async fn web(
             .warm()
             .await
             .map_err(|e| SearchError::Failed(e.to_string()))?;
-        let deadline = Instant::now() + ENGINE_DEADLINE;
-        let outcomes = join_all(
-            run.iter()
-                .map(|&e| async move { (e, run_engine(ctx, e, query, f.since, deadline).await) }),
-        )
+        let outcomes = join_all(run.iter().map(|&e| async move {
+            let got = run_engine(ctx, e, query, f.since, ENGINE_DEADLINE, request).await;
+            (e, got)
+        }))
         .await;
         for (e, got) in outcomes {
             match got {

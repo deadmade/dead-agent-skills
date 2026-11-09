@@ -271,7 +271,7 @@ impl Mcp {
         m
     }
 
-    fn send(&mut self, m: &Value) {
+    pub fn send(&mut self, m: &Value) {
         let stdin = self.stdin.as_mut().unwrap();
         writeln!(stdin, "{m}").unwrap();
         stdin.flush().unwrap();
@@ -303,7 +303,8 @@ impl Mcp {
             let mut line = String::new();
             assert!(self.out.read_line(&mut line).unwrap() > 0, "server exited");
             let v: Value = serde_json::from_str(&line).unwrap();
-            if let Some(id) = v["id"].as_u64() {
+            // A request sent through `send` answers here too.
+            if let Some(id) = v["id"].as_u64().filter(|id| ids.contains(id)) {
                 got.insert(id, v);
             }
         }
