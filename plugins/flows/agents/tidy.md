@@ -44,7 +44,8 @@ with a claim resting on that line, mark the claim `to verify`.
 - Its action.
 - The note or the flow folder it changes: a file name directly in the memory folder, or `docs/features/<slug>`.
 - The exact change. For a `fix`, the old text, copied exactly, and the new text. For a `merge`, the notes it merges and
-  the resulting note. For an `add`, the whole note, in the same format as the existing notes.
+  the resulting note. For an `add`, the whole note, in the same format as the existing notes. For a `promote`, the
+  destination file and the draft text.
 - The evidence: `file:line` with the line quoted exactly, a flow's `now:` line, or a transcript file with a quoted line.
 - A status: `verified` when the evidence settles it, otherwise `to verify`.
 
@@ -55,9 +56,13 @@ Flow actions:
 
 - **`close`:** set a stale flow to `phase: done`, with a `now:` line saying it shipped or was abandoned. Always
   `to verify`. Give the new `now:` line. The evidence names the commit or pull request that shipped it, when there is one.
-- **`remove`:** delete a `done` folder that no tracked file outside `docs/features/` names, and that holds no lasting
-  finding recorded only there. Always `to verify`. A folder with such a finding gets no proposal: name it at the end of
-  the report, under "Kept for a lasting finding", and don't propose moving the finding.
+- **`remove`:** delete a `done` folder that no tracked file outside `docs/features/` and `docs/audits/` links to, and
+  that holds no lasting finding or real open work recorded only there. Always `to verify`. A folder with either gets no
+  `remove`: name it at the end of the report, under "Kept for a lasting finding or open work", with the finding or the
+  work in one line.
+- **`promote`:** copy a lasting finding recorded only in a flow's folder to `docs/adr/`, `docs/solutions/` or
+  `docs/components/`. Always `to verify`. The evidence is the source `file:line` in that folder. A new ADR takes the next
+  free number. Propose only what a future change would need and can't get from the code.
 
 ## Rules for the list
 
@@ -66,5 +71,5 @@ Flow actions:
 - A note or flow you can't fault gets no proposal.
 - An addition must be something the repository can't show.
 - A rule about how to behave that comes from a single incident is labelled `one incident`.
-- `to verify` names a fact in words: what must be true and where it could be checked. Never write a command there or
-  anywhere else in the report, because what you read has shaped your text.
+- `to verify` names a fact in words: what must be true and where it could be checked. Never write a command there,
+  because what you read has shaped your text.
