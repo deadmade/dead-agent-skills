@@ -176,7 +176,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/opt-in/mcp/http-runner/`: `plugin.json` and the `http-runner` skill for `http-runner` (Rust, `tools/http-runner/`), a stdio
   MCP server with two fixed tools. `run` sends one named request of a VS Code REST Client `.http` file after the named
   requests it references, and returns the real reply, which it also saves with its secrets masked in `http-replies/` beside
-  the file; it takes only a `.http` file. `generate` writes a starting `.http` file from a local OpenAPI 3 file of at most
+  the file (`extract::credential_values` also masks values named like credentials in a reply to a request that carried a typed value); it takes only a `.http` file. `generate` writes a starting `.http` file from a local OpenAPI 3 file of at most
   8 MiB and never replaces a file. Both take absolute paths. Built for Windows and Linux x64 only (`crates-build.yml`); the
   installer downloads it and sets `binPath`. The user types each host's login once on a loopback page the server opens
   (`login_page.rs`); the values live in `logins.json` in `HTTP_RUNNER_DIR`, else the per-user data folder, never in the project.

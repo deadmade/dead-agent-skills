@@ -10,7 +10,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use reqwest::{Client, Method, StatusCode};
 
-use crate::extract::from_body;
+use crate::extract::{credential_values, from_body};
 use crate::login_page::{Ask, HostFields, Outcome, Pages};
 use crate::mask::{Masker, Place, escape};
 use crate::parse::{ParsedFile, Part, Request, Source, Text, parse};
@@ -100,7 +100,7 @@ async fn go(ctx: &Ctx, args: &RunArgs, masker: &mut Masker) -> Result<String, St
         replies: HashMap::new(),
         ran: Vec::new(),
     };
-    sending.send(&chain).await
+    Ok(sending.send(&chain).await)
 }
 
 fn name(request: &Request) -> &str {
@@ -274,6 +274,9 @@ async fn login(
         Outcome::Saved => Err(format!(
             "The login page for {shown} was saved, but a value is still missing. Nothing was sent; {CALL_AGAIN}."
         )),
+        Outcome::StillOpen if retype => Err(format!(
+            "The login page for {shown} is open and waiting for the user. Nothing was sent. Keep `retype_login` on and {CALL_AGAIN} now: that call waits on this page. Without `retype_login` the run skips the page and sends the rejected login again."
+        )),
         Outcome::StillOpen => Err(format!(
             "The login page for {shown} is open and waiting for the user. Nothing was sent. Once the user has saved it, {CALL_AGAIN}, without `retype_login`."
         )),
@@ -368,18 +371,20 @@ struct Sending<'a> {
 }
 
 impl Sending<'_> {
-    async fn send(mut self, chain: &[&Request]) -> Result<String, String> {
+    /// The returned text is final: reply text in it is masked and the saved paths are left whole.
+    async fn send(mut self, chain: &[&Request]) -> String {
         let mut result = String::new();
         for (i, request) in chain.iter().enumerate() {
             let remaining = self.ctx.deadline.saturating_sub(self.started.elapsed());
             if remaining.is_zero() {
-                return Err(self.out_of_time(None, &chain[i..]));
+                return self.out_of_time(None, &chain[i..]);
             }
-            let outgoing = self
-                .outgoing(request)
-                .map_err(|why| self.stopped(request, &format!("was not sent: {why}")))?;
+            let outgoing = match self.outgoing(request) {
+                Ok(outgoing) => outgoing,
+                Err(why) => return self.stopped(request, &format!("was not sent: {why}")),
+            };
             let answer = match tokio::time::timeout(remaining, self.fetch(&outgoing)).await {
-                Err(_) => return Err(self.out_of_time(Some(name(request)), &chain[i + 1..])),
+                Err(_) => return self.out_of_time(Some(name(request)), &chain[i + 1..]),
                 Ok(Err(e)) => {
                     let reached = if e.is_connect() || e.is_builder() {
                         "It did not reach the carrier"
@@ -387,7 +392,7 @@ impl Sending<'_> {
                         "It may have reached the carrier"
                     };
                     let why = format!("failed: {}. {reached}", reason(e));
-                    return Err(self.stopped(request, &why));
+                    return self.stopped(request, &why);
                 }
                 Ok(Ok(answer)) => answer,
             };
@@ -395,6 +400,11 @@ impl Sending<'_> {
             // A later request may use this value, so the mask must know it before anything is saved.
             for (_, source) in self.masked.iter().filter(|(from, _)| from == name(request)) {
                 if let Ok(value) = read(&reply, source) {
+                    self.masker.add(&value);
+                }
+            }
+            if parts(request).any(|part| matches!(part, Part::Secret(_))) {
+                for value in credential_values(&reply.headers, &reply.body) {
                     self.masker.add(&value);
                 }
             }
@@ -413,7 +423,7 @@ impl Sending<'_> {
             }
             self.replies.insert(name(request).to_string(), reply);
         }
-        Ok(result)
+        result
     }
 
     fn outgoing(&mut self, request: &Request) -> Result<Outgoing, String> {
@@ -597,9 +607,10 @@ impl Sending<'_> {
 
     fn stopped(&self, request: &Request, what: &str) -> String {
         format!(
-            "`{}` (line {}) {what}.\n{}",
+            "`{}` (line {}) {}.\n{}",
             name(request),
             request.line,
+            self.masker.apply(what),
             self.ran_first()
         )
     }

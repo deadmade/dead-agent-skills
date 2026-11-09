@@ -218,6 +218,26 @@ async fn retype_login_reopens_before_sending() {
 }
 
 #[tokio::test]
+async fn retype_retried_while_the_page_is_open_sends_nothing() {
+    let rig = rig(
+        "retype-open",
+        &[("localhost", &[("KEY", "old-key-value")])],
+        |_| ok("answer"),
+    )
+    .deadline(Duration::from_millis(300));
+    let file = rig.file(KEYED);
+    let first = rig.start(&file, "a", true).await.unwrap();
+    says(&first, "Keep `retype_login` on");
+    says(&first, CALL_AGAIN);
+    let page = rig.address(1).await;
+    let second = rig.start(&file, "a", true).await.unwrap();
+    says(&second, "Keep `retype_login` on");
+    assert_eq!(rig.carrier.connections(), 0);
+    // A retry that had replaced the page would leave this address answering 404.
+    submit(&page, &[("localhost/KEY", "new-key-value")]);
+}
+
+#[tokio::test]
 async fn replaced_page_sends_nothing() {
     let rig = rig("replaced", &[], |_| ok("answer"));
     let file = rig.file(
@@ -421,6 +441,105 @@ async fn login_run_alone_is_masked() {
     never(&result, "login-tok-6");
     absent_from_saved(&rig, "login-tok-6");
     assert_eq!(rig.carrier.paths(), ["/login"]);
+}
+
+const TYPED_KEY: common::Confirmed = &[("localhost", &[("KEY", "typed-key-value")])];
+const TYPED_LOGIN: &str =
+    "# @name login\nPOST http://localhost:PORT/login\nX-Key: {{$dotenv KEY}}\n";
+
+#[tokio::test]
+async fn json_token_is_masked_when_the_file_never_references_it() {
+    let rig = rig("named-json", TYPED_KEY, |_| {
+        ok(r#"{"Access_Token":"named-tok-1","shipmentNumber":"SHIP-4711"}"#)
+    });
+    let file = rig.file(TYPED_LOGIN);
+    let result = rig.run(&file, "login").await;
+    never(&result, "named-tok-1");
+    absent_from_saved(&rig, "named-tok-1");
+    says(&result, "SHIP-4711");
+    says(&rig.saved_for("login")[0], "SHIP-4711");
+}
+
+#[tokio::test]
+async fn xml_token_is_masked_when_the_file_never_references_it() {
+    for (tag, body) in [
+        (
+            "plain",
+            "<r><authToken>xml-tok-2</authToken><mpsId>MPS0164</mpsId></r>",
+        ),
+        (
+            "prefixed",
+            "<r xmlns:n=\"urn:n\"><n:authToken>xml-tok-2</n:authToken><n:mpsId>MPS0164</n:mpsId></r>",
+        ),
+    ] {
+        let rig = rig(&format!("named-xml-{tag}"), TYPED_KEY, move |_| ok(body));
+        let file = rig.file(TYPED_LOGIN);
+        let result = rig.run(&file, "login").await;
+        never(&result, "xml-tok-2");
+        absent_from_saved(&rig, "xml-tok-2");
+        says(&result, "MPS0164");
+    }
+}
+
+#[tokio::test]
+async fn token_in_a_reply_to_a_request_with_no_typed_value_stays_readable() {
+    let rig = rig("named-none", LOCAL, |_| ok(r#"{"token":"open-tok-3"}"#));
+    let file = rig.file("# @name a\nGET http://localhost:PORT/a\n");
+    says(&rig.run(&file, "a").await, "open-tok-3");
+    says(&rig.saved_for("a")[0], "open-tok-3");
+}
+
+#[tokio::test]
+async fn set_cookie_value_is_masked_and_its_attributes_stay() {
+    let rig = rig("named-cookie", TYPED_KEY, |_| {
+        reply(
+            "200 OK",
+            &[("Set-Cookie", "JSESSIONID=cookie-val-4; Path=/app; HttpOnly")],
+            "{}",
+        )
+    });
+    let file = rig.file(TYPED_LOGIN);
+    let result = rig.run(&file, "login").await;
+    never(&result, "cookie-val-4");
+    absent_from_saved(&rig, "cookie-val-4");
+    says(&result, "Path=/app");
+}
+
+#[tokio::test]
+async fn named_token_is_sent_real_and_masked_from_its_reply_onward() {
+    let rig = rig("named-chain", TYPED_KEY, |s: &Seen| {
+        if s.path == "/login" {
+            ok(r#"{"session_token":"chain-tok-5"}"#)
+        } else {
+            ok(r#"{"echo":"chain-tok-5"}"#)
+        }
+    });
+    let file = rig.file(&format!(
+        "{TYPED_LOGIN}\n###\n# @name use\nGET http://localhost:PORT/use/{{{{login.response.body.$.session_token}}}}\n"
+    ));
+    let result = rig.run(&file, "use").await;
+    assert_eq!(rig.carrier.paths(), ["/login", "/use/chain-tok-5"]);
+    never(&result, "chain-tok-5");
+    absent_from_saved(&rig, "chain-tok-5");
+}
+
+#[tokio::test]
+async fn saved_path_survives_a_typed_value_equal_to_one_of_its_folders() {
+    let rig = rig(
+        "path-segment",
+        &[("localhost", &[("KEY", "http-replies")])],
+        |_| ok(r#"{"v":"seen"}"#),
+    );
+    let text = format!(
+        "# @name a\nGET http://localhost:PORT/a\nX-Key: {{{{$dotenv KEY}}}}\n\n###\n# @name b\nGET http://localhost:{}/b/{{{{a.response.body.$.v}}}}\n",
+        closed_port()
+    );
+    let file = rig.file(&text);
+    let result = rig.run(&file, "b").await;
+    says(&result, "`b` (line");
+    let saved = result.split("saved to ").nth(1).unwrap();
+    let saved = PathBuf::from(saved.lines().next().unwrap());
+    assert!(saved.is_file(), "{}", saved.display());
 }
 
 #[tokio::test]

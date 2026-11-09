@@ -5,7 +5,7 @@ description: "Use when building an integration with an HTTP API, REST or SOAP, a
 
 # http-runner
 
-Without a real reply you guess what an API returns and write tests around the guess. `run` sends one request of a `.http` file (VS Code REST Client's format, so the user can open the file there) and returns the real reply or the real error. It saves every exchange, with typed secrets masked.
+Without a real reply you guess what an API returns and write tests around the guess. `run` sends one request of a `.http` file (VS Code REST Client's format, so the user can open the file there) and returns the real reply or the real error. It saves every exchange, with typed secrets and reply values named like credentials masked.
 
 ## The tools
 
@@ -16,7 +16,7 @@ Without a real reply you guess what an API returns and write tests around the gu
 ## Method
 
 1. With an OpenAPI file, call `generate` with the sandbox as `base_url`. For SOAP, read the WSDL and write the file yourself; the XML body is plain text. An operation with no example has no body: write one from the schema.
-2. Add the login as a named request. Secrets appear only as `{{$dotenv NAME}}`. Never write a secret into a file, and never ask for one in the chat. A host the user has not confirmed, or a secret with no saved value, makes `run` open a login page in the user's browser. When the result says that page is open, call `run` again once the user has saved. A refusal is final: plain http to any host but `localhost` and `127.0.0.1`, or a reply value that holds what the user typed for another host, means the file names the wrong host or carries a value it must not, so correct the file's host or ask the user, and never work around the refusal.
+2. Add the login as a named request. Secrets appear only as `{{$dotenv NAME}}`. Never write a secret into a file, and never ask for one in the chat. A host the user has not confirmed, or a secret with no saved value, makes `run` open a login page in the user's browser. When the result says that page is open, call `run` again once the user has saved. A refusal is final: plain http to any host but `localhost` and `127.0.0.1`, or a reply value that holds what the user typed for another host, means the file names the wrong host or carries a value it must not, so correct the file's scheme or host or ask the user, and never work around the refusal.
 3. Read a value from an earlier reply with `{{login.response.body.<path>}}` or `{{login.response.headers.<name>}}`. A path starting with `$` is JSONPath. Any other is XPath 1.0 with no namespace map, so write `//*[local-name()='token']` for a prefixed element. Anything outside REST Client's format comes back as a parse error with its line.
 4. Run, read the real error, fix the file, run again. Do not guess past an error.
 5. Keep chains to logins. Every run repeats every named request it refers to, so a chain through a create request creates again each time. Copy any other value from a saved reply into a file variable (`@orderId = 123`).

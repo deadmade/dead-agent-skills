@@ -51,6 +51,95 @@ fn from_xml(body: &str, path: &str) -> Result<String, String> {
     }
 }
 
+/// Whether a JSON key, XML element or response header is named like a credential, ignoring case,
+/// `-` and `_`.
+fn credential_name(name: &str) -> bool {
+    const WORDS: [&str; 6] = ["token", "session", "jwt", "secret", "password", "apikey"];
+    let name: String = name
+        .chars()
+        .filter(|c| !matches!(c, '-' | '_'))
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    matches!(name.as_str(), "sid" | "setcookie" | "authorization")
+        || WORDS.iter().any(|word| name.contains(word))
+}
+
+/// The value of a `Set-Cookie` header: what stands between the first `=` and the first `;`.
+fn cookie_value(header: &str) -> &str {
+    let pair = header.split(';').next().unwrap_or_default();
+    let value = pair.split_once('=').map_or(pair, |(_, value)| value);
+    value.trim().trim_matches('"')
+}
+
+/// Every scalar in a reply that its own name marks as a credential: response headers, JSON keys
+/// and XML elements by local name. A boolean or `null` holds no secret, and masking `true` would
+/// rewrite every other `true` in the reply. A body that is neither JSON nor XML yields only headers.
+#[must_use]
+pub fn credential_values(headers: &[(String, String)], body: &str) -> Vec<String> {
+    let mut found: Vec<String> = headers
+        .iter()
+        .filter(|(name, _)| credential_name(name))
+        .map(|(name, value)| {
+            if name.eq_ignore_ascii_case("set-cookie") {
+                cookie_value(value).to_owned()
+            } else {
+                value.clone()
+            }
+        })
+        .collect();
+    // A .NET service commonly starts its XML with a byte order mark, which neither parser takes.
+    let body = body.trim_start_matches('\u{feff}');
+    if let Ok(json) = serde_json::from_str::<Json>(body) {
+        json_credentials(&json, &mut found);
+    } else {
+        xml_credentials(body, &mut found);
+    }
+    found
+}
+
+/// Walks with a list, not recursion, as a reply decides how deep it goes.
+fn json_credentials(json: &Json, found: &mut Vec<String>) {
+    let mut todo = vec![json];
+    while let Some(value) = todo.pop() {
+        match value {
+            Json::Object(fields) => {
+                for (key, value) in fields {
+                    match value {
+                        Json::String(s) if credential_name(key) => found.push(s.clone()),
+                        Json::Number(n) if credential_name(key) => found.push(n.to_string()),
+                        other => todo.push(other),
+                    }
+                }
+            }
+            Json::Array(items) => todo.extend(items),
+            _ => {}
+        }
+    }
+}
+
+/// An element is a scalar when it holds only text.
+fn xml_credentials(body: &str, found: &mut Vec<String>) {
+    let Ok(package) = sxd_document::parser::parse(body) else {
+        return;
+    };
+    let document = package.as_document();
+    let roots = document.root().children();
+    let mut todo: Vec<_> = roots.iter().filter_map(|c| c.element()).collect();
+    while let Some(element) = todo.pop() {
+        let children = element.children();
+        let before = todo.len();
+        todo.extend(children.iter().filter_map(|c| c.element()));
+        if todo.len() == before && credential_name(element.name().local_part()) {
+            let text: String = children
+                .iter()
+                .filter_map(|c| c.text())
+                .map(|t| t.text())
+                .collect();
+            found.push(text.trim().to_owned());
+        }
+    }
+}
+
 /// Whether the path has a `:` outside quotes that is not part of `::`. sxd-xpath panics on a
 /// prefix it has no namespace for, so such a path is refused before it is evaluated.
 fn has_prefix(path: &str) -> bool {
@@ -149,6 +238,91 @@ mod tests {
     fn jsonpath_no_match_is_an_error() {
         let err = from_body("{\"a\":1}", "$.b").unwrap_err();
         assert!(err.contains("$.b"), "{err}");
+    }
+
+    const NONE: [&str; 0] = [];
+
+    fn credentials(body: &str) -> Vec<String> {
+        let mut values = credential_values(&[], body);
+        values.sort();
+        values
+    }
+
+    #[test]
+    fn credential_names_ignore_case_dashes_and_underscores() {
+        for name in [
+            "token",
+            "access_token",
+            "X-Auth-Token",
+            "sessionId",
+            "JWT",
+            "client-secret",
+            "PassWord",
+            "api_key",
+            "API-Key",
+            "SID",
+            "Set-Cookie",
+            "authorization",
+        ] {
+            assert!(credential_name(name), "{name}");
+        }
+        for name in ["delisId", "inside", "shipmentNumber", "Authorized", "id"] {
+            assert!(!credential_name(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn json_scalars_named_like_credentials_are_found_at_any_depth() {
+        let body = r#"{"a":{"token":"T1","n":"keep"},"list":[{"sid":12345}],"apiKey":"K2"}"#;
+        assert_eq!(credentials(body), ["12345", "K2", "T1"]);
+    }
+
+    #[test]
+    fn only_scalars_count() {
+        let body = r#"{"session":{"id":"keep"},"tokens":["keep"],"tokenValid":true,"jwt":null}"#;
+        assert_eq!(credentials(body), NONE);
+        assert_eq!(credentials("<a><session><id>keep</id></session></a>"), NONE);
+    }
+
+    #[test]
+    fn xml_elements_match_by_local_name_and_lose_outer_space() {
+        let body = "<a xmlns:n=\"urn:n\"><n:authToken>\n  T1\n</n:authToken><id>keep</id></a>";
+        assert_eq!(credentials(body), ["T1"]);
+    }
+
+    #[test]
+    fn a_byte_order_mark_does_not_hide_a_credential() {
+        assert_eq!(
+            credentials("\u{feff}<a><authToken>T1</authToken></a>"),
+            ["T1"]
+        );
+    }
+
+    #[test]
+    fn text_that_is_neither_json_nor_xml_has_no_credentials() {
+        assert_eq!(credentials("token=abcd"), NONE);
+    }
+
+    #[test]
+    fn headers_named_like_credentials_are_found() {
+        let headers = [
+            ("x-auth-token".to_string(), "T1".to_string()),
+            ("content-type".to_string(), "text/plain".to_string()),
+        ];
+        assert_eq!(credential_values(&headers, ""), ["T1"]);
+    }
+
+    #[test]
+    fn set_cookie_yields_the_cookie_value() {
+        for (header, want) in [
+            ("SID=abc123; Path=/; HttpOnly", "abc123"),
+            ("a=b64==; Secure", "b64=="),
+            ("a=\"quoted\"", "quoted"),
+            ("bare", "bare"),
+        ] {
+            let headers = [("Set-Cookie".to_string(), header.to_string())];
+            assert_eq!(credential_values(&headers, ""), [want], "{header}");
+        }
     }
 
     #[test]

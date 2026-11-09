@@ -101,6 +101,10 @@ fn spellings(c: char) -> Vec<String> {
     let mut all = vec![c.to_string(), format!("&#{n};")];
     all.extend(xml_entity(c).map(String::from));
     all.extend(json_short_escape(c).map(String::from));
+    // A form-encoded body writes a space as `+`.
+    if c == ' ' {
+        all.push("+".into());
+    }
     all.extend(hex.iter().map(|s| s.to_lowercase()));
     all.extend(hex);
     all.sort_unstable();
@@ -272,6 +276,13 @@ mod tests {
                 "{form}"
             );
         }
+    }
+
+    #[test]
+    fn plus_is_a_spelling_of_a_space() {
+        assert_eq!(masked(&["two words"], "q=two+words&x=1"), "q=***&x=1");
+        // Only a space: a literal `+` in a value stays itself and its percent form.
+        assert_eq!(masked(&["a+bc"], "a bc"), "a bc");
     }
 
     #[test]
