@@ -7,8 +7,8 @@ import {
   selfConfigure,
   afterPrompts,
 } from '../core/config.ts';
-import { BIN_PLUGINS } from '../core/binaries.ts';
 import { manifestPath, nameOf, type Marketplace } from '../core/plugins.ts';
+import { toolOfPlugin } from '../core/tools.ts';
 import { PKG, must, tryJson, failures } from '../context.ts';
 import { join } from 'node:path';
 import { claude } from '../system/proc.ts';
@@ -40,7 +40,7 @@ export async function collectConfig(
     if (step === 'handoff') selfHandoff.push(id);
     if (step !== 'prompt') continue;
     log('info', `${nameOf(id)} settings:`);
-    const prompts = configPrompts(userConfig, BIN_PLUGINS[nameOf(id)].key, configuredKeys);
+    const prompts = configPrompts(userConfig, toolOfPlugin(nameOf(id))[1].key, configuredKeys);
     const answers: Record<string, string | null> = {};
     for (const p of prompts) {
       log('info', `  ${p.description}`);

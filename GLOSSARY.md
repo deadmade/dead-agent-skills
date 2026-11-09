@@ -81,6 +81,25 @@ The one file that holds a repo fact. Tools read it; none restates it, and where 
 differs.
 _Avoid_: source of truth, manifest
 
+## Installer
+
+**Tool**:
+A program the installer puts on a machine for a plugin: one of our release binaries, an upstream binary pinned by hash,
+or a Python tool installed through uv. Each is one entry in the tool manifest.
+_Avoid_: dependency, package (alone), binary (a tool installed through uv is not one)
+
+**Tool manifest**:
+`tools/installer/assets/tools.json`: the one file that says where each tool comes from, its version, and its file and
+sha256 per platform. The installer's engine and the weekly upstream sync both read it.
+_Avoid_: pin file, lockfile (it does not lock a tool's own dependencies)
+
+**Our copy**:
+The copy of a tool in the installer's bin folder (`<config>/bin`, `~/.claude/bin` by default; the Codex step uses its own
+bin folder for agent-browser) that the installer downloaded and that the plugin's settings point at. A copy elsewhere on
+PATH is never used, except by the Codex step, which looks on PATH first for web-mcp and ado-mcp, and for agent-browser
+only where no build is pinned.
+_Avoid_: managed copy, local copy
+
 ## Flows
 
 **Conductor**:

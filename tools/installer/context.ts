@@ -9,6 +9,7 @@ export const PKG = join(import.meta.dirname, '..', '..');
 export const ASSETS = join(import.meta.dirname, 'assets');
 export const CONFIG = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
 export const SETTINGS = join(CONFIG, 'settings.json');
+export const BIN_DIR = join(CONFIG, 'bin');
 export const WIN = process.platform === 'win32';
 export const FLAGS = process.argv.slice(2);
 
