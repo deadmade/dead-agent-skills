@@ -4,6 +4,12 @@ use jsonpath_rust::JsonPath;
 use serde_json::Value as Json;
 use sxd_xpath::Value as Xml;
 
+use crate::mask::maskable;
+
+/// Masking time grows with the number of values, so one reply may add only this many.
+const MAX_VALUES: usize = 256;
+const MAX_VALUE_BYTES: usize = 64 * 1024;
+
 /// A path starting with `$` is `JSONPath`; any other is `XPath` 1.0 with no namespace map. The first
 /// match wins: a JSON string yields its content, any other JSON value its JSON text; an `XPath`
 /// node its text content (an attribute its value), anything else its text.
@@ -74,8 +80,12 @@ fn cookie_value(header: &str) -> &str {
 /// Every scalar in a reply that its own name marks as a credential: response headers, JSON keys
 /// and XML elements by local name. A boolean or `null` holds no secret, and masking `true` would
 /// rewrite every other `true` in the reply. A body that is neither JSON nor XML yields only headers.
-#[must_use]
-pub fn credential_values(headers: &[(String, String)], body: &str) -> Vec<String> {
+/// Each value comes once, and a value too short to mask is left out.
+///
+/// # Errors
+///
+/// Returns the note that replaces the reply when it holds more than one reply may add to the mask.
+pub fn credential_values(headers: &[(String, String)], body: &str) -> Result<Vec<String>, String> {
     let mut found: Vec<String> = headers
         .iter()
         .filter(|(name, _)| credential_name(name))
@@ -94,7 +104,17 @@ pub fn credential_values(headers: &[(String, String)], body: &str) -> Vec<String
     } else {
         xml_credentials(body, &mut found);
     }
-    found
+    found.retain(|value| maskable(value));
+    found.sort_unstable();
+    found.dedup();
+    let bytes: usize = found.iter().map(String::len).sum();
+    if found.len() > MAX_VALUES || bytes > MAX_VALUE_BYTES {
+        return Err(format!(
+            "Withheld: this reply holds {} values named like credentials, {bytes} bytes in all. One reply may add at most {MAX_VALUES} values and {MAX_VALUE_BYTES} bytes to the mask, because masking time grows with their number. Its body and headers were not kept.",
+            found.len()
+        ));
+    }
+    Ok(found)
 }
 
 /// Walks with a list, not recursion, as a reply decides how deep it goes.
@@ -243,7 +263,7 @@ mod tests {
     const NONE: [&str; 0] = [];
 
     fn credentials(body: &str) -> Vec<String> {
-        let mut values = credential_values(&[], body);
+        let mut values = credential_values(&[], body).unwrap();
         values.sort();
         values
     }
@@ -273,8 +293,8 @@ mod tests {
 
     #[test]
     fn json_scalars_named_like_credentials_are_found_at_any_depth() {
-        let body = r#"{"a":{"token":"T1","n":"keep"},"list":[{"sid":12345}],"apiKey":"K2"}"#;
-        assert_eq!(credentials(body), ["12345", "K2", "T1"]);
+        let body = r#"{"a":{"token":"TOK1","n":"keep"},"list":[{"sid":12345}],"apiKey":"KEY2"}"#;
+        assert_eq!(credentials(body), ["12345", "KEY2", "TOK1"]);
     }
 
     #[test]
@@ -286,15 +306,15 @@ mod tests {
 
     #[test]
     fn xml_elements_match_by_local_name_and_lose_outer_space() {
-        let body = "<a xmlns:n=\"urn:n\"><n:authToken>\n  T1\n</n:authToken><id>keep</id></a>";
-        assert_eq!(credentials(body), ["T1"]);
+        let body = "<a xmlns:n=\"urn:n\"><n:authToken>\n  TOK1\n</n:authToken><id>keep</id></a>";
+        assert_eq!(credentials(body), ["TOK1"]);
     }
 
     #[test]
     fn a_byte_order_mark_does_not_hide_a_credential() {
         assert_eq!(
-            credentials("\u{feff}<a><authToken>T1</authToken></a>"),
-            ["T1"]
+            credentials("\u{feff}<a><authToken>TOK1</authToken></a>"),
+            ["TOK1"]
         );
     }
 
@@ -306,10 +326,10 @@ mod tests {
     #[test]
     fn headers_named_like_credentials_are_found() {
         let headers = [
-            ("x-auth-token".to_string(), "T1".to_string()),
+            ("x-auth-token".to_string(), "TOK1".to_string()),
             ("content-type".to_string(), "text/plain".to_string()),
         ];
-        assert_eq!(credential_values(&headers, ""), ["T1"]);
+        assert_eq!(credential_values(&headers, "").unwrap(), ["TOK1"]);
     }
 
     #[test]
@@ -321,8 +341,45 @@ mod tests {
             ("bare", "bare"),
         ] {
             let headers = [("Set-Cookie".to_string(), header.to_string())];
-            assert_eq!(credential_values(&headers, ""), [want], "{header}");
+            assert_eq!(credential_values(&headers, "").unwrap(), [want], "{header}");
         }
+    }
+
+    fn tokens(values: &[String]) -> String {
+        let items: Vec<_> = values
+            .iter()
+            .map(|v| serde_json::json!({"token": v}))
+            .collect();
+        Json::Array(items).to_string()
+    }
+
+    #[test]
+    fn the_limits_count_distinct_maskable_values() {
+        let numbered: Vec<_> = (0..MAX_VALUES).map(|n| format!("tok-{n:04}")).collect();
+        assert_eq!(credentials(&tokens(&numbered)).len(), MAX_VALUES);
+        let mut repeated = numbered.clone();
+        repeated.extend(numbered.clone());
+        assert_eq!(credentials(&tokens(&repeated)).len(), MAX_VALUES);
+        let mut too_short = numbered.clone();
+        too_short.extend((0..500).map(|n| n.to_string()));
+        assert_eq!(credentials(&tokens(&too_short)).len(), MAX_VALUES);
+        let mut one_more = numbered;
+        one_more.push("tok-over".into());
+        assert!(credential_values(&[], &tokens(&one_more)).is_err());
+    }
+
+    #[test]
+    fn the_byte_limit_is_inclusive() {
+        let fits = [
+            "a".repeat(MAX_VALUE_BYTES / 2),
+            "b".repeat(MAX_VALUE_BYTES / 2),
+        ];
+        assert_eq!(credentials(&tokens(&fits)).len(), 2);
+        let over = [
+            "a".repeat(MAX_VALUE_BYTES / 2),
+            "b".repeat(MAX_VALUE_BYTES / 2 + 1),
+        ];
+        assert!(credential_values(&[], &tokens(&over)).is_err());
     }
 
     #[test]

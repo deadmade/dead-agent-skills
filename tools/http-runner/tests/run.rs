@@ -524,6 +524,117 @@ async fn named_token_is_sent_real_and_masked_from_its_reply_onward() {
 }
 
 #[tokio::test]
+async fn chained_refresh_token_is_masked() {
+    let rig = rig("refresh", TYPED_KEY, |s: &Seen| {
+        if s.path == "/login" {
+            ok(r#"{"token":"first-tok-6"}"#)
+        } else {
+            ok(r#"{"new_token":"second-tok-6"}"#)
+        }
+    });
+    let file = rig.file(&format!(
+        "{TYPED_LOGIN}\n###\n# @name refresh\nPOST http://localhost:PORT/refresh\nX-Old: {{{{login.response.body.$.token}}}}\n"
+    ));
+    let result = rig.run(&file, "refresh").await;
+    assert_eq!(rig.carrier.seen()[1].header("x-old"), Some("first-tok-6"));
+    never(&result, "second-tok-6");
+    absent_from_saved(&rig, "second-tok-6");
+}
+
+#[tokio::test]
+async fn request_with_only_a_shipment_number_keeps_a_token_readable() {
+    let rig = rig("track", TYPED_KEY, |s: &Seen| {
+        if s.path == "/login" {
+            ok(r#"{"shipmentNumber":"SHIP-4711"}"#)
+        } else {
+            ok(r#"{"token":"track-tok-7"}"#)
+        }
+    });
+    let file = rig.file(&format!(
+        "{TYPED_LOGIN}\n###\n# @name track\nGET http://localhost:PORT/track/{{{{login.response.body.$.shipmentNumber}}}}\n"
+    ));
+    let result = rig.run(&file, "track").await;
+    says(&result, "track-tok-7");
+    says(&rig.saved_for("track")[0], "track-tok-7");
+}
+
+/// A reply of `tokens`, plus a field and a header no withheld reply may keep.
+fn tokens_reply(tokens: &[String]) -> String {
+    let items: Vec<_> = tokens
+        .iter()
+        .map(|t| serde_json::json!({ "token": t }))
+        .collect();
+    let body = serde_json::json!({ "items": items, "marker": "body-marker" });
+    reply(
+        "201 Created",
+        &[("X-Marker", "head-marker")],
+        &body.to_string(),
+    )
+}
+
+fn numbered_tokens(count: usize) -> Vec<String> {
+    (0..count).map(|n| format!("many-tok-{n:04}")).collect()
+}
+
+fn assert_withheld(rig: &common::Rig, result: &str, gone: &str) {
+    says(result, "201 Created");
+    says(result, "Withheld");
+    says(&rig.saved_for("login")[0], "201");
+    says(&rig.saved_for("login")[0], "Withheld");
+    for text in [gone, "body-marker", "head-marker"] {
+        never(result, text);
+        absent_from_saved(rig, text);
+    }
+}
+
+#[tokio::test]
+async fn reply_over_the_value_limit_is_withheld() {
+    let answer = tokens_reply(&numbered_tokens(257));
+    let rig = rig("over-count", TYPED_KEY, move |_| answer.clone());
+    let file = rig.file(TYPED_LOGIN);
+    let result = rig.run(&file, "login").await;
+    assert_withheld(&rig, &result, "many-tok-");
+}
+
+#[tokio::test]
+async fn reply_over_the_byte_limit_is_withheld() {
+    let answer = tokens_reply(&["a".repeat(32 * 1024), "b".repeat(32 * 1024 + 1)]);
+    let rig = rig("over-bytes", TYPED_KEY, move |_| answer.clone());
+    let file = rig.file(TYPED_LOGIN);
+    let result = rig.run(&file, "login").await;
+    assert_withheld(&rig, &result, "aaaa");
+}
+
+#[tokio::test]
+async fn reply_at_the_value_limit_is_masked_normally() {
+    let answer = tokens_reply(&numbered_tokens(256));
+    let rig = rig("at-count", TYPED_KEY, move |_| answer.clone());
+    let file = rig.file(TYPED_LOGIN);
+    let result = rig.run(&file, "login").await;
+    says(&result, "201 Created");
+    says(&result, "body-marker");
+    says(&result, "head-marker");
+    never(&result, "Withheld");
+    never(&result, "many-tok-");
+    absent_from_saved(&rig, "many-tok-");
+    says(&rig.saved_for("login")[0], "body-marker");
+}
+
+#[tokio::test]
+async fn chain_stops_at_a_withheld_reply() {
+    let answer = tokens_reply(&numbered_tokens(257));
+    let rig = rig("withheld-chain", TYPED_KEY, move |_| answer.clone());
+    let file = rig.file(&format!(
+        "{TYPED_LOGIN}\n###\n# @name use\nGET http://localhost:PORT/use/{{{{login.response.body.$.items[0].token}}}}\n"
+    ));
+    let result = rig.run(&file, "use").await;
+    assert_withheld(&rig, &result, "many-tok-");
+    says(&result, "Not sent");
+    says(&result, "`use`");
+    assert_eq!(rig.carrier.paths(), ["/login"]);
+}
+
+#[tokio::test]
 async fn saved_path_survives_a_typed_value_equal_to_one_of_its_folders() {
     let rig = rig(
         "path-segment",

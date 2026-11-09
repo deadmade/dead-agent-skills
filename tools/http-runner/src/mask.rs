@@ -2,6 +2,7 @@
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use std::collections::HashSet;
 use std::fmt::Write as _;
 
 /// A shorter value is left alone: masking it would rewrite unrelated text.
@@ -125,8 +126,13 @@ fn ends_with_escape(s: &str) -> bool {
     escape(b"%", 2) || escape(b"\\u", 4)
 }
 
+/// Whether `value` is long enough to mask; a shorter one would rewrite unrelated text.
+#[must_use]
+pub fn maskable(value: &str) -> bool {
+    value.chars().count() >= MIN_CHARS
+}
+
 /// One value to remove, as the spellings of each of its characters.
-#[derive(PartialEq)]
 struct Secret {
     chars: Vec<Vec<String>>,
     mask: String,
@@ -176,6 +182,8 @@ impl Secret {
 #[derive(Default)]
 pub struct Masker {
     secrets: Vec<Secret>,
+    /// The values in `secrets`, so a duplicate costs no walk over them.
+    values: HashSet<String>,
 }
 
 // Not derived: a derived `Debug` would print the secrets.
@@ -183,7 +191,7 @@ impl std::fmt::Debug for Masker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Masker")
             .field("secrets", &self.secrets.len())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -197,11 +205,11 @@ impl Masker {
     /// so a JSON number stays one, and matches only where no digit adjoins it; any other
     /// value becomes `***`. A value under four characters is ignored.
     pub fn add(&mut self, value: &str) {
-        if value.chars().count() < MIN_CHARS {
+        if !maskable(value) || !self.values.insert(value.to_owned()) {
             return;
         }
         let digits = value.chars().all(|c| c.is_ascii_digit());
-        let secret = Secret {
+        self.secrets.push(Secret {
             chars: value.chars().map(spellings).collect(),
             mask: if digits {
                 "9".repeat(value.len())
@@ -209,10 +217,13 @@ impl Masker {
                 "***".into()
             },
             digits,
-        };
-        if !self.secrets.contains(&secret) {
-            self.secrets.push(secret);
-        }
+        });
+    }
+
+    /// Whether `value` itself was added.
+    #[must_use]
+    pub fn holds(&self, value: &str) -> bool {
+        self.values.contains(value)
     }
 
     /// Masks the user, the password and the Base64 of a Basic header made from them.
@@ -276,6 +287,17 @@ mod tests {
                 "{form}"
             );
         }
+    }
+
+    #[test]
+    fn holds_knows_only_what_was_added() {
+        let mut m = Masker::new();
+        m.add("abcd");
+        m.add("abcd");
+        m.add("abc");
+        assert!(m.holds("abcd"));
+        assert!(!m.holds("abc") && !m.holds("abcde"));
+        assert_eq!(m.secrets.len(), 1);
     }
 
     #[test]

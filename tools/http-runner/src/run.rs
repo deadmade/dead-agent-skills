@@ -396,15 +396,26 @@ impl Sending<'_> {
                 }
                 Ok(Ok(answer)) => answer,
             };
-            let (status, reply) = answer;
+            let (status, mut reply) = answer;
+            let found = if self.carries_masked(request) {
+                credential_values(&reply.headers, &reply.body)
+            } else {
+                Ok(Vec::new())
+            };
+            let withheld = found.is_err();
+            match found {
+                Ok(values) => values.iter().for_each(|value| self.masker.add(value)),
+                // Dropped here, so nothing later, a reference included, can reach the raw reply.
+                Err(note) => {
+                    reply = Reply {
+                        headers: Vec::new(),
+                        body: note,
+                    };
+                }
+            }
             // A later request may use this value, so the mask must know it before anything is saved.
             for (_, source) in self.masked.iter().filter(|(from, _)| from == name(request)) {
                 if let Ok(value) = read(&reply, source) {
-                    self.masker.add(&value);
-                }
-            }
-            if parts(request).any(|part| matches!(part, Part::Secret(_))) {
-                for value in credential_values(&reply.headers, &reply.body) {
                     self.masker.add(&value);
                 }
             }
@@ -415,6 +426,9 @@ impl Sending<'_> {
                 Err(why) => format!("not saved: {}", self.masker.apply(why)),
             };
             result = self.report(request, status, &exchange, &saved);
+            if withheld {
+                return with_unsent(result, &chain[i + 1..]);
+            }
             if i + 1 < chain.len() {
                 self.ran.push(format!(
                     "{}: received, {status}, saved to {saved}",
@@ -424,6 +438,22 @@ impl Sending<'_> {
             self.replies.insert(name(request).to_string(), reply);
         }
         result
+    }
+
+    /// Whether `request` carries a typed value, or a reply value that is in the mask.
+    fn carries_masked(&self, request: &Request) -> bool {
+        parts(request).any(|part| match part {
+            Part::Secret(_) => true,
+            Part::Reply {
+                request: from,
+                source,
+            } => self
+                .replies
+                .get(from)
+                .and_then(|reply| read(reply, source).ok())
+                .is_some_and(|value| self.masker.holds(&value)),
+            _ => false,
+        })
     }
 
     fn outgoing(&mut self, request: &Request) -> Result<Outgoing, String> {
@@ -635,6 +665,19 @@ impl Sending<'_> {
         }
         text
     }
+}
+
+/// `result` of a withheld reply, with the requests the chain will not send after it.
+fn with_unsent(mut result: String, rest: &[&Request]) -> String {
+    if !rest.is_empty() {
+        let names: Vec<String> = rest.iter().map(|r| format!("`{}`", name(r))).collect();
+        let _ = write!(
+            result,
+            "\n\nNot sent, because a reference into this withheld reply cannot be read: {}.",
+            names.join(", ")
+        );
+    }
+    result
 }
 
 /// How a substituted value is escaped in a body, from its `Content-Type`.
