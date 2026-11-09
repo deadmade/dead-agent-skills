@@ -1,10 +1,8 @@
-// headroom-trim's trim server is a uv project. Our copy in ~/.claude/bin (where the plugin's launcher looks first) is kept
-// at the version pinned in tools/installer/assets/uv.json; with none there, a PATH uv at or above the pin is used. Then the
-// server's environment and tiktoken's vocabulary are built into the plugin's data folder, so the first session starts
-// at once. Asks before a download; every failure is a summary line.
-import { existsSync } from 'node:fs';
+// headroom-trim's trim server is a uv project. Our copy of uv in ~/.claude/bin (where the plugin's launcher looks first) is
+// kept at the version pinned in tools/installer/assets/tools.json. Then the server's environment and tiktoken's
+// vocabulary are built into the plugin's data folder, so the first session starts at once. Asks before a download; every
+// failure is a summary line.
 import { join } from 'node:path';
-import { GRAPHIFY_EXTRAS, GRAPHIFY_SPEC, type UpstreamPin, graphifyToolArgs, uvAsset, uvPlan } from '../core/binaries.ts';
 import {
   pluginDataDir,
   pluginInstallPath,
@@ -13,54 +11,18 @@ import {
   trimServerPort,
 } from '../core/plugins.ts';
 import { MARKETPLACE } from '../core/release.ts';
-import { ASSETS, CONFIG, WIN, ask, done, failures, readJson, tryJson } from '../context.ts';
-import { downloadBin, stopLocalServer } from '../system/net.ts';
-import { errCode, startSync, versionOf, which } from '../system/proc.ts';
-import { log, progress } from '../ui/ui.ts';
-import { BIN_DIR } from './binaries.ts';
+import { CONFIG, done, failures, tryJson } from '../context.ts';
+import { TOOLS, pypiSpec } from '../core/tools.ts';
+import { stopLocalServer } from '../system/net.ts';
+import { errCode, startSync } from '../system/proc.ts';
+import { log } from '../ui/ui.ts';
+import { ensureTool } from './tools.ts';
 
 export const HEADROOM_TRIM = `headroom-trim@${MARKETPLACE}`;
 const OFF = 'headroom-trim and graphify stay as they are until uv is installed';
 
 // The uv path in use, or undefined (a summary line says why).
-export async function installUv(): Promise<string | undefined> {
-  const pin: UpstreamPin = readJson(join(ASSETS, 'uv.json'));
-  const pinned = pin.upstream ?? '';
-  const key = `${process.platform}-${process.arch}`;
-  const asset = uvAsset(process.platform, process.arch, pin);
-  if (!asset) {
-    failures.push(`uv: no pinned build for ${key} in tools/installer/assets/uv.json; ${OFF}`);
-    return undefined;
-  }
-  const bin = join(BIN_DIR, WIN ? 'uv.exe' : 'uv');
-  const theirs = which('uv');
-  const plan = uvPlan({
-    oursExists: existsSync(bin),
-    ours: versionOf(bin),
-    theirs: theirs && versionOf(theirs),
-    pinned,
-  });
-  if (plan.use === 'path') {
-    done.push(`uv: using the one on PATH (${theirs})`);
-    return theirs;
-  }
-  if (plan.download === 'skip') return bin;
-  const what = plan.download === 'install' ? 'Download' : 'Upgrade';
-  if (!(await ask(`${what} uv ${pinned} (Astral's release binary) to ${bin} for headroom-trim and graphify?`, true))) {
-    failures.push(`uv: install skipped by you; ${OFF}`);
-    return undefined;
-  }
-  const r = await progress(`Downloading uv ${pinned}`, async () => {
-    await downloadBin('uv', asset, bin);
-    return { ok: true };
-  });
-  if (!r.ok) {
-    failures.push(`uv ${pinned}: ${r.err}; ${OFF}`);
-    return undefined;
-  }
-  done.push(`uv: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
-  return bin;
-}
+export const installUv = async () => (await ensureTool('uv', { off: OFF }))?.path;
 
 // Asks a running trim server to exit (port from the installed copy's hooks.json); a summary line when it stays up.
 export async function stopTrimServer(installed: any, then: string): Promise<void> {
@@ -105,12 +67,14 @@ export async function prepareTrimServer(uv: string): Promise<void> {
 // a new graphifyy; a failure is a summary line.
 export function installGraphify(uv: string): void {
   log('info', 'Installing graphify (uv tool install)');
-  const r = startSync(uv, graphifyToolArgs(), { stdio: 'inherit' });
+  const r = startSync(uv, ['tool', 'install', '--upgrade', pypiSpec('graphify')], { stdio: 'inherit' });
   if (r.status !== 0) {
     failures.push(
-      `graphify: uv tool install failed (${errCode(r.error) ?? `exit ${r.status}`}); run it yourself: uv tool install ${GRAPHIFY_SPEC}`,
+      `graphify: uv tool install failed (${errCode(r.error) ?? `exit ${r.status}`}); run it yourself: uv tool install "${pypiSpec('graphify')}"`,
     );
     return;
   }
-  done.push(`graphify: installed with the ${GRAPHIFY_EXTRAS.join(', ')} extras`);
+  done.push(
+    `graphify: installed with the ${(TOOLS.tools.graphify as { extras: string }).extras.replaceAll(',', ', ')} extras`,
+  );
 }

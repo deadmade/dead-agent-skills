@@ -2,17 +2,15 @@
 // goes to ~/.claude/bin and the plugin's userConfig key points at it.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { BIN_PLUGINS, binAction, binAdvice, binAsset, binPath } from '../core/binaries.ts';
 import { MARKETPLACE } from '../core/release.ts';
-import { CONFIG, VERSION, done, failures } from '../context.ts';
+import { BIN_DIR, VERSION, done, failures } from '../context.ts';
 import { downloadBin } from '../system/net.ts';
 import { claude, onPath } from '../system/proc.ts';
 import { progress } from '../ui/ui.ts';
 
 export const WEB_MCP = `web-mcp@${MARKETPLACE}`;
 export const MCP_AZURE = `mcp-azure@${MARKETPLACE}`;
-export const BIN_DIR = join(CONFIG, 'bin');
 
 // The version a binary reports (`<name> <version>`), or undefined when there is none or it does not run.
 function binVersionAt(name: string, path: string) {

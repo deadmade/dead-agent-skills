@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { posix, win32 } from 'node:path';
 import { BUNDLE } from './plugins.ts';
 import { RELEASES, newer, semver } from './release.ts';
+import { pypiSpec } from './tools.ts';
 
 // tools/installer/assets/agent-browser.json and uv.json.
 export interface UpstreamPin {
@@ -31,7 +32,7 @@ const BINARIES = [
   ['jq', BUNDLE, 'nix: jq', 'winget install -e --id jqlang.jq'],
   ['python3', BUNDLE, 'nix: python3', 'winget install -e --id Python.Python.3.13'],
   ['uv', 'graphify', 'nix: uv', 'winget install -e --id astral-sh.uv'],
-  ['graphify', 'graphify', `uv tool install ${GRAPHIFY_SPEC}`, `uv tool install ${GRAPHIFY_SPEC}`],
+  ['graphify', 'graphify', `uv tool install "${pypiSpec('graphify')}"`, `uv tool install "${pypiSpec('graphify')}"`],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
 ];
 

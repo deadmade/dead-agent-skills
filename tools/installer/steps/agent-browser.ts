@@ -11,12 +11,12 @@ import {
   upstreamPlan,
   windowProblem,
 } from '../core/binaries.ts';
-import { ASSETS, ask, done, failures, readJson } from '../context.ts';
+import { ASSETS, BIN_DIR, ask, done, failures, readJson } from '../context.ts';
 import { searchBrowserWorks } from '../system/browser.ts';
 import { downloadBin } from '../system/net.ts';
 import { claude, errCode, startSync, versionOf, which } from '../system/proc.ts';
 import { log, progress } from '../ui/ui.ts';
-import { BIN_DIR, WEB_MCP } from './binaries.ts';
+import { WEB_MCP } from './binaries.ts';
 
 export async function installAgentBrowser(binDir = BIN_DIR): Promise<{ path?: string; works: boolean }> {
   const pin: UpstreamPin = readJson(join(ASSETS, 'agent-browser.json'));
