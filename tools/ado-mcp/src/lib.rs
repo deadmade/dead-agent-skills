@@ -1,5 +1,4 @@
-//! What the MCP server (`main.rs`) and the timetrack TUI (`bin/timetrack`) share: the config, the Azure DevOps client
-//! and the tools.
+//! The MCP server's library: the config, the Azure DevOps client and the tools.
 
 mod api;
 mod config;
@@ -14,7 +13,5 @@ mod tools;
 mod wi;
 mod wiki;
 
-pub use api::{Api, ApiError};
 pub use config::Config;
 pub use tools::Server;
-pub use wi::{Ticket, mine, tickets};

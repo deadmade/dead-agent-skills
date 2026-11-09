@@ -148,9 +148,6 @@
         # The tests read git remotes and build reqwest clients, whose platform verifier needs CA certificates (cacert's
         # setup hook sets SSL_CERT_FILE in the sandbox); debug checks keep the ADO_TIMEOUT_MS hook, debug builds only.
         nativeCheckInputs = [pkgs.git pkgs.cacert];
-        # timetrack's test looks up Europe/Berlin. jiff reads $TZDIR, else system directories like /usr/share/zoneinfo,
-        # which the sandbox lacks, and tzdata has no setup hook to set it.
-        preCheck = "export TZDIR=${pkgs.tzdata}/share/zoneinfo";
         checkType = "debug";
         meta = {
           inherit (adoMcp) description;

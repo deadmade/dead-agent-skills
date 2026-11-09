@@ -42,10 +42,8 @@ test('flake and devEngines agree on the Node major', () => {
 
 test('hand-typed Night City colours are in the palette', () => {
   const palettePath = 'plugins/default/themes/palette.json';
-  const OFF_PALETTE = ['#221D33'];
-  const allowed = new Set([...Object.values(JSON.parse(read(palettePath)).colors), ...OFF_PALETTE]);
+  const allowed = new Set(Object.values(JSON.parse(read(palettePath)).colors));
   const viewPath = 'tools/installer/ui/view.ts';
-  const uiPath = 'tools/ado-mcp/src/bin/timetrack/ui.rs';
   const nightCity = read(viewPath).match(/const NIGHT_CITY = \{([\s\S]*?)\n\};/);
   assert.ok(nightCity, `NIGHT_CITY missing from ${viewPath}`);
   const copies = [
@@ -55,7 +53,6 @@ test('hand-typed Night City colours are in the palette', () => {
         ([, ...rgb]) => '#' + rgb.map((n) => Number(n).toString(16).padStart(2, '0')).join(''),
       ),
     ],
-    [uiPath, [...read(uiPath).matchAll(/0x00([0-9a-f]{2})_([0-9a-f]{4})\b/gi)].map(([, rg, gb]) => '#' + rg + gb)],
   ];
   const deviations = [];
   for (const [path, colors] of copies) {
