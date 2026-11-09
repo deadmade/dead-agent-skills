@@ -79,8 +79,8 @@ fn port(address: &str) -> u16 {
     url::Url::parse(address).unwrap().port().unwrap()
 }
 
-/// One request to the port of `address`, at its path; returns the status and the body.
-fn request(address: &str, method: &str, headers: &[(&str, &str)], body: &str) -> (u16, String) {
+/// One request to the port of `address`, at its path; returns the response head and body.
+fn exchange(address: &str, method: &str, headers: &[(&str, &str)], body: &str) -> (String, String) {
     let url = url::Url::parse(address).unwrap();
     let port = url.port().unwrap();
     let mut lines = vec![format!("{method} {} HTTP/1.1", url.path())];
@@ -97,7 +97,13 @@ fn request(address: &str, method: &str, headers: &[(&str, &str)], body: &str) ->
     let mut reply = String::new();
     stream.read_to_string(&mut reply).unwrap();
     let (head, body) = reply.split_once("\r\n\r\n").unwrap();
-    (head[9..12].parse().unwrap(), body.into())
+    (head.into(), body.into())
+}
+
+/// The same request; returns the status and the body.
+fn request(address: &str, method: &str, headers: &[(&str, &str)], body: &str) -> (u16, String) {
+    let (head, body) = exchange(address, method, headers, body);
+    (head[9..12].parse().unwrap(), body)
 }
 
 fn get(address: &str) -> (u16, String) {
@@ -171,7 +177,13 @@ async fn refuses_bad_host_and_origin() {
     let rig = rig("origin", LONG, &[]);
     let asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
-    for bad in [("Host", "evil.example"), ("Origin", "https://evil.example")] {
+    // A browser sends `Origin: null` for a form posted under a `no-referrer` policy, so none is served.
+    let bad_ones = [
+        ("Host", "evil.example"),
+        ("Origin", "https://evil.example"),
+        ("Origin", "null"),
+    ];
+    for bad in bad_ones {
         assert_eq!(request(&url, "POST", &[bad], &form(&A_VALUES)).0, 403);
         assert_eq!(request(&url, "GET", &[bad], "").0, 403);
     }
@@ -182,6 +194,23 @@ async fn refuses_bad_host_and_origin() {
         200
     );
     assert_eq!(asking.await.unwrap(), Outcome::Saved);
+}
+
+#[tokio::test]
+async fn served_policy_is_same_origin() {
+    // A raw client cannot show the browser's `Origin: null`; the policy that causes it is checked instead.
+    let rig = rig("policy", LONG, &[]);
+    let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
+    let (head, page) = exchange(&rig.address(1).await, "GET", &[], "");
+    assert!(
+        head.contains("\r\nReferrer-Policy: same-origin\r\n"),
+        "{head}"
+    );
+    assert!(
+        page.contains("<meta name=\"referrer\" content=\"same-origin\">"),
+        "{page}"
+    );
+    assert!(!head.contains("no-referrer") && !page.contains("no-referrer"));
 }
 
 #[tokio::test]
@@ -243,6 +272,23 @@ async fn still_open_then_saved() {
     // The saved page answers once: a later ask, such as a retyped login, gets a page of its own.
     assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::StillOpen);
     assert_eq!(addresses(&rig.out).len(), 2);
+}
+
+#[tokio::test]
+async fn saved_page_is_not_replayed_later() {
+    let rig = rig("later", LONG, &[]);
+    let hosts: &[(&str, &[&str])] = &[("a.example", &["USER", "PASS"])];
+    let short = Duration::from_millis(100);
+    assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::StillOpen);
+    let old = rig.address(1).await;
+    assert_eq!(post(&old, &form(&A_VALUES)).0, 200);
+    // Past the window, as with a retyped login after the carrier refused the saved one.
+    tokio::time::sleep(Duration::from_millis(2500)).await;
+    assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::StillOpen);
+    let new = rig.address(2).await;
+    assert_ne!(old, new);
+    assert_eq!(post(&new, &form(&A_VALUES)).0, 200);
+    assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::Saved);
 }
 
 #[tokio::test]

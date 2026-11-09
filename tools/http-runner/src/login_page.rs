@@ -10,7 +10,7 @@ use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::sync::{oneshot, watch};
 
@@ -18,6 +18,9 @@ use crate::store::Store;
 
 const MAX_HEAD: usize = 16 * 1024;
 const MAX_BODY: usize = 64 * 1024;
+/// How long after a save an ask still gets `Saved`: long enough for an ask that was on its way
+/// when the user saved, too short for a retyped login to be taken for that save.
+const SAVED_REPLAY: Duration = Duration::from_secs(2);
 const BAD: Option<&str> = Some("400 Bad Request");
 const CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
@@ -59,7 +62,7 @@ struct Shared {
     store: Arc<Store>,
     open: Open,
     lifetime: Duration,
-    /// An open page, or a saved one that the next ask to cover it still reports.
+    /// An open page, or a saved one that an ask within `SAVED_REPLAY` of the save still reports.
     page: Mutex<Option<Page>>,
     port: OnceLock<Result<u16, String>>,
 }
@@ -69,6 +72,7 @@ struct Page {
     hosts: Vec<HostFields>,
     /// `None` while open.
     state: watch::Sender<Option<Outcome>>,
+    saved: Option<Instant>,
 }
 
 impl Pages {
@@ -90,7 +94,8 @@ impl Pages {
 
     /// Waits up to `wait` for the user to save what `ask` lacks. An ask the open page already
     /// covers waits on it; any other closes that page, whose waiters get `Replaced`, and opens a
-    /// new one. A saved page answers one ask and is then forgotten, so a later ask opens its own.
+    /// new one. A saved page answers one ask made within two seconds of the save, so a later ask,
+    /// such as a retyped login, opens its own.
     pub async fn ask(&self, ask: Ask, wait: Duration) -> Outcome {
         let shared = &self.shared;
         let port = match shared.port.get_or_init(|| serve(shared.clone())) {
@@ -99,7 +104,7 @@ impl Pages {
         };
         let (mut state, token, fresh) = {
             let mut slot = shared.page();
-            if let Some(page) = slot.as_ref().filter(|p| p.covers(&ask)) {
+            if let Some(page) = slot.as_ref().filter(|p| p.live() && p.covers(&ask)) {
                 (page.state.subscribe(), page.token.clone(), false)
             } else {
                 let Some(token) = new_token() else {
@@ -114,6 +119,7 @@ impl Pages {
                     token: token.clone(),
                     hosts,
                     state: sender,
+                    saved: None,
                 });
                 (state, token, true)
             }
@@ -163,6 +169,11 @@ impl Page {
         });
     }
 
+    /// Open, or saved so recently that an ask still gets the save.
+    fn live(&self) -> bool {
+        self.is_open() || self.saved.is_some_and(|at| at.elapsed() < SAVED_REPLAY)
+    }
+
     fn covers(&self, ask: &Ask) -> bool {
         let has = |a: &HostFields| {
             let page = self.hosts.iter().find(|p| p.host == a.host);
@@ -199,7 +210,7 @@ impl Shared {
 
     fn submit(&self, token: &str, body: &[u8]) -> Reply {
         let mut slot = self.page();
-        let Some(page) = slot.as_ref().filter(|p| p.token == token && p.is_open()) else {
+        let Some(page) = slot.as_mut().filter(|p| p.token == token && p.is_open()) else {
             return not_found();
         };
         let Some(typed) = typed_values(&page.hosts, body) else {
@@ -211,6 +222,7 @@ impl Shared {
             .try_for_each(|(host, values)| self.store.save(host, values))
         {
             Ok(()) => {
+                page.saved = Some(Instant::now());
                 page.state.send_replace(Some(Outcome::Saved));
                 (
                     "200 OK",
@@ -363,7 +375,7 @@ fn handle(shared: &Shared, port: u16, mut stream: TcpStream) {
         Err(None) => return,
     };
     let head = format!(
-        "HTTP/1.1 {}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: {CSP}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nReferrer-Policy: same-origin\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: {CSP}\r\nConnection: close\r\n\r\n",
         reply.0,
         reply.1.len()
     );
@@ -463,7 +475,7 @@ fn esc(text: &str) -> String {
 
 fn shell(title: &str, body: &str) -> String {
     format!(
-        "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"referrer\" content=\"no-referrer\"><meta name=\"description\" content=\"Confirm where http-runner sends your login.\"><title>{title}</title><style>{STYLE}</style><main>{body}</main></html>"
+        "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"referrer\" content=\"same-origin\"><meta name=\"description\" content=\"Confirm where http-runner sends your login.\"><title>{title}</title><style>{STYLE}</style><main>{body}</main></html>"
     )
 }
 
