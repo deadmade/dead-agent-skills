@@ -253,3 +253,20 @@ _Avoid_: query tool
 An mcp-azure tool that changes something on the server; Claude Code asks the user before every call, in every
 permission mode but `dontAsk`, which denies it.
 _Avoid_: action, mutation
+
+## shopping-search
+
+**Group**:
+A set of sibling elements of one kind that web-mcp's `rows` tool finds on a page, such as the ads in a search result or
+the filters in a sidebar. `rows` returns the largest two, numbered.
+_Avoid_: list, block, section
+
+**Row**:
+One line `rows` returns for one item of a Group: the item's text collapsed to one line (cut at about 200 characters)
+and its first link. It holds no parsed fields; the agent reads prices and specs from the text.
+_Avoid_: listing, record, result, ad (an ad is what a Row may describe)
+
+**Recipe**:
+What the `shop` skill holds for one shop: the address pattern of its search and notes on reading it (which parts of the
+address are filters, what a blocked page looks like). It holds no selectors except one `item` hint where the guess ranks the wrong group.
+_Avoid_: adapter, parser, scraper
