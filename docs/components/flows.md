@@ -3,7 +3,7 @@
 `plugins/flows/`, except its packs (see [packs.md](packs.md)).
 
 `plugins/flows/`: the conductor skills (`/build-feature`, `/research-feature`, `/implement`, `/fix`, `/upgrade`,
-`/refactor`, `/review-code`, `/understand`, `/learn`, `/evaluate`). Each runs other plugins' skills in order; the rules
+`/refactor`, `/review-code`, `/understand`, `/learn`, `/evaluate`, `/tidy`). Each runs other plugins' skills in order; the rules
 they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing plugin) live
 once in `plugins/flows/steps/*.toml`, composed into each conductor at build time
 (`docs/adr/0011-conductors-composed-from-flow-steps.md`), so a SKILL.md says what it runs and names its steps
@@ -26,6 +26,11 @@ its `references/`); on Claude Code its correctness lens is the built-in `code-re
 default branch on a clean tree (the host adapter template) and otherwise ponytail-review's brief
 (`references/lenses.md`), and the one agent it vendors is `flows:pr-test-analyzer`, next to tob's checker in `agents/`.
 `/self-review` was a plugin of its own through 0.5.0, so the installer keeps flows on a machine that had it.
+
+## /tidy
+
+`agents/tidy.md` is hand-written, its `tools:` line is the only thing keeping it read-only, and `scripts/tidy.test.mjs`
+holds that line. `/tidy` is the one conductor without phases, because it keeps no flow.md and has no gates.
 
 ## The prose standard
 

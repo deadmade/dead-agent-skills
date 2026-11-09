@@ -11,6 +11,10 @@ test('the agent can only read', () => {
   assert.ok(frontmatter(read('plugins/flows/agents/tidy.md')).includes('tools: Read, Grep, Glob'));
 });
 
+test('the command is manual only', () => {
+  assert.ok(frontmatter(read('plugins/flows/skills/tidy/SKILL.md')).includes('disable-model-invocation: true'));
+});
+
 test('the agent has no memory field', () => {
   assert.ok(!frontmatter(read('plugins/flows/agents/tidy.md')).some((line) => line.startsWith('memory:')));
 });

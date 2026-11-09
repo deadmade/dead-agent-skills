@@ -18,6 +18,7 @@ on one page. Claude proposes and recommends; you decide.
 | `/learn [flow]`                                  | keep what the work taught                                       | no questions: the few lessons that matter, written to AGENTS.md/CLAUDE.md, `domain-modeling`, a `docs/solutions/` note or memory; ADRs, checks and skill fixes to the Parking lot                                                                                           | done                                              |
 | `/flows:writing copyedit <file.md>`              | revise a finished document for a new reader                     | a fresh agent revises it by the `writing` skill; `compare.mjs` refuses an edit that lost what code can check                                                                                                                                                                | the edited document, uncommitted                  |
 | `/flows:diagrams <file.md>`                      | check a spec or plan's pictures and show it as one page         | `check.mjs` parses each Mermaid diagram with Mermaid itself and checks file maps against the repo; `render.mjs` writes the text and pictures as one HTML page; every gate that shows a spec or plan runs both                                                               | a page, or its path                               |
+| `/flows:tidy`                                    | recheck memory notes and flow folders                           | a read-only agent proposes; the main session checks each proposal and asks only about strange ones                                                                                                                                                                          | changes applied and reported, uncommitted         |
 
 `branch` (the default) audits what changed against the base, plus the tests and docs that should have changed with
 it; `all` audits the whole repo, vendored content skipped.
@@ -116,6 +117,8 @@ review-code
 ├ superpowers: finishing-a-development-branch, systematic-debugging, test-driven-development, verification-before-completion
 ├ tob-picks: mutation-testing, property-based-testing, sharp-edges, spec-to-code-compliance
 └ web-mcp: fetch
+
+tidy
 
 understand
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
