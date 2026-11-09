@@ -35,6 +35,13 @@ fn interval(url: &Url) -> Duration {
 
 impl HostLimits {
     pub async fn acquire(&self, url: &Url) -> HostPermit {
+        self.acquire_with(url, interval(url)).await
+    }
+
+    /// Like `acquire`, but the next request to this host starts no sooner than `gap` after this one.
+    /// The next-start time is shared per host, so that gap binds whichever request comes next, from any caller:
+    /// a `fetch` right after a `rows` call to the same host waits up to `gap`.
+    pub async fn acquire_with(&self, url: &Url, gap: Duration) -> HostPermit {
         let host = url.host_str().unwrap_or("").to_owned();
         let sem = {
             let mut hosts = self.hosts.lock().unwrap_or_else(PoisonError::into_inner);
@@ -48,7 +55,7 @@ impl HostLimits {
             let mut hosts = self.hosts.lock().unwrap_or_else(PoisonError::into_inner);
             let next = &mut hosts.get_mut(&host).expect("inserted above").1;
             let start = (*next).max(Instant::now());
-            *next = start + interval(url);
+            *next = start + gap.max(interval(url));
             start
         };
         tokio::time::sleep_until(start).await;
@@ -94,5 +101,41 @@ mod tests {
         );
         drop(held);
         fifth.await.unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn acquire_with_spaces_calls_by_the_gap() {
+        let l = HostLimits::default();
+        let gap = Duration::from_secs(1);
+        let t0 = Instant::now();
+        drop(l.acquire_with(&u("https://example.com/a"), gap).await);
+        drop(l.acquire_with(&u("https://example.com/b"), gap).await);
+        assert!(t0.elapsed() >= gap);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn plain_acquire_waits_the_remaining_gap() {
+        let l = HostLimits::default();
+        let t0 = Instant::now();
+        drop(
+            l.acquire_with(&u("https://example.com/a"), Duration::from_secs(1))
+                .await,
+        );
+        drop(l.acquire(&u("https://example.com/b")).await);
+        assert!(t0.elapsed() >= Duration::from_secs(1));
+
+        let t1 = Instant::now();
+        drop(l.acquire(&u("https://other.example/")).await);
+        assert!(t1.elapsed() < Duration::from_millis(10));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn short_gap_never_shortens_the_hosts_own_spacing() {
+        let l = HostLimits::default();
+        let arxiv = u("https://export.arxiv.org/api/query");
+        let t0 = Instant::now();
+        drop(l.acquire_with(&arxiv, Duration::from_secs(1)).await);
+        drop(l.acquire(&arxiv).await);
+        assert!(t0.elapsed() >= Duration::from_secs(3));
     }
 }

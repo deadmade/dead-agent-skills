@@ -254,8 +254,12 @@ impl Inner {
                 if let Some(r) = &rendered {
                     Self::write(&dir.join("rendered.html"), r.as_bytes()).await?;
                 }
+                // `rows` and an empty search page store no text: they must not blank a fetched `page.md`.
+                // A first, empty write stays, so `fetch` can cache a page that really has no text.
                 let md = dir.join("page.md");
-                Self::write(&md, markdown.as_bytes()).await?;
+                if !markdown.is_empty() || !md.exists() {
+                    Self::write(&md, markdown.as_bytes()).await?;
+                }
                 let raw_sha = sha(&raw);
                 for (name, bytes) in &images {
                     let p = dir.join("images").join(sanitize_file(name));
@@ -688,6 +692,47 @@ mod tests {
         }
         a.put(p).await.unwrap();
         assert!(a.cached(&u("https://example.com/no")).is_none());
+    }
+
+    fn without_markdown(url: &str) -> Item {
+        let mut p = page(url, None);
+        if let Item::Page {
+            markdown, cache, ..
+        } = &mut p
+        {
+            markdown.clear();
+            *cache = false;
+        }
+        p
+    }
+
+    #[tokio::test]
+    async fn page_without_markdown_keeps_the_fetched_page_md() {
+        let d = tempdir();
+        let a = open(&d);
+        let url = u("https://example.com/shop");
+        let fetched = a.put(page(url.as_str(), None)).await.unwrap();
+        a.put(without_markdown(url.as_str())).await.unwrap();
+        assert_eq!(a.cached(&url), Some(fetched.clone()));
+        let md = std::fs::read_to_string(a.0.web.join(&fetched.path)).unwrap();
+        assert_eq!(md, "hi");
+    }
+
+    #[tokio::test]
+    async fn fetched_page_with_no_text_is_still_cached_with_a_page_md() {
+        let d = tempdir();
+        let a = open(&d);
+        let url = u("https://example.com/blank");
+        let mut p = page(url.as_str(), None);
+        if let Item::Page { markdown, .. } = &mut p {
+            markdown.clear();
+        }
+        let got = a.put(p).await.unwrap();
+        assert_eq!(a.cached(&url), Some(got.clone()));
+        assert_eq!(
+            std::fs::read_to_string(a.0.web.join(&got.path)).unwrap(),
+            ""
+        );
     }
 
     #[tokio::test]

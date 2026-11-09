@@ -13,6 +13,7 @@ mod papers;
 mod passages;
 mod profile;
 mod rank;
+mod rows;
 mod search;
 mod tools;
 mod window;
@@ -31,7 +32,7 @@ pub struct Ctx {
     pub archive: archive::Archive,
     pub inflight: fetch::Inflight,
     pub lookup: lookup::Cache,
-    /// `Err` without a search folder: then `search`, `browser` and the fetch fallback fail.
+    /// `Err` without a search folder: then `search`, `browser`, `rows` and the fetch fallback fail.
     pub profiles: Result<Arc<profile::Profiles>, String>,
     pub browser: browser::Browser,
 }

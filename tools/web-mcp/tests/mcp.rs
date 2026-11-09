@@ -4,7 +4,7 @@ use std::process::{Command, Stdio};
 use serde_json::{Value, json};
 
 #[test]
-fn lists_four_tools() {
+fn lists_five_tools() {
     let project = std::env::temp_dir().join(format!("web-mcp-mcp-{}", std::process::id()));
     std::fs::create_dir_all(&project).unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_web-mcp"))
@@ -31,10 +31,12 @@ fn lists_four_tools() {
     let mut tools = v["result"]["tools"].as_array().unwrap().clone();
     tools.sort_by_key(|t| t["name"].as_str().unwrap().to_string());
     let names: Vec<_> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["browser", "fetch", "lookup", "search"]);
-    let [browser, fetch, lookup, search] = [&tools[0], &tools[1], &tools[2], &tools[3]];
+    assert_eq!(names, ["browser", "fetch", "lookup", "rows", "search"]);
+    let [browser, fetch, lookup, rows, search] =
+        [&tools[0], &tools[1], &tools[2], &tools[3], &tools[4]];
     assert_eq!(lookup["annotations"]["readOnlyHint"], true);
     assert!(lookup["description"].as_str().unwrap().contains("cite"));
+    assert_eq!(rows["annotations"]["readOnlyHint"], true);
     assert_eq!(search["annotations"]["readOnlyHint"], true);
     assert_eq!(fetch["annotations"]["readOnlyHint"], true);
     assert_ne!(browser["annotations"]["readOnlyHint"], true);
@@ -64,7 +66,7 @@ fn lists_four_tools() {
             .contains("archive path")
     );
     assert!(browser["description"].as_str().unwrap().contains("close"));
-    for t in [browser, fetch, lookup, search] {
+    for t in [browser, fetch, lookup, rows, search] {
         let size =
             t["description"].to_string().len() + t["inputSchema"]["properties"].to_string().len();
         assert!(size < 1200, "{size} bytes of schema for {}", t["name"]);

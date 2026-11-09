@@ -1,5 +1,5 @@
 {
-  "description": "Web research tools for Claude: search (Google, Bing, DuckDuckGo and Brave read in web-mcp's own browser, paper APIs plus Google Scholar and Semantic Scholar, ranked with BM25), fetch (whole pages as markdown), browser (agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records), all archived in .web/. Needs the web-mcp binary and agent-browser.",
+  "description": "Web research tools for Claude: search (Google, Bing, DuckDuckGo and Brave read in web-mcp's own browser, paper APIs plus Google Scholar and Semantic Scholar, ranked with BM25), fetch (whole pages as markdown), browser (agent-browser), rows (a page's repeating items as numbered rows) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records), all archived in .web/. Needs the web-mcp binary and agent-browser.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"

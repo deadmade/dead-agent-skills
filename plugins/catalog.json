@@ -56,6 +56,13 @@
     "targets": ["claude-code", "codex"]
   },
   {
+    "name": "shop",
+    "source": "plugins/opt-in/shop",
+    "resources": ["skills"],
+    "dependencies": ["web-mcp"],
+    "targets": ["claude-code", "codex"]
+  },
+  {
     "name": "mcp-github",
     "source": "plugins/opt-in/mcp/mcp-github",
     "resources": [],

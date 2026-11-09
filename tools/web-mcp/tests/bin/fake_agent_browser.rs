@@ -2,8 +2,9 @@
 //! `$FAKE_AB_LOG` (unset: to `calls.jsonl` beside its `--config`, if any) and prints canned `--json` answers.
 //! An `open` of a URL containing "fail" fails; a batch's `wait` fails for a URL containing "wait-fail", and for
 //! one containing "wait-slow" only after its `--timeout` ms. A batch opening a search engine's host answers from
-//! `$FAKE_AB_PAGES` when that is set (see `engine_page`); a file `<engine>.landed` there holds the URL its `get url`
-//! answers (`engine_landed`), else it answers the opened one. A batch with an `open` stores its URL in
+//! `$FAKE_AB_PAGES` when that is set (see `engine_page`); so does a batch opening any other host, from the file
+//! `<last path segment of the URL>.html` there when it exists (else the canned page). A file `<engine>.landed` there
+//! holds the URL its `get url` answers (`engine_landed`), else it answers the opened one. A batch with an `open` stores its URL in
 //! `<state>/<session>.url`: the session's tab keeps that page, so a batch without an `open` answers for the stored
 //! URL (its `engine_page`, its `get url`, the host lookups and `wait` failures keyed on the URL), and `tab new`
 //! removes it (a blank tab). `get cdp-url` answers `ws://127.0.0.1:<port>/devtools/browser/<chrome>`, `<chrome>` being
@@ -427,11 +428,20 @@ fn pages_dir() -> Option<PathBuf> {
     std::env::var_os("FAKE_AB_PAGES").map(PathBuf::from)
 }
 
+/// For a host that is no engine: `$FAKE_AB_PAGES/<last path segment of url>.html`, when that file exists.
+fn other_page(url: &str) -> Option<String> {
+    let url = url::Url::parse(url).ok()?;
+    let name = url.path_segments()?.next_back()?;
+    std::fs::read_to_string(pages_dir()?.join(format!("{name}.html"))).ok()
+}
+
 /// The result page of the engine whose host `url` is on, from `$FAKE_AB_PAGES` (unset: `None`), after
 /// `$FAKE_AB_DELAY_MS`. A marker file `<engine>.<marker>` there picks it: `none`, `blocked`, `consent-once` (the
 /// consent page, once), `slow` (60 s first) or `offline` (`Err`: the failure `open` reports); else `<engine>.html`.
 fn engine_page(url: &str) -> Option<Result<String, &'static str>> {
-    let engine = engine_of(url)?;
+    let Some(engine) = engine_of(url) else {
+        return other_page(url).map(Ok);
+    };
     let dir = pages_dir()?;
     if let Some(ms) = std::env::var("FAKE_AB_DELAY_MS")
         .ok()

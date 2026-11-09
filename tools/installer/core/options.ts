@@ -35,7 +35,7 @@ export const CATEGORIES: Page[] = [
     id: 'workflow',
     title: 'Conductors & skills',
     blurb: 'flows runs the other skills in order and brings the ones it uses; plus standalone skills.',
-    keys: ['flows', 'hallmark', 'skill-creator'],
+    keys: ['flows', 'hallmark', 'shop', 'skill-creator'],
   },
   {
     id: 'lsp',

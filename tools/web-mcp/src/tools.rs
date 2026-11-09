@@ -20,7 +20,7 @@ use crate::archive::Item;
 use crate::browser;
 use crate::fetch::{self, GetOpts};
 use crate::images;
-use crate::{lookup, papers, search};
+use crate::{lookup, papers, rows, search};
 
 static SHOTS: AtomicU64 = AtomicU64::new(0);
 const FETCH_DEADLINE: Duration = Duration::from_secs(30);
@@ -47,6 +47,19 @@ pub struct FetchArgs {
     pub url: String,
     /// Also return the page's images (default false).
     pub images: Option<bool>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub struct RowsArgs {
+    /// An http(s) URL; one page per call.
+    pub url: String,
+    /// Print only this group, 1 or 2.
+    pub group: Option<usize>,
+    /// A CSS selector for the repeating element, when the guessed groups are wrong; gives one group.
+    pub item: Option<String>,
+    /// Rows per group, 1-200 (default 30).
+    pub limit: Option<usize>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -366,6 +379,22 @@ impl Server {
         match fetch::get(&self.ctx, &url, FETCH_DEADLINE, opts).await {
             Ok(f) => fetch::render(&self.ctx, &f, images).await,
             Err(e) => error(format!("Fetching {url} failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Open one http(s) page in web-mcp's browser and return its two largest groups of repeating items (ads, products, search hits) as numbered rows: text plus link. The page is archived under .web/. If the guessed group is wrong, pass `item`, a CSS selector.",
+        annotations(read_only_hint = true)
+    )]
+    async fn rows(&self, Parameters(args): Parameters<RowsArgs>) -> CallToolResult {
+        let url = match Url::parse(&args.url) {
+            Ok(u) if matches!(u.scheme(), "http" | "https") => u,
+            _ => return error(format!("{} is not an http(s) URL", args.url)),
+        };
+        let limit = args.limit.unwrap_or(30);
+        match rows::run(&self.ctx, &url, args.group, args.item.as_deref(), limit).await {
+            Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
+            Err(e) => error(e),
         }
     }
 

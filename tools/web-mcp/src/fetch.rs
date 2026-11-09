@@ -395,7 +395,7 @@ async fn browser_page(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<Strin
 }
 
 /// Private by URL or by any resolved address; unresolvable counts as private.
-async fn private_landing(url: &Url) -> bool {
+pub(crate) async fn private_landing(url: &Url) -> bool {
     if is_private(url) {
         return true;
     }
