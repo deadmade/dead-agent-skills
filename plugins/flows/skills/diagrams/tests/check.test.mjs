@@ -1,7 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -171,9 +181,55 @@ test('works from another working directory', { skip: NEEDS_PARSER }, () => {
   assert.equal(r.code, 0, r.out);
 });
 
-test('leaves no node_modules in the skill folder', { skip: NEEDS_PARSER }, () => {
-  check(fence('mermaid', 'flowchart LR\n  a --> b'));
-  assert.equal(existsSync(join(SKILL, 'node_modules')), false);
+test('leaves no node_modules in the skill folder', () => {
+  // The checker runs from a copy of the skill, on a cold cache with a stand-in npm, so a node_modules installed in the
+  // real skill folder cannot fail the test and the test cannot pass when nothing was installed.
+  const root = temp();
+  const copy = join(root, 'diagrams');
+  cpSync(join(SKILL, 'scripts'), join(copy, 'scripts'), { recursive: true });
+  for (const f of ['package.json', 'package-lock.json']) copyFileSync(join(SKILL, f), join(copy, f));
+  mkdirSync(join(root, 'build-feature', 'scripts'), { recursive: true }); // check.mjs imports glance.mjs from here
+  copyFileSync(
+    join(SKILL, '..', 'build-feature', 'scripts', 'glance.mjs'),
+    join(root, 'build-feature', 'scripts', 'glance.mjs'),
+  );
+  const modules = {
+    jsdom: 'export class JSDOM { constructor() { this.window = { document: {} }; } }',
+    mermaid: 'export default { initialize() {}, mermaidAPI: { getDiagramFromText: async () => ({ type: "pie" }) } };',
+  };
+  const script = `#!${process.execPath}
+const { mkdirSync, writeFileSync } = require('node:fs');
+for (const [name, code] of Object.entries(${JSON.stringify(modules)})) {
+  mkdirSync('node_modules/' + name, { recursive: true });
+  writeFileSync('node_modules/' + name + '/package.json', JSON.stringify({ name, type: 'module', main: 'index.js' }));
+  writeFileSync('node_modules/' + name + '/index.js', code);
+}
+`;
+  const bin = temp();
+  fake(bin, 'npm', script); // POSIX: findNpm runs `npm`
+  mkdirSync(join(bin, 'node_modules', 'npm', 'bin'), { recursive: true }); // Windows: findNpm runs npm-cli.js beside npm.cmd
+  writeFileSync(join(bin, 'npm.cmd'), '');
+  writeFileSync(join(bin, 'node_modules', 'npm', 'bin', 'npm-cli.js'), script);
+  const doc = join(temp(), 'doc.md');
+  writeFileSync(doc, fence('mermaid', 'flowchart LR\n  a --> b'));
+  const cache = temp();
+  const before = readdirSync(copy).sort();
+  const r = spawnSync(process.execPath, [join(copy, 'scripts', 'check.mjs'), doc, '--root', temp()], {
+    encoding: 'utf8',
+    env: {
+      PATH: bin,
+      HOME: cache,
+      USERPROFILE: cache,
+      XDG_CACHE_HOME: cache,
+      LOCALAPPDATA: cache,
+      SystemRoot: process.env.SystemRoot,
+    },
+  });
+  const out = (r.stdout ?? '') + (r.stderr ?? '');
+  assert.equal(r.status, 0, out);
+  assert.deepEqual(readdirSync(copy).sort(), before);
+  assert.doesNotMatch(out, /not parser-checked/);
+  assert.equal(existsSync(join(cache, 'dead-agent-skills', 'diagrams-node', 'node_modules', 'mermaid')), true);
 });
 
 test('files block: a missing ~ path is a warning for a hand-written block', () => {
