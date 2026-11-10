@@ -44,7 +44,6 @@ export interface Hook {
   http?: string; // a local endpoint that receives the payload
   args?: string[]; // extra arguments for `script`
   tools?: HookTool[]; // for tool.starting / tool.completed
-  paths?: string[]; // glob filters for file.write / file.edit hooks
   required: boolean;
   background: boolean;
   timeoutSeconds?: number;

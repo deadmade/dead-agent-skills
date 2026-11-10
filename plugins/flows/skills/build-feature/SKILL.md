@@ -115,8 +115,6 @@ from the user. Recommended answers are fine here.
 **Gate 1, spec approved:** when the frontier is empty, give a five-line summary of what changed in the spec and ask
 the user to approve the spec.
 
-[step: copyedit]
-
 [step: gate]
 
 ## Phase 4: Plan
@@ -143,8 +141,8 @@ spec too if a decision changes it (say so: that edit reopens Gate 1 for that ite
 Optional, for a large or ambiguous design, offer before the review: pstack `architect` (sketch types and signatures
 first) or `arena` (several models draft the plan, best one wins). Only on the user's yes.
 
-**Gate 2, plan approved:** the plan and the execution method, in one answer. Before it, copyedit the edited plan
-(Phase 3), then re-run glance on it (Phase 4). The gate message shows glance's block, the **Test seams** list and the
+**Gate 2, plan approved:** the plan and the execution method, in one answer. Before it, re-run glance on the edited plan
+(Phase 4). The gate message shows glance's block, the **Test seams** list and the
 findings, with plan.md linked rather than pasted. Approving the plan approves the seams.
 
 [step: gate]

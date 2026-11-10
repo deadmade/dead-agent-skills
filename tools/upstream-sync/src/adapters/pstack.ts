@@ -18,6 +18,8 @@ const SKILLS = [
   'architect',
   'arena',
   'show-me-your-work',
+  'unslop',
+  'technical-writing',
   'principle-separate-before-serializing-shared-state',
   'principle-redesign-from-first-principles',
   'principle-type-system-discipline',
@@ -28,9 +30,6 @@ const SKILLS = [
 const AGENTS = ['comment-sicko'];
 // Upstream skills deliberately not vendored. Anything in neither list is reported as new.
 const SKIPPED = [
-  // flows' own `writing` skill replaces these two; the REWRITES below point their references at it
-  'unslop',
-  'technical-writing',
   'automate-me',
   'create-verification-skill',
   'figure-it-out',
@@ -73,15 +72,13 @@ const SKIPPED = [
   'statechart',
 ];
 // Cursor-isms that must not survive the rewrite, checked per line (case-sensitive; "cursor location" in prose is fine).
-// `unslop` and `technical-writing` are retired names: a new reference to either needs a rewrite to flows' `writing` skill.
 const GUARD =
-  /\bunslop\b|\btechnical-writing\b|\.cursor|Cursor|\bTask\b|AskQuestion|generalPurpose|[Rr]eadonly|environment: "|cloud_base_branch|agent-transcripts|mcps\/|todolist|grok-|gpt-5|sol-max|-thinking-|pstack-models|interrogate reviewers|poteto-mode|subagent_type: "Comment Sicko"|^name: Comment Sicko/;
+  /\.cursor|Cursor|\bTask\b|AskQuestion|generalPurpose|[Rr]eadonly|environment: "|cloud_base_branch|agent-transcripts|mcps\/|todolist|grok-|gpt-5|sol-max|-thinking-|pstack-models|interrogate reviewers|poteto-mode|subagent_type: "Comment Sicko"|^name: Comment Sicko/;
 
 // --- Cursor -> Claude Code rewrites -------------------------------------------------------------
 // Applied in order to each whole .md file. Rules match content, never line numbers. Anything they miss is caught by GUARD.
 const CLAUDE_MODELS = '`fable`, `opus`, `sonnet`, `haiku`';
 const CURSOR_PANEL = String.raw`\`claude-fable-5-1-thinking-max\`, \`gpt-5\.6-sol-max\`, \`grok-4\.6-fast-xhigh\`, \`claude-opus-5-thinking-xhigh\``;
-const WRITING = "flows' **writing** skill (`flows:writing`, loaded through the Skill tool)";
 const re = (src: string, flags = 'g') => new RegExp(src, flags);
 const REWRITES: [RegExp, string][] = [
   // --- subagent config (how, why, interrogate) ---
@@ -142,14 +139,6 @@ const REWRITES: [RegExp, string][] = [
   [
     /Read this run's transcript under the active workspace's `agent-transcripts\/` directory \(the system prompt names the path\)\. Don't glob across `~\/\.cursor\/projects\/\*\/`\./g,
     "Read this run's transcript in this workspace's transcript directory, `~/.claude/projects/<slug>/` (the newest `.jsonl`). Don't glob across `~/.claude/projects/*/`.",
-  ],
-
-  // --- the retired unslop skill (blast-radius, recall, show-me-your-work) -> flows' writing skill ---
-  [/Write the brief through the \*\*unslop\*\* skill/g, `Write the brief through ${WRITING}`],
-  [/Write it through `unslop`/g, `Write it through ${WRITING}`],
-  [
-    /\(the \*\*unslop\*\* skill applies to log text too\)/g,
-    "(flows' **writing** skill, `flows:writing` loaded through the Skill tool, applies to log text too)",
   ],
 
   // --- Comment Sicko agent ---

@@ -9,10 +9,9 @@ folder like `packs/`); conductors read a pack's skills by path (`<flow-root>/pac
 installer retires old installs of them and checks none remains (`stillInstalled`). The folder list is the source of
 truth, not this file.
 
-pstack-picks leaves out pstack's `technical-writing` and `unslop` (flows' `writing` replaces them; the sync rewrites the
-lines that name `unslop`, and `GUARD` fails on a new mention of either);
-`npm run sync -- apply pstack-picks --ref <hash>` syncs one commit, given as a full 40-character hash, instead of
-upstream's default branch; its entry in `tools/upstream-sync/src/sources.ts` checks the number of vendored skills (16),
+pstack-picks vendors pstack's own `unslop` and `technical-writing`, so the pstack skills that cite them read them as
+siblings; `npm run sync -- apply pstack-picks --ref <hash>` syncs one commit, given as a full 40-character hash, instead of
+upstream's default branch; its entry in `tools/upstream-sync/src/sources.ts` checks the number of vendored skills (18),
 so change that count whenever you change `SKILLS`. When upstream's text gets past the rewrites, the sync's `GUARD` fails
 its weekly `sync.yml` job until a PR adapts them; don't hand-edit the pack to get past it.
 

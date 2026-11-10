@@ -35,25 +35,10 @@ names are the contract between the two files, so change them together: a renamed
 `agents/tidy.md` is hand-written, its `tools:` line is the only thing keeping it read-only, and `scripts/tidy.test.mjs`
 holds that line. `/tidy` is the one conductor without phases, because it keeps no flow.md and has no gates.
 
-## The prose standard
-
-flows also owns the prose standard: `skills/writing/` is one of the two skills in it Claude may load on its own
-(`flows:writing`; the other, `flows:diagrams`, is described below). `flows-uses.mjs` treats only
-`disable-model-invocation: true` skills as conductors, so a `uses:` line may list either. `hooks/prose-check.mjs` (logic
-in `prose.mjs`) is a code-only `PostToolUse` check on `*.md` writes for conversation shorthand, off with
-`FLOWS_PROSE_CHECK=off`.
-
-The writing skill also holds the copyedit (`references/copyedit.md`, run as `/flows:writing copyedit <file>`): a fresh
-agent on the strongest model edits a document by the skill, then `scripts/compare.mjs` replaces it only when nothing
-code can check was lost (the list is in `references/copyedit.md`). The conductors run it, by `steps/copyedit.toml`,
-before a gate shows a spec, plan, research report or audit report. `compare.mjs` imports `check` and `report` from
-`hooks/prose.mjs`, so a change there can break the copyedit; their tests are
-`plugins/flows/skills/writing/tests/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and
-`references/` state _Style_ in our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
-
 ## Diagrams
 
-flows also holds `skills/diagrams/` (`flows:diagrams`, model-invocable like `writing`): `check.mjs` checks the `mermaid`
+flows also holds `skills/diagrams/` (`flows:diagrams`, the one flows skill Claude may load on its own; `flows-uses.mjs` treats only
+`disable-model-invocation: true` skills as conductors, so a `uses:` line may list it): `check.mjs` checks the `mermaid`
 and `files` blocks of a spec or plan, `render.mjs` writes it and its pictures as one HTML page, and `steps/gate.toml`
 has every gate that shows a spec or plan run both. The checker installs Mermaid and jsdom (`package.json` and
 `package-lock.json` beside `SKILL.md`) into the user's cache folder, never into the plugin; tests that need them skip

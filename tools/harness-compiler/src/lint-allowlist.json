@@ -24,10 +24,6 @@
     "reason": "Claude Code-only plugin: the launcher and its docs read Claude's plugin environment and bin folder"
   },
   {
-    "path": "plugins/flows/skills/writing/tests/writing-skill.test.mjs",
-    "reason": "Repository test that reads the generated Claude marketplace at the repository root"
-  },
-  {
     "path": "plugins/default/tsconfig.json",
     "reason": "UI mod source: TypeScript written against Claude's UI engine, declared in plugin.json `extensions`; the compiler leaves it out of other harnesses' packages"
   },

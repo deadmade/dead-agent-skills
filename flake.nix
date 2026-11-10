@@ -94,7 +94,7 @@
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|http-runner|web-mcp)/|plugins/default/hooks/|plugins/flows/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|package\\.json$)";
+            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|http-runner|web-mcp)/|plugins/default/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|package\\.json$)";
             pass_filenames = false;
           };
         };

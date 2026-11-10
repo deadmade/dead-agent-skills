@@ -99,7 +99,7 @@ would make it a bad fit. Recommended answers are fine. Record each settled choic
 
 ## Phase 4: Report
 
-<!-- runs: `research.md`, copyedited, then `/learn` and one commit · output: the report, lessons, the commit -->
+<!-- runs: `research.md`, then `/learn` and one commit · output: the report, lessons, the commit -->
 
 Write `docs/features/<slug>/research.md` and link it under **Artifacts** as the Report:
 
@@ -112,8 +112,6 @@ Write `docs/features/<slug>/research.md` and link it under **Artifacts** as the 
    codebase and a rough effort.
 5. **Recommendation** and what would change it.
 6. **Open questions**, including any a measurement here would settle.
-
-[step: copyedit]
 
 **Gate 1, report approved:** ask the user to approve the report.
 

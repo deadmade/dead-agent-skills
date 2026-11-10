@@ -26,7 +26,6 @@ interface Native {
   command?: string;
   args?: string[];
   url?: string;
-  if?: string;
   async?: boolean;
   timeout?: number;
 }
@@ -56,16 +55,8 @@ export function nativeHooks(hooks: Hook[], target: Target, pluginRoot: string): 
       return { type: 'http', url: hook.http!, ...(hook.timeoutSeconds ? { timeout: hook.timeoutSeconds } : {}) };
     };
     let matcher = mapping.matcher;
-    let entries: Native[];
-    if (hook.tools) {
-      const names = hook.tools.map((t) => target.tools[t]);
-      matcher = hook.tools.includes('*') ? '*' : names.join('|');
-      // A path filter applies per tool: `Write(**/*.md)`.
-      entries = hook.paths
-        ? names.flatMap((tool) => hook.paths!.map((path) => ({ ...run(), if: `${tool}(${path})` })))
-        : [run()];
-    } else entries = [run()];
-    (events[mapping.event] ??= []).push({ ...(matcher ? { matcher } : {}), hooks: entries });
+    if (hook.tools) matcher = hook.tools.includes('*') ? '*' : hook.tools.map((t) => target.tools[t]).join('|');
+    (events[mapping.event] ??= []).push({ ...(matcher ? { matcher } : {}), hooks: [run()] });
   }
   return events;
 }

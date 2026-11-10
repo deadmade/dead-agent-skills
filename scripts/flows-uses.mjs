@@ -17,7 +17,7 @@ export const BUILTIN = 'claude-code';
 const START = '<!-- uses:start -->';
 const END = '<!-- uses:end -->';
 
-// flows' skills, split by frontmatter: conductors carry `disable-model-invocation: true`; the rest (writing, diagrams)
+// flows' skills, split by frontmatter: conductors carry `disable-model-invocation: true`; the rest (diagrams)
 // Claude may load on its own.
 const flowsSkills = (root) => {
   const dir = join(root, FLOWS, 'skills');
@@ -54,7 +54,7 @@ export function checkUseNames(root, uses) {
   for (const [conductor, used] of Object.entries(uses)) {
     const at = `${FLOWS}/skills/${conductor}/SKILL.md`;
     for (const [plugin, names] of Object.entries(used)) {
-      // flows' own non-conductor skills (writing, diagrams) are listed under flows; other conductors aren't listed at all.
+      // flows' own non-conductor skills (diagrams) are listed under flows; other conductors aren't listed at all.
       if (plugin === 'flows') {
         for (const name of names) {
           const own = skills.find((s) => s.name === name);

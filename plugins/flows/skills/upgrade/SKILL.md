@@ -72,8 +72,7 @@ The one task and the plan below are both written under this rule, and the builde
 **One task**, when the list holds only patch and minor bumps, all in one area: no plan.md and no executor. The task
 is the bump list under **Request**; its **Files** list is that area's manifest and lockfile, every file the break map
 says a change hits, and the test files those hits need, written under **Grounding**. The gate shows the bump list,
-the break map and the **Files** list, as `- Gate 1, upgrade approved: <date>`, and asks no execution method. flow.md
-is never copyedited, so the gate message says `not copyedited: no plan`.
+the break map and the **Files** list, as `- Gate 1, upgrade approved: <date>`, and asks no execution method.
 
 **A plan**, for any major and for bumps in several areas. The patch and minor bumps are one task together; each major
 gets its own. The bump task's check, its test command, is the package manager's install or restore (the lockfile
@@ -84,11 +83,9 @@ fixes in such batches, each one green. Where the ecosystem allows a version per 
 manifest with its fixes, and that major gets no bump task of its own; where it doesn't (one central version or
 lockfile), the plan says that the intermediate batches are checked by building that batch only. Deprecated calls are
 replaced only where the plan says so. **Global Constraints** also get: "A failed install or restore stops the task:
-report `NEEDS_CONTEXT` with the package manager's error." The plan is written, copyedited and checked by these rules:
+report `NEEDS_CONTEXT` with the package manager's error." The plan is written and checked by these rules:
 
 [step: plan-shape]
-
-[step: copyedit]
 
 [step: plan-check]
 

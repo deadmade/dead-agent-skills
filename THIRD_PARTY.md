@@ -48,8 +48,7 @@ apart from flattening `engineering/` and `productivity/` into one folder. Synced
 [pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT License, Copyright (c) 2026 Lauren Tan;
 full text in `plugins/flows/packs/pstack-picks/LICENSE`). Modified mechanically for Claude Code by
 `tools/upstream-sync/src/adapters/pstack.ts` (tool names, subagent types, model names, paths, and an added port note
-under each file's frontmatter). Not vendored: pstack's `unslop` and `technical-writing`, which flows' own `writing` skill
-replaces; the sync rewrites the references to them to point at it. The synced upstream commit is in
+under each file's frontmatter). The synced upstream commit is in
 `plugins/flows/packs/pstack-picks/UPSTREAM`.
 
 ## tob-picks
@@ -118,16 +117,6 @@ flows' `/review-code` (`plugins/flows/skills/review-code/`) vendors one agent fr
 (weekly via GitHub Actions; the synced commit is in `plugins/flows/skills/review-code/UPSTREAM`, `NOTICE` sits next to
 it). Until 2026-11 the same adapter also vendored the code-review command, four more toolkit agents and
 mattpocock/skills' engineering code-review skill for the former `/self-review`.
-
-## writing (flows)
-
-flows' `writing` skill (`plugins/flows/skills/writing/SKILL.md`) states the density test of
-[technical-writing-density](https://github.com/mlwelles/technical-writing-density) (MIT License, Copyright (c) 2026
-Michael Welles) in its own words and links to it; nothing is copied. The rest of the skill is our own wording of
-Williams and Bizup's _Style: Lessons in Clarity and Grace_ (12th edition, Pearson, 2016): `SKILL.md` and one reference
-per lesson and appendix in `references/`, written as procedures in our own words with invented software examples. They
-quote no passage and use none of the book's examples; a script checked them for word runs shared with the book, and
-what remains is terms of art and fixed lists (coordinating conjunctions, "the first seven or eight words").
 
 ## ponytail
 

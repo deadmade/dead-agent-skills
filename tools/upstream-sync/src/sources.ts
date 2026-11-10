@@ -224,7 +224,7 @@ export function sources(ROOT: string): Source[] {
       check: () => {
         const d = 'plugins/flows/packs/pstack-picks';
         json();
-        count('pstack-picks skills', skillCount(`${d}/skills`), 16);
+        count('pstack-picks skills', skillCount(`${d}/skills`), 18);
         exists(`${d}/agents/comment-sicko.md`);
         return { sha: upstream(`${d}/UPSTREAM`) };
       },
