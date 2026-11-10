@@ -56,10 +56,15 @@ struct Body {
 /// Returns readable text, ending with the hint that the agent can write the file itself, when the spec cannot be
 /// read or is not `OpenAPI` 3, no single base URL can be told, or the target exists.
 pub fn generate(spec: &Path, output: &Path, base_url: Option<&str>) -> Result<Generated, String> {
-    write(spec, output, base_url).map_err(|e| format!("{e}. {HINT}"))
+    write(spec, output, base_url, DEADLINE).map_err(|e| format!("{e}. {HINT}"))
 }
 
-fn write(spec: &Path, output: &Path, base_url: Option<&str>) -> Result<Generated, String> {
+fn write(
+    spec: &Path,
+    output: &Path,
+    base_url: Option<&str>,
+    deadline: Duration,
+) -> Result<Generated, String> {
     for (what, path) in [("spec", spec), ("output", output)] {
         if !path.is_absolute() {
             return Err(format!(
@@ -68,7 +73,7 @@ fn write(spec: &Path, output: &Path, base_url: Option<&str>) -> Result<Generated
             ));
         }
     }
-    let (text, requests, with_body) = build(spec, base_url)?;
+    let (text, requests, with_body) = build(spec, base_url, deadline)?;
     let mut file_name = spec.file_stem().unwrap_or_default().to_owned();
     file_name.push(".http");
     let path = output.join(file_name);
@@ -93,12 +98,16 @@ fn write(spec: &Path, output: &Path, base_url: Option<&str>) -> Result<Generated
     })
 }
 
-/// Reads the spec and renders the file, on a worker thread that is given `DEADLINE`, so a spec the YAML reader
-/// takes long over costs that long and no more. Nothing is created until this returns.
+/// Reads the spec and renders the file, on a worker thread that is given `deadline` (`DEADLINE` but in tests), so a
+/// spec the YAML reader takes long over costs that long and no more. Nothing is created until this returns.
 ///
 /// shortcut: a thread cannot be stopped, so a worker that overruns is left to finish on its own, holding a core and
 /// the spec's memory until libyaml is done; move to a child process that can be killed if such workers pile up.
-fn build(spec: &Path, base_url: Option<&str>) -> Result<(String, usize, usize), String> {
+fn build(
+    spec: &Path,
+    base_url: Option<&str>,
+    deadline: Duration,
+) -> Result<(String, usize, usize), String> {
     let (spec, base_url) = (spec.to_owned(), base_url.map(str::to_owned));
     let (send, receive) = mpsc::channel();
     thread::spawn(move || {
@@ -112,10 +121,10 @@ fn build(spec: &Path, base_url: Option<&str>) -> Result<(String, usize, usize), 
         // After a timeout nobody is listening.
         let _ = send.send(built);
     });
-    receive.recv_timeout(DEADLINE).map_err(|_| {
+    receive.recv_timeout(deadline).map_err(|_| {
         format!(
             "the spec could not be read within {} seconds",
-            DEADLINE.as_secs()
+            deadline.as_secs()
         )
     })?
 }
@@ -712,6 +721,22 @@ mod tests {
         err
     }
 
+    /// Like `refused`, but reading the spec gets `deadline` in place of the real one.
+    fn refused_within(tag: &str, rest: &str, deadline: Duration) -> String {
+        let dir = scratch(tag);
+        fs::write(dir.join("api.yaml"), format!("{HEAD}{rest}")).unwrap();
+        let Err(err) = write(
+            &dir.join("api.yaml"),
+            &dir.join("out"),
+            Some(BASE),
+            deadline,
+        ) else {
+            panic!("expected a refusal");
+        };
+        assert!(!scratch_out(tag).exists(), "a refusal writes nothing");
+        err
+    }
+
     fn scratch_out(tag: &str) -> PathBuf {
         std::env::temp_dir()
             .join(format!("http-runner-generate-{tag}-{}", std::process::id()))
@@ -1250,19 +1275,19 @@ paths:
             "1, ".repeat(20_000),
             "*a, ".repeat(5_000)
         );
-        let err = refused("alias-bomb", &bomb, Some(BASE));
+        // 60 s is far past the 3 s this takes in a debug build, so a loaded machine can't reach it.
+        let err = refused_within("alias-bomb", &bomb, Duration::from_secs(60));
         assert!(err.contains("aliases are replayed"), "{err}");
     }
 
     #[test]
     fn deep_flow_nesting_is_refused_quickly() {
         // Each closer sits in a comment, so a scan of the text never sees the nesting libyaml's reader does:
-        // 400 KB that libyaml takes minutes to read (159 s in a debug build).
+        // 40 KB that libyaml takes 1.7 s to read in a debug build, far past 100 ms. The worker that overruns keeps
+        // running after the test, which is why this is the smallest input that still overruns.
         let block = format!("{}\n#{}\n", "[".repeat(100), "]".repeat(100));
-        let spec = format!("x: {}", block.repeat(2_000));
-        let started = std::time::Instant::now();
-        let err = refused("deep", &spec, Some(BASE));
-        assert!(started.elapsed() < std::time::Duration::from_secs(12));
+        let spec = format!("x: {}", block.repeat(200));
+        let err = refused_within("deep", &spec, Duration::from_millis(100));
         assert!(err.contains("could not be read within"), "{err}");
     }
 
@@ -1300,7 +1325,8 @@ paths:
         let spec = format!(
             "paths:\n{uses}\ncomponents:\n  requestBodies:\n    Big:\n      content:\n        text/plain:\n          example: {big}\n"
         );
-        let err = refused("output-cap", &spec, Some(BASE));
+        // 60 s is far past the 6 s this takes in a debug build, so a loaded machine can't reach it.
+        let err = refused_within("output-cap", &spec, Duration::from_secs(60));
         assert!(err.contains("would pass"), "{err}");
     }
 
