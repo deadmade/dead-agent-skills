@@ -267,7 +267,7 @@ fn rows_failed_render_reports_the_browsers_error() {
 
 #[test]
 fn rows_a_slow_page_says_it_is_still_loading() {
-    // The fake holds a page whose address has `/slow` for 3 s; the deadline is shorter.
+    // The fake holds a page whose address has `/slow` for 30 s; the deadline is shorter.
     let (mut mcp, _) = start_with(&[], &[("WEB_MCP_FALLBACK_MS", "500".into())]);
     let r = mcp.call("rows", json!({"url": url("slow")}));
     assert!(is_error(&r), "{r}");
