@@ -110,6 +110,8 @@ them at Gate 1 (2026-11-10). Every other test that passed on the base must still
 
 - Fix 1-5: base 26364290d661bec2a2b537ad31c4c082ea2cf92d, untracked at start: flow.md, plan.md, the audit file. files clean (the files the findings name; Fix 4's test edit is the decided deviation). Fix check: PASS on all five.
 
+- Task 5: added 2026-11-10 by the user's decision "Vendor pstack's unslop and technical-writing instead of rewriting their references". Changed `pstack.ts` (two skills moved from `SKIPPED` to `SKILLS`, their names out of `GUARD`, the three `unslop` rewrites deleted), `sources.ts` (count 16 to 18), `THIRD_PARTY.md`, `docs/components/packs.md`; re-synced at the pinned commit, so the three pstack lines are upstream's again. `npm run typecheck` and `npm test` exit 0; the skill scanner (uvx, 2.3.2) reports 18 safe skills, info findings only.
+
 ## Rulings
 
 - 2026-11-10, Task 4: dropped the glossary's **Conversation shorthand** entry too — only ADR 0014, which is history and explains the term itself, still uses it — if wrong, one entry to restore. — confirmed
@@ -128,6 +130,10 @@ Status: decided 2026-11-10: the user picked Fix 4 at Gate 2, approving the edit 
 
 <!-- Decisions that go to the user, one per `### <deviation>` heading, then `Status: open` or
 `Status: decided <date>: <what>`; below it, why the plan doesn't hold and the options with a recommendation. -->
+
+### Vendor pstack's unslop and technical-writing instead of rewriting their references
+
+Status: decided 2026-11-10: the user asked, after the PR opened, to use what pstack's skills provide rather than rewrite them; Task 3's plain-wording rewrites are replaced by vendoring the two skills.
 
 ## Walkthrough
 

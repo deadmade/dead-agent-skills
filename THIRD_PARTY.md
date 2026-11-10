@@ -48,8 +48,7 @@ apart from flattening `engineering/` and `productivity/` into one folder. Synced
 [pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT License, Copyright (c) 2026 Lauren Tan;
 full text in `plugins/flows/packs/pstack-picks/LICENSE`). Modified mechanically for Claude Code by
 `tools/upstream-sync/src/adapters/pstack.ts` (tool names, subagent types, model names, paths, and an added port note
-under each file's frontmatter). Not vendored: pstack's `unslop` and `technical-writing`; the sync rewrites its references to
-`unslop` into plain wording. The synced upstream commit is in
+under each file's frontmatter). The synced upstream commit is in
 `plugins/flows/packs/pstack-picks/UPSTREAM`.
 
 ## tob-picks

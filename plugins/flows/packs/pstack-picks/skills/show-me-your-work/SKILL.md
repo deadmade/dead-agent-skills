@@ -35,7 +35,7 @@ ts	phase	decision	why	evidence	result
 
 ## Logging a row
 
-Write each entry the way you'd tell a teammate what you did. Plain words, concrete actions, no AI speak or abstract jargon.
+Write each entry the way you'd tell a teammate what you did. Plain words, concrete actions, no AI speak or abstract jargon (the **unslop** skill applies to log text too).
 
 Use the helper `scripts/log.sh <logfile> <phase> <decision> <why> <evidence> <result>`. It stamps `ts`, writes the header on first use, strips stray tabs/newlines, and prefixes any cell starting with `=`, `+`, `-`, or `@` with a single quote. A bare `printf` appending a row works too, but mind those same bytes if cells come from generated or user-supplied text.
 
