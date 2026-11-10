@@ -1,0 +1,107 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "dead-claude-skills",
+  "description": "deadmade's personal Claude Code setup: own skills plus the third-party plugins used on every machine.",
+  "metadata": {
+    "version": "0.6.49"
+  },
+  "owner": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "allowCrossMarketplaceDependenciesOn": [
+    "claude-plugins-official"
+  ],
+  "plugins": [
+    {
+      "name": "dead-skills",
+      "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus core plugins from claude-plugins-official as dependencies.",
+      "source": "./.claude-plugin/dead-skills",
+      "category": "productivity"
+    },
+    {
+      "name": "flows",
+      "description": "Conductor skills, most with approval gates and resumable state: build, research, evaluate, review and learn, with the skill packs they run.",
+      "source": "./.claude-plugin/flows",
+      "category": "development"
+    },
+    {
+      "name": "graphify",
+      "description": "Graphify: turn a codebase, docs and papers into a queryable knowledge graph (/graphify), plus hooks that nudge Claude to query the graph before reading files. Needs the graphify CLI (the installer installs it with uv, with the sql, pdf, office, watch and leiden extras). Vendored from Graphify-Labs/graphify, synced weekly.",
+      "source": "./.claude-plugin/graphify",
+      "category": "development"
+    },
+    {
+      "name": "hallmark",
+      "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark, synced weekly.",
+      "source": "./.claude-plugin/hallmark",
+      "category": "development"
+    },
+    {
+      "name": "rust-skills",
+      "description": "Apollo GraphQL's Rust best practices handbook as a skill. Vendored from apollographql/skills, synced weekly.",
+      "source": "./.claude-plugin/rust-skills",
+      "category": "development"
+    },
+    {
+      "name": "csharp-skills",
+      "description": "Microsoft's .NET skills (dotnet/skills) behind six C#-only router skills. Vendored from dotnet/skills, synced weekly.",
+      "source": "./.claude-plugin/csharp-skills",
+      "category": "development"
+    },
+    {
+      "name": "postgres",
+      "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
+      "source": "./.claude-plugin/postgres",
+      "category": "development"
+    },
+    {
+      "name": "web-mcp",
+      "description": "Web research tools for Claude: search (Google, Bing, DuckDuckGo and Brave read in web-mcp's own browser, paper APIs plus Google Scholar and Semantic Scholar, ranked with BM25), fetch (whole pages as markdown), browser (agent-browser), rows (a page's repeating items as numbered rows) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records), all archived in .web/. Needs the web-mcp binary and agent-browser.",
+      "source": "./.claude-plugin/web-mcp",
+      "category": "development"
+    },
+    {
+      "name": "shop",
+      "description": "Shop: a skill for buying decisions and price checks. It points web-mcp's rows tool at Kleinanzeigen and Geizhals and says how to judge what comes back.",
+      "source": "./.claude-plugin/shop",
+      "category": "development"
+    },
+    {
+      "name": "mcp-github",
+      "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions, code search). Opt-in per machine; needs a GitHub PAT.",
+      "source": "./.claude-plugin/mcp-github",
+      "category": "productivity"
+    },
+    {
+      "name": "mcp-azure",
+      "description": "Azure DevOps Server tools through the ado-mcp release binary: pull requests, work items, pipelines, search, wikis and repository files. Self-hosted, PAT authentication; opt-in.",
+      "source": "./.claude-plugin/mcp-azure",
+      "category": "productivity"
+    },
+    {
+      "name": "http-runner",
+      "description": "http-runner: runs VS Code REST Client .http files for the agent and returns the API's real reply, saved with secrets masked under http-replies/. It can write a starting .http file from a local OpenAPI file. The user types each host's login once on a local page the server opens. Needs the http-runner binary.",
+      "source": "./.claude-plugin/http-runner",
+      "category": "development"
+    },
+    {
+      "name": "nix-lsp",
+      "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
+      "source": "./.claude-plugin/nix-lsp",
+      "category": "development"
+    },
+    {
+      "name": "headroom-trim",
+      "description": "Shrinks every tool result with headroom's no-ML lossy compression before Claude reads it, through a local trim server that runs offline. Needs uv, which the installer downloads. Opt-in.",
+      "source": "./.claude-plugin/headroom-trim",
+      "category": "development"
+    },
+    {
+      "name": "agent-review",
+      "description": "Checks agent work through verified artifacts, independent extractions and cold reviews. Used by the default bundle and flows.",
+      "source": "./.claude-plugin/agent-review",
+      "category": "development"
+    }
+  ]
+}

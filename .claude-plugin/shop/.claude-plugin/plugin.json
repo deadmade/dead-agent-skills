@@ -1,0 +1,15 @@
+{
+  "name": "shop",
+  "version": "0.6.49",
+  "description": "Shop: a skill for buying decisions and price checks. It points web-mcp's rows tool at Kleinanzeigen and Geizhals and says how to judge what comes back.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-agent-skills",
+  "license": "MIT",
+  "dependencies": [
+    "web-mcp"
+  ],
+  "skills": "./skills/"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "http-runner",
+  "version": "0.6.49",
+  "description": "http-runner: runs VS Code REST Client .http files for the agent and returns the API's real reply, saved with secrets masked under http-replies/. It can write a starting .http file from a local OpenAPI file. The user types each host's login once on a local page the server opens. Needs the http-runner binary.",
+  "interface": {
+    "displayName": "http-runner",
+    "shortDescription": "http-runner: runs VS Code REST Client .http files for the agent and returns the API's real reply, sa"
+  },
+  "skills": "./skills/"
+}
