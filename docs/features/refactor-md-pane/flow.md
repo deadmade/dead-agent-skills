@@ -1,7 +1,7 @@
 ---
 flow: refactor
-phase: finish
-now: Waiting for you: pick how the branch ends.
+phase: done
+now: 'Done: PR handed over for refactor-md-pane.'
 ---
 
 # Remove md-pane: flow
