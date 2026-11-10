@@ -1,7 +1,7 @@
 ---
 flow: refactor
-phase: finish
-now: Waiting for you: pick how the branch ends.
+phase: done
+now: Done: PR handed over for worktree-refactor-writing.
 ---
 
 # Remove the writing skill: flow
