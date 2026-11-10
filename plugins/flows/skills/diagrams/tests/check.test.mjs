@@ -26,6 +26,9 @@ function check(markdown, { root = temp(), env, cwd } = {}) {
   return { code: r.status, out: (r.stdout ?? '') + (r.stderr ?? ''), root };
 }
 
+// This is the one test file that runs the checker on the user's cache. `node --test` runs test files at once, and two
+// checkers on one cold cache run `npm ci` in one folder. Other test files give the checker a cache and a PATH of their own,
+// as `render.test.mjs`'s `render()` does.
 // The first run installs the parser into the user's cache; offline it cannot, and the tests that need it stand down.
 const READY = !check(fence('mermaid', 'flowchart LR\n  a --> b')).out.includes('not parser-checked');
 const NEEDS_PARSER = READY ? false : 'the parser cannot be installed (offline)';
