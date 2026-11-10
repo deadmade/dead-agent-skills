@@ -31,9 +31,9 @@ test('a GROUPS folder can hold another one', () => {
   assert.deepEqual(pluginDirs(fx), ['plugins/opt-in/implementation/i', 'plugins/opt-in/mcp/m', 'plugins/opt-in/x']);
 });
 
-test('the real repo lists md-pane but not the grouping folder', () => {
+test('the real repo lists headroom-trim but not the grouping folder', () => {
   const dirs = pluginDirs(ROOT);
-  assert.ok(dirs.includes('plugins/opt-in/md-pane'));
+  assert.ok(dirs.includes('plugins/opt-in/headroom-trim'));
   assert.ok(!dirs.includes('plugins/opt-in'));
 });
 
