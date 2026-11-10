@@ -786,8 +786,8 @@ impl Browser {
             return tokio::time::sleep(Duration::from_secs(1)).await;
         };
         let files = ["pid", "sock"].map(|ext| dir.join(format!("{session}.{ext}")));
-        let until = std::time::Instant::now() + Duration::from_secs(1);
-        while files.iter().any(|f| f.exists()) && std::time::Instant::now() < until {
+        let until = tokio::time::Instant::now() + Duration::from_secs(1);
+        while files.iter().any(|f| f.exists()) && tokio::time::Instant::now() < until {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
     }
@@ -1156,33 +1156,43 @@ mod tests {
         for f in &files {
             std::fs::write(f, "").unwrap();
         }
-        // Files that never go: the wait gives up after 1 s (plus the deadline and the two closing calls).
+        // Files that never go: the render waits for them, after the deadline and the two closing calls. The
+        // wait's own 1 s cap is `session_gone_waits_for_the_files_up_to_a_second`'s.
         let t = std::time::Instant::now();
         b.render(Some(&url), key, Some(run()), deadline)
             .await
             .unwrap_err();
         let capped = t.elapsed();
         assert!(capped >= deadline + Duration::from_secs(1), "{capped:?}");
-        assert!(capped < Duration::from_secs(3), "{capped:?}");
         assert_eq!(args(calls(&dir).last().unwrap()).last(), Some(&"close"));
-        // Files that go after 500 ms end the wait then, well before the cap.
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn session_gone_waits_for_the_files_up_to_a_second() {
+        let (dir, b) = fake("gone-paused");
+        let session = name("search-duckduckgo", 1);
+        let files = ["pid", "sock"].map(|ext| dir.join("sock").join(format!("{session}.{ext}")));
+        for f in &files {
+            std::fs::write(f, "").unwrap();
+        }
+        // Files that stay: the wait gives up after exactly 1 s.
+        let t = tokio::time::Instant::now();
+        b.session_gone(&session).await;
+        assert_eq!(t.elapsed(), Duration::from_secs(1));
+        // Files that go after 500 ms end the wait at the next poll, which runs every 50 ms.
         let gone = files.clone();
-        let remover = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(500));
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(500)).await;
             for f in &gone {
                 std::fs::remove_file(f).unwrap();
             }
         });
-        let t = std::time::Instant::now();
-        b.render(Some(&url), key, Some(run()), deadline)
-            .await
-            .unwrap_err();
+        let t = tokio::time::Instant::now();
+        b.session_gone(&session).await;
         let waited = t.elapsed();
-        remover.join().unwrap();
-        assert!(waited >= Duration::from_millis(500), "{waited:?}");
         assert!(
-            waited + Duration::from_millis(400) < capped,
-            "{waited:?} vs {capped:?}"
+            (Duration::from_millis(500)..=Duration::from_millis(550)).contains(&waited),
+            "{waited:?}"
         );
     }
 
