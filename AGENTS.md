@@ -54,9 +54,6 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   connect Atlassian through the official connector. It is the only url-sourced entry, deliberately unpinned. Because it is
   Codex-only, it never reaches `shippedVersions`, which reads a pinned url entry's version from its `ref` for the Claude
   marketplace only.
-- `plugins/opt-in/md-pane/`: a mod. The pure path logic is in `hooks/paths.ts`. `register.tsx` redraws replies that name an existing
-  `.md` file as its own `Markdown` and shows the clicked file in a pane, refreshed by a 1 s stat while open. Only a plugin-drawn
-  `Markdown` with `onLinkPress` receives plain link clicks, and only in the fullscreen terminal.
 - `plugins/opt-in/headroom-trim/`: trims tool results before Claude reads them, through a uv-run Python server on
   loopback. Every failure leaves Claude the original output. Read `docs/components/headroom-trim.md` before changing it.
 - `plugins/opt-in/implementation/`: the vendored language and database plugins (rust-skills, csharp-skills, postgres).
@@ -132,9 +129,8 @@ Read `docs/components/ci.md` for how a release is built and published.
   linking fails.
 - Don't share `CARGO_TARGET_DIR` between worktrees: a test binary keeps the `CARGO_MANIFEST_DIR` of the worktree that
   built it, and web-mcp's integration tests start whichever server binary was built last.
-- mod tests: after a build, copy each plugin's `hooks/*.test.*` into its generated package and run `claude plugin test .`
-  in `.claude-plugin/dead-skills` and `.claude-plugin/md-pane`, as `test.yml` does (in `plugins/` it fails: those folders
-  hold neutral manifests). CI doesn't run `tsc -p .` in `plugins/default` and `plugins/opt-in/md-pane`. It needs the engine's typings in
+- mod tests: after a build, copy `plugins/default/hooks/*.test.*` into `.claude-plugin/dead-skills/hooks/` and run `claude plugin test .`
+  there, as `test.yml` does (in `plugins/default` it fails: it holds a neutral manifest). CI doesn't run `tsc -p .` in `plugins/default`. It needs the engine's typings in
   `.claude-plugin/types/` (gitignored), which `claude plugin test` doesn't write.
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded). Enter it only from the repo root:

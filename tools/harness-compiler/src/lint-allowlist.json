@@ -26,13 +26,5 @@
   {
     "path": "plugins/default/tsconfig.json",
     "reason": "UI mod source: TypeScript written against Claude's UI engine, declared in plugin.json `extensions`; the compiler leaves it out of other harnesses' packages"
-  },
-  {
-    "path": "plugins/opt-in/md-pane/tsconfig.json",
-    "reason": "UI mod source: TypeScript written against Claude's UI engine, declared in plugin.json `extensions`; the compiler leaves it out of other harnesses' packages"
-  },
-  {
-    "path": "plugins/opt-in/md-pane/hooks/paths.test.ts",
-    "reason": "UI mod source: TypeScript written against Claude's UI engine, declared in plugin.json `extensions`; the compiler leaves it out of other harnesses' packages"
   }
 ]

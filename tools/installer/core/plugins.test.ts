@@ -47,7 +47,6 @@ test('opt-ins from the real manifests', () => {
         'http-runner',
         'mcp-azure',
         'mcp-github',
-        'md-pane',
         'nix-lsp',
         'postgres',
         'rust-skills',
@@ -102,7 +101,7 @@ test('foreign plugins and marketplaces spare ours and the official plugins we us
 
 test('retired plugins are ours but no longer in the marketplace', () => {
   const managed = [...bundleIds(bundle), ...optIns(marketplace, bundle)];
-  assert.deepEqual(retiredPlugins([`dev-feature@${M}`, `md-pane@${M}`, `code-review@${O}`, 'x@y'], managed), [
+  assert.deepEqual(retiredPlugins([`dev-feature@${M}`, `graphify@${M}`, `code-review@${O}`, 'x@y'], managed), [
     `dev-feature@${M}`,
   ]);
 });
@@ -155,8 +154,8 @@ test("flows' dependencies are marketplace or official plugins", () => {
 
 test('outdated compares our shipped versions only, once per id, never downgrading', () => {
   const rows = [
-    { id: `md-pane@${M}`, version: '0.1.0', scope: 'user' },
-    { id: `md-pane@${M}`, version: '0.1.0', scope: 'project' },
+    { id: `headroom-trim@${M}`, version: '0.1.0', scope: 'user' },
+    { id: `headroom-trim@${M}`, version: '0.1.0', scope: 'project' },
     { id: `feature-flow@${M}`, version: '0.1.1' },
     { id: `graphify@${M}`, version: '29c78da38ecf' },
     { id: `hallmark@${M}`, version: '0.2.0' },
@@ -164,14 +163,14 @@ test('outdated compares our shipped versions only, once per id, never downgradin
     { id: `code-review@${O}`, version: '1.0.0' },
   ];
   const shipped = {
-    'md-pane': '0.1.1',
+    'headroom-trim': '0.1.1',
     'feature-flow': '0.1.1',
     graphify: '0.1.1',
     hallmark: '0.1.1',
     'code-review': '9.9.9',
   };
   assert.deepEqual(outdated(rows, shipped), [
-    { id: `md-pane@${M}`, from: '0.1.0', to: '0.1.1' },
+    { id: `headroom-trim@${M}`, from: '0.1.0', to: '0.1.1' },
     { id: `graphify@${M}`, from: '29c78da38ecf', to: '0.1.1' },
   ]);
 });

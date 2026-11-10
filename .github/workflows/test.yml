@@ -91,13 +91,6 @@ jobs:
           cd .claude-plugin/dead-skills
           claude plugin test .
 
-      - name: md-pane mod tests
-        if: needs.changes.outputs.node == 'true'
-        run: |
-          cp plugins/opt-in/md-pane/hooks/*.test.* .claude-plugin/md-pane/hooks/
-          cd .claude-plugin/md-pane
-          claude plugin test .
-
       - name: headroom-trim server tests
         if: needs.changes.outputs.node == 'true'
         working-directory: plugins/opt-in/headroom-trim/server

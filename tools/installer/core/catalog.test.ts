@@ -7,7 +7,7 @@ const root = resolve(import.meta.dirname, '../../..');
 const definitions = () => readCatalog(root);
 test('neutral catalog preserves names, default and dependency closure without native-only plugins', () => {
   const all = definitions();
-  assert.equal(all.length, 17);
+  assert.equal(all.length, 16);
   assert.deepEqual(
     selectTarget(all, 'codex').plugins.map((p) => p.name),
     [
@@ -26,11 +26,11 @@ test('neutral catalog preserves names, default and dependency closure without na
       'atlassian',
     ],
   );
-  assert.equal(selectTarget(all, 'claude-code').plugins.length, 16);
+  assert.equal(selectTarget(all, 'claude-code').plugins.length, 15);
   assert.deepEqual(portableSelection(all, []), ['dead-skills']);
   assert.deepEqual(portableSelection(all, ['flows']), ['dead-skills', 'flows', 'graphify', 'web-mcp']);
   assert.deepEqual(portableSelection(all, ['flows', 'flows']), ['dead-skills', 'flows', 'graphify', 'web-mcp']);
-  assert.throws(() => portableSelection(all, ['md-pane']), /Unknown portable/);
+  assert.throws(() => portableSelection(all, ['nix-lsp']), /Unknown portable/);
   assert.throws(() => portableSelection(all, ['unknown']), /Unknown portable/);
 });
 test('dependency validation rejects unknown references, cycles and duplicate identities', () => {

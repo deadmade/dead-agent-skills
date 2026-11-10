@@ -246,7 +246,7 @@ test('Codex offers shared catalog choices and installs the flows dependency clos
         'shop',
         'web-mcp',
       ]);
-      for (const native of ['nix-lsp', 'md-pane']) assert.equal(Object.hasOwn(choices, native), false);
+      for (const native of ['nix-lsp']) assert.equal(Object.hasOwn(choices, native), false);
       // The default component is automatic rather than an opt-out choice.
       assert.equal(Object.hasOwn(choices, 'dead-skills'), false);
       return choose(state, controls);

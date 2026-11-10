@@ -126,7 +126,7 @@ export const claudeCode: Target = {
         name: p.name,
         description: p.description,
         source: typeof p.source === 'string' ? `${prefix}/${p.name}` : p.source,
-        category: ['dead-skills', 'mcp-github', 'mcp-azure', 'atlassian', 'md-pane'].includes(p.name)
+        category: ['dead-skills', 'mcp-github', 'mcp-azure', 'atlassian'].includes(p.name)
           ? 'productivity'
           : 'development',
       })),

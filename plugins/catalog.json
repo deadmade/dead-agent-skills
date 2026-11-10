@@ -102,13 +102,6 @@
     "targets": ["claude-code"]
   },
   {
-    "name": "md-pane",
-    "source": "plugins/opt-in/md-pane",
-    "resources": [],
-    "dependencies": [],
-    "targets": ["claude-code"]
-  },
-  {
     "name": "headroom-trim",
     "source": "plugins/opt-in/headroom-trim",
     "resources": ["server"],
