@@ -15,9 +15,7 @@ text = '''
 - Only a plan gate offers an execution method, and on that gate's own line: subagent-driven (offered only when
   subagents are available) or native = `executing-plans`, with your recommendation. The user approves the plan **and**
   picks the method in the same answer. Every other gate asks for approval alone.
-- The gate message says whether the document it shows was copyedited: `copyedited`, `copyedit refused` with the lines
-  `compare.mjs` printed, `not copyedited: no subagents`, or `not copyedited: a given plan is not changed`.
 - Before a gate shows a spec or a plan, read `<flow-root>/skills/diagrams/SKILL.md` and follow it; the gate shows the
-  page it produces beside the usual summary. Render after the copyedit. A spec or plan the run was given, and flow.md,
+  page it produces beside the usual summary. A spec or plan the run was given, and flow.md,
   are rendered but never edited.
 '''

@@ -82,11 +82,7 @@ first task writes them. The plan is written and checked by these rules, and the 
 **A restructuring** then gets plan review: follow [plan-review.md](../build-feature/references/plan-review.md), with
 `### Shape` and its pick in place of the spec and no prior-art sections, logged under **Plan review**. Without
 subagents: plan review is an independent check, so it is skipped and recorded under **Skipped**
-(`plan review: no subagents`).
-
-Then, for both sizes and once, after any plan review, the plan is copyedited and checked again before the gate:
-
-[step: copyedit]
+(`plan review: no subagents`). The review's edits are edits to the plan: run glance again before the gate.
 
 ## Phase 3: Gate
 

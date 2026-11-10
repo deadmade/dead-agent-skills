@@ -45,20 +45,15 @@ test('runtime handlers get the harness, event and plugin root of the target', ()
     /CODEX_PLUGIN_ROOT.*--harness codex/,
   );
 });
-test('tool hooks map neutral tool names and path filters per tool', () => {
+test('tool hooks map neutral tool names', () => {
   const h = hook({
     event: 'tool.completed',
     handler: undefined,
     script: 'hooks/p.mjs',
     tools: ['file.write', 'file.edit'],
-    paths: ['**/*.md'],
   });
   const r = nativeHooks([h], claude, 'ROOT') as any;
   assert.equal(r.PostToolUse[0].matcher, 'Write|Edit');
-  assert.deepEqual(
-    r.PostToolUse[0].hooks.map((x: any) => x.if),
-    ['Write(**/*.md)', 'Edit(**/*.md)'],
-  );
   assert.equal(
     (
       nativeHooks(

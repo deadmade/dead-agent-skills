@@ -84,9 +84,6 @@ once the ticket or plan is fixed, and otherwise offers to set `phase: done` with
   so the user can change the plan and run /implement again; offer `/build-feature` only when the user wants the design
   reopened.
 
-Neither is copyedited, since the run changes neither: for a plan, the gate message says so as the gate rules below
-give it; for a ticket, `not copyedited: a given ticket is not changed`.
-
 [step: gate]
 
 ## Phase 3: Execute

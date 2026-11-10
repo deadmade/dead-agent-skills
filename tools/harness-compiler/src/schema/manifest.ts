@@ -169,19 +169,7 @@ export function parseHooks(value: unknown, name: string): { description?: string
     const h = object(raw, w);
     only(
       h,
-      [
-        'event',
-        'handler',
-        'script',
-        'command',
-        'http',
-        'args',
-        'tools',
-        'paths',
-        'required',
-        'background',
-        'timeoutSeconds',
-      ],
+      ['event', 'handler', 'script', 'command', 'http', 'args', 'tools', 'required', 'background', 'timeoutSeconds'],
       w,
     );
     const ways = ['handler', 'script', 'command', 'http'].filter((k) => h[k] !== undefined);
@@ -204,7 +192,6 @@ export function parseHooks(value: unknown, name: string): { description?: string
       ...(h.http ? { http: string(h.http, `${w}.http`) } : {}),
       ...(h.args ? { args: strings(h.args, `${w}.args`) } : {}),
       ...(h.tools ? { tools: strings(h.tools, `${w}.tools`).map((t) => oneOf(t, HOOK_TOOLS, `${w}.tools`)) } : {}),
-      ...(h.paths ? { paths: strings(h.paths, `${w}.paths`) } : {}),
       required: h.required === true,
       background: h.background === true,
       ...(h.timeoutSeconds !== undefined ? { timeoutSeconds: h.timeoutSeconds as number } : {}),

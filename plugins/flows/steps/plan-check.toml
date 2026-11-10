@@ -1,7 +1,6 @@
 #:schema ./step.schema.json
 text = '''
-Run `node "<flow-root>/skills/build-feature/scripts/glance.mjs" "<plan.md>"` after every edit to the plan and again
-after its copyedit, so the block a gate shows matches the plan below it. It writes the plan's task graph and table at
+Run `node "<flow-root>/skills/build-feature/scripts/glance.mjs" "<plan.md>"` after every edit to the plan, so the block a gate shows matches the plan below it. It writes the plan's task graph and table at
 the top of plan.md, and it fails with the reason when the plan has no `### Task <n>:` headings or a task lacks
 `Depends on:`, names no task in it, or has a `Size:` that isn't `~N`. A missing **Does:**, **Adds:** or **Size:**
 line doesn't fail it, so read its table as well: every task has all four lines, and an empty `does` or a `?` under

@@ -51,7 +51,7 @@ checker holds that map to the repository as an error.
 
 ## Steps
 
-1. Write the pictures into the document as you draft it. Check and render only after the copyedit, if the gate copyedits it.
+1. Write the pictures into the document as you draft it.
 2. Check it, and fix the blocks until it exits 0. Each line names the block it is about:
 
    `node "<flow-root>/skills/diagrams/scripts/check.mjs" "<doc>"`

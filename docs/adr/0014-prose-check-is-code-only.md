@@ -1,5 +1,8 @@
 # The prose check is code only and looks only for conversation shorthand
 
+Superseded on 2026-11-10: the prose check, the copyedit and the writing skill were removed
+(`docs/features/refactor-writing/`).
+
 `plugins/flows/hooks/prose-check.mjs` checks `*.md` writes for conversation shorthand. It uses no linter and no model.
 We measured the alternatives first, on one sample spec with model judges:
 

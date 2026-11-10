@@ -3,7 +3,7 @@ name: review-code
 description: 'Review a branch before it merges, the whole repo, or a pull request: run its checks once, settle the intent, pick review lenses from what the diff touches (correctness, lean and spec, tests, docs, security, risk), verify every finding, and report on one screen with the full table in docs/audits/. Fixes only what you pick, then confirms the decisions the build made on its own, makes the commits and offers how to integrate; a pull request is only reported on. Never posts or pushes. Use for /review-code [branch|all|pr <number>] [base].'
 disable-model-invocation: true
 argument-hint: '[branch|all|pr <number>] [base branch or commit]'
-uses: flows:writing, superpowers:verification-before-completion, superpowers:systematic-debugging, superpowers:test-driven-development, ponytail:ponytail-review, ponytail:ponytail-audit, pstack-picks:blast-radius, pstack-picks:interrogate, pstack-picks:principle-boundary-discipline, tob-picks:spec-to-code-compliance, tob-picks:mutation-testing, tob-picks:property-based-testing, tob-picks:sharp-edges, security-audit:security-audit, mattpocock-picks:improve-codebase-architecture, mattpocock-picks:grilling
+uses: superpowers:verification-before-completion, superpowers:systematic-debugging, superpowers:test-driven-development, ponytail:ponytail-review, ponytail:ponytail-audit, pstack-picks:blast-radius, pstack-picks:interrogate, pstack-picks:principle-boundary-discipline, tob-picks:spec-to-code-compliance, tob-picks:mutation-testing, tob-picks:property-based-testing, tob-picks:sharp-edges, security-audit:security-audit, mattpocock-picks:improve-codebase-architecture, mattpocock-picks:grilling
 template: skills/review-code/references/audit-template.md
 ---
 
@@ -122,11 +122,9 @@ Security and security-domain findings keep their own severity.
 
 ## Phase 5: Report
 
-<!-- runs: report.md, the copyedit · output: one screen, `docs/audits/…` -->
+<!-- runs: report.md · output: one screen, `docs/audits/…` -->
 
-Follow [references/report.md](references/report.md), then copyedit the audit file:
-
-[step: copyedit]
+Follow [references/report.md](references/report.md).
 
 **Gate 1, report:** the user picks by number (`1,3`, `all fix` for every finding whose `bucket` is
 `fix before merge`, `all`, `none`). Record `Picks: <finding numbers> | none` in the audit file. Under `pr`, there is

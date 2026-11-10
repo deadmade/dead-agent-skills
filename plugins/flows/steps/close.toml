@@ -3,7 +3,6 @@ uses = [
   "superpowers:finishing-a-development-branch",
   "superpowers:systematic-debugging",
   "pstack-picks:blast-radius",
-  "flows:writing",
 ]
 requires = ["decide"]
 
@@ -29,7 +28,7 @@ writes; pushing is the owner's call and their hooks block it.
 - The body, saved to a scratchpad file: why; what changed, opening with the smallest picture of it (a call tree, a
   before/after line, a few boxes in plain text); blast radius (pstack `blast-radius` over the diff) with a **Door**
   line (one-way: data, a wire format, a public interface; two-way: a revert undoes it); verification, with the
-  before/after output where behaviour changed. Revise it by `flows:writing`.
+  before/after output where behaviour changed.
 - **Gate:** show the title, the body and the closing commit below, and ask once: one yes approves all three. Make the
   closing commit first, so the PR carries it; then hand over `git push -u origin <branch>`, then
   `gh pr create --title "<title>" --body-file <file>`, one at a time: {{user-runs}}.

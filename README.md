@@ -66,10 +66,6 @@ The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: condu
 `/fix`, `/review-code`, `/learn` and more), nearly all of which run the other plugins' skills in order,
 most with approval gates. Build and research flows keep a flow.md to resume from; /review-code keeps an audit file.
 They keep the number of agents small, ultracode included, and run each on a model suited to its job rather than the one you picked. Picking flows installs every plugin its conductors use.
-flows also sets the house standard for prose. A `writing` skill states Williams and Bizup's _Style_ in our own words.
-A code-only check on each Write or Edit of a Markdown file flags conversation shorthand such as `Q11` or `round 2`
-(`FLOWS_PROSE_CHECK=off` turns it off). Before a gate, a fresh editor agent on the strongest model the host
-offers copyedits the spec, plan or report by the skill; when code finds something lost, the gate shows the unedited document and what was lost.
 flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup,
 Cloudflare's security-audit and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
 their skills, hooks and ponytail's band stay out of your sessions outside the conductors, and the installer removes

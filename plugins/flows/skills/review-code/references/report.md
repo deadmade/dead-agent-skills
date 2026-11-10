@@ -49,4 +49,3 @@ a · <decision> — <your recommendation>
   in a few words, your pick): the build's **Rulings**, its **Deviations** and their decisions, new `shortcut:` lines,
   and the **Parking lot** (Decide lists where each comes from). Lettered, so they don't clash with finding numbers.
 - The last line ends with the run rules' footer as its "Not checked" part.
-- The copyedit (Phase 5) runs on the file before the gate; the screen is short enough to go as written.

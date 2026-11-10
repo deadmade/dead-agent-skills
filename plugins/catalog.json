@@ -9,7 +9,7 @@
   {
     "name": "flows",
     "source": "plugins/flows",
-    "resources": ["skills", "references", "packs", "agents", "hooks/prose.mjs"],
+    "resources": ["skills", "references", "packs", "agents"],
     "dependencies": ["dead-skills", "graphify", "web-mcp"],
     "targets": ["claude-code", "codex"]
   },

@@ -63,7 +63,7 @@ as not checked.
 
 ## Prose
 
-Docs the diff changed, read against `flows:writing`, loaded with the host's skill tool. Findings only, severity low
+Docs the diff changed, read as a reader who wasn't in the conversation would read them. Findings only, severity low
 unless the wording misleads.
 
 ## Severity and fixes

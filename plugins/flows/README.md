@@ -17,7 +17,6 @@ Claude proposes and recommends; you decide.
 | `/refactor <what>`                               | restructure code without changing behaviour                     | `how` and the suite, shape and size the target, a plan, characterization tests where coverage is thin, the moves on a branch                                                                                                                                                                                                                                                                                                                 | `/review-code`, `/learn`                          |
 | `/review-code [branch\|all\|pr <number>] [base]` | review a branch before merge, the whole repo, or a pull request | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes; `pr` only reports                                                                                                                                                                  | merge, or a PR (`!` lines to push) and CI watched |
 | `/learn [flow]`                                  | keep what the work taught                                       | no questions: the few lessons that matter, written to AGENTS.md/CLAUDE.md, `domain-modeling`, a `docs/solutions/` note or memory; ADRs, checks and skill fixes to the Parking lot                                                                                                                                                                                                                                                            | done                                              |
-| `/flows:writing copyedit <file.md>`              | revise a finished document for a new reader                     | a fresh agent revises it by the `writing` skill; `compare.mjs` refuses an edit that lost what code can check                                                                                                                                                                                                                                                                                                                                 | the edited document, uncommitted                  |
 | `/flows:diagrams <file.md>`                      | check a spec or plan's pictures and show it as one page         | `check.mjs` parses each Mermaid diagram with Mermaid itself and checks file maps against the repo; `render.mjs` writes the text and pictures as one HTML page; every gate that shows a spec or plan runs both                                                                                                                                                                                                                                | a page, or its path                               |
 | `/flows:tidy`                                    | recheck memory notes and flow folders                           | a read-only agent proposes; the main session checks each proposal and drops what fails. It edits memory notes and `flow.md`, writes findings under `docs/` and runs `git rm` on finished flow folders. It asks first about what looks strange: closing a flow, promoting a finding to `docs/`, `user` or `feedback` notes, a note's `name` or `description`, rules about behaviour, and new text without evidence from git or a tracked file | changes applied and reported, uncommitted         |
 
@@ -37,7 +36,7 @@ build-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: diagrams, writing
+├ flows: diagrams
 ├ graphify: graphify
 ├ mattpocock-picks: codebase-design, domain-modeling, grilling, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
@@ -58,7 +57,7 @@ fix
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: diagrams, writing
+├ flows: diagrams
 ├ pstack-picks: blast-radius, how, interrogate, why
 ├ superpowers: finishing-a-development-branch, systematic-debugging, test-driven-development, using-git-worktrees
 └ web-mcp: fetch, search
@@ -67,7 +66,7 @@ implement
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: diagrams, writing
+├ flows: diagrams
 ├ graphify: graphify
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why
@@ -87,7 +86,7 @@ refactor
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: diagrams, writing
+├ flows: diagrams
 ├ graphify: graphify
 ├ mattpocock-picks: codebase-design, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
@@ -99,7 +98,7 @@ research-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: diagrams, writing
+├ flows: diagrams
 ├ graphify: graphify
 ├ mattpocock-picks: grilling, setup-matt-pocock-skills
 ├ paper-lookup: paper-lookup
@@ -110,7 +109,7 @@ review-code
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ flows: diagrams, writing
+├ flows: diagrams
 ├ mattpocock-picks: grilling, improve-codebase-architecture
 ├ ponytail: ponytail-audit, ponytail-review
 ├ pstack-picks: blast-radius, interrogate, principle-boundary-discipline
@@ -135,7 +134,7 @@ upgrade
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ dead-skills: context7
-├ flows: diagrams, writing
+├ flows: diagrams
 ├ graphify: graphify
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why
@@ -156,32 +155,6 @@ Renamed in 2026-11: `/feature-flow` is `/build-feature`, `/research-flow` is `/r
 and builds nothing), `/fix-flow` is `/fix`, and `/review-code` replaces `/self-review`, `/verify`, `/test-audit`,
 `/doc-audit` and `/harden`. Runs started under the old names resume under the new ones; research runs started before
 the change don't.
-
-## Writing
-
-flows holds one standard for prose a person will read: a skill that states it, a check on every Markdown write, and a
-copyedit that revises a document by it before a gate.
-
-- **The `writing` skill** (`skills/writing/`) is Williams and Bizup's _Style: Lessons in Clarity and Grace_ in our own
-  words, as checks to run on a draft from the top down: the problem and the point at the end of a short opening, the
-  order the reader needs rather than the order the work happened in, topic strings and old-before-new, characters as
-  subjects and actions as verbs, the book's six concision cuts limited by a density test, and naming who acted. A
-  short section adds rules for technical documents that the book doesn't cover, such as no conversation shorthand.
-  `references/` holds the full method of every lesson and both appendices, which Claude reads when a pass needs it.
-  Unlike the conductors, Claude may load it on its own (`flows:writing`) whenever it writes a spec, a plan, a report,
-  a README, a PR description or a commit message. `/review-code`'s docs lens reads changed docs against it, and its PR step
-  revises the PR body by it.
-- **The prose check** (`hooks/prose-check.mjs`, a `PostToolUse` hook on every `Write` and `Edit` of a `*.md` file)
-  reports conversation shorthand (`Q4`, `D2`, `round 2`, `my call`) in the new text only: an Edit's new string, or the
-  lines a Write added to the file, unless the file defines the label. It is Node code with no model call, so it costs no
-  tokens. Claude sees its findings and may leave a sentence that a finding gets wrong. In `flow.md` files it is off,
-  since flow.md is the log where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
-- **The copyedit** (`skills/writing/references/copyedit.md`, `/flows:writing copyedit <file.md>`): a fresh agent
-  revises a document by the skill for a reader who wasn't in the conversation, and the edit goes through only when
-  code finds nothing lost that it can check. What it refuses is listed in that file. Code can't see meaning, so a
-  dropped sentence or a flipped negation still needs the diff it shows. It commits nothing. Before a gate shows a spec, a plan, a research report or an audit report, the
-  conductors run it on that document; when it refuses an edit, the gate shows the unedited document and what the edit
-  lost.
 
 ## Packs
 
@@ -208,7 +181,7 @@ writes each host's form of that policy from the conductor's `disable-model-invoc
 mapping is written into each built conductor (`tools/harness-compiler/src/templates/hosts/`), and cross-package lookups are described in
 `references/resource-index.md`.
 If a session cannot launch subagents, the main session does the delegated work (searching, exploring) itself, and
-independent checks (reviewers, source checks, the copyedit) are skipped and recorded as not checked. Keep approval gates.
+independent checks (reviewers, source checks) are skipped and recorded as not checked. Keep approval gates.
 
 Install instructions are generated with each distribution and listed in the repository README.
 
