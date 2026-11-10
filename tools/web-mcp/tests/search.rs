@@ -139,9 +139,16 @@ fn setup() -> (Fixture, PathBuf) {
 
 /// A server whose fake agent-browser reads `pages` and logs to `pages/calls.jsonl`.
 fn start(pages: &Path, envs: &[(&str, String)]) -> Mcp {
+    // Real Chrome answers on its debug port, but the fake's default port has no listener, and Windows takes about 2 s
+    // to refuse a connect, so each typed engine's tab raise would cost 2 s of the engines' 10 s. A 404 is enough:
+    // the raise is best effort. The fixture has no `Drop`, so its thread outlives the handle.
+    let state = tempdir();
+    let cdp = Fixture::start("127.0.0.1");
+    std::fs::write(state.join("cdp-port"), cdp.addr.port().to_string()).unwrap();
     let mut all = vec![
         ("FAKE_AB_PAGES", pages.display().to_string()),
         ("FAKE_AB_LOG", log_path(pages).display().to_string()),
+        ("FAKE_AB_STATE", state.display().to_string()),
     ];
     all.extend_from_slice(envs);
     Mcp::start_with(tempdir(), &all)

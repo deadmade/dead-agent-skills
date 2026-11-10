@@ -141,7 +141,7 @@ fn batch(stdin: &str, state: &Path, session: &str, tab_gone: bool, bail: bool) -
         return Value::Array(typing(&cmds, state, session, tab_gone, bail));
     }
     if stdin.contains("/slow") {
-        std::thread::sleep(std::time::Duration::from_secs(3)); // a page that hangs
+        std::thread::sleep(std::time::Duration::from_secs(30)); // a page that hangs: killed with its call
     }
     let stored = stored_url(state, session);
     let url = match cmds.iter().find(|c| c[0] == "open") {

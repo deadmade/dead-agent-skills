@@ -662,21 +662,26 @@ fn slow_fallback_still_closes_its_session() {
     .unwrap();
     fx.route("/slow.html", vec![common::Resp::html(shell)]);
     let log = tempdir().join("calls.jsonl");
+    // 2 s, not less: the deadline also covers starting agent-browser, which a loaded runner can make slow.
     let mut mcp = Mcp::start_with(
         tempdir(),
         &[
             ("WEB_MCP_AGENT_BROWSER", FAKE.to_owned()),
             ("FAKE_AB_LOG", log.display().to_string()),
-            ("WEB_MCP_FALLBACK_MS", "300".to_owned()),
+            ("WEB_MCP_FALLBACK_MS", "2000".to_owned()),
         ],
     );
-    let started = std::time::Instant::now();
     let r = mcp.call("fetch", json!({"url": fx.url("/slow.html")}));
-    assert!(started.elapsed() < std::time::Duration::from_secs(3));
     assert!(!is_error(&r), "{r}");
-    assert!(text(&r).contains("browser fallback"), "{r}");
+    assert!(
+        text(&r).contains("browser fallback failed: the page did not finish within"),
+        "{r}"
+    );
     let c = calls(&log);
-    let batch = c.iter().find(|c| args(c).contains(&"batch")).unwrap();
+    let batch = c
+        .iter()
+        .find(|c| args(c).contains(&"batch"))
+        .unwrap_or_else(|| panic!("no batch logged: {r}\n{c:?}"));
     let session = args(batch)[1];
     assert!(
         c.iter()

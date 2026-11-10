@@ -14,12 +14,17 @@ const temp = () => mkdtempSync(join(tmpdir(), 'diagrams-render-'));
 const fence = (kind, body) => `\`\`\`${kind}\n${body}\n\`\`\`\n`;
 
 // Runs the renderer on `markdown` with a temp folder as the working directory (the checker's root).
+// The folder is also the checker's cache and its whole PATH, so the checker finds no npm and never touches the user's cache.
 function render(markdown, args = (doc, out) => [doc, out]) {
   const dir = temp();
   const doc = join(dir, 'doc.md');
   const out = join(dir, 'out.html');
   writeFileSync(doc, markdown);
-  const r = spawnSync(process.execPath, [RENDER, ...args(doc, out)], { encoding: 'utf8', cwd: dir });
+  const r = spawnSync(process.execPath, [RENDER, ...args(doc, out)], {
+    encoding: 'utf8',
+    cwd: dir,
+    env: { PATH: dir, HOME: dir, USERPROFILE: dir, XDG_CACHE_HOME: dir, LOCALAPPDATA: dir },
+  });
   const html = existsSync(out) ? readFileSync(out, 'utf8') : undefined;
   return { code: r.status, text: (r.stdout ?? '') + (r.stderr ?? ''), err: r.stderr ?? '', html, out };
 }

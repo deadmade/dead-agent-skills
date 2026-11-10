@@ -50,7 +50,7 @@ suppressions:
   - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
     skills: [diagrams]
     paths: [tests/check.test.mjs, tests/render.test.mjs]
-    reason: The tests spawnSync node on the skill's own scripts, with argument arrays and no shell.
+    reason: The tests spawnSync node on the skill's own scripts, or a temp copy of them, with argument arrays and no shell.
   - rule_id: COMMAND_INJECTION_JS_FUNCTION_CONSTRUCTOR
     skills: [diagrams]
     paths: [tests/render.test.mjs]

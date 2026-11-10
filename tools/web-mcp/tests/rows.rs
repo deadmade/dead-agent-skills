@@ -4,6 +4,7 @@
 mod common;
 
 use std::fmt::Write as _;
+use std::io::Write as _;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -266,7 +267,7 @@ fn rows_failed_render_reports_the_browsers_error() {
 
 #[test]
 fn rows_a_slow_page_says_it_is_still_loading() {
-    // The fake holds a page whose address has `/slow` for 3 s; the deadline is shorter.
+    // The fake holds a page whose address has `/slow` for 30 s; the deadline is shorter.
     let (mut mcp, _) = start_with(&[], &[("WEB_MCP_FALLBACK_MS", "500".into())]);
     let r = mcp.call("rows", json!({"url": url("slow")}));
     assert!(is_error(&r), "{r}");
@@ -324,16 +325,42 @@ fn rows_deeply_nested_hostile_page_returns_in_bounded_time() {
     );
 }
 
-/// A page of 3,000 nested levels around `inside` must get its answer within a few seconds. Deeper only slows the
-/// test: the HTML parser alone takes 30 s on 20,000 levels in a debug build.
+/// A page of 3,000 nested levels around `inside` must get its answer in under twice the time a parse of the same page
+/// takes. Two servers take the page at the same time: one walks it, and the other is given an `item` that matches
+/// nothing, so it renders and parses the same bytes and walks nothing. The bound is relative because a fixed one fails
+/// on a slow or loaded machine. Deeper pages only slow the test: the HTML parser alone takes 30 s on 20,000 levels in a
+/// debug build.
 fn nested_page_returns_in_bounded_time(open: &str, inside: &str, close: &str) {
     let html = format!("{}{inside}{}", open.repeat(3_000), close.repeat(3_000));
-    let (mut mcp, _) = start(&[("nest.html", html)]);
-    let started = Instant::now();
-    let r = mcp.call("rows", json!({"url": url("nest")}));
-    let took = started.elapsed();
-    assert!(!is_error(&r), "{r}");
-    assert!(took < Duration::from_secs(5), "{took:?}");
+    let (mut walker, _) = start(&[("nest.html", html.clone())]);
+    let (mut parser, _) = start(&[("nest.html", html)]);
+    let timed = |mcp: &mut Mcp, args: Value| {
+        let started = Instant::now();
+        let r = mcp.call("rows", args);
+        (started.elapsed(), r)
+    };
+    let ((took, walk_reply), (base, parse_reply)) = std::thread::scope(|s| {
+        let walk = s.spawn(|| timed(&mut walker, json!({"url": url("nest")})));
+        let parse = s.spawn(|| {
+            timed(
+                &mut parser,
+                json!({"url": url("nest"), "item": "li.nothing"}),
+            )
+        });
+        (walk.join().unwrap(), parse.join().unwrap())
+    });
+    assert!(!is_error(&walk_reply), "{walk_reply}");
+    assert!(
+        text(&parse_reply).contains("matched nothing"),
+        "{parse_reply}"
+    );
+    let ratio = took.as_secs_f64() / base.as_secs_f64();
+    // `eprintln!` is captured by libtest; this line reaches the log of a passing run.
+    let _ = writeln!(
+        std::io::stderr(),
+        "rows_deep walk/parse: {took:?} / {base:?} = {ratio:.2}"
+    );
+    assert!(took < base * 2, "walk {took:?} against parse {base:?}");
 }
 
 #[test]
