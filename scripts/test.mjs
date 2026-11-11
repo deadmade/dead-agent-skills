@@ -1,9 +1,9 @@
 // The one list of what runs: each suite, its test files and how it starts. It uses only the Node standard library and
 // tools/installer/system/proc.ts, because crates.yml runs it without `npm ci`.
 import { createHash } from 'node:crypto';
-import { existsSync, globSync, readFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, posix } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startSync, which } from '../tools/installer/system/proc.ts';
 
@@ -40,7 +40,8 @@ const NODE_FLAGS = [
 const TREES = { file: process.execPath, args: ['tools/harness-compiler/src/cli.ts', 'build'] };
 
 // Each suite gives { commands, fail } (fail: why it cannot start) or { notRun } (why it is skipped).
-// A command is { file, args, cwd (relative to the root), env }.
+// A command is { file, args, cwd (relative to the root), env }, or { list, run } when it is more than one program start:
+// `list` is what --list prints and `run` returns the status of what it ran.
 const SUITES = {
   repo: ({ modules }) => ({
     commands: [{ file: process.execPath, args: ['scripts/check-repo.mjs'] }],
@@ -52,6 +53,50 @@ const SUITES = {
       commands: [{ file: process.execPath, args: [...NODE_FLAGS, ...files] }],
       fail: modules ?? (files.length ? undefined : 'node: no test files'),
     };
+  },
+  mods: ({ root, modules }) => {
+    if (modules) return { notRun: modules };
+    const claude = which('claude');
+    if (!claude) return { notRun: 'claude not on PATH' };
+    const catalog = JSON.parse(readFileSync(join(root, 'plugins/catalog.json'), 'utf8'));
+    const files = suiteFiles(root).mods;
+    const orphans = new Set(files);
+    const commands = [];
+    // A url source (atlassian) has no folder.
+    for (const { name, source } of catalog.filter((p) => typeof p.source === 'string')) {
+      const mine = files.filter((f) => f.startsWith(`${source}/`));
+      for (const f of mine) orphans.delete(f);
+      if (!mine.length) continue;
+      commands.push({
+        list: `(in a copy of .claude-plugin/${name}, with ${mine.join(' ')}) claude plugin test .`,
+        // A copy, so .claude-plugin/ never holds a test file.
+        run: () => {
+          const copy = mkdtempSync(join(tmpdir(), `mods-${name}-`));
+          try {
+            cpSync(join(root, '.claude-plugin', name), copy, { recursive: true });
+            for (const f of mine) {
+              const to = join(copy, f.slice(source.length + 1));
+              mkdirSync(dirname(to), { recursive: true });
+              copyFileSync(join(root, f), to);
+            }
+            return startSync(claude, ['plugin', 'test', '.'], { cwd: copy, stdio: 'inherit' });
+          } finally {
+            rmSync(copy, { recursive: true, force: true });
+          }
+        },
+      });
+    }
+    for (const f of orphans) {
+      const message = `${f}: no catalog plugin holds this test`;
+      commands.push({
+        list: message,
+        run: () => {
+          console.error(message);
+          return { status: 1 };
+        },
+      });
+    }
+    return { commands };
   },
   python: ({ root }) => {
     const file = which('uv');
@@ -96,7 +141,7 @@ const SUITES = {
 };
 
 const USAGE =
-  'usage: node scripts/test.mjs [--strict] [--list] [--packages a,b] [--each-package] [repo|node|python|rust ...]';
+  'usage: node scripts/test.mjs [--strict] [--list] [--packages a,b] [--each-package] [repo|node|mods|python|rust ...]';
 
 function usage(message) {
   console.error(`${message}\n${USAGE}`);
@@ -134,7 +179,7 @@ function main(argv) {
   const modules = existsSync(join(root, 'node_modules')) ? undefined : 'node_modules missing: run npm ci';
   const plan = (suite) => SUITES[suite]({ root, modules, packages, each });
   // When repo is selected, check-repo builds the generated trees itself.
-  const needsTrees = (suite) => suite === 'node' && !suites.includes('repo');
+  const needsTrees = (suite) => (suite === 'node' || suite === 'mods') && !suites.includes('repo');
 
   if (list) {
     let treesListed = false;
@@ -149,12 +194,13 @@ function main(argv) {
         commands.unshift(TREES);
       }
       for (const c of commands)
-        console.log(`${suite}: ${[c.file, ...c.args].join(' ')}${c.cwd ? ` (in ${c.cwd})` : ''}`);
+        console.log(`${suite}: ${c.list ?? `${[c.file, ...c.args].join(' ')}${c.cwd ? ` (in ${c.cwd})` : ''}`}`);
     }
     return 0;
   }
 
   const run = (c) =>
+    c.run?.() ??
     startSync(c.file, c.args, { cwd: join(root, c.cwd ?? ''), env: c.env ?? process.env, stdio: 'inherit' });
   let treesBuilt; // undefined until a suite needs the build
   // Returns [status, reason]; a missing reason means the suite ran, so the summary shows its time.

@@ -1,7 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +25,11 @@ const SH =
   '#!/bin/sh\necho "$(pwd) :: $* :: $UV_PROJECT_ENVIRONMENT $PYTHONDONTWRITEBYTECODE" >> "$FAKE_LOG"\n[ -f fail ] && exit 1\nexit 0\n';
 const CMD =
   '@echo off\r\n>> "%FAKE_LOG%" echo %cd% :: %* :: %UV_PROJECT_ENVIRONMENT% %PYTHONDONTWRITEBYTECODE%\r\nif exist fail exit /b 1\r\nexit /b 0\r\n';
+// The fake claude logs `<cwd> :: <args> :: <its hooks/ and tests/ test files>` and fails when `fail` is in its cwd.
+const CLAUDE_SH =
+  '#!/bin/sh\nfor f in hooks/*.test.ts* tests/*.test.ts*; do [ -f "$f" ] && files="$files $f"; done\necho "$(pwd) :: $* ::$files" >> "$FAKE_LOG"\n[ -f fail ] && exit 1\nexit 0\n';
+const CLAUDE_CMD =
+  '@echo off\r\nset files=\r\nfor %%f in (hooks\\*.test.ts* tests\\*.test.ts*) do call set files=%%files%% %%f\r\n>> "%FAKE_LOG%" echo %cd% :: %* ::%files%\r\nif exist fail exit /b 1\r\nexit /b 0\r\n';
 const REPO_STUB = `import { appendFileSync } from 'node:fs';
 appendFileSync(process.env.FAKE_LOG, 'check-repo :: ' + process.argv.slice(2).join(' ') + '\\n');
 process.exit(Number(process.env.REPO_EXIT ?? 0));
@@ -50,7 +65,8 @@ function door(t, { modules = true, tools = ['uv', 'cargo'] } = {}) {
   const bin = join(root, 'fake tools');
   const logFile = join(root, 'log.txt');
   mkdirSync(bin);
-  const fake = (name, sh = SH) => writeFileSync(join(bin, WIN ? `${name}.cmd` : name), WIN ? CMD : sh, { mode: 0o755 });
+  const fake = (name, sh = SH, cmd = CMD) =>
+    writeFileSync(join(bin, WIN ? `${name}.cmd` : name), WIN ? cmd : sh, { mode: 0o755 });
   for (const name of tools) fake(name);
 
   const run = (args, extra = {}) => {
@@ -67,7 +83,7 @@ function door(t, { modules = true, tools = ['uv', 'cargo'] } = {}) {
     const log = readFileSync(logFile, 'utf8').replaceAll('"', '').split(/\r?\n/).filter(Boolean);
     return { status: r.status, out: r.stdout, err: r.stderr, log };
   };
-  return { root, fake, run };
+  return { root, fake, put, run };
 }
 
 test('a failing suite does not stop the next, and fails the run', (t) => {
@@ -92,9 +108,10 @@ test('a failing suite does not stop the next, and fails the run', (t) => {
 
 test('a missing tool is NOT RUN, which fails only under --strict; a missing node_modules fails repo and node', (t) => {
   const d = door(t, { tools: [] });
-  const r = d.run(['python']);
+  const r = d.run(['python', 'mods']);
   assert.equal(r.status, 0);
   assert.match(r.out, /^python +NOT RUN +uv not on PATH$/m);
+  assert.match(r.out, /^mods +NOT RUN +claude not on PATH$/m);
   assert.equal(d.run(['--strict', 'python']).status, 1);
 
   const bare = door(t, { modules: false });
@@ -146,6 +163,59 @@ test('the python suite runs in the server folder with its venv outside the tree'
   assert.equal(a.bytecode, '1');
   const set = join(d.root, 'my venv');
   assert.equal(uv(d, { UV_PROJECT_ENVIRONMENT: set }).venv, set);
+});
+
+test('the mods suite tests each package in a temp copy with its tests copied in', (t) => {
+  const d = door(t, { tools: [] });
+  d.fake('claude', CLAUDE_SH, CLAUDE_CMD);
+  d.put(
+    'plugins/catalog.json',
+    JSON.stringify([
+      { name: 'bad', source: 'plugins/bad' },
+      { name: 'good', source: 'plugins/good' },
+    ]),
+  );
+  for (const f of [
+    'plugins/bad/hooks/b.test.tsx',
+    'plugins/good/hooks/a.test.ts',
+    'plugins/orphan/hooks/c.test.ts',
+    '.claude-plugin/bad/fail',
+    '.claude-plugin/good/hooks/register.tsx',
+  ])
+    d.put(f, '');
+  const tree = () => readdirSync(join(d.root, '.claude-plugin'), { recursive: true }).sort();
+  const before = tree();
+
+  const r = d.run(['mods']);
+  assert.equal(r.status, 1);
+  // The first line is the native build, which mods needs without repo.
+  const runs = r.log.slice(1).map((l) => l.replaceAll('\\', '/').split(' :: '));
+  assert.equal(runs.length, 2);
+  for (const [cwd, args] of runs) {
+    assert.equal(args, 'plugin test .');
+    assert.ok(!cwd.startsWith(d.root.replaceAll('\\', '/')));
+    assert.ok(!existsSync(cwd));
+  }
+  const [bad, good] = runs;
+  assert.match(bad[0], /\/mods-bad-/);
+  assert.equal(bad[2], 'hooks/b.test.tsx');
+  assert.match(good[0], /\/mods-good-/);
+  assert.equal(good[2], 'hooks/a.test.ts');
+  assert.match(r.out + r.err, /^plugins\/orphan\/hooks\/c\.test\.ts: no catalog plugin holds this test$/m);
+  assert.deepEqual(tree(), before);
+  assert.match(r.out, /^mods +failed/m);
+});
+
+test('without repo, the door builds the native trees before mods', (t) => {
+  const d = door(t, { tools: ['claude'] });
+  const m = d.run(['mods']);
+  assert.equal(m.status, 0);
+  assert.deepEqual(m.log, ['build :: build']);
+  assert.match(m.out, /^mods +passed/m);
+  const r = d.run(['repo', 'mods']);
+  assert.equal(r.status, 0);
+  assert.equal(r.log.length, 1);
+  assert.match(r.log[0], /^check-repo ::/);
 });
 
 test('usage errors exit 2 and run nothing', (t) => {
