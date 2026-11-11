@@ -146,9 +146,14 @@ for (const [where, v] of [
 const cargo = /^version = "(.*)"/m.exec(readFileSync('Cargo.toml', 'utf8'))?.[1];
 if (cargo !== version) problems.push(`Cargo.toml: workspace version is ${cargo}, package.json has ${version}`);
 const cargoLock = readFileSync('Cargo.lock', 'utf8');
-for (const name of workspacePackages()) {
-  const locked = new RegExp(`^name = "${name}"\\r?\\nversion = "(.*)"`, 'm').exec(cargoLock)?.[1];
-  if (locked !== version) problems.push(`Cargo.lock: ${name} is ${locked}, package.json has ${version}`);
+// A member manifest that is missing or not TOML throws here; the policy below names which one.
+try {
+  for (const name of workspacePackages()) {
+    const locked = new RegExp(`^name = "${name}"\\r?\\nversion = "(.*)"`, 'm').exec(cargoLock)?.[1];
+    if (locked !== version) problems.push(`Cargo.lock: ${name} is ${locked}, package.json has ${version}`);
+  }
+} catch (error) {
+  problems.push(`Cargo.lock versions not checked: ${error.message.split('\n')[0]}`);
 }
 
 // --- the Cargo workspace policy (scripts/cargo-workspace.mjs) ---
