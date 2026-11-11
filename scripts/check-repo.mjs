@@ -10,6 +10,7 @@ import { loadPlugins, selectTarget } from '../tools/harness-compiler/src/load.ts
 import { TARGETS } from '../tools/harness-compiler/src/targets/index.ts';
 import { TOKENS as CLAUDE_CODE } from '../tools/harness-compiler/src/templates/hosts/claude-code.ts';
 import { TOKENS as CODEX } from '../tools/harness-compiler/src/templates/hosts/codex.ts';
+import { checkCargoWorkspace } from './cargo-workspace.mjs';
 import {
   checkOverrides,
   checkPackPaths,
@@ -124,6 +125,9 @@ for (const name of workspacePackages()) {
   const locked = new RegExp(`^name = "${name}"\\r?\\nversion = "(.*)"`, 'm').exec(cargoLock)?.[1];
   if (locked !== version) problems.push(`Cargo.lock: ${name} is ${locked}, package.json has ${version}`);
 }
+
+// --- the Cargo workspace policy (scripts/cargo-workspace.mjs) ---
+problems.push(...checkCargoWorkspace('.'));
 
 if (problems.length) {
   console.error(problems.map((p) => `✗ ${p}`).join('\n'));

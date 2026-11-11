@@ -40,10 +40,8 @@ jobs:
         with:
           workspaces: .
 
-      - name: Workspace policy and formatting
+      - name: Formatting
         run: |
-          python -m unittest discover -s scripts -p 'check_cargo_workspace_test.py'
-          python scripts/check_cargo_workspace.py
           packages=$(node -e 'console.log(JSON.parse(process.env.PACKAGES).map(p => "-p " + p).join(" "))')
           cargo fmt $packages -- --check
 

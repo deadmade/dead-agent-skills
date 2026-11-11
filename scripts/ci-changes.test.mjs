@@ -64,7 +64,6 @@ test('shared dependencies, CI and unknown components select everything', () => {
     '.cargo/config.toml',
     '.github/workflows/test.yml',
     'scripts/ci-changes.mjs',
-    'scripts/check_cargo_workspace.py',
     'tools/new-crate/src/lib.rs',
   ]) {
     assert.deepEqual(selectChecks([path]), selectChecks([], true), path);
@@ -88,6 +87,7 @@ test('docs skip expensive checks, but root readmes and crate manifests get consi
   assert.equal(selectChecks(['docs/adr/example.md']).node, false);
   assert.equal(selectChecks(['README.md']).node, true);
   assert.equal(selectChecks(['tools/ado-mcp/Cargo.toml']).node, true);
+  assert.equal(selectChecks(['tools/web-mcp/Cargo.lock']).node, true);
 });
 
 test('mixed changes take a deterministic union', () => {

@@ -23,8 +23,13 @@ export function selectChecks(paths, all = false) {
     const crate = crates.find((c) => roots[c].some((root) => path.startsWith(root)));
     if (crate) {
       selected.add(crate);
-      // Manifests and the hand-typed repository slug participate in repository consistency checks.
-      if (path.startsWith('plugins/') || path.endsWith('/Cargo.toml') || path === 'tools/web-mcp/src/api.rs')
+      // Manifests, lockfiles and the hand-typed repository slug participate in repository consistency checks.
+      if (
+        path.startsWith('plugins/') ||
+        path.endsWith('/Cargo.toml') ||
+        path.endsWith('/Cargo.lock') ||
+        path === 'tools/web-mcp/src/api.rs'
+      )
         node = true;
       if (path.startsWith('plugins/')) skills = true;
       continue;
@@ -35,8 +40,7 @@ export function selectChecks(paths, all = false) {
       path.startsWith('.cargo/') ||
       path.startsWith('rust-toolchain') ||
       path.startsWith('.github/workflows/') ||
-      path.startsWith('scripts/ci-changes') ||
-      path.startsWith('scripts/check_cargo_workspace')
+      path.startsWith('scripts/ci-changes')
     ) {
       everything();
     } else if (path.startsWith('plugins/') || path.startsWith('tools/harness-compiler/')) {
