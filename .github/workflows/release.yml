@@ -94,7 +94,7 @@ jobs:
       - run: npm ci
 
       - name: Tests
-        run: npm test
+        run: node scripts/test.mjs repo node
 
   binaries:
     needs: version

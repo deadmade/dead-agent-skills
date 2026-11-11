@@ -64,6 +64,7 @@ test('shared dependencies, CI and unknown components select everything', () => {
     '.cargo/config.toml',
     '.github/workflows/test.yml',
     'scripts/ci-changes.mjs',
+    'scripts/test.mjs',
     'tools/new-crate/src/lib.rs',
   ]) {
     assert.deepEqual(selectChecks([path]), selectChecks([], true), path);
@@ -195,6 +196,7 @@ test("test files and fixtures route like their component, at today's path and in
     ],
     ['tools/upstream-sync/src/cli.test.ts', 'tools/upstream-sync/tests/cli.test.ts', 'tools/upstream-sync/src/cli.ts'],
     ['scripts/flows-uses.test.mjs', 'scripts/tests/flows-uses.test.mjs', 'scripts/flows-uses.mjs'],
+    ['scripts/test.test.mjs', 'scripts/tests/test.test.mjs', 'scripts/flows-uses.mjs'],
     ['scripts/fixtures/ci-pr122-paths.json', 'scripts/tests/fixtures/ci-pr122-paths.json', 'scripts/flows-uses.mjs'],
     ['plugins/default/hooks/lib.test.mjs', 'plugins/default/tests/lib.test.mjs', 'plugins/default/hooks/lib.mjs'],
     [
@@ -214,4 +216,12 @@ test("test files and fixtures route like their component, at today's path and in
   // The one pair that routes differently after the move: the Node job runs this test, and nothing in it changes which checks run.
   assert.deepEqual(selectChecks(['scripts/ci-changes.test.mjs']), selectChecks([], true));
   assert.deepEqual(selectChecks(['scripts/tests/ci-changes.test.mjs']), selectChecks(['scripts/flows-uses.mjs']));
+  // A test-named file selects the Node job wherever it sits, so the layout guard runs on it.
+  for (const path of ['docs/zz.test.mjs', 'docs/a/test_b.py', 'docs/a/b_test.py']) {
+    assert.deepEqual(
+      selectChecks([path]),
+      { node: true, skills: false, rust: false, binaries: [], packages: [] },
+      path,
+    );
+  }
 });

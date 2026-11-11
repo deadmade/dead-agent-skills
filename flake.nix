@@ -55,13 +55,13 @@
       check-repo = pkgs.writeShellApplication {
         name = "check-repo";
         runtimeInputs = [node pkgs.git];
-        text = ''exec node scripts/check-repo.mjs'';
+        text = ''exec node scripts/test.mjs repo'';
       };
 
       installer-test = pkgs.writeShellApplication {
         name = "installer-test";
         runtimeInputs = [node pkgs.git];
-        text = ''exec npm test'';
+        text = ''exec node scripts/test.mjs repo node'';
       };
     in
       git-hooks.lib.${system}.run {
@@ -92,9 +92,9 @@
           };
           installer-test = {
             enable = true;
-            name = "installer tests";
+            name = "repo checks and Node tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|http-runner|web-mcp)/|plugins/default/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|package\\.json$)";
+            files = "^(plugins/|tools/|scripts/|package\\.json$|treefmt\\.toml$)";
             pass_filenames = false;
           };
         };

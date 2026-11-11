@@ -50,10 +50,12 @@ jobs:
       - run: npm ci
         if: needs.changes.outputs.node == 'true'
 
-      # check-repo, the first test, builds the native distributions (gitignored) that the later steps read.
+      # The repo suite builds the native distributions (gitignored) that the later suites and steps read.
       - name: Repo checks and tests
         if: needs.changes.outputs.node == 'true'
-        run: npm test
+        env:
+          UV_PROJECT_ENVIRONMENT: ${{ runner.temp }}/trim-venv
+        run: node scripts/test.mjs --strict repo node mods python
 
       - name: Installer and upstream-sync typecheck
         if: needs.changes.outputs.node == 'true'
@@ -81,22 +83,6 @@ jobs:
           set -e
           echo "$out"
           [ "$code" = 1 ] && grep -q 'Run this in a terminal' <<< "$out"
-
-      # The Claude packages are generated from plugins/, which holds the sources and their tests, so each is tested with
-      # its tests copied in.
-      - name: dead-skills mod tests
-        if: needs.changes.outputs.node == 'true'
-        run: |
-          cp plugins/default/hooks/*.test.* .claude-plugin/dead-skills/hooks/
-          cd .claude-plugin/dead-skills
-          claude plugin test .
-
-      - name: headroom-trim server tests
-        if: needs.changes.outputs.node == 'true'
-        working-directory: plugins/opt-in/headroom-trim/server
-        env:
-          UV_PROJECT_ENVIRONMENT: ${{ runner.temp }}/trim-venv
-        run: uv run --locked python -m unittest discover -s tests
 
   # Cisco's skill-scanner over every skill under plugins/ and the composed flows skills in .claude-plugin/flows/skills/
   # (policy: .github/skill-scanner.yaml); fails on high or critical.

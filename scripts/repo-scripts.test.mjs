@@ -23,7 +23,10 @@ test('package scripts and prepack build through the harness compiler, and the pa
 
 test('a release commits only the version bumps, after the tests', () => {
   const release = source('scripts/release.mjs');
-  assert.ok(release.indexOf('text.replace(version') < release.indexOf("run('npm', ['test'])"));
+  assert.ok(
+    release.indexOf('text.replace(version') <
+      release.indexOf("run(process.execPath, ['scripts/test.mjs', 'repo', 'node'])"),
+  );
   assert.match(release, /const files = bumps\.map/);
   assert.doesNotMatch(release, /'\.claude-plugin'|'\.agents\/plugins'/);
 });

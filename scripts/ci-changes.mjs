@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { isTestName } from './test.mjs';
 
 const crates = ['web-mcp', 'ado-mcp', 'http-runner'];
 const roots = {
@@ -20,6 +21,7 @@ export function selectChecks(paths, all = false) {
   };
   if (all) everything();
   for (const path of paths) {
+    if (isTestName(path)) node = true;
     const crate = crates.find((c) => roots[c].some((root) => path.startsWith(root)));
     if (crate) {
       selected.add(crate);
@@ -40,7 +42,8 @@ export function selectChecks(paths, all = false) {
       path.startsWith('.cargo/') ||
       path.startsWith('rust-toolchain') ||
       path.startsWith('.github/workflows/') ||
-      path.startsWith('scripts/ci-changes')
+      path.startsWith('scripts/ci-changes') ||
+      path === 'scripts/test.mjs'
     ) {
       everything();
     } else if (path.startsWith('plugins/') || path.startsWith('tools/harness-compiler/')) {

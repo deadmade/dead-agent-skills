@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test \"src/**/*.test.ts\" \"src/**/*.test.mjs\""
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "engines": {
     "node": ">=26"

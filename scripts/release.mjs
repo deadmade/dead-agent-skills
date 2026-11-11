@@ -89,8 +89,8 @@ function main() {
     writeFileSync(f, text.replace(version, `$1"${next}"`));
   }
 
-  // npm test builds the native distributions from the bumped versions (check-repo); they stay out of the commit.
-  if (!run('npm', ['test'])) {
+  // The repo and node suites build the native distributions from the bumped versions (check-repo); they stay out of the commit.
+  if (!run(process.execPath, ['scripts/test.mjs', 'repo', 'node'])) {
     git('checkout', '--', ...files);
     die('checks failed, versions reverted');
   }
