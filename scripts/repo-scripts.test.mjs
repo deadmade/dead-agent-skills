@@ -58,7 +58,12 @@ test('releases require plugin/tool changes or shared build inputs', () => {
   const block = workflow.match(/^    paths:\n((?:      - '[^']+'\n)+)/m);
   assert.ok(block, 'release has an explicit push path allowlist');
   const patterns = [...block[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
-  const triggers = (paths) => paths.some((path) => patterns.some((pattern) => posix.matchesGlob(path, pattern)));
+  // GitHub's rule for `paths` with `!` patterns: the last pattern that matches a path decides, and a `!` one drops it.
+  const triggers = (paths) =>
+    paths.some((path) => {
+      const last = patterns.findLast((pattern) => posix.matchesGlob(path, pattern.replace(/^!/, '')));
+      return last !== undefined && !last.startsWith('!');
+    });
   for (const path of [
     'plugins/flows/skills/build-feature/SKILL.md',
     'plugins/default/hooks/notify.mjs',
@@ -94,4 +99,12 @@ test('releases require plugin/tool changes or shared build inputs', () => {
   ];
   assert.equal(triggers(maintenance), false);
   assert.equal(triggers([...maintenance, 'tools/ado-mcp/src/wi.rs']), true);
+  const testsOnly = [
+    'tools/web-mcp/tests/search.rs',
+    'tools/ado-mcp/tests/fixtures/pr-threads.json',
+    'plugins/flows/skills/diagrams/tests/check.test.mjs',
+    'plugins/opt-in/headroom-trim/server/tests/test_server.py',
+  ];
+  for (const path of testsOnly) assert.equal(triggers([path]), false, path);
+  assert.equal(triggers([...testsOnly, 'tools/web-mcp/src/search.rs']), true);
 });
