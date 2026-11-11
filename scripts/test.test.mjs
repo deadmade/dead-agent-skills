@@ -204,6 +204,9 @@ test('the mods suite tests each package in a temp copy with its tests copied in'
   assert.match(r.out + r.err, /^plugins\/orphan\/hooks\/c\.test\.ts: no catalog plugin holds this test$/m);
   assert.deepEqual(tree(), before);
   assert.match(r.out, /^mods +failed/m);
+  // Without the orphan only the copied `fail` file can fail the run, so a package that is not copied in passes.
+  rmSync(join(d.root, 'plugins/orphan'), { recursive: true });
+  assert.equal(d.run(['mods']).status, 1);
 });
 
 test('without repo, the door builds the native trees before mods', (t) => {

@@ -80,6 +80,9 @@ const SUITES = {
               copyFileSync(join(root, f), to);
             }
             return startSync(claude, ['plugin', 'test', '.'], { cwd: copy, stdio: 'inherit' });
+          } catch (error) {
+            // A copy that fails, such as a package not built, fails mods and shows its reason, not the door.
+            return { status: null, error };
           } finally {
             rmSync(copy, { recursive: true, force: true });
           }
