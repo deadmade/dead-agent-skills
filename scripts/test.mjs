@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, cpSync, existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { startSync, which } from '../tools/installer/system/proc.ts';
 
 // The extensions are named because, given no paths, `node --test` also runs .test.cjs, the stale .test.js that
@@ -101,7 +101,12 @@ const SUITES = {
             // A copy that fails, such as a package not built, fails mods and shows its reason, not the door.
             return { status: null, error };
           } finally {
-            rmSync(copy, { recursive: true, force: true });
+            // A file still held on Windows must not throw out of the door and take the later suites with it.
+            try {
+              rmSync(copy, { recursive: true, force: true, maxRetries: 3 });
+            } catch (error) {
+              console.error(`mods: could not remove ${copy}: ${error.message}`);
+            }
           }
         },
       });
@@ -252,7 +257,8 @@ function main(argv) {
   return results.some((r) => r.status === 'failed' || (strict && r.status === 'NOT RUN')) ? 1 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// import.meta.main, not a comparison with argv[1], which keeps a symlinked path: the door would then run nothing and pass.
+if (import.meta.main) {
   // Importing proc.ts loads ui.ts, whose SIGTERM and SIGHUP handlers never run in this synchronous script and replace
   // the default terminate, so a kill or a timeout would not stop the run. Only the CLI drops them: an importer keeps its own.
   for (const signal of ['SIGTERM', 'SIGHUP']) process.removeAllListeners(signal);

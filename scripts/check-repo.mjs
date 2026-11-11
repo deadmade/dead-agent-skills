@@ -80,8 +80,13 @@ const git = which('git');
 if (!git) problems.push('git ls-files failed: git not on PATH; the layout guard did not run');
 else {
   const r = startSync(git, ['ls-files', '-z']);
-  if (r.status === 0) problems.push(...layoutProblems('.', r.stdout.split('\0').filter(Boolean)));
-  else {
+  if (r.status === 0) {
+    try {
+      problems.push(...layoutProblems('.', r.stdout.split('\0').filter(Boolean)));
+    } catch (error) {
+      problems.push(`layout guard: ${error.message}`);
+    }
+  } else {
     const why = r.stderr?.split(/\r?\n/)[0] || r.error?.message || `killed by ${r.signal}`;
     problems.push(`git ls-files failed: ${why}; the layout guard did not run`);
   }
@@ -147,7 +152,11 @@ for (const name of workspacePackages()) {
 }
 
 // --- the Cargo workspace policy (scripts/cargo-workspace.mjs) ---
-problems.push(...checkCargoWorkspace('.'));
+try {
+  problems.push(...checkCargoWorkspace('.'));
+} catch (error) {
+  problems.push(`cargo workspace policy: ${error.message}`);
+}
 
 if (problems.length) {
   console.error(problems.map((p) => `✗ ${p}`).join('\n'));

@@ -10,6 +10,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -69,12 +70,12 @@ function door(t, { modules = true, tools = ['uv', 'cargo'] } = {}) {
     writeFileSync(join(bin, WIN ? `${name}.cmd` : name), WIN ? cmd : sh, { mode: 0o755 });
   for (const name of tools) fake(name);
 
-  const run = (args, extra = {}) => {
+  const run = (args, extra = {}, script = join(root, 'scripts/test.mjs')) => {
     writeFileSync(logFile, '');
     const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== 'PATH'));
     delete env.MSYSTEM;
     delete env.UV_PROJECT_ENVIRONMENT;
-    const r = spawnSync(process.execPath, [join(root, 'scripts/test.mjs'), ...args], {
+    const r = spawnSync(process.execPath, [script, ...args], {
       cwd: join(root, 'scripts'),
       env: { ...env, PATH: bin, FAKE_LOG: logFile, ...extra },
       encoding: 'utf8',
@@ -121,6 +122,20 @@ test('a missing tool is NOT RUN, which fails only under --strict; a missing node
   assert.match(m.out, /^repo +failed +node_modules missing: run npm ci$/m);
   assert.match(m.out, /^node +failed +node_modules missing: run npm ci$/m);
   assert.deepEqual(m.log, []);
+  bare.fake('claude', CLAUDE_SH, CLAUDE_CMD);
+  assert.match(bare.run(['mods']).out, /^mods +NOT RUN +node_modules missing: run npm ci$/m);
+});
+
+test('started through a symlinked folder, the door still runs its suites', (t) => {
+  const d = door(t);
+  const outside = mkdtempSync(join(tmpdir(), 'door link '));
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  const link = join(outside, 'checkout');
+  symlinkSync(d.root, link, WIN ? 'junction' : 'dir');
+  const r = d.run(['repo'], {}, join(link, 'scripts/test.mjs'));
+  assert.equal(r.status, 0);
+  assert.match(r.out, /^repo +passed/m);
+  assert.match(r.log[0], /^check-repo ::/);
 });
 
 test('under Git Bash the rust suite refuses to run cargo', (t) => {

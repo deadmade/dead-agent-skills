@@ -21,7 +21,12 @@ export function checkCargoWorkspace(root) {
       problems.push(`${path}: use the root lockfile`);
       continue;
     }
-    const data = parse(readFileSync(join(root, path), 'utf8'));
+    let data;
+    try {
+      data = parse(readFileSync(join(root, path), 'utf8'));
+    } catch (error) {
+      throw new Error(`${path}: ${error.message}`, { cause: error });
+    }
     if ('workspace' in data) problems.push(`${path}: nested workspace`);
     if (!members.has(path)) problems.push(`${path}: not a workspace member`);
     for (const key of ['version', 'edition', 'rust-version', 'license', 'publish']) {

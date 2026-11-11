@@ -72,6 +72,12 @@ test('each broken workspace names its problem', (t) => {
       (write) => write(MEMBER_PATH, MEMBER.replace('license.workspace = true', 'license = "MIT"')),
       'tools/app/Cargo.toml: license must be inherited',
     ],
+    [
+      'version = { workspace = true, x = 1 }',
+      (write) =>
+        write(MEMBER_PATH, MEMBER.replace('version.workspace = true', 'version = { workspace = true, x = 1 }')),
+      'tools/app/Cargo.toml: version must be inherited',
+    ],
     ['version in [dependencies]', localVersion('dependencies'), inherit('dependencies.serde')],
     ['version in [dev-dependencies]', localVersion('dev-dependencies'), inherit('dev-dependencies.serde')],
     ['version in [build-dependencies]', localVersion('build-dependencies'), inherit('build-dependencies.serde')],
@@ -103,4 +109,10 @@ test('each broken workspace names its problem', (t) => {
     change(write, root);
     assert.deepEqual(checkCargoWorkspace(root), [problem], edit);
   }
+});
+
+test('a member that is not TOML throws an error that names it', (t) => {
+  const { root, write } = workspace(t);
+  write(MEMBER_PATH, MEMBER.replace(DEP, 'serde = { workspace = true,, }'));
+  assert.throws(() => checkCargoWorkspace(root), /^Error: tools\/app\/Cargo\.toml: /);
 });

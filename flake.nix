@@ -52,14 +52,8 @@
         };
       };
 
-      check-repo = pkgs.writeShellApplication {
-        name = "check-repo";
-        runtimeInputs = [node pkgs.git];
-        text = ''exec node scripts/test.mjs repo'';
-      };
-
-      installer-test = pkgs.writeShellApplication {
-        name = "installer-test";
+      repo-node = pkgs.writeShellApplication {
+        name = "repo-node";
         runtimeInputs = [node pkgs.git];
         text = ''exec node scripts/test.mjs repo node'';
       };
@@ -83,18 +77,12 @@
             enable = true;
             excludes = vendored;
           };
-          plugin-validate = {
-            enable = true;
-            name = "claude plugin validate + marketplace consistency";
-            entry = "${check-repo}/bin/check-repo";
-            files = "^(plugins/|tools/harness-compiler/|tools/(ado-mcp|http-runner|web-mcp)/|scripts/check-repo\\.mjs$|Cargo\\.(toml|lock)$|package\\.json$)";
-            pass_filenames = false;
-          };
-          installer-test = {
+          # One hook, so check-repo runs once a commit: it holds claude plugin validate and the marketplace checks.
+          repo-node = {
             enable = true;
             name = "repo checks and Node tests";
-            entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/|tools/|scripts/|package\\.json$|treefmt\\.toml$)";
+            entry = "${repo-node}/bin/repo-node";
+            files = "^(plugins/|tools/|scripts/|\\.github/workflows/|package(-lock)?\\.json$|Cargo\\.(toml|lock)$|treefmt\\.toml$)";
             pass_filenames = false;
           };
         };
