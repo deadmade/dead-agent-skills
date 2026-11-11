@@ -24,6 +24,7 @@ permissions:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       node: ${{ steps.select.outputs.node }}
       skills: ${{ steps.select.outputs.skills }}

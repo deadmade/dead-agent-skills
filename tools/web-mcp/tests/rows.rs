@@ -325,11 +325,13 @@ fn rows_deeply_nested_hostile_page_returns_in_bounded_time() {
     );
 }
 
-/// A page of 3,000 nested levels around `inside` must get its answer in under twice the time a parse of the same page
-/// takes. Two servers take the page at the same time: one walks it, and the other is given an `item` that matches
-/// nothing, so it renders and parses the same bytes and walks nothing. The bound is relative because a fixed one fails
-/// on a slow or loaded machine. Deeper pages only slow the test: the HTML parser alone takes 30 s on 20,000 levels in a
-/// debug build.
+/// A page of 3,000 nested levels around `inside` must get its answer in under twice the time of a call that skips the
+/// walk. Two servers take the page at the same time: one walks it, and the other is given an `item` that matches
+/// nothing. Both render and archive the page, parse it twice and read its body text, so the bound covers only the
+/// walker's group search and walk; the 1,500-level test keeps an absolute bound on the shared work. The bound is
+/// relative because a fixed one fails on a slow or loaded machine. Deeper pages only slow the test: the HTML parser
+/// alone takes 30 s on 20,000 levels in a debug build. Baseline, PR 1's CI (2026-11-10): ratios 0.91-1.25 on
+/// ubuntu-latest and 1.05-1.21 on windows-latest.
 fn nested_page_returns_in_bounded_time(open: &str, inside: &str, close: &str) {
     let html = format!("{}{inside}{}", open.repeat(3_000), close.repeat(3_000));
     let (mut walker, _) = start(&[("nest.html", html.clone())]);

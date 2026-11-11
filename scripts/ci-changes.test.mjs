@@ -64,7 +64,7 @@ test('shared dependencies, CI and unknown components select everything', () => {
     '.cargo/config.toml',
     '.github/workflows/test.yml',
     'scripts/ci-changes.mjs',
-    'scripts/check_cargo_workspace.py',
+    'scripts/test.mjs',
     'tools/new-crate/src/lib.rs',
   ]) {
     assert.deepEqual(selectChecks([path]), selectChecks([], true), path);
@@ -88,6 +88,7 @@ test('docs skip expensive checks, but root readmes and crate manifests get consi
   assert.equal(selectChecks(['docs/adr/example.md']).node, false);
   assert.equal(selectChecks(['README.md']).node, true);
   assert.equal(selectChecks(['tools/ado-mcp/Cargo.toml']).node, true);
+  assert.equal(selectChecks(['tools/web-mcp/Cargo.lock']).node, true);
 });
 
 test('mixed changes take a deterministic union', () => {
@@ -168,4 +169,59 @@ for (const path of ['Cargo.toml', 'flake.nix']) {
 
 test('the web API slug participates in Node repository checks', () => {
   assert.equal(selectChecks(['tools/web-mcp/src/api.rs']).node, true);
+});
+
+test("test files and fixtures route like their component, at today's path and in its tests/ folder", () => {
+  for (const [today, moved, source] of [
+    [
+      'tools/installer/core/settings.test.ts',
+      'tools/installer/tests/core/settings.test.ts',
+      'tools/installer/core/settings.ts',
+    ],
+    [
+      'tools/installer/core/fixtures/dcg-hooks.json',
+      'tools/installer/tests/core/fixtures/dcg-hooks.json',
+      'tools/installer/core/settings.ts',
+    ],
+    ['tools/installer/modules.test.ts', 'tools/installer/tests/modules.test.ts', 'tools/installer/install.ts'],
+    [
+      'tools/harness-compiler/test/build.test.ts',
+      'tools/harness-compiler/tests/build.test.ts',
+      'tools/harness-compiler/src/emit/build.ts',
+    ],
+    [
+      'tools/harness-compiler/test/fixtures/codex.json',
+      'tools/harness-compiler/tests/fixtures/codex.json',
+      'tools/harness-compiler/src/emit/build.ts',
+    ],
+    ['tools/upstream-sync/src/cli.test.ts', 'tools/upstream-sync/tests/cli.test.ts', 'tools/upstream-sync/src/cli.ts'],
+    ['scripts/flows-uses.test.mjs', 'scripts/tests/flows-uses.test.mjs', 'scripts/flows-uses.mjs'],
+    ['scripts/test.test.mjs', 'scripts/tests/test.test.mjs', 'scripts/flows-uses.mjs'],
+    ['scripts/fixtures/ci-pr122-paths.json', 'scripts/tests/fixtures/ci-pr122-paths.json', 'scripts/flows-uses.mjs'],
+    ['plugins/default/hooks/lib.test.mjs', 'plugins/default/tests/lib.test.mjs', 'plugins/default/hooks/lib.mjs'],
+    [
+      'plugins/default/hooks/register.test.ts',
+      'plugins/default/tests/register.test.ts',
+      'plugins/default/hooks/register.tsx',
+    ],
+    [
+      'plugins/opt-in/headroom-trim/hooks/launcher.test.mjs',
+      'plugins/opt-in/headroom-trim/tests/launcher.test.mjs',
+      'plugins/opt-in/headroom-trim/hooks/launcher.mjs',
+    ],
+  ]) {
+    assert.deepEqual(selectChecks([today]), selectChecks([source]), today);
+    assert.deepEqual(selectChecks([moved]), selectChecks([source]), moved);
+  }
+  // The one pair that routes differently after the move: the Node job runs this test, and nothing in it changes which checks run.
+  assert.deepEqual(selectChecks(['scripts/ci-changes.test.mjs']), selectChecks([], true));
+  assert.deepEqual(selectChecks(['scripts/tests/ci-changes.test.mjs']), selectChecks(['scripts/flows-uses.mjs']));
+  // A test-named file selects the Node job wherever it sits, so the layout guard runs on it.
+  for (const path of ['docs/zz.test.mjs', 'docs/a/test_b.py', 'docs/a/b_test.py']) {
+    assert.deepEqual(
+      selectChecks([path]),
+      { node: true, skills: false, rust: false, binaries: [], packages: [] },
+      path,
+    );
+  }
 });

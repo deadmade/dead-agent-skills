@@ -8,8 +8,7 @@
     "harness-compiler": "src/cli.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test \"test/**/*.test.ts\" \"test/**/*.test.mjs\""
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "engines": {
     "node": ">=26"

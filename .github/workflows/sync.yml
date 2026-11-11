@@ -39,6 +39,7 @@ jobs:
   sync:
     needs: list
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -70,7 +71,7 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Repo checks
-        run: node scripts/check-repo.mjs
+        run: node scripts/test.mjs --strict repo
 
       - name: Skill scan
         if: steps.run.outputs.scan == 'true'

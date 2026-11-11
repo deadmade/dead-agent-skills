@@ -52,16 +52,10 @@
         };
       };
 
-      check-repo = pkgs.writeShellApplication {
-        name = "check-repo";
-        runtimeInputs = [node];
-        text = ''exec node scripts/check-repo.mjs'';
-      };
-
-      installer-test = pkgs.writeShellApplication {
-        name = "installer-test";
+      repo-node = pkgs.writeShellApplication {
+        name = "repo-node";
         runtimeInputs = [node pkgs.git];
-        text = ''exec npm test'';
+        text = ''exec node scripts/test.mjs repo node'';
       };
     in
       git-hooks.lib.${system}.run {
@@ -83,18 +77,12 @@
             enable = true;
             excludes = vendored;
           };
-          plugin-validate = {
+          # One hook, so check-repo runs once a commit: it holds claude plugin validate and the marketplace checks.
+          repo-node = {
             enable = true;
-            name = "claude plugin validate + marketplace consistency";
-            entry = "${check-repo}/bin/check-repo";
-            files = "^(plugins/|tools/harness-compiler/|tools/(ado-mcp|http-runner|web-mcp)/|scripts/check-repo\\.mjs$|Cargo\\.(toml|lock)$|package\\.json$)";
-            pass_filenames = false;
-          };
-          installer-test = {
-            enable = true;
-            name = "installer tests";
-            entry = "${installer-test}/bin/installer-test";
-            files = "^(plugins/catalog\\.json$|tools/installer/|tools/harness-compiler/|tools/upstream-sync/|scripts/|tools/(ado-mcp|http-runner|web-mcp)/|plugins/default/hooks/|plugins/opt-in/headroom-trim/hooks/|plugins/flows/skills/|package\\.json$)";
+            name = "repo checks and Node tests";
+            entry = "${repo-node}/bin/repo-node";
+            files = "^(plugins/|tools/|scripts/|\\.github/workflows/|package(-lock)?\\.json$|Cargo\\.(toml|lock)$|treefmt\\.toml$)";
             pass_filenames = false;
           };
         };

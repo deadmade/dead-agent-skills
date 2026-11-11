@@ -6,7 +6,7 @@ name: Release
 # pushed to); a release you choose is `npm run release -- minor` pushed to main with its tag, which this run then
 # releases. The run checks the repo, builds web-mcp, ado-mcp and http-runner from the tag,
 # publishes the release, and commits the native distributions (gitignored on main) onto the release branch. Only
-# plugin/tool sources and shared build inputs trigger a release; CI, docs and analysis artifacts alone do not.
+# plugin/tool sources and shared build inputs trigger a release; CI, docs, tests (any `tests/` folder) and analysis artifacts alone do not.
 on:
   push:
     branches: [main]
@@ -23,6 +23,7 @@ on:
       - '.cargo/**'
       - 'rust-toolchain*'
       - '.gitattributes'
+      - '!**/tests/**'
 
 permissions:
   contents: read
@@ -36,6 +37,7 @@ jobs:
   # The tag to release: the one already on HEAD (a release commit pushed with its tag), or a patch cut from the merge.
   version:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     outputs:
@@ -77,6 +79,7 @@ jobs:
     needs: version
     if: needs.version.outputs.tag
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       TAG: ${{ needs.version.outputs.tag }}
     steps:
@@ -94,7 +97,7 @@ jobs:
       - run: npm ci
 
       - name: Tests
-        run: npm test
+        run: node scripts/test.mjs repo node
 
   binaries:
     needs: version

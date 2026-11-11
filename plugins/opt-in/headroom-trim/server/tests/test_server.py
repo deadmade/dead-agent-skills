@@ -320,7 +320,7 @@ class ProcessTest(unittest.TestCase):
             held.bind(("127.0.0.1", 0))
             held.listen()
             proc = self.start(held.getsockname()[1])
-            proc.wait(2)
+            proc.wait(60)  # it imports headroom before it binds: a new process's start, as wait_healthy allows
         self.assertEqual(proc.returncode, 75)
 
     @unittest.skipIf(sys.platform == "win32", "Linux only: Windows keeps allow_reuse_address off")
@@ -328,7 +328,7 @@ class ProcessTest(unittest.TestCase):
         port = free_port()
         proc = self.start(port)
         wait_healthy(port, proc)
-        request(port, "/hook", payload())
+        request(port, "/hook", payload(), timeout=60)  # a new process's first trim is part of its start: wait_healthy's 60 s
         request(port, "/shutdown", b"")
         proc.wait(5)
         proc2 = self.start(port)
@@ -343,12 +343,19 @@ class ProcessTest(unittest.TestCase):
         wait_healthy(port, proc)
         body = payload()
         body["tool_response"]["stdout"] = long_log()
-        status, out = request(port, "/hook", body)
+        status, out = request(port, "/hook", body, timeout=60)  # a new process's first trim is part of its start
         self.assertIn(b"updatedToolOutput", out)
         request(port, "/shutdown", b"")
         proc.wait(5)
         self.assertEqual(list(home.rglob("*")), [])
         self.assertTrue((self.data / "trim.log").exists())
+
+
+def setUpModule():
+    # A process's first compress() imports ~240 modules, builds headroom's pipeline and tries the tokenizer's vocabulary:
+    # pay that here, outside every request's timeout. Another log than the tests send, so they still compress, not hit
+    # headroom's cache.
+    server.trim.headroom_text("Bash", long_log().replace(" handled ", " served "))
 
 
 if __name__ == "__main__":
