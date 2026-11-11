@@ -3,6 +3,8 @@ name: crates
 # Check affected packages together and independently; shared inputs select the whole workspace.
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +15,7 @@ jobs:
   changes:
     uses: ./.github/workflows/changes.yml
 
-  test:
+  rust:
     needs: changes
     if: needs.changes.outputs.rust == 'true'
     strategy:
@@ -21,6 +23,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     env:
       PACKAGES: ${{ needs.changes.outputs.packages }}
     defaults:
@@ -52,23 +55,13 @@ jobs:
           $selection = @($packages | ForEach-Object { '-p'; $_ })
           cargo clippy @selection --all-targets --locked -- -D warnings
 
-      # The fake is needed by unit tests, which cannot use CARGO_BIN_EXE.
+      # The rust suite builds the fake first: unit tests reach it by path, not CARGO_BIN_EXE.
       - name: Rust tests
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          $packages = @($env:PACKAGES | ConvertFrom-Json)
-          $selection = @($packages | ForEach-Object { '-p'; $_ })
-          if ($packages -contains 'web-mcp') { cargo build --locked -p web-mcp --bin fake-agent-browser }
-          cargo test @selection --locked
-
-      - name: Individual package tests
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          foreach ($package in ($env:PACKAGES | ConvertFrom-Json)) {
-            cargo test --locked -p $package
-          }
+          $packages = @($env:PACKAGES | ConvertFrom-Json) -join ','
+          node scripts/test.mjs --strict rust --packages $packages --each-package
 
   # Validate each independently installed Linux package.
   nix:
@@ -79,6 +72,7 @@ jobs:
       matrix:
         package: ${{ fromJSON(needs.changes.outputs.binaries) }}
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -93,6 +87,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Minimum supported Rust

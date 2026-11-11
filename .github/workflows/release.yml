@@ -36,6 +36,7 @@ jobs:
   # The tag to release: the one already on HEAD (a release commit pushed with its tag), or a patch cut from the merge.
   version:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     outputs:
@@ -77,6 +78,7 @@ jobs:
     needs: version
     if: needs.version.outputs.tag
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       TAG: ${{ needs.version.outputs.tag }}
     steps:
