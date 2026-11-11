@@ -187,5 +187,8 @@ function main(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  // Importing proc.ts loads ui.ts, whose SIGTERM and SIGHUP handlers never run in this synchronous script and replace
+  // the default terminate, so a kill or a timeout would not stop the run. Only the CLI drops them: an importer keeps its own.
+  for (const signal of ['SIGTERM', 'SIGHUP']) process.removeAllListeners(signal);
   process.exitCode = main(process.argv.slice(2));
 }
