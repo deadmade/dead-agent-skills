@@ -15,18 +15,35 @@ const GLOBS = {
   python: ['plugins/opt-in/headroom-trim/server/tests/test*.py'],
 };
 
-// Sorted repo-relative `/` paths. `**` does not skip node_modules, so exclude lists them.
-export function suiteFiles(root) {
+// Whether a repo-relative `/` path is vendored: treefmt.toml's excludes name every vendored path.
+function vendoredPath(root) {
   const toml = readFileSync(join(root, 'treefmt.toml'), 'utf8').replaceAll('\r\n', '\n');
   const excludes = /^excludes = \[([\s\S]*?)^\]/m.exec(toml);
   if (!excludes) throw new Error('treefmt.toml has no excludes list');
-  const vendored = [...excludes[1].matchAll(/^\s*"([^"]+)"/gm)].map((m) => m[1]);
+  const globs = [...excludes[1].matchAll(/^\s*"([^"]+)"/gm)].map((m) => m[1]);
+  return (p) => globs.some((g) => posix.matchesGlob(p, g));
+}
+
+// Sorted repo-relative `/` paths. `**` does not skip node_modules, so exclude lists them.
+export function suiteFiles(root) {
+  const vendored = vendoredPath(root);
   const files = (globs) =>
     globSync(globs, { cwd: root, exclude: ['**/node_modules/**', '**/target/**'] })
       .map((p) => p.replaceAll('\\', '/'))
-      .filter((p) => !vendored.some((g) => posix.matchesGlob(p, g)))
+      .filter((p) => !vendored(p))
       .sort();
   return { node: files(GLOBS.node), mods: files(GLOBS.mods), python: files(GLOBS.python) };
+}
+
+export const isTestName = (path) => /\.test\.|^test_.*\.py$|_test\.py$/.test(posix.basename(path));
+
+// One problem per tracked first-party test no suite runs.
+export function layoutProblems(root, tracked) {
+  const vendored = vendoredPath(root);
+  const run = new Set(Object.values(suiteFiles(root)).flat());
+  return tracked
+    .filter((p) => isTestName(p) && !vendored(p) && !run.has(p))
+    .map((p) => `${p}: no suite in scripts/test.mjs runs this test`);
 }
 
 const NODE_FLAGS = [
@@ -43,8 +60,8 @@ const TREES = { file: process.execPath, args: ['tools/harness-compiler/src/cli.t
 // A command is { file, args, cwd (relative to the root), env }, or { list, run } when it is more than one program start:
 // `list` is what --list prints and `run` returns the status of what it ran.
 const SUITES = {
-  repo: ({ modules }) => ({
-    commands: [{ file: process.execPath, args: ['scripts/check-repo.mjs'] }],
+  repo: ({ modules, strict }) => ({
+    commands: [{ file: process.execPath, args: ['scripts/check-repo.mjs', ...(strict ? ['--strict'] : [])] }],
     fail: modules,
   }),
   node: ({ root, modules }) => {
@@ -180,7 +197,7 @@ function main(argv) {
   const { suites, strict, list, packages, each } = parse(argv);
   const root = fileURLToPath(new URL('..', import.meta.url));
   const modules = existsSync(join(root, 'node_modules')) ? undefined : 'node_modules missing: run npm ci';
-  const plan = (suite) => SUITES[suite]({ root, modules, packages, each });
+  const plan = (suite) => SUITES[suite]({ root, modules, packages, each, strict });
   // When repo is selected, check-repo builds the generated trees itself.
   const needsTrees = (suite) => (suite === 'node' || suite === 'mods') && !suites.includes('repo');
 

@@ -1,6 +1,7 @@
 // Repo checks for the pre-commit hook: the neutral plugin definitions validate and compile into the generated
-// distributions (built here, gitignored, so later tests read a fresh tree), and everything carries package.json's version. Skips `claude plugin validate` when claude
-// isn't on PATH (nix flake check sandbox, CI).
+// distributions (built here, gitignored, so later tests read a fresh tree), everything carries package.json's version,
+// and every tracked test file is run by a suite (scripts/test.mjs). Skips `claude plugin validate` when claude
+// isn't on PATH (nix flake check sandbox), unless --strict makes that a failure.
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,6 +11,7 @@ import { loadPlugins, selectTarget } from '../tools/harness-compiler/src/load.ts
 import { TARGETS } from '../tools/harness-compiler/src/targets/index.ts';
 import { TOKENS as CLAUDE_CODE } from '../tools/harness-compiler/src/templates/hosts/claude-code.ts';
 import { TOKENS as CODEX } from '../tools/harness-compiler/src/templates/hosts/codex.ts';
+import { startSync, which } from '../tools/installer/system/proc.ts';
 import { checkCargoWorkspace } from './cargo-workspace.mjs';
 import {
   checkOverrides,
@@ -25,6 +27,11 @@ import {
 } from './flows-uses.mjs';
 import { pluginDirs as findPluginDirs } from './plugin-dirs.mjs';
 import { workspacePackages } from './release.mjs';
+import { layoutProblems } from './test.mjs';
+
+// Importing proc.ts loads ui.ts, whose SIGTERM and SIGHUP handlers never run in this synchronous script and replace
+// the default terminate, so a kill or a timeout would not stop the run.
+for (const signal of ['SIGTERM', 'SIGHUP']) process.removeAllListeners(signal);
 
 process.chdir(join(import.meta.dirname, '..'));
 
@@ -58,13 +65,26 @@ if (
 
 // --- claude plugin validate, on what Claude Code actually loads: the generated tree ---
 const market = JSON.parse(readFileSync(MARKETPLACE, 'utf8'));
-for (const target of ['.', ...market.plugins.filter((p) => typeof p.source === 'string').map((p) => p.source)]) {
-  const r = spawnSync('claude', ['plugin', 'validate', target], { encoding: 'utf8' });
-  if (r.error?.code === 'ENOENT') {
-    console.log('claude not on PATH: skipping claude plugin validate');
-    break;
+const claude = which('claude');
+if (!claude) {
+  if (process.argv.includes('--strict')) problems.push('claude not on PATH: claude plugin validate did not run');
+  else console.log('claude not on PATH: skipping claude plugin validate');
+} else
+  for (const target of ['.', ...market.plugins.filter((p) => typeof p.source === 'string').map((p) => p.source)]) {
+    const r = startSync(claude, ['plugin', 'validate', target]);
+    if (r.status !== 0) problems.push(`claude plugin validate ${target} failed:\n${r.stdout}${r.stderr}`);
   }
-  if (r.status !== 0) problems.push(`claude plugin validate ${target} failed:\n${r.stdout}${r.stderr}`);
+
+// --- the layout guard: every tracked first-party test file is run by a suite (scripts/test.mjs) ---
+const git = which('git');
+if (!git) problems.push('git ls-files failed: git not on PATH; the layout guard did not run');
+else {
+  const r = startSync(git, ['ls-files', '-z']);
+  if (r.status === 0) problems.push(...layoutProblems('.', r.stdout.split('\0').filter(Boolean)));
+  else {
+    const why = r.stderr?.split(/\r?\n/)[0] || r.error?.message || `killed by ${r.signal}`;
+    problems.push(`git ls-files failed: ${why}; the layout guard did not run`);
+  }
 }
 
 // --- the Claude marketplace lists exactly the catalog's Claude plugins, and cross-marketplace dependencies are allowed ---

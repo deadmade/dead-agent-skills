@@ -54,7 +54,7 @@
 
       check-repo = pkgs.writeShellApplication {
         name = "check-repo";
-        runtimeInputs = [node];
+        runtimeInputs = [node pkgs.git];
         text = ''exec node scripts/check-repo.mjs'';
       };
 

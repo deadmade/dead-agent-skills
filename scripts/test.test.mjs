@@ -15,7 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { suiteFiles } from './test.mjs';
+import { layoutProblems, suiteFiles } from './test.mjs';
 
 const REAL = fileURLToPath(new URL('..', import.meta.url));
 const WIN = process.platform === 'win32';
@@ -113,6 +113,7 @@ test('a missing tool is NOT RUN, which fails only under --strict; a missing node
   assert.match(r.out, /^python +NOT RUN +uv not on PATH$/m);
   assert.match(r.out, /^mods +NOT RUN +claude not on PATH$/m);
   assert.equal(d.run(['--strict', 'python']).status, 1);
+  assert.deepEqual(d.run(['--strict', 'repo']).log, ['check-repo :: --strict']);
 
   const bare = door(t, { modules: false });
   const m = bare.run(['repo', 'node']);
@@ -269,4 +270,21 @@ test("suiteFiles picks each suite's files and skips vendored ones", (t) => {
   // A Windows checkout may have CRLF.
   writeFileSync(join(root, 'treefmt.toml'), TOML.replaceAll('\n', '\r\n'));
   assert.deepEqual(suiteFiles(root), expected);
+});
+
+test('layoutProblems names each tracked test no suite runs', (t) => {
+  const d = door(t);
+  d.put('scripts/a.test.mjs', '');
+  const tracked = [
+    'scripts/a.test.mjs',
+    'docs/b.test.mjs',
+    'scripts/c_test.py',
+    'plugins/vendored/d.test.cjs',
+    'plugins/opt-in/headroom-trim/server/tests/test_x.py',
+    'scripts/a.mjs',
+  ];
+  assert.deepEqual(layoutProblems(d.root, tracked), [
+    'docs/b.test.mjs: no suite in scripts/test.mjs runs this test',
+    'scripts/c_test.py: no suite in scripts/test.mjs runs this test',
+  ]);
 });
