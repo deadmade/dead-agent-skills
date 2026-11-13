@@ -14,6 +14,10 @@ One browser window per server, every engine, `browser` session and fetch fallbac
 `docs/features/web-mcp-search/findings.md`, and specific bugs in `docs/solutions/` (Google's `/goto` links, a hidden
 tab's `click`/`press`, agent-browser's install and a Windows Chrome quirk).
 
+The browser, window and profile code (the agent-browser driver, the one window, the profile slots and the cookie
+extension download) lives in the `tools/browser-core/` library crate, which web-mcp depends on
+(`docs/components/browser-core.md`). The search policy (engines, their turns, rests and deadlines) stays here.
+
 `rows` opens its pages as a tab of that window too, holds a 1 s gap per host, and its group detection is tested on
 captured pages in `tests/fixtures/rows/` (`docs/adr/0013-rows-tool-and-shop-skill.md`). Its tree walk is bounded by a
 visit budget that charges text by bytes, because a hostile page can hide a huge text node under thousands of nested

@@ -58,13 +58,15 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   loopback. Every failure leaves Claude the original output. Read `docs/components/headroom-trim.md` before changing it.
 - `plugins/opt-in/implementation/`: the vendored language and database plugins (rust-skills, csharp-skills, postgres).
   Their notes are in `docs/components/packs.md`.
-- `tools/`: the installer, the harness compiler, upstream-sync and three Rust packages in one root Cargo workspace:
-  `web-mcp`, `ado-mcp` and `http-runner`. The root `Cargo.toml` owns all dependency versions,
+- `tools/`: the installer, the harness compiler, upstream-sync and four Rust packages in one root Cargo workspace:
+  `web-mcp`, `ado-mcp`, `http-runner` and `browser-core`. The root `Cargo.toml` owns all dependency versions,
   package metadata, Clippy settings and the release profile; members inherit them and select their own features.
   There is one root `Cargo.lock` and `target/`. Use `-p <package>` to build or test one member. Nothing in the
-  plugins reaches into the crates at runtime. `scripts/check_cargo_workspace.py` (Python 3.11+) rejects local
+  plugins reaches into the crates at runtime. `scripts/cargo-workspace.mjs` (run by check-repo) rejects local
   dependency versions, nested workspaces and extra lockfiles in CI. Incompatible upstream transitive versions
   may coexist; direct dependency versions must be declared only in `[workspace.dependencies]`.
+- `tools/browser-core/` (Rust library): the agent-browser driver, the one browser window and the search folder's profile slots, split out of
+  `web-mcp`, its only consumer. It names no search or fetch code. Read `docs/components/browser-core.md` before changing it.
 - `tools/installer/`: the optional TypeScript installer. `install.ts` only runs the flow; new logic goes into `core/` (pure
   decisions) or `system/` (OS access) with a test next to it. No runtime npm dependencies. Node runs the `.ts` files as
   they are, so code uses only erasable syntax and imports name the `.ts` file. Programs start through `system/proc.ts`, never by
@@ -91,7 +93,7 @@ Dependabot (`.github/dependabot.yml`, weekly, one grouped PR per entry) keeps Gi
 ## Versions and releases
 
 Everything ships as one version, recorded in `package.json` and `package-lock.json`, the root `Cargo.toml` workspace version
-and all three local package entries in `Cargo.lock`. The build stamps this version into the marketplaces and generated
+and all four local package entries in `Cargo.lock`. The build stamps this version into the marketplaces and generated
 plugin manifests. README.md's installer command carries no version (it names `latest/`); `newerInstaller` is how a
 stale cached run of it hands over to a newer release.
 `check-repo.mjs` fails on drift. Never bump by hand.
@@ -122,8 +124,7 @@ Read `docs/components/ci.md` for how a release is built and published.
 - Rust, from the root: `cargo build --locked -p web-mcp --bin fake-agent-browser`, then
   `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
   `cargo fmt --all -- --check`. Use `-p web-mcp` or another member instead of `--workspace`
-  for independent checks. Run `python3 scripts/check_cargo_workspace.py` and
-  `python3 -m unittest discover -s scripts -p 'check_cargo_workspace_test.py'` for the workspace policy.
+  for independent checks. The workspace policy is `scripts/cargo-workspace.mjs`, tested by `scripts/cargo-workspace.test.mjs`.
   CI lints with latest stable Rust and separately checks the selected packages with the workspace's declared `rust-version` (1.97).
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
   linking fails.
