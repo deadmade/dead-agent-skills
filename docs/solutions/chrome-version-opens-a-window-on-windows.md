@@ -5,7 +5,7 @@
   same.
 - **Cause:** both checked a browser by running `chrome.exe --version` and waiting for it to exit. On Windows, Chrome
   doesn't print its version: it starts a browser and keeps running, so the check timed out and Chrome for Testing was
-  rejected (`tools/browser-core/src/profile.rs`, `starts` and `pick`; `tools/installer/system/browser.ts`,
+  rejected (`tools/web/browser-core/src/profile.rs`, `starts` and `pick`; `tools/installer/system/browser.ts`,
   `searchBrowserWorks`).
 - **Fix:** d09fd2e. On Windows nothing starts the binary: a Chrome for Testing that exists counts, and its major
   version comes from its folder name (`~/.agent-browser/browsers/chrome-<version>/chrome-win64/chrome.exe`).

@@ -1,6 +1,6 @@
 # browser-core
 
-`tools/browser-core/`, a Rust library crate in the root Cargo workspace. web-mcp is its only consumer.
+`tools/web/browser-core/`, a Rust library crate in the root Cargo workspace. web-mcp is its only consumer.
 
 ## What it owns
 

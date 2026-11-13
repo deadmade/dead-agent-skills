@@ -8,7 +8,7 @@
   issue #2146). The obvious fix, agent-browser's own `tab <id>`, does raise the tab but makes the daemon forget its
   refs, so every `click @e1` after it answers `Unknown ref` (measured). The fake agent-browser doesn't model that, so
   every unit and integration test passed until the live run.
-- **Fix:** `Browser::raise` (`tools/browser-core/src/browser.rs`) finds the session's own tab with `tab list` (the `active`
+- **Fix:** `Browser::raise` (`tools/web/browser-core/src/browser.rs`) finds the session's own tab with `tab list` (the `active`
   row's `targetId`) and activates it through Chrome's debug port, `GET /json/activate/<targetId>`, under one `front`
   lock held until the input is sent. Live, the same replay delivered 3 of 3 clicks by ref and 3 of 3 `press Enter`,
   against 0 of 3 before. Branch `worktree-web-mcp-google-results-and-clicks`.

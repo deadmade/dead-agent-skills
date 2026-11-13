@@ -30,7 +30,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   Don't hand-edit a pack to get past a failing sync. Where a conductor or step changes a pack's rule, it quotes the
   sentence in an `overrides` marker, and check-repo fails when the sentence is gone. Read `docs/components/packs.md`
   before changing or syncing a pack.
-- `plugins/shared/web-mcp/` (Rust, `tools/web-mcp/`): a stdio MCP server with `search`, `fetch`, `browser`, `rows` and
+- `plugins/shared/web-mcp/` (Rust, `tools/web/web-mcp/`): a stdio MCP server with `search`, `fetch`, `browser`, `rows` and
   `lookup`, built for Windows and Linux x64 only. Read `docs/components/web-mcp.md` before changing it.
 - `plugins/opt-in/mcp/mcp-azure/` (Rust, `tools/ado-mcp/`): a stdio MCP server for one Azure DevOps Server collection and
   PAT. A new write tool goes in `WRITES` in `tools.rs`; a new read tool needs `read_only_hint` and a `READS` entry in
@@ -65,7 +65,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   plugins reaches into the crates at runtime. `scripts/cargo-workspace.mjs` (run by check-repo) rejects local
   dependency versions, nested workspaces and extra lockfiles in CI. Incompatible upstream transitive versions
   may coexist; direct dependency versions must be declared only in `[workspace.dependencies]`.
-- `tools/browser-core/` (Rust library): the agent-browser driver, the one browser window and the search folder's profile slots, split out of
+- `tools/web/browser-core/` (Rust library): the agent-browser driver, the one browser window and the search folder's profile slots, split out of
   `web-mcp`, its only consumer. It names no search or fetch code. Read `docs/components/browser-core.md` before changing it.
 - `tools/installer/`: the optional TypeScript installer. `install.ts` only runs the flow; new logic goes into `core/` (pure
   decisions) or `system/` (OS access) with a test next to it. No runtime npm dependencies. Node runs the `.ts` files as
@@ -166,7 +166,7 @@ Shared handlers must not learn native event or manifest shapes. Required unsuppo
 are reported and omitted. Never edit `.claude-plugin/` or `.agents/plugins/` by hand.
 Keep Claude marketplace IDs and the legacy executable alias stable even though the GitHub repository has moved to a
 new slug: `package.json`'s `repository` owns the slug for the installer and the build; `LOOKUP_UA` in
-`tools/web-mcp/src/api.rs` and README.md repeat it by hand.
+`tools/web/web-mcp/src/api.rs` and README.md repeat it by hand.
 Flow behavior is shared; each built conductor carries its host's wording through the `{{adapter}}` and other tokens in
 `tools/harness-compiler/src/templates/hosts/`.
 Without subagents the main session does delegated work (searching, exploring) itself; independent checks are skipped and

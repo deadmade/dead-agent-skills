@@ -6,12 +6,12 @@ import { isTestName } from './test.mjs';
 
 const crates = ['web-mcp', 'ado-mcp', 'http-runner'];
 const roots = {
-  'web-mcp': ['tools/web-mcp/', 'plugins/shared/web-mcp/'],
+  'web-mcp': ['tools/web/web-mcp/', 'plugins/shared/web-mcp/'],
   'ado-mcp': ['tools/ado-mcp/', 'plugins/opt-in/mcp/mcp-azure/'],
   'http-runner': ['tools/http-runner/', 'plugins/opt-in/mcp/http-runner/'],
 };
 // Library crates: a change in one selects the binary that links it, whose checks then test the library too.
-const libraries = { 'browser-core': { root: 'tools/browser-core/', binary: 'web-mcp' } };
+const libraries = { 'browser-core': { root: 'tools/web/browser-core/', binary: 'web-mcp' } };
 
 export function selectChecks(paths, all = false) {
   const selected = new Set();
@@ -34,7 +34,7 @@ export function selectChecks(paths, all = false) {
         path.startsWith('plugins/') ||
         path.endsWith('/Cargo.toml') ||
         path.endsWith('/Cargo.lock') ||
-        path === 'tools/web-mcp/src/api.rs'
+        path === 'tools/web/web-mcp/src/api.rs'
       )
         node = true;
       if (path.startsWith('plugins/')) skills = true;

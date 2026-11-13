@@ -101,9 +101,9 @@
         in
           builtins.baseNameOf path
           != "target"
-          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["web-mcp" "ado-mcp" "http-runner" "browser-core"]);
+          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["web" "ado-mcp" "http-runner"]);
       };
-      webMcp = (pkgs.lib.importTOML ./tools/web-mcp/Cargo.toml).package;
+      webMcp = (pkgs.lib.importTOML ./tools/web/web-mcp/Cargo.toml).package;
       workspace = (pkgs.lib.importTOML ./Cargo.toml).workspace.package;
       adoMcp = (pkgs.lib.importTOML ./tools/ado-mcp/Cargo.toml).package;
       httpRunner = (pkgs.lib.importTOML ./tools/http-runner/Cargo.toml).package;
