@@ -6,6 +6,7 @@ use std::fmt::{self, Write as _};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use browser_core::browser::{ATTACHED_TIMEOUT, BrowserError, READ_MARGIN, SearchRun};
 use futures::future::join_all;
 use jiff::Timestamp;
 use rmcp::RoleServer;
@@ -15,7 +16,6 @@ use url::Url;
 
 use crate::Ctx;
 use crate::archive::Item;
-use crate::browser::{ATTACHED_TIMEOUT, BrowserError, READ_MARGIN, SearchRun};
 use crate::engines::{Block, Engine, Found, Parsed};
 use crate::fetch::{self, GetOpts, slash};
 use crate::fuse::{final_order, fuse, normalise};

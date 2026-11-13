@@ -10,7 +10,19 @@ const all = ['web-mcp', 'ado-mcp', 'http-runner'];
 
 test('full runs select exactly the remaining binaries and workspace packages', () => {
   assert.deepEqual(selectChecks([], true).binaries, all);
-  assert.deepEqual(selectChecks([], true).packages, ['web-mcp', 'ado-mcp', 'http-runner']);
+  assert.deepEqual(selectChecks([], true).packages, ['web-mcp', 'ado-mcp', 'http-runner', 'browser-core']);
+});
+
+test('a browser-core change selects web-mcp, and browser-core is a package, never a binary', () => {
+  assert.deepEqual(selectChecks(['tools/browser-core/src/browser.rs']), {
+    node: false,
+    skills: false,
+    rust: true,
+    binaries: ['web-mcp'],
+    packages: ['web-mcp', 'browser-core'],
+  });
+  assert.equal(selectChecks(['tools/browser-core/Cargo.toml']).node, true);
+  assert.ok(!selectChecks([], true).binaries.includes('browser-core'));
 });
 
 test('an ado implementation change selects only ado checks', () => {
@@ -27,7 +39,7 @@ test('each crate selects its checks', () => {
   for (const crate of all) {
     const result = selectChecks([`tools/${crate}/src/lib.rs`]);
     assert.deepEqual(result.binaries, [crate]);
-    assert.deepEqual(result.packages, [crate]);
+    assert.deepEqual(result.packages, crate === 'web-mcp' ? [crate, 'browser-core'] : [crate]);
   }
 });
 
@@ -157,7 +169,7 @@ test('PR 122 selects only web-mcp', () => {
     skills: true,
     rust: true,
     binaries: ['web-mcp'],
-    packages: ['web-mcp'],
+    packages: ['web-mcp', 'browser-core'],
   });
 });
 

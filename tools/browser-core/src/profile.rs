@@ -19,9 +19,8 @@ use tokio::process::Command;
 
 use crate::browser::Browser;
 
-pub const EXTENSION_URL: &str = "https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies/releases/download/v1.1.9/ISDCAC-chrome-source.zip";
-pub const EXTENSION_SHA256: &str =
-    "8f70ab947cb2d274f4022a970f5dd3cecd8ec02b060e05187bef9ee3cb18bbcb";
+const EXTENSION_URL: &str = "https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies/releases/download/v1.1.9/ISDCAC-chrome-source.zip";
+const EXTENSION_SHA256: &str = "8f70ab947cb2d274f4022a970f5dd3cecd8ec02b060e05187bef9ee3cb18bbcb";
 
 /// The cookie extension download's budget.
 const DOWNLOAD: Duration = Duration::from_secs(20);
@@ -35,7 +34,7 @@ const DOWNLOAD_MAX: usize = 2 << 20;
 /// # Errors
 /// When the hash isn't `expected_sha256`, an entry is a symlink or would land outside the folder (nothing is
 /// written then), or writing fails.
-pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, String> {
+fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, String> {
     let sha = sha(zip);
     if !sha.eq_ignore_ascii_case(expected_sha256) {
         return Err(format!("its sha256 is {sha}, not {expected_sha256}"));
@@ -88,7 +87,7 @@ pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, 
 
 /// What the window's owner config needs, found when the window starts.
 #[derive(Debug)]
-pub struct Ready {
+pub(crate) struct Ready {
     /// The browser agent-browser launches (`executablePath`).
     pub chrome: PathBuf,
     /// The unpacked cookie extension.
@@ -104,8 +103,8 @@ pub struct Profiles {
     http: reqwest::Client,
     /// `profiles/<n>` and its held lock, taken on the first `slot()` and kept until exit.
     slot: OnceLock<(PathBuf, File)>,
-    /// The browser `ready()` uses in tests instead of looking for one.
-    #[cfg(test)]
+    /// The browser `ready()` uses in tests (this crate's, and with `test-support` another's) instead of looking for one.
+    #[cfg(any(test, feature = "test-support"))]
     chrome: Option<PathBuf>,
 }
 
@@ -128,20 +127,22 @@ impl Profiles {
             dir,
             http,
             slot: OnceLock::new(),
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             chrome: None,
         })
     }
 
     /// `ready()` then uses `chrome` instead of `WEB_MCP_CHROME`, HOME and PATH.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
+    #[must_use]
     pub fn with_chrome(mut self, chrome: PathBuf) -> Self {
         self.chrome = Some(chrome);
         self
     }
 
     /// The search folder.
-    pub fn dir(&self) -> &Path {
+    #[cfg(test)]
+    fn dir(&self) -> &Path {
         &self.dir
     }
 
@@ -149,7 +150,7 @@ impl Profiles {
     ///
     /// # Errors
     /// When a lock can't be opened.
-    pub fn slot(&self) -> Result<&Path, String> {
+    pub(crate) fn slot(&self) -> Result<&Path, String> {
         if let Some((slot, _)) = self.slot.get() {
             return Ok(slot);
         }
@@ -174,13 +175,13 @@ impl Profiles {
     }
 
     /// The owner session named in `<slot>/owner`, left by the slot's last holder.
-    pub fn previous_owner(&self) -> Option<String> {
+    pub(crate) fn previous_owner(&self) -> Option<String> {
         let owner = std::fs::read_to_string(self.slot().ok()?.join("owner")).ok()?;
         Some(owner.trim().to_owned()).filter(|o| !o.is_empty())
     }
 
     /// Names `session` in `<slot>/owner`. Best effort: a lost name only leaves an old owner's Chrome running.
-    pub fn set_owner(&self, session: &str) {
+    pub(crate) fn set_owner(&self, session: &str) {
         if let Ok(slot) = self.slot() {
             let _ = write_if_changed(&slot.join("owner"), session.as_bytes(), false);
         }
@@ -190,7 +191,7 @@ impl Profiles {
     ///
     /// # Errors
     /// When there is no slot, a path isn't UTF-8 or it can't be written.
-    pub fn owner_config(&self, r: &Ready) -> Result<PathBuf, String> {
+    pub(crate) fn owner_config(&self, r: &Ready) -> Result<PathBuf, String> {
         let slot = self.slot()?;
         let json = serde_json::json!({
             "profile": utf8(&slot.join("profile"))?,
@@ -208,7 +209,7 @@ impl Profiles {
     ///
     /// # Errors
     /// When it can't be written.
-    pub fn attach_config(&self) -> Result<PathBuf, String> {
+    pub(crate) fn attach_config(&self) -> Result<PathBuf, String> {
         write_json(
             &self.dir.join("attach.json"),
             &serde_json::json!({"idleTimeout": "3600s"}),
@@ -229,8 +230,8 @@ impl Profiles {
     ///
     /// # Errors
     /// When the search folder isn't the user's, no browser is found or the extension can't be had.
-    pub async fn ready(&self) -> Result<Ready, String> {
-        #[cfg(test)]
+    pub(crate) async fn ready(&self) -> Result<Ready, String> {
+        #[cfg(any(test, feature = "test-support"))]
         if let Some(chrome) = &self.chrome {
             return self
                 .ready_with(Some(chrome.clone()), None, OsStr::new(""))

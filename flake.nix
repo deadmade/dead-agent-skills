@@ -101,7 +101,7 @@
         in
           builtins.baseNameOf path
           != "target"
-          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["web-mcp" "ado-mcp" "http-runner"]);
+          && (relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "tools" || builtins.any (name: relative == "tools/${name}" || pkgs.lib.hasPrefix "tools/${name}/" relative) ["web-mcp" "ado-mcp" "http-runner" "browser-core"]);
       };
       webMcp = (pkgs.lib.importTOML ./tools/web-mcp/Cargo.toml).package;
       workspace = (pkgs.lib.importTOML ./Cargo.toml).workspace.package;
@@ -115,7 +115,7 @@
         src = workspaceSource;
         cargoLock.lockFile = ./Cargo.lock;
         cargoBuildFlags = ["-p" "web-mcp" "--bin" "web-mcp"];
-        cargoTestFlags = ["-p" "web-mcp"];
+        cargoTestFlags = ["-p" "web-mcp" "-p" "browser-core"];
         # Test clients load the system trust store even when they only call the local fake server.
         nativeCheckInputs = [pkgs.cacert];
         # Debug checks: the fetch tests' WEB_MCP_TEST_PUBLIC_IP hook exists only in debug builds or the `test-hooks` feature.

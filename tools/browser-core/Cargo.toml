@@ -1,0 +1,37 @@
+[package]
+name = "browser-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "web-mcp's one browser window: agent-browser driven as a child process, the window's owner session and the search folder's profiles."
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "process", "time", "sync", "io-util"] }
+reqwest = { workspace = true, features = ["rustls-no-provider"] }
+serde_json = { workspace = true }
+url = { workspace = true }
+jiff = { workspace = true }
+sha2 = { workspace = true }
+zip = { workspace = true, features = ["deflate"] }
+futures = { workspace = true, features = ["std"] }
+
+[target.'cfg(unix)'.dependencies]
+# geteuid, to refuse a search folder another user owns; already in the tree through tokio.
+libc = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+# The kill-on-close job that takes the window's Chrome down with web-mcp; already in the tree through tokio.
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Security"] }
+
+[dev-dependencies]
+rustls = { workspace = true, features = ["ring", "std", "tls12"] }
+tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }
+
+# Lets another crate's tests give `Profiles` a browser instead of looking for one.
+[features]
+test-support = []
+
+[lints]
+workspace = true

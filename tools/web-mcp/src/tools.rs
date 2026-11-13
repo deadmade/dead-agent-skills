@@ -14,11 +14,11 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use browser_core::browser;
 use url::Url;
 
 use crate::Ctx;
 use crate::archive::Item;
-use crate::browser;
 use crate::fetch::{self, GetOpts};
 use crate::images;
 use crate::{lookup, papers, rows, search};
