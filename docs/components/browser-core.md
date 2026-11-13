@@ -15,9 +15,9 @@
 
 ## Why a crate
 
-A second server can use the window without taking web-mcp's search, fetch and rows code. The three files name none of
+A second server can use the window without taking web-mcp's search, fetch and rows code. The three files import none of
 it (`engines`, `search`, `fetch`, `archive`, `rows`, `papers`, `tools`, `api`, `lookup`), and as a separate crate the
-compiler enforces that. Search policy stays in web-mcp: which engine, its turn, the `search-<engine>` session name, the
+compiler enforces that. They still carry web-mcp's session-name conventions: see the reserved names below. Search policy stays in web-mcp: which engine, its turn, the `search-<engine>` session name, the
 10 s engine deadline and the 30 min rest.
 
 ## Public API
@@ -26,8 +26,10 @@ What web-mcp uses, and nothing else:
 
 - `browser::{Browser, BrowserError, SearchRun, ATTACHED_TIMEOUT, READ_MARGIN, check_session}`. `Browser` has `new`,
   `session`, `warm`, `run`, `batch`, `batch_once`, `render`, `rendered_html`, `close`, `close_all` and the public field
-  `fallback_deadline`.
-- `window::{Window, tie_to_process}`.
+  `fallback_deadline`. `SearchRun` has the public field `ready_js`; `BrowserError` has the variants `Missing`, `Failed`,
+  `Timeout` and `TabGone`.
+- `window::{Window, tie_to_process}`. `Window::new` takes the `Profiles` (or the error that made them). `tie_to_process`
+  does nothing off Windows.
 - `profile::Profiles`: `new`, `rest`, `resting`, `consent_seen` and `set_consent_seen`. With the feature `test-support`,
   also `with_chrome`, which gives a test a browser instead of the lookup through `WEB_MCP_CHROME`, HOME and PATH.
 
@@ -35,8 +37,10 @@ What web-mcp uses, and nothing else:
 
 - Install a rustls crypto provider before `Profiles::new`. The crate depends on reqwest with `rustls-no-provider` and
   picks none. web-mcp's `main.rs` installs ring first.
-- `rest`, `resting`, `consent_seen` and `set_consent_seen` take a plain name and join it under the search folder. Pass one
-  path segment: nothing checks it.
+- `rest` and `resting` take a plain name and join it under the search folder; `consent_seen` and `set_consent_seen` join
+  it under the held profile slot (the search folder until one is held). Pass one path segment: nothing checks it.
+- Session names that start with `search-`, `web-mcp-search-` or `web-mcp-fetch-`, and the name `window`, are reserved:
+  `check_session` rejects them, and a key with the fetch prefix is named differently from a user's.
 - Build `fake-agent-browser` before the crate's unit tests: `cargo build --locked -p web-mcp --bin fake-agent-browser`.
   The fake stays in web-mcp. A crate that runs `Profiles::with_chrome` in its own tests enables `test-support`.
 

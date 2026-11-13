@@ -48,7 +48,7 @@ test('a release updates the workspace and all local lock entries without changin
     writeFileSync(path, source.replace(pattern, '$1"9.8.7"'));
   }
   const locked = readFileSync(join(root, 'Cargo.lock'), 'utf8');
-  for (const name of ['web-mcp', 'ado-mcp', 'http-runner']) {
+  for (const name of ['web-mcp', 'ado-mcp', 'http-runner', 'browser-core']) {
     assert.match(locked, new RegExp(`name = "${name}"\\r?\\nversion = "9.8.7"`));
   }
   assert.equal(locked.replaceAll('version = "9.8.7"', `version = "${current}"`), before);

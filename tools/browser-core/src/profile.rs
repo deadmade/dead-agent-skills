@@ -140,12 +140,6 @@ impl Profiles {
         self
     }
 
-    /// The search folder.
-    #[cfg(test)]
-    fn dir(&self) -> &Path {
-        &self.dir
-    }
-
     /// This process's profile slot: the first `profiles/<n>` (n = 1, 2, …) whose lock is free, held until exit.
     ///
     /// # Errors
@@ -806,7 +800,7 @@ mod tests {
         let p = profiles(&dir).with_chrome(chrome.clone());
         let r = p.ready().await.unwrap();
         assert_eq!(r.chrome, chrome);
-        assert_eq!(p.dir(), dir);
+        assert_eq!(p.dir, dir);
     }
 
     /// A dummy executable printing `out` for `--version`, exiting with `code`.

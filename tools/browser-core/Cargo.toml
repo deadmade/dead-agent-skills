@@ -27,7 +27,7 @@ windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_
 
 [dev-dependencies]
 rustls = { workspace = true, features = ["ring", "std", "tls12"] }
-tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["test-util"] }
 
 # Lets another crate's tests give `Profiles` a browser instead of looking for one.
 [features]
