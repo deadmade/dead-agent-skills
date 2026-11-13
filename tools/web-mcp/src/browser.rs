@@ -16,8 +16,6 @@ use tokio::io::AsyncWriteExt as _;
 use tokio::process::Command;
 use url::Url;
 
-use crate::engines::Engine;
-use crate::profile::ENGINE_DEADLINE;
 use crate::window::{Live, Window};
 
 /// Sessions the fetch fallback names for itself; the `browser` tool may not use them.
@@ -119,7 +117,7 @@ enum Via<'a> {
 
 /// Attached calls' `AGENT_BROWSER_DEFAULT_TIMEOUT`: a constant, because it is part of agent-browser's daemon
 /// fingerprint. A search's `wait` carries its own `--timeout`.
-const ATTACHED_TIMEOUT: Duration = ENGINE_DEADLINE.saturating_sub(READ_MARGIN);
+pub const ATTACHED_TIMEOUT: Duration = Duration::from_secs(8);
 
 /// Points `cmd` at the config with `--config` (and, for a tab, the window), runs it in the search dir and drops every
 /// `AGENT_BROWSER_*` variable of `env` (web-mcp's), so nothing of the user's agent-browser setup applies.
@@ -302,16 +300,6 @@ impl Browser {
     )]
     pub fn session(&self, name: &str) -> String {
         name.to_owned()
-    }
-
-    /// The key of engine `e`'s tab, mapped like the user ones: `browser` names can't start with `search-`.
-    #[must_use]
-    #[expect(
-        clippy::unused_self,
-        reason = "the window's session key, asked of its browser"
-    )]
-    pub fn engine_session(&self, e: Engine) -> String {
-        format!("search-{}", e.name())
     }
 
     /// Starts the window, or asks its owner whether Chrome came back on a new url: before any deadline starts.

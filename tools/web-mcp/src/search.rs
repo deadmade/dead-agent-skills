@@ -15,15 +15,19 @@ use url::Url;
 
 use crate::Ctx;
 use crate::archive::Item;
-use crate::browser::{BrowserError, READ_MARGIN, SearchRun};
+use crate::browser::{ATTACHED_TIMEOUT, BrowserError, READ_MARGIN, SearchRun};
 use crate::engines::{Block, Engine, Found, Parsed};
 use crate::fetch::{self, GetOpts, slash};
 use crate::fuse::{final_order, fuse, normalise};
 use crate::limits::HostLimits;
-use crate::profile::{ENGINE_DEADLINE, REST};
 use crate::rank::{Hit, MemIndex, PassageDoc};
 
 pub use crate::engines::Since;
+
+/// How long a blocked engine sits out.
+pub const REST: Duration = Duration::from_mins(30);
+/// Each engine's whole budget in a search, from the moment it wins its turn.
+pub const ENGINE_DEADLINE: Duration = ATTACHED_TIMEOUT.saturating_add(READ_MARGIN);
 
 /// How many fused results are fetched.
 const TOP: usize = 5;
@@ -168,7 +172,7 @@ pub async fn run_engine(
     if let Some(why) = resting() {
         return Err(why);
     }
-    let session = ctx.browser.engine_session(e);
+    let session = format!("search-{}", e.name());
     let url = e.url(query, since);
     let typed = match e.search_box() {
         Some(sel) if types(e, prev.as_deref(), query, since) => {

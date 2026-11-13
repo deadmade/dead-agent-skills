@@ -21,10 +21,6 @@ pub const EXTENSION_URL: &str = "https://github.com/OhMyGuus/I-Still-Dont-Care-A
 pub const EXTENSION_SHA256: &str =
     "8f70ab947cb2d274f4022a970f5dd3cecd8ec02b060e05187bef9ee3cb18bbcb";
 
-/// How long a blocked engine sits out.
-pub const REST: Duration = Duration::from_mins(30);
-/// Each engine's whole budget in a search, from the moment it wins its turn.
-pub const ENGINE_DEADLINE: Duration = Duration::from_secs(10);
 /// The cookie extension download's budget.
 const DOWNLOAD: Duration = Duration::from_secs(20);
 /// The zip is under 2 MiB.
@@ -668,7 +664,7 @@ mod tests {
         let p = profiles(&dir);
         let now = Timestamp::now();
         assert_eq!(p.resting("google", now), None);
-        let until = now + REST;
+        let until = now + Duration::from_mins(30);
         p.rest("google", until);
         assert_eq!(p.resting("google", now), Some(until));
         assert_eq!(p.resting("bing", now), None);
