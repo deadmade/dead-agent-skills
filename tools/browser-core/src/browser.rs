@@ -910,7 +910,7 @@ mod tests {
     /// socket dir). The fake logs beside each call's config: the owner's in `profiles/1/calls.jsonl`, attached
     /// calls in `calls.jsonl`.
     fn fake(tag: &str) -> (PathBuf, Browser) {
-        // The fake sits next to the test binary's deps/ folder; cargo builds it for the integration tests.
+        // The fake sits next to the test binary's deps/ folder; build it first with `cargo build -p web-mcp --bin fake-agent-browser`.
         let exe = std::env::current_exe().unwrap();
         let bin = exe.parent().and_then(Path::parent).unwrap().join(format!(
             "fake-agent-browser{}",

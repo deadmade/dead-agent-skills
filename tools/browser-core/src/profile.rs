@@ -109,7 +109,7 @@ pub struct Profiles {
 }
 
 impl Profiles {
-    /// `dir` is `Config::search_dir`.
+    /// `dir` is the search folder (web-mcp passes `WEB_MCP_SEARCH_DIR`).
     ///
     /// # Errors
     /// When there is no `dir` or the HTTP client can't be built.
@@ -216,7 +216,7 @@ impl Profiles {
         )
     }
 
-    /// The engine's consent mark: per slot once one is held (each has its own cookies), machine-wide before.
+    /// The consent mark of `name`: per slot once one is held (each has its own cookies), machine-wide before.
     fn consent_mark(&self, name: &str) -> PathBuf {
         self.slot
             .get()
@@ -337,27 +337,26 @@ impl Profiles {
         unpack(&zip, EXTENSION_SHA256, &extensions).map_err(|e| why(&e))
     }
 
-    /// When the engine's rest ends, if it is resting at `now`.
+    /// When the rest of `name` ends, if it is resting at `now`.
     pub fn resting(&self, name: &str, now: Timestamp) -> Option<Timestamp> {
         let rest = std::fs::read_to_string(self.dir.join(name).join("rest")).ok()?;
         let until: Timestamp = rest.trim().parse().ok()?;
         (until > now).then_some(until)
     }
 
-    /// Rests the engine until `until`, for every web-mcp process on the machine.
+    /// Rests `name` until `until`, for every web-mcp process on the machine.
     pub fn rest(&self, name: &str, until: Timestamp) {
-        // Best effort: an engine that can't rest is only asked again.
+        // Best effort: a name that can't rest is only asked again.
         let path = self.dir.join(name).join("rest");
         let _ = write_if_changed(&path, until.to_string().as_bytes(), false);
     }
 
-    /// Whether the last search of the engine met a consent page.
+    /// Whether the last search under `name` met a consent page.
     pub fn consent_seen(&self, name: &str) -> bool {
         self.consent_mark(name).exists()
     }
 
-    /// Marks (or clears) that the engine met a consent page, in the mark `consent_seen` reads. The caller holds the
-    /// engine's turn.
+    /// Marks (or clears) that `name` met a consent page, in the mark `consent_seen` reads.
     pub fn set_consent_seen(&self, name: &str, seen: bool) {
         // Best effort, like `rest`: a lost mark costs one more `consent (clearing)`.
         let path = self.consent_mark(name);
