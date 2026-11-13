@@ -4,11 +4,11 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::time::Duration;
 
+use browser_core::browser::BrowserError;
 use dom_query::{Document, Matcher, NodeData, NodeId, NodeRef};
 use url::Url;
 
 use crate::Ctx;
-use crate::browser::BrowserError;
 use crate::fetch::private_landing;
 use crate::papers::collapse;
 use crate::search::keep_page;

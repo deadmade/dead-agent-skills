@@ -10,7 +10,7 @@ use crate::profile::Profiles;
 
 /// The window as it is now: its generation (from 1, one more each time Chrome came back on a new url) and its url.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Live {
+pub(crate) struct Live {
     pub r#gen: u32,
     pub url: String,
 }
@@ -36,7 +36,7 @@ impl Window {
         clippy::unused_self,
         reason = "the window's own name, asked of the window"
     )]
-    pub fn owner(&self) -> String {
+    pub(crate) fn owner(&self) -> String {
         format!("web-mcp-{}-window", std::process::id())
     }
 
@@ -44,7 +44,7 @@ impl Window {
     ///
     /// # Errors
     /// When there is no search folder, or the file can't be written.
-    pub fn attach_config(&self) -> Result<PathBuf, String> {
+    pub(crate) fn attach_config(&self) -> Result<PathBuf, String> {
         self.profiles
             .as_ref()
             .map_err(Clone::clone)?
@@ -55,7 +55,7 @@ impl Window {
     ///
     /// # Errors
     /// When there is no search folder, browser or extension, or the owner fails.
-    pub async fn live(&self, b: &Browser) -> Result<Live, String> {
+    pub(crate) async fn live(&self, b: &Browser) -> Result<Live, String> {
         let p = self.profiles.as_ref().map_err(Clone::clone)?;
         let mut state = self.state.lock().await;
         let owner = self.owner();
@@ -107,6 +107,9 @@ impl Window {
 
 /// Puts web-mcp in a kill-on-close job, so the window's daemon and Chrome die with it, even when it is killed
 /// (Windows). Best effort: one line on stderr when it can't.
+///
+/// # Panics
+/// Never: the job's limit struct is far smaller than `u32::MAX` bytes.
 pub fn tie_to_process() {
     #[cfg(windows)]
     {
@@ -158,7 +161,10 @@ mod tests {
             "fake-agent-browser{}",
             std::env::consts::EXE_SUFFIX
         ));
-        assert!(fake.is_file(), "build the fake first: cargo build --bins");
+        assert!(
+            fake.is_file(),
+            "build the fake first: cargo build --locked -p web-mcp --bin fake-agent-browser"
+        );
         Browser::new(&fake.to_string_lossy(), Window::new(Err("unused".into())))
     }
 

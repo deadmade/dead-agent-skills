@@ -6,10 +6,12 @@ import { isTestName } from './test.mjs';
 
 const crates = ['web-mcp', 'ado-mcp', 'http-runner'];
 const roots = {
-  'web-mcp': ['tools/web-mcp/', 'plugins/shared/web-mcp/'],
+  'web-mcp': ['tools/web/web-mcp/', 'plugins/shared/web-mcp/'],
   'ado-mcp': ['tools/ado-mcp/', 'plugins/opt-in/mcp/mcp-azure/'],
   'http-runner': ['tools/http-runner/', 'plugins/opt-in/mcp/http-runner/'],
 };
+// Library crates: a change in one selects the binary that links it, whose checks then test the library too.
+const libraries = { 'browser-core': { root: 'tools/web/browser-core/', binary: 'web-mcp' } };
 
 export function selectChecks(paths, all = false) {
   const selected = new Set();
@@ -22,7 +24,9 @@ export function selectChecks(paths, all = false) {
   if (all) everything();
   for (const path of paths) {
     if (isTestName(path)) node = true;
-    const crate = crates.find((c) => roots[c].some((root) => path.startsWith(root)));
+    const crate =
+      crates.find((c) => roots[c].some((root) => path.startsWith(root))) ??
+      Object.values(libraries).find((l) => path.startsWith(l.root))?.binary;
     if (crate) {
       selected.add(crate);
       // Manifests, lockfiles and the hand-typed repository slug participate in repository consistency checks.
@@ -30,7 +34,7 @@ export function selectChecks(paths, all = false) {
         path.startsWith('plugins/') ||
         path.endsWith('/Cargo.toml') ||
         path.endsWith('/Cargo.lock') ||
-        path === 'tools/web-mcp/src/api.rs'
+        path === 'tools/web/web-mcp/src/api.rs'
       )
         node = true;
       if (path.startsWith('plugins/')) skills = true;
@@ -63,7 +67,8 @@ export function selectChecks(paths, all = false) {
     }
   }
   const binaries = crates.filter((c) => selected.has(c));
-  return { node, skills, rust: binaries.length > 0, binaries, packages: binaries };
+  const libs = Object.keys(libraries).filter((l) => selected.has(libraries[l].binary));
+  return { node, skills, rust: binaries.length > 0, binaries, packages: [...binaries, ...libs] };
 }
 
 export function changedPaths(eventName, event, git = (args) => execFileSync('git', args, { encoding: 'utf8' })) {

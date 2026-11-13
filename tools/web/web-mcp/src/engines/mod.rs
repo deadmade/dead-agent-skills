@@ -11,6 +11,7 @@ mod scholar;
 mod semanticscholar;
 
 use std::collections::HashSet;
+use std::time::Instant;
 
 use dom_query::Selection;
 use rmcp::schemars::{self, JsonSchema};
@@ -163,6 +164,28 @@ impl Engine {
     }
 }
 
+/// One turn per engine, indexed by its discriminant: an engine's tab serves one search at a time. Each holds the
+/// engine's last query without `since` that parsed as results, in this process.
+pub struct Turns([tokio::sync::Mutex<Option<String>>; Engine::ALL.len()]);
+
+impl Turns {
+    pub fn new() -> Self {
+        Self(std::array::from_fn(|_| tokio::sync::Mutex::new(None)))
+    }
+
+    /// The engine's turn in this process, waited for until `until`; dropping it ends the turn. It holds the engine's
+    /// last query without `since` that parsed as results, in this process.
+    pub async fn turn(
+        &self,
+        e: Engine,
+        until: Instant,
+    ) -> Option<tokio::sync::MutexGuard<'_, Option<String>>> {
+        tokio::time::timeout_at(until.into(), self.0[e as usize].lock())
+            .await
+            .ok()
+    }
+}
+
 /// The text of a selection with its whitespace (non-breaking spaces and line breaks included) collapsed.
 fn text(sel: &Selection) -> String {
     sel.text().split_whitespace().collect::<Vec<_>>().join(" ")
@@ -215,6 +238,8 @@ fn captcha_if(doc: &dom_query::Document, sels: &str) -> Option<Block> {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::Since::{Week, Year};
     use super::*;
 
@@ -382,5 +407,29 @@ mod tests {
     fn only_scholars_are_papers() {
         let papers: Vec<_> = Engine::ALL.into_iter().filter(|e| e.papers()).collect();
         assert_eq!(papers, [Engine::Scholar, Engine::SemanticScholar]);
+    }
+
+    #[tokio::test]
+    async fn turn_waits_then_gives_up() {
+        let p = Turns::new();
+        let held = p.turn(Engine::Scholar, Instant::now()).await.unwrap();
+        let t = Instant::now();
+        assert!(
+            p.turn(Engine::Scholar, t + Duration::from_millis(300))
+                .await
+                .is_none()
+        );
+        assert!(t.elapsed() >= Duration::from_millis(300));
+        // Another engine's turn is its own.
+        assert!(p.turn(Engine::Brave, Instant::now()).await.is_some());
+        let release = async {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            drop(held);
+        };
+        let (got, ()) = tokio::join!(
+            p.turn(Engine::Scholar, Instant::now() + Duration::from_secs(3)),
+            release
+        );
+        assert!(got.is_some());
     }
 }

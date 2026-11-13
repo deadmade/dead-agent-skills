@@ -19,7 +19,7 @@ excludes = [
   "plugins/flows/skills/review-code/UPSTREAM",
   # Test fixtures are real documents and templates, read as written.
   "tools/ado-mcp/tests/fixtures/**",
-  "tools/web-mcp/tests/fixtures/**",
+  "tools/web/web-mcp/tests/fixtures/**",
   "plugins/shared/agent-review/skills/**",
   "plugins/shared/agent-review/LICENSE",
   "plugins/shared/agent-review/UPSTREAM",

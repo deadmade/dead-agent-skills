@@ -16,8 +16,6 @@ use tokio::io::AsyncWriteExt as _;
 use tokio::process::Command;
 use url::Url;
 
-use crate::engines::Engine;
-use crate::profile::ENGINE_DEADLINE;
 use crate::window::{Live, Window};
 
 /// Sessions the fetch fallback names for itself; the `browser` tool may not use them.
@@ -76,7 +74,7 @@ impl fmt::Display for BrowserError {
 }
 
 pub struct Browser {
-    pub bin: PathBuf,
+    bin: PathBuf,
     /// How long the fetch fallback's batch may take.
     pub fallback_deadline: Duration,
     window: Window,
@@ -96,7 +94,7 @@ pub struct Browser {
     /// The client that activates a tab through Chrome's debug port, built on the first raise.
     http: std::sync::OnceLock<Option<reqwest::Client>>,
     /// Where agent-browser keeps its sessions' `.pid` and `.sock` files; `None` where that isn't known.
-    pub socket_dir: Option<PathBuf>,
+    socket_dir: Option<PathBuf>,
 }
 
 /// A search's page load, in an engine's tab.
@@ -119,7 +117,7 @@ enum Via<'a> {
 
 /// Attached calls' `AGENT_BROWSER_DEFAULT_TIMEOUT`: a constant, because it is part of agent-browser's daemon
 /// fingerprint. A search's `wait` carries its own `--timeout`.
-const ATTACHED_TIMEOUT: Duration = ENGINE_DEADLINE.saturating_sub(READ_MARGIN);
+pub const ATTACHED_TIMEOUT: Duration = Duration::from_secs(8);
 
 /// Points `cmd` at the config with `--config` (and, for a tab, the window), runs it in the search dir and drops every
 /// `AGENT_BROWSER_*` variable of `env` (web-mcp's), so nothing of the user's agent-browser setup applies.
@@ -296,22 +294,8 @@ impl Browser {
     /// digits + `-g99-` (longer after 99 browser restarts) + 32 name characters = 55 bytes, which leaves room in
     /// agent-browser's ~103-byte socket path.
     #[must_use]
-    #[expect(
-        clippy::unused_self,
-        reason = "the window's session key, asked of its browser"
-    )]
     pub fn session(&self, name: &str) -> String {
         name.to_owned()
-    }
-
-    /// The key of engine `e`'s tab, mapped like the user ones: `browser` names can't start with `search-`.
-    #[must_use]
-    #[expect(
-        clippy::unused_self,
-        reason = "the window's session key, asked of its browser"
-    )]
-    pub fn engine_session(&self, e: Engine) -> String {
-        format!("search-{}", e.name())
     }
 
     /// Starts the window, or asks its owner whether Chrome came back on a new url: before any deadline starts.
@@ -425,6 +409,9 @@ impl Browser {
     ///
     /// # Errors
     /// As `run`; never retried.
+    ///
+    /// # Panics
+    /// When another thread panicked holding the window or session lock.
     pub async fn close(&self, key: &str) -> Result<Value, BrowserError> {
         let live = self.live.lock().expect("window").clone();
         let Some(live) = live else {
@@ -477,6 +464,9 @@ impl Browser {
 
     /// Closes every session still open, in parallel, best effort, each within 5 s; then the owner, which closes
     /// Chrome.
+    ///
+    /// # Panics
+    /// When another thread panicked holding the window, session or owner lock.
     pub async fn close_all(&self) {
         let ran = std::mem::take(&mut *self.ran.lock().expect("sessions"));
         let live = self.live.lock().expect("window").clone();
@@ -498,13 +488,13 @@ impl Browser {
     /// A path to an existing file, or `name` found on PATH. On Windows each `PATHEXT` extension is
     /// tried too, so npm's `agent-browser.cmd` resolves (Rust runs `.cmd` files through cmd.exe itself).
     #[must_use]
-    pub fn resolve(name: &str) -> Option<PathBuf> {
+    fn resolve(name: &str) -> Option<PathBuf> {
         Self::resolve_on(name, &std::env::var_os("PATH").unwrap_or_default())
     }
 
     /// `resolve` with `path` in place of PATH.
     #[must_use]
-    pub fn resolve_on(name: &str, path: &OsStr) -> Option<PathBuf> {
+    pub(crate) fn resolve_on(name: &str, path: &OsStr) -> Option<PathBuf> {
         let exts = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
         resolve_in(name, path, cfg!(windows).then_some(exts.as_str()))
     }
@@ -728,6 +718,9 @@ impl Browser {
     ///
     /// # Errors
     /// As `batch`, when the deadline passes, or when it answers no HTML or no URL.
+    ///
+    /// # Panics
+    /// When another thread panicked holding the window or session lock.
     pub async fn render(
         &self,
         url: Option<&Url>,
@@ -854,8 +847,52 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::fetch::tests::{Seen, paths, reply, stub};
     use crate::profile::Profiles;
+
+    /// The raw requests a `stub` was sent, in order.
+    pub(crate) type Seen = Arc<std::sync::Mutex<Vec<String>>>;
+
+    /// Serves `replies` (raw HTTP) in order, the last repeating, each after `delay`; returns the URL and the requests
+    /// seen.
+    pub(crate) fn stub(replies: Vec<String>, delay: std::time::Duration) -> (Url, Seen) {
+        use std::io::{Read, Write};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        let seen = Seen::default();
+        let log = Arc::clone(&seen);
+        let n = AtomicUsize::new(0);
+        std::thread::spawn(move || {
+            for mut c in listener.incoming().flatten() {
+                let mut buf = [0; 8192];
+                let len = c.read(&mut buf).unwrap_or(0);
+                log.lock()
+                    .unwrap()
+                    .push(String::from_utf8_lossy(&buf[..len]).into_owned());
+                std::thread::sleep(delay);
+                let i = n.fetch_add(1, Ordering::SeqCst).min(replies.len() - 1);
+                let _ = c.write_all(replies[i].as_bytes());
+            }
+        });
+        (url, seen)
+    }
+
+    /// A raw HTTP reply for `stub`.
+    pub(crate) fn reply(status: &str, headers: &str, body: &str) -> String {
+        format!(
+            "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n{headers}\r\n{body}",
+            body.len()
+        )
+    }
+
+    /// The request paths of `seen`, in order.
+    pub(crate) fn paths(seen: &Seen) -> Vec<String> {
+        seen.lock()
+            .unwrap()
+            .iter()
+            .map(|r| r.split_whitespace().nth(1).unwrap_or("").to_owned())
+            .collect()
+    }
 
     #[test]
     fn resolve_finds_cmd_via_pathext() {
@@ -873,13 +910,16 @@ mod tests {
     /// socket dir). The fake logs beside each call's config: the owner's in `profiles/1/calls.jsonl`, attached
     /// calls in `calls.jsonl`.
     fn fake(tag: &str) -> (PathBuf, Browser) {
-        // The fake sits next to the test binary's deps/ folder; cargo builds it for the integration tests.
+        // The fake sits next to the test binary's deps/ folder; build it first with `cargo build -p web-mcp --bin fake-agent-browser`.
         let exe = std::env::current_exe().unwrap();
         let bin = exe.parent().and_then(Path::parent).unwrap().join(format!(
             "fake-agent-browser{}",
             std::env::consts::EXE_SUFFIX
         ));
-        assert!(bin.is_file(), "build the fake first: cargo build --bins");
+        assert!(
+            bin.is_file(),
+            "build the fake first: cargo build --locked -p web-mcp --bin fake-agent-browser"
+        );
         let dir =
             std::env::temp_dir().join(format!("web-mcp-browser-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);

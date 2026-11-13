@@ -6,6 +6,7 @@ use std::fmt::{self, Write as _};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use browser_core::browser::{ATTACHED_TIMEOUT, BrowserError, READ_MARGIN, SearchRun};
 use futures::future::join_all;
 use jiff::Timestamp;
 use rmcp::RoleServer;
@@ -15,15 +16,18 @@ use url::Url;
 
 use crate::Ctx;
 use crate::archive::Item;
-use crate::browser::{BrowserError, READ_MARGIN, SearchRun};
 use crate::engines::{Block, Engine, Found, Parsed};
 use crate::fetch::{self, GetOpts, slash};
 use crate::fuse::{final_order, fuse, normalise};
 use crate::limits::HostLimits;
-use crate::profile::{ENGINE_DEADLINE, REST};
 use crate::rank::{Hit, MemIndex, PassageDoc};
 
 pub use crate::engines::Since;
+
+/// How long a blocked engine sits out.
+pub const REST: Duration = Duration::from_mins(30);
+/// Each engine's whole budget in a search, from the moment it wins its turn.
+pub const ENGINE_DEADLINE: Duration = ATTACHED_TIMEOUT.saturating_add(READ_MARGIN);
 
 /// How many fused results are fetched.
 const TOP: usize = 5;
@@ -149,7 +153,7 @@ pub async fn run_engine(
     let profiles = ctx.profiles.as_ref().map_err(Clone::clone)?;
     let resting = || {
         profiles
-            .resting(e, Timestamp::now())
+            .resting(e.name(), Timestamp::now())
             .map(|t| format!("resting until {t}"))
     };
     if let Some(why) = resting() {
@@ -157,7 +161,7 @@ pub async fn run_engine(
     }
     // Only the wait is raced: a turn already held ends within its budget.
     let mut last = tokio::select! {
-        turn = profiles.turn(e, Instant::now() + QUEUE_WAIT) => turn.ok_or("busy")?,
+        turn = ctx.turns.turn(e, Instant::now() + QUEUE_WAIT) => turn.ok_or("busy")?,
         () = request.ct.cancelled() => return Err("cancelled".into()),
     };
     // Starts with the turn, so a search behind others keeps all of it.
@@ -168,7 +172,7 @@ pub async fn run_engine(
     if let Some(why) = resting() {
         return Err(why);
     }
-    let session = ctx.browser.engine_session(e);
+    let session = format!("search-{}", e.name());
     let url = e.url(query, since);
     let typed = match e.search_box() {
         Some(sel) if types(e, prev.as_deref(), query, since) => {
@@ -203,7 +207,7 @@ pub async fn run_engine(
         Parsed::Results(found) => {
             // The engine's page was read: a consent page is over and the tab holds this query, whatever comes of
             // its links.
-            profiles.set_consent_seen(e, false);
+            profiles.set_consent_seen(e.name(), false);
             if since.is_none() {
                 *last = Some(query.to_owned());
             }
@@ -220,15 +224,15 @@ pub async fn run_engine(
                 Ok(found)
             };
         }
-        Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e) => {
-            profiles.set_consent_seen(e, true);
+        Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e.name()) => {
+            profiles.set_consent_seen(e.name(), true);
             let _ = keep_page(ctx, url, landed, html).await;
             return Err("consent (clearing)".into());
         }
         Parsed::Blocked(b) => {
-            profiles.rest(e, Timestamp::now() + REST);
+            profiles.rest(e.name(), Timestamp::now() + REST);
             // After the rest, a consent page gets a fresh clearing pass.
-            profiles.set_consent_seen(e, false);
+            profiles.set_consent_seen(e.name(), false);
             match b {
                 Block::Captcha => "captcha",
                 Block::Consent => "consent",
