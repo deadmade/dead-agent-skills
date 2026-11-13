@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
+use std::fmt::Write as _;
 use std::fs::{File, TryLockError};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -13,6 +14,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use jiff::Timestamp;
+use sha2::{Digest, Sha256};
 use tokio::process::Command;
 
 use crate::browser::Browser;
@@ -34,7 +36,7 @@ const DOWNLOAD_MAX: usize = 2 << 20;
 /// When the hash isn't `expected_sha256`, an entry is a symlink or would land outside the folder (nothing is
 /// written then), or writing fails.
 pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, String> {
-    let sha = crate::archive::sha(zip);
+    let sha = sha(zip);
     if !sha.eq_ignore_ascii_case(expected_sha256) {
         return Err(format!("its sha256 is {sha}, not {expected_sha256}"));
     }
@@ -323,9 +325,8 @@ impl Profiles {
                 .await
                 .and_then(reqwest::Response::error_for_status)
                 .map_err(|e| e.to_string())?;
-            crate::fetch::read_capped(resp, DOWNLOAD_MAX)
-                .await
-                .map_err(|e| e.to_string())?
+            read_capped(resp, DOWNLOAD_MAX)
+                .await?
                 .ok_or_else(|| "it is over 2 MiB".to_owned())
         };
         let zip = tokio::time::timeout(DOWNLOAD, get)
@@ -365,6 +366,30 @@ impl Profiles {
             let _ = std::fs::remove_file(&path);
         }
     }
+}
+
+fn sha(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .fold(String::with_capacity(64), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
+}
+
+/// The body of `resp`, or `None` when it is over `max` bytes.
+async fn read_capped(mut resp: reqwest::Response, max: usize) -> Result<Option<Vec<u8>>, String> {
+    if resp.content_length().is_some_and(|n| n > max as u64) {
+        return Ok(None);
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
+        if body.len() + chunk.len() > max {
+            return Ok(None);
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(Some(body))
 }
 
 /// A path for a config file or script: written lossily, it would name another file.
@@ -563,7 +588,7 @@ mod tests {
     fn broken_existing_version_is_replaced() {
         let dir = tempdir("broken");
         let zip = zip_of(&[("manifest.json", "{}")], None);
-        let sha = crate::archive::sha(&zip);
+        let sha = sha(&zip);
         let target = dir.join(format!("idcac-{}", &sha[..8]));
         std::fs::create_dir_all(target.join("half")).unwrap();
         assert_eq!(unpack(&zip, &sha, &dir).unwrap(), target);
@@ -633,7 +658,7 @@ mod tests {
         .iter()
         .enumerate()
         {
-            let sha = crate::archive::sha(zip);
+            let sha = sha(zip);
             let got = unpack(zip, &sha, &dir);
             assert!(got.is_err(), "zip {i}: {got:?}");
             assert_eq!(files_in(&dir), Vec::<String>::new());
@@ -645,7 +670,7 @@ mod tests {
     fn unpack_keeps_existing_version() {
         let dir = tempdir("keep");
         let zip = zip_of(&[("manifest.json", "{\"v\":1}"), ("sub/a.js", "a")], None);
-        let sha = crate::archive::sha(&zip);
+        let sha = sha(&zip);
         let got = unpack(&zip, &sha, &dir).unwrap();
         assert_eq!(got, dir.join(format!("idcac-{}", &sha[..8])));
         assert_eq!(std::fs::read_to_string(got.join("sub/a.js")).unwrap(), "a");
