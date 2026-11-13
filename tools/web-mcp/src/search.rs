@@ -149,7 +149,7 @@ pub async fn run_engine(
     let profiles = ctx.profiles.as_ref().map_err(Clone::clone)?;
     let resting = || {
         profiles
-            .resting(e, Timestamp::now())
+            .resting(e.name(), Timestamp::now())
             .map(|t| format!("resting until {t}"))
     };
     if let Some(why) = resting() {
@@ -157,7 +157,7 @@ pub async fn run_engine(
     }
     // Only the wait is raced: a turn already held ends within its budget.
     let mut last = tokio::select! {
-        turn = profiles.turn(e, Instant::now() + QUEUE_WAIT) => turn.ok_or("busy")?,
+        turn = ctx.turns.turn(e, Instant::now() + QUEUE_WAIT) => turn.ok_or("busy")?,
         () = request.ct.cancelled() => return Err("cancelled".into()),
     };
     // Starts with the turn, so a search behind others keeps all of it.
@@ -203,7 +203,7 @@ pub async fn run_engine(
         Parsed::Results(found) => {
             // The engine's page was read: a consent page is over and the tab holds this query, whatever comes of
             // its links.
-            profiles.set_consent_seen(e, false);
+            profiles.set_consent_seen(e.name(), false);
             if since.is_none() {
                 *last = Some(query.to_owned());
             }
@@ -220,15 +220,15 @@ pub async fn run_engine(
                 Ok(found)
             };
         }
-        Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e) => {
-            profiles.set_consent_seen(e, true);
+        Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e.name()) => {
+            profiles.set_consent_seen(e.name(), true);
             let _ = keep_page(ctx, url, landed, html).await;
             return Err("consent (clearing)".into());
         }
         Parsed::Blocked(b) => {
-            profiles.rest(e, Timestamp::now() + REST);
+            profiles.rest(e.name(), Timestamp::now() + REST);
             // After the rest, a consent page gets a fresh clearing pass.
-            profiles.set_consent_seen(e, false);
+            profiles.set_consent_seen(e.name(), false);
             match b {
                 Block::Captcha => "captcha",
                 Block::Consent => "consent",

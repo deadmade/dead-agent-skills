@@ -860,6 +860,7 @@ pub(crate) mod tests {
             inflight: Inflight::default(),
             lookup: crate::lookup::Cache::default(),
             browser,
+            turns: crate::engines::Turns::new(),
         })
     }
 

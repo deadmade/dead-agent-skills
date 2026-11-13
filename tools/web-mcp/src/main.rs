@@ -35,6 +35,8 @@ pub struct Ctx {
     /// `Err` without a search folder: then `search`, `browser`, `rows` and the fetch fallback fail.
     pub profiles: Result<Arc<profile::Profiles>, String>,
     pub browser: browser::Browser,
+    /// Each engine's turn: its tab serves one search at a time.
+    pub turns: engines::Turns,
 }
 
 #[tokio::main]
@@ -59,6 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         limits: limits::HostLimits::default(),
         inflight: fetch::Inflight::default(),
         lookup: lookup::Cache::default(),
+        turns: engines::Turns::new(),
         cfg,
     };
     let ctx = Arc::new(ctx);

@@ -1,6 +1,6 @@
 //! The search folder: the browser and cookie extension the window runs with, the profile slots (one
 //! persistent browser profile per web-mcp process, held under a lock, with its own consent marks), the config files,
-//! the engines' turns, and their rests, shared by every web-mcp process on the machine.
+//! and the rests, shared by every web-mcp process on the machine. Marks are keyed by a name the caller picks.
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -16,7 +16,6 @@ use jiff::Timestamp;
 use tokio::process::Command;
 
 use crate::browser::Browser;
-use crate::engines::Engine;
 
 pub const EXTENSION_URL: &str = "https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies/releases/download/v1.1.9/ISDCAC-chrome-source.zip";
 pub const EXTENSION_SHA256: &str =
@@ -98,18 +97,15 @@ pub struct Ready {
     pub extension: PathBuf,
 }
 
-/// The search folder: per engine `<engine>/rest`, plus the shared `extensions/` and, for Helium,
+/// The search folder: per name `<name>/rest`, plus the shared `extensions/` and, for Helium,
 /// `helium-wrap.sh`; the profile slots `profiles/<n>/` (`lock`, `owner`, `agent-browser.json`, `profile/`,
-/// `<engine>/consent-seen`) and the attached calls' `attach.json`.
+/// `<name>/consent-seen`) and the attached calls' `attach.json`.
 pub struct Profiles {
     dir: PathBuf,
     /// For the cookie extension download: https only, at most 5 redirects (GitHub redirects release assets).
     http: reqwest::Client,
     /// `profiles/<n>` and its held lock, taken on the first `slot()` and kept until exit.
     slot: OnceLock<(PathBuf, File)>,
-    /// One turn per engine, indexed by its discriminant: an engine's tab serves one search at a time. Each holds the
-    /// engine's last query without `since` that parsed as results, in this process.
-    turns: [tokio::sync::Mutex<Option<String>>; Engine::ALL.len()],
     /// The browser `ready()` uses in tests instead of looking for one.
     #[cfg(test)]
     chrome: Option<PathBuf>,
@@ -134,7 +130,6 @@ impl Profiles {
             dir,
             http,
             slot: OnceLock::new(),
-            turns: std::array::from_fn(|_| tokio::sync::Mutex::new(None)),
             #[cfg(test)]
             chrome: None,
         })
@@ -222,24 +217,12 @@ impl Profiles {
         )
     }
 
-    /// The engine's turn in this process, waited for until `until`; dropping it ends the turn. It holds the engine's
-    /// last query without `since` that parsed as results, in this process.
-    pub async fn turn(
-        &self,
-        e: Engine,
-        until: Instant,
-    ) -> Option<tokio::sync::MutexGuard<'_, Option<String>>> {
-        tokio::time::timeout_at(until.into(), self.turns[e as usize].lock())
-            .await
-            .ok()
-    }
-
     /// The engine's consent mark: per slot once one is held (each has its own cookies), machine-wide before.
-    fn consent_mark(&self, e: Engine) -> PathBuf {
+    fn consent_mark(&self, name: &str) -> PathBuf {
         self.slot
             .get()
             .map_or(self.dir.as_path(), |(slot, _)| slot)
-            .join(e.name())
+            .join(name)
             .join("consent-seen")
     }
 
@@ -357,29 +340,29 @@ impl Profiles {
     }
 
     /// When the engine's rest ends, if it is resting at `now`.
-    pub fn resting(&self, e: Engine, now: Timestamp) -> Option<Timestamp> {
-        let rest = std::fs::read_to_string(self.dir.join(e.name()).join("rest")).ok()?;
+    pub fn resting(&self, name: &str, now: Timestamp) -> Option<Timestamp> {
+        let rest = std::fs::read_to_string(self.dir.join(name).join("rest")).ok()?;
         let until: Timestamp = rest.trim().parse().ok()?;
         (until > now).then_some(until)
     }
 
     /// Rests the engine until `until`, for every web-mcp process on the machine.
-    pub fn rest(&self, e: Engine, until: Timestamp) {
+    pub fn rest(&self, name: &str, until: Timestamp) {
         // Best effort: an engine that can't rest is only asked again.
-        let path = self.dir.join(e.name()).join("rest");
+        let path = self.dir.join(name).join("rest");
         let _ = write_if_changed(&path, until.to_string().as_bytes(), false);
     }
 
     /// Whether the last search of the engine met a consent page.
-    pub fn consent_seen(&self, e: Engine) -> bool {
-        self.consent_mark(e).exists()
+    pub fn consent_seen(&self, name: &str) -> bool {
+        self.consent_mark(name).exists()
     }
 
     /// Marks (or clears) that the engine met a consent page, in the mark `consent_seen` reads. The caller holds the
     /// engine's turn.
-    pub fn set_consent_seen(&self, e: Engine, seen: bool) {
+    pub fn set_consent_seen(&self, name: &str, seen: bool) {
         // Best effort, like `rest`: a lost mark costs one more `consent (clearing)`.
-        let path = self.consent_mark(e);
+        let path = self.consent_mark(name);
         if seen {
             let _ = write_if_changed(&path, b"", false);
         } else {
@@ -684,12 +667,12 @@ mod tests {
         let dir = tempdir("rest");
         let p = profiles(&dir);
         let now = Timestamp::now();
-        assert_eq!(p.resting(Engine::Google, now), None);
+        assert_eq!(p.resting("google", now), None);
         let until = now + REST;
-        p.rest(Engine::Google, until);
-        assert_eq!(p.resting(Engine::Google, now), Some(until));
-        assert_eq!(p.resting(Engine::Bing, now), None);
-        assert_eq!(p.resting(Engine::Google, until), None);
+        p.rest("google", until);
+        assert_eq!(p.resting("google", now), Some(until));
+        assert_eq!(p.resting("bing", now), None);
+        assert_eq!(p.resting("google", until), None);
     }
 
     #[test]
@@ -698,7 +681,7 @@ mod tests {
         let p = profiles(&dir);
         std::fs::create_dir_all(dir.join("google")).unwrap();
         std::fs::write(dir.join("google/rest"), "soon").unwrap();
-        assert_eq!(p.resting(Engine::Google, Timestamp::now()), None);
+        assert_eq!(p.resting("google", Timestamp::now()), None);
     }
 
     #[test]
@@ -723,49 +706,24 @@ mod tests {
         assert_eq!(c.slot().unwrap(), dir.join("profiles").join("1"));
     }
 
-    #[tokio::test]
-    async fn turn_waits_then_gives_up() {
-        let dir = tempdir("turn");
-        let p = profiles(&dir);
-        let held = p.turn(Engine::Scholar, Instant::now()).await.unwrap();
-        let t = Instant::now();
-        assert!(
-            p.turn(Engine::Scholar, t + Duration::from_millis(300))
-                .await
-                .is_none()
-        );
-        assert!(t.elapsed() >= Duration::from_millis(300));
-        // Another engine's turn is its own.
-        assert!(p.turn(Engine::Brave, Instant::now()).await.is_some());
-        let release = async {
-            tokio::time::sleep(Duration::from_millis(200)).await;
-            drop(held);
-        };
-        let (got, ()) = tokio::join!(
-            p.turn(Engine::Scholar, Instant::now() + Duration::from_secs(3)),
-            release
-        );
-        assert!(got.is_some());
-    }
-
     #[test]
     fn consent_mark_is_per_slot() {
         let dir = tempdir("consent");
         let a = profiles(&dir);
         let b = profiles(&dir);
         // Before a slot is held: the old machine-wide mark.
-        a.set_consent_seen(Engine::Google, true);
+        a.set_consent_seen("google", true);
         assert!(dir.join("google").join("consent-seen").is_file());
-        assert!(a.consent_seen(Engine::Google));
+        assert!(a.consent_seen("google"));
         let slot = a.slot().unwrap().to_owned();
-        assert!(!a.consent_seen(Engine::Google));
-        a.set_consent_seen(Engine::Google, true);
+        assert!(!a.consent_seen("google"));
+        a.set_consent_seen("google", true);
         assert!(slot.join("google").join("consent-seen").is_file());
-        assert!(a.consent_seen(Engine::Google));
+        assert!(a.consent_seen("google"));
         b.slot().unwrap();
-        assert!(!b.consent_seen(Engine::Google));
-        a.set_consent_seen(Engine::Google, false);
-        assert!(!a.consent_seen(Engine::Google));
+        assert!(!b.consent_seen("google"));
+        a.set_consent_seen("google", false);
+        assert!(!a.consent_seen("google"));
         assert!(dir.join("google").join("consent-seen").is_file());
     }
 
