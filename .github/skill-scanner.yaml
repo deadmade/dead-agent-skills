@@ -46,7 +46,7 @@ suppressions:
   - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
     skills: [diagrams]
     paths: [scripts/check.mjs]
-    reason: execFile of `npm ci --ignore-scripts` and of node on the skill's own parse.mjs in the cache folder, with fixed argument arrays and no shell.
+    reason: execFile of `npm ci --ignore-scripts` (Mermaid, jsdom, web-tree-sitter and its grammars) and of node on the skill's own parse.mjs and outline.mjs in the cache folder, with fixed argument arrays and no shell.
   - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
     skills: [diagrams]
     paths: [tests/check.test.mjs, tests/render.test.mjs]

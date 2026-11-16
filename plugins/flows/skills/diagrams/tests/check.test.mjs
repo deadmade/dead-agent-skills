@@ -15,10 +15,13 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { outlineFiles, parseDiagrams, parseFilesBlock, planMap } from '../scripts/check.mjs';
+import { overviewMermaid } from '../scripts/render.mjs';
 
 const SKILL = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = join(SKILL, 'scripts', 'check.mjs');
 const FIXTURE = readFileSync(join(SKILL, 'tests', 'fixtures', 'api-mcp-diagrams.md'), 'utf8');
+const OUTLINED = join(SKILL, 'tests', 'fixtures', 'outline');
 const WIN = process.platform === 'win32';
 
 const temp = () => mkdtempSync(join(tmpdir(), 'diagrams-'));
@@ -44,9 +47,10 @@ const READY = !check(fence('mermaid', 'flowchart LR\n  a --> b')).out.includes('
 const NEEDS_PARSER = READY ? false : 'the parser cannot be installed (offline)';
 
 // A checker run whose cache is an empty folder and whose PATH holds only `bin`.
-function isolated(markdown, bin) {
+function isolated(markdown, bin, root) {
   const cache = temp();
   return check(markdown, {
+    root,
     env: { PATH: bin, HOME: cache, USERPROFILE: cache, XDG_CACHE_HOME: cache, LOCALAPPDATA: cache },
   });
 }
@@ -266,6 +270,13 @@ test('files block: a Files item with no backticked path gives "no plan map"', ()
   assert.match(r.out, /warning.*no plan map/);
 });
 
+test('a malformed task fence is an error even when the plan map cannot be built', () => {
+  const r = check(plan([1, 'none', '- Modify: src/a.ts', '', fence('files', '~ src/a.ts\nmove it')]));
+  assert.match(r.out, /warning.*no plan map/);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /error: block 1.*move it/);
+});
+
 test('files block: a + path that exists, a malformed line and a backslash path are each reported', () => {
   const root = temp();
   put(root, 'here.txt');
@@ -277,4 +288,312 @@ test('files block: a + path that exists, a malformed line and a backslash path a
   const slash = check(fence('files', '+ src\\win.txt'), { root });
   assert.equal(slash.code, 1);
   assert.match(slash.out, /block 1.*src\\win\.txt/);
+});
+
+const RENDER = 'plugins/flows/skills/diagrams/scripts/render.mjs';
+const OUTLINE = 'plugins/flows/skills/diagrams/scripts/outline.mjs';
+
+test('parseFilesBlock reads why, symbols, a symbol move and uses', () => {
+  const block = [
+    `~ ${RENDER}  draw the overview and cards`,
+    '    + overviewMermaid  builds the flowchart text',
+    '    ~ listHtml  becomes the file cards',
+    '    - planMapHtml',
+    '    > treeHtml -> plugins/flows/skills/diagrams/scripts/cards.mjs',
+    `+ ${OUTLINE}  tree-sitter outlines`,
+    `${RENDER} uses ${OUTLINE}`,
+  ].join('\n');
+  assert.deepEqual(parseFilesBlock(block), [
+    {
+      marker: '~',
+      path: RENDER,
+      why: 'draw the overview and cards',
+      symbols: [
+        { marker: '+', name: 'overviewMermaid', why: 'builds the flowchart text' },
+        { marker: '~', name: 'listHtml', why: 'becomes the file cards' },
+        { marker: '-', name: 'planMapHtml' },
+        { marker: '>', name: 'treeHtml', to: 'plugins/flows/skills/diagrams/scripts/cards.mjs' },
+      ],
+      uses: [OUTLINE],
+    },
+    { marker: '+', path: OUTLINE, why: 'tree-sitter outlines', symbols: [], uses: [] },
+  ]);
+});
+
+test('a why needs two spaces, so a path with one space is still an error', () => {
+  assert.deepEqual(parseFilesBlock('+ new.txt  a why'), [
+    { marker: '+', path: 'new.txt', why: 'a why', symbols: [], uses: [] },
+  ]);
+  const r = check(fence('files', '+ my file.txt'));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /error.*block 1.*bad files line.*my file\.txt/);
+});
+
+test('a fence nested in a list keeps its file lines as files', () => {
+  const root = temp();
+  put(root, 'b.txt');
+  const r = check(`- an item\n\n  \`\`\`files\n  + a.txt\n  ~ b.txt\n      ~ sym\n  \`\`\`\n`, { root });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
+test('a uses line naming a path not in the block is an error', () => {
+  const r = check(fence('files', '+ a.txt\n+ b.txt\na.txt uses c.txt'));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /error.*block 1.*uses names a path not in the block.*c\.txt/);
+  const source = check(fence('files', '+ a.txt\nc.txt uses a.txt'));
+  assert.equal(source.code, 1);
+  assert.match(source.out, /error.*block 1.*uses names a path not in the block.*c\.txt/);
+});
+
+test('a ~ code file without symbols is a warning, a ~ file with no grammar is not', () => {
+  const root = temp();
+  put(root, 'x.ts', 'README.md');
+  const r = check(fence('files', '~ x.ts\n~ README.md'), { root });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /warning.*block 1.*x\.ts.*no symbols/);
+  assert.doesNotMatch(r.out, /README\.md/);
+  assert.doesNotMatch(check(fence('files', '~ x.ts\n  + f'), { root }).out, /no symbols/);
+  assert.equal(check(plan([1, 'none', '- Modify: `README.md`']), { root }).out.trim(), '');
+});
+
+test('an old paths-only block still passes', () => {
+  const root = temp();
+  put(root, 'a.txt', 'b.txt', 'c.txt');
+  const r = check(fence('files', '~ a.txt\n- b.txt\n> c.txt -> d.txt\n+ e.txt'), { root });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /^error/m);
+});
+
+test('an old block whose file lines are all indented still passes', () => {
+  const root = temp();
+  put(root, 'b.txt');
+  assert.deepEqual(parseFilesBlock('  + a.txt\n  ~ b.txt\n      ~ f'), [
+    { marker: '+', path: 'a.txt', symbols: [], uses: [] },
+    { marker: '~', path: 'b.txt', symbols: [{ marker: '~', name: 'f' }], uses: [] },
+  ]);
+  const r = check(fence('files', '  + a.txt\n  ~ b.txt'), { root });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /^error/m);
+});
+
+test("a task's uses naming a path not in the plan's map is an error", () => {
+  const root = temp();
+  put(root, 'a.txt');
+  const r = check(plan([1, 'none', '- Modify: `a.txt`', '', fence('files', '~ a.txt\n  ~ f\na.txt uses c.txt')]), {
+    root,
+  });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /error.*block 1.*Task 1.*uses names a path not in the plan's map.*c\.txt/);
+});
+
+test("planMap takes a task's files fence", () => {
+  const md = plan(
+    [1, 'none', '- Modify: `a.txt`', '', fence('files', '~ a.txt  why\n    + f  new\na.txt uses b.txt')],
+    [2, 'Task 1', '- Create: `b.txt`'],
+  );
+  assert.deepEqual(planMap(md), [
+    {
+      task: 'Task 1: t1',
+      marker: '~',
+      path: 'a.txt',
+      why: 'why',
+      symbols: [{ marker: '+', name: 'f', why: 'new' }],
+      uses: ['b.txt'],
+    },
+    { task: 'Task 2: t2', marker: '+', path: 'b.txt', symbols: [], uses: [] },
+  ]);
+  const root = temp();
+  put(root, 'a.txt');
+  const r = check(md, { root });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
+test("a task's fence naming a path outside its Files list is an error and the path checks still run", () => {
+  const r = check(
+    plan([1, 'none', '- Modify: `gone.txt`', '', fence('files', '~ gone.txt\n  ~ f\n~ other.txt\n  ~ g')]),
+  );
+  assert.equal(r.code, 1);
+  assert.match(r.out, /error.*block 1.*Task 1.*other\.txt.*Files list/);
+  assert.match(r.out, /error.*Task 1.*gone\.txt does not exist/);
+  assert.doesNotMatch(r.out, /warning.*does not exist/);
+});
+
+test("a files fence after a task's first step is an example, checked like a hand-written block", () => {
+  const root = temp();
+  put(root, 'a.md');
+  const md = `${plan([1, 'none', '- Modify: `a.md`'])}\n${fence('files', '+ src/example/new.ts  the new entry point')}`;
+  const r = check(md, { root });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
+test('a Files bullet wrapped onto an indented line is still one entry', () => {
+  const files = '- Modify: `a.txt` (one note)\n  continues the note, naming `nope.txt` and + b.txt';
+  const md = plan([1, 'none', files, '', fence('files', '~ a.txt\n    ~ f')]);
+  assert.deepEqual(planMap(md), [
+    { task: 'Task 1: t1', marker: '~', path: 'a.txt', symbols: [{ marker: '~', name: 'f' }], uses: [] },
+  ]);
+  const root = temp();
+  put(root, 'a.txt');
+  const r = check(md, { root });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
+const outline = (rows) => rows.map(([name, kind, line]) => ({ name, kind, line }));
+
+test('outlineFiles lists the declarations of a TS, JS, Rust, C# and Python file', { skip: NEEDS_PARSER }, async () => {
+  const outlines = await outlineFiles(['sample.ts', 'sample.mjs', 'sample.rs', 'Sample.cs', 'sample.py'], OUTLINED);
+  assert.deepEqual(
+    outlines,
+    new Map([
+      [
+        'sample.ts',
+        outline([
+          ['load', 'function', 1],
+          ['save', 'function', 5],
+          ['Store', 'class', 7],
+          ['Store.handler', 'method', 9],
+          ['Store.get', 'method', 10],
+          ['Shape', 'interface', 15],
+          ['Shape.area', 'method', 16],
+        ]),
+      ],
+      [
+        'sample.mjs',
+        outline([
+          ['start', 'function', 1],
+          ['Button', 'class', 3],
+          ['Button.onClick', 'method', 5],
+          ['Button.onHover', 'method', 6],
+          ['Button.render', 'method', 7],
+        ]),
+      ],
+      [
+        'sample.rs',
+        outline([
+          ['Counter', 'struct', 1],
+          ['Counter', 'impl', 5],
+          ['Counter.bump', 'method', 6],
+          ['start', 'function', 12],
+          ['tests', 'mod', 17],
+          ['tests.bumps', 'function', 21],
+        ]),
+      ],
+      [
+        'Sample.cs',
+        outline([
+          ['Demo', 'namespace', 1],
+          ['Demo.Runner', 'class', 3],
+          ['Demo.Runner.Run', 'method', 5],
+          ['Demo.Runner.Run', 'method', 9],
+        ]),
+      ],
+      [
+        'sample.py',
+        outline([
+          ['load', 'function', 5],
+          ['Store', 'class', 9],
+          ['Store.size', 'method', 11],
+          ['Store.get', 'method', 14],
+        ]),
+      ],
+    ]),
+  );
+});
+
+test('a C# file-scoped namespace names the declarations after it', { skip: NEEDS_PARSER }, async () => {
+  assert.deepEqual(
+    await outlineFiles(['Scoped.cs'], OUTLINED),
+    new Map([
+      [
+        'Scoped.cs',
+        outline([
+          ['Demo', 'namespace', 1],
+          ['Demo.Runner', 'class', 3],
+          ['Demo.Runner.Run', 'method', 5],
+        ]),
+      ],
+    ]),
+  );
+});
+
+test('a ~ ../ path outside the root gets no outline', { skip: NEEDS_PARSER }, () => {
+  const dir = temp();
+  writeFileSync(join(dir, 'outside.ts'), 'export function secret() {}\n');
+  mkdirSync(join(dir, 'root'));
+  const r = check(fence('files', '~ ../outside.ts\n    + secret'), { root: join(dir, 'root') });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
+test('a .md file has no outline (null)', { skip: NEEDS_PARSER }, async () => {
+  assert.deepEqual(await outlineFiles(['README.md'], temp()), new Map([['README.md', null]]));
+});
+
+test('a ~, - and > symbol missing from the outline is a warning', { skip: NEEDS_PARSER }, () => {
+  const block =
+    '~ sample.ts\n    ~ load\n    ~ missing\n- sample.py\n    - Store.gone\n> sample.rs -> moved.rs\n    ~ absent';
+  const r = check(fence('files', block), { root: OUTLINED });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /warning: block 1: ~ sample\.ts: missing not found/);
+  assert.match(r.out, /warning: block 1: - sample\.py: Store\.gone not found/);
+  assert.match(r.out, /warning: block 1: ~ sample\.rs: absent not found/);
+  assert.doesNotMatch(r.out, /load/);
+});
+
+test('a + symbol already in the outline is a warning', { skip: NEEDS_PARSER }, () => {
+  const r = check(fence('files', '~ sample.ts\n    + get\n    + fresh'), { root: OUTLINED });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /warning: block 1: \+ sample\.ts: get already exists/);
+  assert.doesNotMatch(r.out, /fresh/);
+});
+
+test('an overloaded name marks every match', { skip: NEEDS_PARSER }, () => {
+  const r = check(fence('files', '~ Sample.cs\n    ~ Run\n    ~ Demo.Runner.Run\n    + Run'), { root: OUTLINED });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), 'warning: block 1: + Sample.cs: Run already exists');
+});
+
+test('a symbol an earlier task adds is not reported missing in a later task', { skip: NEEDS_PARSER }, () => {
+  const md = plan(
+    [1, 'none', '- Modify: `sample.ts`', '', fence('files', '~ sample.ts\n    + fresh')],
+    [2, 'Task 1', '- Modify: `sample.ts`', '', fence('files', '~ sample.ts\n    ~ fresh\n    ~ other')],
+  );
+  const r = check(md, { root: OUTLINED });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), 'warning: Task 2: t2: ~ sample.ts: other not found');
+});
+
+test('no npm gives "not outlined" and exit 0', { skip: WIN }, () => {
+  const root = temp();
+  put(root, 'a.ts');
+  const r = isolated(fence('files', '~ a.ts\n    ~ f'), temp(), root);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /warning: not outlined: npm was not found/);
+});
+
+test('check.mjs on a doc with only a .md files block installs nothing', () => {
+  const root = temp();
+  put(root, 'notes.md');
+  const r = isolated(fence('files', '~ notes.md\n    ~ Intro'), temp(), root);
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
+test('parseDiagrams accepts generated overviews of 3 and 13 files', { skip: NEEDS_PARSER }, async () => {
+  const small = parseFilesBlock(
+    '~ a/x.ts  why\n    + f\n    > g -> lib/"q".ts\n> a/old.ts -> b/new.ts\n- <c>.md\na/x.ts uses b/new.ts',
+  );
+  const big = parseFilesBlock(
+    [...Array.from({ length: 13 }, (_, i) => `+ d${i % 3}/f${i}.ts`), 'd0/f0.ts uses d1/f1.ts'].join('\n'),
+  );
+  const results = await parseDiagrams([overviewMermaid(small, 'b1'), overviewMermaid(big, 'p')]);
+  assert.deepEqual(
+    results.map((r) => r.ok),
+    [true, true],
+    JSON.stringify(results),
+  );
 });
