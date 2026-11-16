@@ -128,6 +128,9 @@ Read `docs/components/ci.md` for how a release is built and published.
   CI lints with latest stable Rust and separately checks the selected packages with the workspace's declared `rust-version` (1.97).
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
   linking fails.
+- `flows:diagrams`' checker installs into one user cache folder (`dead-agent-skills/diagrams-node`) shared by every
+  checkout: running its tests in a worktree whose `package.json` or `outline.mjs` differs reinstalls the cache for all
+  of them, so the next run elsewhere reinstalls again (minutes, about 350 MB).
 - Don't share `CARGO_TARGET_DIR` between worktrees: a test binary keeps the `CARGO_MANIFEST_DIR` of the worktree that
   built it, and web-mcp's integration tests start whichever server binary was built last.
 - mod tests: after a build, copy `plugins/default/hooks/*.test.*` into `.claude-plugin/dead-skills/hooks/` and run `claude plugin test .`
