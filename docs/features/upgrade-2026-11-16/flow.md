@@ -1,7 +1,7 @@
 ---
 flow: upgrade
-phase: finish
-now: Waiting for you: pick how the branch ends.
+phase: done
+now: "Done: merged into dev."
 ---
 
 # Upgrade outdated packages (2026-11-16): flow
