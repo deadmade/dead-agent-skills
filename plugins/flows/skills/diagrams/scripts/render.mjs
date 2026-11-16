@@ -120,8 +120,17 @@ function folders(files) {
   return fold(root);
 }
 
-// The overview of a map as a Mermaid flowchart. Node ids are `<prefix>f<n>` (the n-th file, as in mapHtml),
-// `<prefix>d<n>` (a folder) and `<prefix>x<n>` (a grey path outside the map); only quoted labels carry paths.
+// The relations between a map's files, each [from path, labelled Mermaid arrow, to path].
+const relations = (files) =>
+  files.flatMap((f) => [
+    ...f.uses.map((u) => [f.path, '-->|uses|', u]),
+    ...(f.from ? [[f.from, '-.->|moved|', f.path]] : []),
+    ...f.symbols.filter((s) => s.to).map((s) => [f.path, `-.->|"${label(s.name)}"|`, s.to]),
+  ]);
+
+// The overview of a map as a Mermaid flowchart, or '' when up to 12 files have no relation. Node ids are
+// `<prefix>f<n>` (the n-th file, as in mapHtml), `<prefix>d<n>` (a folder, over 12 files) and `<prefix>x<n>` (a grey
+// path outside the map); only quoted labels carry paths. Up to 12 files it draws only the files that relate.
 export function overviewMermaid(entries, prefix) {
   const files = merge(entries);
   const out = ['flowchart LR'];
@@ -130,11 +139,7 @@ export function overviewMermaid(entries, prefix) {
     if (!others.has(path)) others.set(path, `${prefix}x${others.size}`);
     return others.get(path);
   };
-  const edges = files.flatMap((f) => [
-    ...f.uses.map((u) => [f.path, '-->', u]),
-    ...(f.from ? [[f.from, '-.->|moved|', f.path]] : []),
-    ...f.symbols.filter((s) => s.to).map((s) => [f.path, `-.->|"${label(s.name)}"|`, s.to]),
-  ]);
+  const edges = relations(files);
   const classes = { add: [], mod: [], del: [], move: [] };
   let node;
   if (files.length > MAX_FILES) {
@@ -147,23 +152,17 @@ export function overviewMermaid(entries, prefix) {
     node = (path) => dirs.get(folder(path)) ?? other(`${folder(path) || '.'}/`);
     edges.forEach((e) => (e[1] = e[1].startsWith('-.->') ? '-.->' : '-->'));
   } else {
-    let d = 0;
-    const draw = (dir, pad) => {
-      for (const [name, sub] of dir.dirs) {
-        out.push(`${pad}subgraph ${prefix}d${d++}["${label(`${name}/`)}"]`);
-        draw(sub, `${pad}  `);
-        out.push(`${pad}end`);
-      }
-      for (const n of dir.files) {
-        const f = files[n];
-        const symbols = counts(f.symbols.map((s) => s.marker));
-        out.push(
-          `${pad}${prefix}f${n}["${label(`${f.marker} ${parts(f.path).at(-1) ?? f.path}`)}${symbols ? `<br>${label(symbols)}` : ''}"]`,
-        );
-        classes[MARKS[f.marker]].push(`${prefix}f${n}`);
-      }
-    };
-    draw(folders(files), '  ');
+    const related = new Set(edges.flatMap(([a, , b]) => [a, b]));
+    if (!related.size) return '';
+    files.forEach((f, n) => {
+      if (!related.has(f.path)) return;
+      // The caption: the file's own folder and its symbol counts, muted by the page's CSS.
+      const caption = [`${parts(f.path).at(-2) ?? '.'}/`, counts(f.symbols.map((s) => s.marker))];
+      out.push(
+        `  ${prefix}f${n}["${label(`${f.marker} ${parts(f.path).at(-1) ?? f.path}`)}<br><small>${label(caption.filter(Boolean).join(' · '))}</small>"]`,
+      );
+      classes[MARKS[f.marker]].push(`${prefix}f${n}`);
+    });
     const ids = new Map(files.map((f, n) => [f.path, `${prefix}f${n}`]));
     node = (path) => ids.get(path) ?? other(path);
   }
@@ -191,10 +190,11 @@ const TOTALS = { '+': 'new', '~': 'changed', '-': 'removed', '>': 'moved' };
 
 // One panel per map: a bar with the file totals and the Files and Relations tabs; the files by folder, each a button
 // `f-<prefix>f<n>`, beside one pane per file, its class `c-<prefix>f<n>` matching the file's button and overview node;
-// and the overview. A pane holds the file's outline in file order with the change marked and untouched rows `same`,
-// then predicted `+` symbols the outline lacks, and the files it uses and is used by. `outlines` is checkMarkdown's:
-// null when nothing was outlined, else path -> outline, null or missing for a file without one. State is the class `on`
-// (the first file's button and pane), since clean() keeps only `class` and `type`; the page script sets the rest.
+// and the overview with the files it leaves out, or a line that none relate. A pane holds the file's outline in file
+// order with the change marked and untouched rows `same`, then predicted `+` symbols the outline lacks, and the files it
+// uses and is used by. `outlines` is checkMarkdown's: null when nothing was outlined, else path -> outline, null or
+// missing for a file without one. State is the class `on` (the first file's button and pane), since clean() keeps only
+// `class` and `type`; the page script sets the rest.
 export function mapHtml(entries, outlines, prefix) {
   const files = merge(entries);
   const mark = (m) => `<span class="mark m-${MARKS[m]}">${escapeHtml(m)}</span>`;
@@ -263,7 +263,13 @@ export function mapHtml(entries, outlines, prefix) {
       .filter(Boolean)
       .join('');
   });
-  const overview = `<figure class="diagram overview"><pre class="source">${escapeHtml(overviewMermaid(entries, prefix))}</pre></figure>`;
+  const mermaid = overviewMermaid(entries, prefix);
+  // Up to 12 files the graph leaves out the files without a relation, so they are listed under it.
+  const related = new Set(relations(files).flatMap(([a, , b]) => [a, b]));
+  const apart = files.length > MAX_FILES ? [] : files.filter((f) => !related.has(f.path));
+  const overview = mermaid
+    ? `<figure class="diagram overview"><pre class="source">${escapeHtml(mermaid)}</pre></figure>${apart.length ? `<p class="apart">Not related: ${apart.map((f) => link(f.path)).join(', ')}</p>` : ''}`
+    : '<p class="apart">No relations between these files.</p>';
   return `<div class="cmap">${bar}<div class="files">${list(folders(files), ' class="tree"')}${panes.join('')}</div><div class="relations">${overview}</div></div>`;
 }
 
@@ -306,6 +312,7 @@ figure { margin: 1.6rem 0; }
 .overview .node.del :is(rect, path, polygon) { stroke: var(--del) !important; }
 .overview .node.move :is(rect, path, polygon) { stroke: var(--move) !important; }
 .overview .node.other { opacity: 0.7; }
+.overview .node small { color: var(--muted); font: 0.8em var(--mono); }
 .cmap { border: 1px solid var(--line); border-radius: 8px; }
 .cmap [hidden] { display: none !important; }
 .cmap button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
@@ -333,7 +340,8 @@ figure { margin: 1.6rem 0; }
 .cmap .pane > :is(.from, .why, .note, .uses) { color: var(--muted); }
 .cmap .pane > .outline { margin: 0.6rem 0; }
 .cmap .pane > .uses { margin-top: 0.8rem; padding-top: 0.5rem; border-top: 1px dashed var(--line); }
-.cmap .uses .file { font-family: var(--mono); text-decoration: underline dotted; text-underline-offset: 0.2em; }
+.cmap .apart { margin: 0; padding: 0.5rem 1rem; color: var(--muted); font-size: 0.875rem; }
+.cmap :is(.uses, .apart) .file { font-family: var(--mono); text-decoration: underline dotted; text-underline-offset: 0.2em; }
 .cmap .relations { overflow: auto; }
 .cmap .relations .diagram { margin: 0; border: 0; }
 @media (max-width: 560px) {
@@ -541,17 +549,19 @@ export async function renderPage(markdown, root) {
   if (plan.length) maps.push({ name: 'plan map', prefix: 'p', entries: plan });
   // The same call as in mapHtml, so the overview checked here is the one the page draws.
   for (const m of maps) m.mermaid = overviewMermaid(m.entries, m.prefix);
-  // The overviews are parse-checked like a hand-written diagram, without the node-count and orphan rules.
+  // The overviews are parse-checked like a hand-written diagram, without the node-count and orphan rules; an empty one
+  // draws nothing.
+  const drawn = maps.filter((m) => m.mermaid);
   let results = [];
-  if (maps.length) {
+  if (drawn.length) {
     try {
-      results = await parseDiagrams(maps.map((m) => m.mermaid));
+      results = await parseDiagrams(drawn.map((m) => m.mermaid));
     } catch (e) {
       if (!problems.some((p) => p.message.startsWith('not parser-checked')))
         console.error(`warning: not parser-checked: ${e.message}`);
     }
   }
-  const failed = results.flatMap((r, i) => (r.ok ? [] : [`error: ${maps[i].name}: overview: ${r.error}`]));
+  const failed = results.flatMap((r, i) => (r.ok ? [] : [`error: ${drawn[i].name}: overview: ${r.error}`]));
   if (failed.length) throw new Error(failed.join('\n'));
   const templates = maps
     .filter((m) => m.key !== undefined)

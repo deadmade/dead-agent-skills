@@ -55,7 +55,7 @@ test('writes one page that holds every block’s text', () => {
 // The Mermaid text of an overview, its lines trimmed.
 const lines = (text) => text.split('\n').map((l) => l.trim());
 
-test('overviewMermaid draws a node per file with marker classes, uses and move edges', () => {
+test('up to 12 files the overview has no subgraph and labels each node with its folder and counts', () => {
   const text = overviewMermaid(
     parseFilesBlock(
       [
@@ -68,30 +68,64 @@ test('overviewMermaid draws a node per file with marker classes, uses and move e
         '- top.md',
         '+ q"<i>.ts',
         'a/b/c/x.ts uses a/b/c/y.ts',
+        'a/b/c/y.ts uses q"<i>.ts',
       ].join('\n'),
     ),
     'b1',
   );
   const l = lines(text);
   assert.equal(l[0], 'flowchart LR');
-  // a/ and a/b/ hold no file of their own, so they fold into one subgraph label.
-  assert.ok(l.includes('subgraph b1d0["a/b/"]'), text);
-  assert.ok(l.includes('subgraph b1d1["c/"]'), text);
-  assert.ok(l.includes('subgraph b1d2["e/"]'), text);
-  assert.ok(l.includes('b1f0["~ x.ts<br>+1 ~1 -1"]'), text);
-  assert.ok(l.includes('b1f1["+ y.ts"]'), text);
-  assert.ok(l.includes('b1f2["#gt; new.ts"]'), text);
-  assert.ok(l.includes('b1f3["- top.md"]'), text);
-  assert.ok(l.includes('b1f4["+ q#quot;#lt;i#gt;.ts"]'), text);
-  assert.ok(l.includes('b1f0 --> b1f1'), text);
+  assert.doesNotMatch(text, /subgraph/);
+  assert.ok(l.includes('b1f0["~ x.ts<br><small>c/ · +1 ~1 -1</small>"]'), text);
+  assert.ok(l.includes('b1f1["+ y.ts<br><small>c/</small>"]'), text);
+  assert.ok(l.includes('b1f2["#gt; new.ts<br><small>e/</small>"]'), text);
+  assert.ok(l.includes('b1f4["+ q#quot;#lt;i#gt;.ts<br><small>./</small>"]'), text);
+  assert.ok(l.includes('b1f0 -->|uses| b1f1'), text);
   assert.ok(l.includes('b1x0["a/b/e/old.ts"]'), text);
   assert.ok(l.includes('b1x0 -.->|moved| b1f2'), text);
   for (const cls of ['add', 'mod', 'del', 'move', 'other']) assert.match(text, new RegExp(`^ *classDef ${cls} `, 'm'));
   assert.ok(l.includes('class b1f1,b1f4 add'), text);
   assert.ok(l.includes('class b1f0 mod'), text);
-  assert.ok(l.includes('class b1f3 del'), text);
   assert.ok(l.includes('class b1f2 move'), text);
   assert.ok(l.includes('class b1x0 other'), text);
+});
+
+test('every edge carries a label', () => {
+  const text = overviewMermaid(
+    parseFilesBlock('~ a/x.ts\n    > f -> b/y.ts\n+ b/y.ts\n> a/old.ts -> a/new.ts\na/x.ts uses a/new.ts'),
+    'b1',
+  );
+  const edges = lines(text).filter((x) => x.includes('->'));
+  assert.equal(edges.length, 3, text);
+  for (const e of edges) assert.match(e, /^\S+ -\.?->\|[^|]+\| \S+$/, text);
+});
+
+test('files without an edge are left out of the graph and listed as not related', () => {
+  const entries = parseFilesBlock('~ a.ts\n+ b.ts\n~ c/d.md\n- e.ts\na.ts uses b.ts');
+  const text = overviewMermaid(entries, 'b1');
+  assert.match(text, /b1f0\[/);
+  assert.match(text, /b1f1\[/);
+  assert.doesNotMatch(text, /b1f[23]/);
+  const apart = dom(mapHtml(entries, null, 'b1')).querySelectorAll('.relations > p.apart');
+  assert.equal(apart.length, 1);
+  assert.match(apart[0].textContent, /^Not related: /);
+  assert.deepEqual(
+    [...apart[0].querySelectorAll('button')].map((b) => [b.className, b.getAttribute('type'), b.textContent]),
+    [
+      ['file f-b1f2', 'button', 'd.md'],
+      ['file f-b1f3', 'button', 'e.ts'],
+    ],
+  );
+  const all = dom(mapHtml(parseFilesBlock('~ a.ts\n+ b.ts\na.ts uses b.ts'), null, 'b1'));
+  assert.equal(all.querySelector('.apart'), null);
+});
+
+test('with no relations there is no graph and the view says so', () => {
+  const entries = parseFilesBlock('~ a.ts\n+ b.ts');
+  assert.equal(overviewMermaid(entries, 'b1'), '');
+  const relations = dom(mapHtml(entries, null, 'b1')).querySelector('.relations');
+  assert.equal(relations.querySelector('.diagram'), null);
+  assert.equal(relations.textContent, 'No relations between these files.');
 });
 
 test('a symbol move to a path not in the map adds a grey node', () => {
@@ -123,10 +157,12 @@ test('over 12 files it draws one node per folder with counts', () => {
 });
 
 test('ids differ between two maps on one page, and paths are escaped', () => {
-  const r = render(`${fence('files', '+ a.ts\n+ <i>.ts')}\n${fence('files', '+ b.ts')}`);
+  const r = render(
+    `${fence('files', '+ a.ts\n+ <i>.ts\na.ts uses <i>.ts')}\n${fence('files', '+ b.ts\n+ c.ts\nb.ts uses c.ts')}`,
+  );
   assert.equal(r.code, 0, r.text);
-  assert.match(r.html, /b1f0\[&quot;\+ a\.ts&quot;\]/);
-  assert.match(r.html, /b2f0\[&quot;\+ b\.ts&quot;\]/);
+  assert.match(r.html, /b1f0\[&quot;\+ a\.ts&lt;br&gt;/);
+  assert.match(r.html, /b2f0\[&quot;\+ b\.ts&lt;br&gt;/);
   assert.match(r.html, /<section class="pane c-b1f0 on">/);
   assert.match(r.html, /<section class="pane c-b2f0 on">/);
   assert.match(r.html, /<figure class="diagram overview"><pre class="source">flowchart LR/);
@@ -148,10 +184,11 @@ test('a plan’s overview uses net markers', () => {
       [2, '- Modify: `a.ts`', '- Delete: `b.ts`', '- Delete: `c.ts`'],
     ),
   );
+  entries[0].uses = ['c.ts', 'd.ts'];
   const l = lines(overviewMermaid(entries, 'p'));
-  assert.ok(l.includes('pf0["+ a.ts"]'));
-  assert.ok(l.includes('pf1["- c.ts"]'));
-  assert.ok(l.includes('pf2["~ d.ts"]'));
+  assert.ok(l.some((x) => x.startsWith('pf0["+ a.ts<br>')));
+  assert.ok(l.some((x) => x.startsWith('pf1["- c.ts<br>')));
+  assert.ok(l.some((x) => x.startsWith('pf2["~ d.ts<br>')));
   assert.ok(!l.some((x) => x.includes('b.ts')));
 });
 
@@ -176,8 +213,8 @@ test('a plan’s tree shows the tasks per file', () => {
   const r = render(plan([1, '- Create: `src/new.ts`, `docs/a.md`'], [2, '- Modify: `src/new.ts` (again)'], [3]));
   assert.equal(r.code, 0, r.text);
   const map = planMap(r.html);
-  assert.equal(map.match(/class="diagram overview"/g).length, 1);
-  assert.match(map, /pf0\[&quot;\+ new\.ts&quot;\]/);
+  assert.doesNotMatch(map, /class="diagram overview"/);
+  assert.match(map, /No relations between these files\./);
   assert.deepEqual(
     [...dom(map).querySelectorAll('.tree .file')].map((b) => [b.className, b.querySelector('.tasks')?.textContent]),
     [
@@ -230,7 +267,8 @@ test('the bar counts files by marker', () => {
       ['Relations', 'button'],
     ],
   );
-  assert.ok(page.querySelector('.cmap > .relations > figure.diagram.overview > pre.source'));
+  const related = map('+ a.ts\n+ b.ts\na.ts uses b.ts');
+  assert.ok(related.querySelector('.cmap > .relations > figure.diagram.overview > pre.source'));
 });
 
 test('mapHtml has one pane per file with the outline rows (touched marked, the rest same) and the first selected', () => {
