@@ -306,7 +306,7 @@ figure { margin: 1.6rem 0; }
 .overview .node.del :is(rect, path, polygon) { stroke: var(--del) !important; }
 .overview .node.move :is(rect, path, polygon) { stroke: var(--move) !important; }
 .overview .node.other { opacity: 0.7; }
-.cmap { border: 1px solid var(--line); border-radius: 8px; margin: 1.6rem 0; }
+.cmap { border: 1px solid var(--line); border-radius: 8px; }
 .cmap [hidden] { display: none !important; }
 .cmap button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .cmap .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--line); font: 0.875rem/1.5 var(--mono); }
@@ -446,25 +446,13 @@ const map = document.getElementById('plan-map');
 const h1 = doc.querySelector('h1');
 if (map) h1 ? h1.after(map.content) : doc.prepend(map.content);
 
-let n = 0;
-for (const pre of doc.querySelectorAll('.diagram > pre.source')) {
-  const id = 'diagram-' + n++;
-  try {
-    pre.parentElement.innerHTML = (await mermaid.render(id, pre.textContent)).svg;
-  } catch (e) {
-    document.getElementById('d' + id)?.remove();
-    pre.parentElement.innerHTML =
-      '<div class="diagram-error" role="alert">This diagram did not draw: ' + esc(String(e.message ?? e)) + '<pre>' + esc(pre.textContent) + '</pre></div>';
-  }
-}
-
 // A map's selected file and shown view are the class \`on\` (the markup's only state); the ARIA states follow it.
 const fileOf = (button) => /\\bf-(\\S+)/.exec(button.className)[1];
 function select(cmap, id) {
   for (const el of cmap.querySelectorAll('.tree .file, .pane')) {
     const on = el.classList.contains('f-' + id) || el.classList.contains('c-' + id);
     el.classList.toggle('on', on);
-    if (el.localName === 'button') el.setAttribute('aria-selected', on);
+    if (el.localName === 'button') on ? el.setAttribute('aria-current', 'true') : el.removeAttribute('aria-current');
   }
 }
 function show(cmap, files) {
@@ -475,7 +463,7 @@ function show(cmap, files) {
     tab.setAttribute('aria-pressed', (i === 0) === files);
   });
 }
-// The overviews drew while shown (Mermaid measures text in the document); each map now opens on its files.
+// Each map opens on its files before any diagram draws, so a slow or stuck Mermaid leaves it usable.
 for (const cmap of doc.querySelectorAll('.cmap')) {
   show(cmap, true);
   const first = cmap.querySelector('.tree .file');
@@ -509,6 +497,19 @@ doc.addEventListener('keydown', (e) => {
   e.preventDefault();
   all[(all.indexOf(file) + (e.key === 'ArrowDown' ? 1 : all.length - 1)) % all.length].click();
 });
+
+// Mermaid lays a diagram out in its own element on <body>, so an overview in the hidden Relations view still measures.
+let n = 0;
+for (const pre of doc.querySelectorAll('.diagram > pre.source')) {
+  const id = 'diagram-' + n++;
+  try {
+    pre.parentElement.innerHTML = (await mermaid.render(id, pre.textContent)).svg;
+  } catch (e) {
+    document.getElementById('d' + id)?.remove();
+    pre.parentElement.innerHTML =
+      '<div class="diagram-error" role="alert">This diagram did not draw: ' + esc(String(e.message ?? e)) + '<pre>' + esc(pre.textContent) + '</pre></div>';
+  }
+}
 `;
 
 const line = (p) => `${p.level}: ${p.block ? `block ${p.block}: ` : ''}${p.message}`;
@@ -538,6 +539,7 @@ export async function renderPage(markdown, root) {
     // the checker has already said why
   }
   if (plan.length) maps.push({ name: 'plan map', prefix: 'p', entries: plan });
+  // The same call as in mapHtml, so the overview checked here is the one the page draws.
   for (const m of maps) m.mermaid = overviewMermaid(m.entries, m.prefix);
   // The overviews are parse-checked like a hand-written diagram, without the node-count and orphan rules.
   let results = [];

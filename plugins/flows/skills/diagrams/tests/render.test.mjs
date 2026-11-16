@@ -320,6 +320,19 @@ test('cardFor maps a node element id of Mermaid 12.3.0’s shape to its pane cla
     assert.equal(cardFor({ id }), null, id);
 });
 
+test('the page sets up each map and its handlers before Mermaid draws, and marks the selected file aria-current', () => {
+  const html = render('# T\n').html;
+  const draw = html.indexOf('await mermaid.render(');
+  for (const step of [
+    "addEventListener('click'",
+    "addEventListener('keydown'",
+    "for (const cmap of doc.querySelectorAll('.cmap'))",
+  ])
+    assert.ok(html.indexOf(step) > 0 && html.indexOf(step) < draw, step);
+  assert.match(html, /aria-current/);
+  assert.doesNotMatch(html, /aria-selected/);
+});
+
 test('keeps markdown HTML inert: JSON-escaped, an escaped title, and a page script that escapes raw HTML and drops script URLs', () => {
   const evil = '# <img src=x onerror=alert(1)>\n\n</script><script>alert(1)</script> <!-- x\n';
   const r = render(evil);
