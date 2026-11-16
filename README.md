@@ -76,7 +76,7 @@ update, then applies only the changes. It points the marketplace at the `release
 release, so Claude Code updates the plugins on its own (rerun the installer for new web-mcp binaries), and
 it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). It
 lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own) and
-compacts the context at 350K tokens (`autoCompactWindow`, unless you set your own; it only matters on 1M-context models). It also switches Claude Code to its built-in `Concise` output style (`outputStyle`, unless you chose one). Optional toggles add ccstatusline
+compacts the context at 350K tokens (`autoCompactWindow`, unless you set your own; it only matters on 1M-context models). It also switches Claude Code to its built-in `Concise` output style (`outputStyle`, unless you chose one) and turns on the experimental Code Mode (`CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1`, unless you set your own; Claude Code 2.1.323+ asks once before the first session). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
 Contributor steps — versioning and releases, the Rust workspace, authoring plugins and building both harness
 packages — are in [AGENTS.md](AGENTS.md), which this file doesn't repeat.

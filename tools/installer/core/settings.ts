@@ -121,7 +121,14 @@ export function mergeSettings(settings: Settings, { statusLine, webBuiltinsOff }
   // tmux (and on Windows, which has none) the variable does nothing.
   // At most 8 workflow agents run at once (flows' **Agents** rule), unless the user set their own number. Claude Code
   // before 2.1.269 ignores the variable.
-  out.env = { CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: '8', ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
+  // Code Mode (experimental, Claude Code 2.1.323+) is on unless the user set the variable; their '0' wins. Claude Code
+  // reads it only from user settings, and asks once before the first Code Mode session.
+  out.env = {
+    CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: '8',
+    CLAUDE_CODE_EXPERIMENTAL_CODE_MODE: '1',
+    ...out.env,
+    CLAUDE_CODE_TMUX_TRUECOLOR: '1',
+  };
   // The theme's id carries its plugin's name, and night-city became part of dead-skills.
   if (out.theme === 'custom:night-city:night-city') out.theme = 'custom:dead-skills:night-city';
   // dead-skills raises its own popups; Claude Code's built-in one would double them.
