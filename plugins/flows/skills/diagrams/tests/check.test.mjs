@@ -346,13 +346,15 @@ test('a uses line naming a path not in the block is an error', () => {
   assert.match(source.out, /error.*block 1.*uses names a path not in the block.*c\.txt/);
 });
 
-test('a ~ file without symbols is a warning', () => {
+test('a ~ code file without symbols is a warning, a ~ file with no grammar is not', () => {
   const root = temp();
-  put(root, 'x.txt');
-  const r = check(fence('files', '~ x.txt'), { root });
+  put(root, 'x.ts', 'README.md');
+  const r = check(fence('files', '~ x.ts\n~ README.md'), { root });
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /warning.*block 1.*x\.txt.*no symbols/);
-  assert.equal(check(fence('files', '~ x.txt\n  ~ f'), { root }).out.trim(), '');
+  assert.match(r.out, /warning.*block 1.*x\.ts.*no symbols/);
+  assert.doesNotMatch(r.out, /README\.md/);
+  assert.doesNotMatch(check(fence('files', '~ x.ts\n  + f'), { root }).out, /no symbols/);
+  assert.equal(check(plan([1, 'none', '- Modify: `README.md`']), { root }).out.trim(), '');
 });
 
 test('an old paths-only block still passes', () => {
@@ -418,6 +420,15 @@ test("a task's fence naming a path outside its Files list is an error and the pa
   assert.doesNotMatch(r.out, /warning.*does not exist/);
 });
 
+test("a files fence after a task's first step is an example, checked like a hand-written block", () => {
+  const root = temp();
+  put(root, 'a.md');
+  const md = `${plan([1, 'none', '- Modify: `a.md`'])}\n${fence('files', '+ src/example/new.ts  the new entry point')}`;
+  const r = check(md, { root });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
 test('a Files bullet wrapped onto an indented line is still one entry', () => {
   const files = '- Modify: `a.txt` (one note)\n  continues the note, naming `nope.txt` and + b.txt';
   const md = plan([1, 'none', files, '', fence('files', '~ a.txt\n    ~ f')]);
@@ -433,8 +444,8 @@ test('a Files bullet wrapped onto an indented line is still one entry', () => {
 
 const outline = (rows) => rows.map(([name, kind, line]) => ({ name, kind, line }));
 
-test('outlineFiles lists the declarations of a TS, Rust, C# and Python file', { skip: NEEDS_PARSER }, async () => {
-  const outlines = await outlineFiles(['sample.ts', 'sample.rs', 'Sample.cs', 'sample.py'], OUTLINED);
+test('outlineFiles lists the declarations of a TS, JS, Rust, C# and Python file', { skip: NEEDS_PARSER }, async () => {
+  const outlines = await outlineFiles(['sample.ts', 'sample.mjs', 'sample.rs', 'Sample.cs', 'sample.py'], OUTLINED);
   assert.deepEqual(
     outlines,
     new Map([
@@ -444,9 +455,20 @@ test('outlineFiles lists the declarations of a TS, Rust, C# and Python file', { 
           ['load', 'function', 1],
           ['save', 'function', 5],
           ['Store', 'class', 7],
-          ['Store.get', 'method', 8],
-          ['Shape', 'interface', 13],
-          ['Shape.area', 'method', 14],
+          ['Store.handler', 'method', 9],
+          ['Store.get', 'method', 10],
+          ['Shape', 'interface', 15],
+          ['Shape.area', 'method', 16],
+        ]),
+      ],
+      [
+        'sample.mjs',
+        outline([
+          ['start', 'function', 1],
+          ['Button', 'class', 3],
+          ['Button.onClick', 'method', 5],
+          ['Button.onHover', 'method', 6],
+          ['Button.render', 'method', 7],
         ]),
       ],
       [

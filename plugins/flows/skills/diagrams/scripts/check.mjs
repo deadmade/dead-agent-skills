@@ -91,17 +91,20 @@ export function parseFilesBlock(text) {
 const MARKER = { Create: '+', Modify: '~', Delete: '-' };
 const TASK = /^### Task (\d+[a-z]?)/;
 
-// Block number (in extractBlocks' order) -> task id, for the first `files` fence in each `### Task` section.
+// Block number (in extractBlocks' order) -> task id, for the first `files` fence in each `### Task` section before the
+// task's first step; a fence inside a step is an example.
 function taskFences(markdown) {
   const heads = [];
   let fence = false;
   markdown.split(/\r?\n/).forEach((line, i) => {
     if (/^\s*(```|~~~)/.test(line)) fence = !fence;
     else if (!fence && /^#{2,3} /.test(line)) heads.push({ id: line.match(TASK)?.[1], line: i + 1 });
+    else if (!fence && /^\s*- \[[ x]\]/i.test(line) && heads.length) heads.at(-1).step ??= i + 1;
   });
   const fences = new Map();
   extractBlocks(markdown).forEach((b, i) => {
-    const id = heads.findLast((h) => h.line < b.line)?.id;
+    const head = heads.findLast((h) => h.line < b.line);
+    const id = !(head?.step < b.line) && head?.id;
     if (b.kind === 'files' && id && ![...fences.values()].includes(id)) fences.set(i + 1, id);
   });
   return fences;
@@ -262,6 +265,13 @@ export async function outlineFiles(paths, root) {
   return new Map(paths.map((p, i) => [p, results[files[i]]]));
 }
 
+// A file whose extension has a grammar, so its symbols can be outlined.
+const coded = (file) => Object.hasOwn(LANGS, extname(file));
+
+// A symbol names a declaration by its full name or its last segment (`get` names `Store.get`); the page marks its
+// outline rows by the same rule.
+export const symbolMatches = (name, declaration) => declaration === name || declaration.split('.').at(-1) === name;
+
 export async function checkMarkdown(markdown, root) {
   const problems = [];
   const add = (level, block, message) => problems.push({ level, block, message });
@@ -299,7 +309,7 @@ export async function checkMarkdown(markdown, root) {
     for (const { marker, path, from, symbols, uses } of entries) {
       for (const to of uses)
         if (!paths.has(to)) add('error', number, `uses names a path not in the block: ${path} uses ${to}`);
-      if (marker === '~' && !symbols.length) add('warning', number, `~ ${path} has no symbols`);
+      if (marker === '~' && !symbols.length && coded(path)) add('warning', number, `~ ${path} has no symbols`);
       if (marker === '+' && here(path)) add('warning', number, `+ ${path} already exists`);
       if (marker === '>') {
         if (!here(from)) add('warning', number, `> ${from} does not exist`);
@@ -326,7 +336,7 @@ export async function checkMarkdown(markdown, root) {
 
   const created = new Set();
   for (const { task, marker, path, symbols } of plan) {
-    if (marker === '~' && !symbols.length) add('warning', 0, `${task}: ~ ${path} has no symbols`);
+    if (marker === '~' && !symbols.length && coded(path)) add('warning', 0, `${task}: ~ ${path} has no symbols`);
     if (marker === '+') {
       if (here(path)) add('warning', 0, `${task}: + ${path} already exists`);
       created.add(path);
@@ -338,7 +348,7 @@ export async function checkMarkdown(markdown, root) {
   const inside = (file) => relative(resolve(root), join(resolve(root), file)).split(sep)[0] !== '..';
   const source = ({ marker, path, from }) => {
     const file = marker === '>' ? from : marker !== '+' && path;
-    return file && Object.hasOwn(LANGS, extname(file)) && inside(file) && here(file) ? file : undefined;
+    return file && coded(file) && inside(file) && here(file) ? file : undefined;
   };
   const files = [...new Set([...written.flatMap((w) => w.entries), ...plan].map(source).filter(Boolean))];
   let outlines = new Map();
@@ -350,13 +360,13 @@ export async function checkMarkdown(markdown, root) {
       return { problems, outlines: null };
     }
   }
-  // A symbol matches a declaration by its full name or its last segment; `added` holds what earlier tasks add.
+  // `added` holds what earlier tasks add.
   const checkSymbols = (number, prefix, entry, added) => {
     const file = source(entry);
     const outline = file && outlines.get(file);
     if (!outline) return;
     for (const { marker, name } of entry.symbols) {
-      const found = added.has(name) || outline.some((o) => o.name === name || o.name.split('.').at(-1) === name);
+      const found = added.has(name) || outline.some((o) => symbolMatches(name, o.name));
       if (marker === '+' && found) add('warning', number, `${prefix}+ ${file}: ${name} already exists`);
       if (marker !== '+' && !found) add('warning', number, `${prefix}${marker} ${file}: ${name} not found`);
     }

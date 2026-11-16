@@ -52,7 +52,7 @@ plugins/example/old.mjs uses plugins/example/new.mjs
 ```
 
 Every plain `+ path` line stays valid; the why, symbols and `uses` are optional. Symbols are expected for every `~`
-file, not enforced: a `~` file with none gets a warning, in a plan's task too.
+code file (one with a grammar, below), not enforced: a `~` code file with none gets a warning, in a plan's task too.
 
 In a spec the map is a prediction from your grounding, so the checker only warns when a path disagrees with the
 repository. A plan needs no `files` block: the renderer builds its map from the tasks' **Files** lists, and the
@@ -85,7 +85,7 @@ compares the symbols with them: a `+` symbol that exists, or a `~`, `-` or `>` s
 4. Show the page: inline if the host has a tool that renders an HTML page in the conversation, and otherwise print
    the file's path for the user to open in a browser. The gate shows it beside its usual summary.
 
-The first check downloads the Mermaid parser and the tree-sitter grammars into the user's cache folder (about 150 MB),
+The first check downloads the Mermaid parser and the tree-sitter grammars into the user's cache folder (about 350 MB on disk),
 so it can take a minute. When Mermaid cannot run (no npm, offline), the checker prints
 `warning: not parser-checked: <reason>` and checks only the rest. Pass that warning on to the user with the gate
 summary, so they know the syntax was not checked. When the outlines cannot be read at all (no npm, offline, install or parse

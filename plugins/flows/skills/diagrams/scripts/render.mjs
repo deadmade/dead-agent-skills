@@ -6,7 +6,7 @@
 // It runs the checker first and, when that finds an error, prints the checker's lines, exits 1 and writes nothing.
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { checkMarkdown, extractBlocks, parseDiagrams, parseFilesBlock, planMap } from './check.mjs';
+import { checkMarkdown, extractBlocks, parseDiagrams, parseFilesBlock, planMap, symbolMatches } from './check.mjs';
 
 // Bumped by hand: Dependabot cannot read these.
 const MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@12.3.0/dist/mermaid.esm.min.mjs';
@@ -234,9 +234,9 @@ export function mapHtml(entries, outlines, prefix) {
   const panes = files.map((f, n) => {
     const outline = outlines?.get(f.marker === '>' ? f.from : f.path);
     const shown = new Set();
-    // A symbol names a declaration by its full name or its last segment, as the checker matches them.
+    // The checker's rule, a full-name match first.
     const match = (o) =>
-      f.symbols.find((s) => s.name === o.name) ?? f.symbols.find((s) => s.name === o.name.split('.').at(-1));
+      f.symbols.find((s) => s.name === o.name) ?? f.symbols.find((s) => symbolMatches(s.name, o.name));
     const rows = (outline ?? []).map((o) => {
       const s = match(o);
       if (s) shown.add(s);

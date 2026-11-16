@@ -21,8 +21,8 @@ steps use only these. Every task gets, right below its heading:
 A task's **Files** entries are plain paths (`` - Modify: `src/x.ts` ``), never `path:123-145`: the files check compares
 them with `git diff --name-only` and counts them with `git diff --numstat`, and a line range matches nothing. Name the
 lines in the task's steps instead. A task may add a ` ```files ` block below that list, with the symbols it changes
-(`diagrams` has the format); never indent them under the bullets. Symbols are expected for every `~` file; a `~` file
-without them is a warning.
+(`diagrams` has the format); never indent them under the bullets. Symbols are expected for every `~` code file; a `~`
+code file without them is a warning.
 <!-- overrides superpowers/skills/writing-plans/SKILL.md: "- Modify: `exact/path/to/existing.py:123-145`" -->
 
 Split a file only where a task's `Adds:` already names the second unit.

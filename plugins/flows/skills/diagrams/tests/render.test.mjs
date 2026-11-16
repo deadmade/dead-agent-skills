@@ -358,16 +358,36 @@ test('cardFor maps a node element id of Mermaid 12.3.0’s shape to its pane cla
     assert.equal(cardFor({ id }), null, id);
 });
 
-test('the page sets up each map and its handlers before Mermaid draws, and marks the selected file aria-current', () => {
+test('the page’s map script, set up before Mermaid draws, switches tabs, selects a file and wraps ArrowUp', () => {
   const html = render('# T\n').html;
-  const draw = html.indexOf('await mermaid.render(');
-  for (const step of [
-    "addEventListener('click'",
-    "addEventListener('keydown'",
-    "for (const cmap of doc.querySelectorAll('.cmap'))",
-  ])
-    assert.ok(html.indexOf(step) > 0 && html.indexOf(step) < draw, step);
-  assert.match(html, /aria-current/);
+  // The page script from the map setup to the handlers, run as it is on a real map.
+  const source = html.match(/\/\/ A map's selected file[^]*?(?=\n\/\/ Mermaid lays)/)[0];
+  assert.ok(html.indexOf(source) < html.indexOf('await mermaid.render('), 'the handlers come before Mermaid draws');
+  const { window } = new JSDOM(
+    `<article id="doc">${mapHtml(parseFilesBlock('~ a.ts\n+ b.ts\n+ c.ts\na.ts uses b.ts'), null, 'b1')}</article>`,
+  );
+  const doc = window.document.getElementById('doc');
+  new Function('doc', source)(doc);
+  const $ = (selector) => doc.querySelector(selector);
+  const current = () => [...doc.querySelectorAll('[aria-current]')].map((b) => b.className);
+  assert.deepEqual(current(), ['file f-b1f0 on']);
+  assert.equal($('.files').hidden, false);
+
+  const [files, relations] = doc.querySelectorAll('.tab');
+  relations.click();
+  assert.equal($('.relations').hidden, false);
+  assert.equal($('.files').hidden, true);
+  assert.ok(relations.classList.contains('on') && !files.classList.contains('on'));
+
+  $('.tree .f-b1f1').click();
+  assert.equal($('.files').hidden, false);
+  assert.ok($('.pane.c-b1f1').classList.contains('on') && !$('.pane.c-b1f0').classList.contains('on'));
+  assert.deepEqual(current(), ['file f-b1f1 on']);
+
+  $('.tree .f-b1f0').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+  assert.deepEqual(current(), ['file f-b1f2 on']);
+  assert.ok($('.pane.c-b1f2').classList.contains('on'));
+  assert.equal(window.document.activeElement, $('.tree .f-b1f2'));
   assert.doesNotMatch(html, /aria-selected/);
 });
 

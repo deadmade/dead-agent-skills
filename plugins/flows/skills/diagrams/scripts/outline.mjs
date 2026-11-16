@@ -64,17 +64,23 @@ const THROUGH = new Set([
   'block',
 ]);
 const FUNCTION_VALUES = new Set(['arrow_function', 'function_expression', 'function']);
+// A variable or class field (TS `public_field_definition`, JS `field_definition`) whose value is a function.
+const HOLDERS = new Set(['variable_declarator', 'public_field_definition', 'field_definition']);
 
 function walk(node, parent, out) {
   for (const child of node.namedChildren) {
-    const value = child.type === 'variable_declarator' && child.childForFieldName('value')?.type;
+    const value = HOLDERS.has(child.type) && child.childForFieldName('value')?.type;
     let kind = FUNCTION_VALUES.has(value) ? 'function' : KIND[child.type];
     if (!kind) {
       if (THROUGH.has(child.type)) walk(child, parent, out);
       continue;
     }
-    // A Rust impl has no name, only the type it implements.
-    const name = (child.childForFieldName('name') ?? child.childForFieldName('type'))?.text;
+    // A JS class field names itself in `property`; a Rust impl has no name, only the type it implements.
+    const name = (
+      child.childForFieldName('name') ??
+      child.childForFieldName('property') ??
+      child.childForFieldName('type')
+    )?.text;
     if (!name) continue;
     if (kind === 'function' && parent && parent.kind !== 'namespace' && parent.kind !== 'mod') kind = 'method';
     const full = parent ? `${parent.name}.${name}` : name;
