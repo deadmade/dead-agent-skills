@@ -15,6 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseFilesBlock, planMap } from '../scripts/check.mjs';
 
 const SKILL = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = join(SKILL, 'scripts', 'check.mjs');
@@ -277,4 +278,123 @@ test('files block: a + path that exists, a malformed line and a backslash path a
   const slash = check(fence('files', '+ src\\win.txt'), { root });
   assert.equal(slash.code, 1);
   assert.match(slash.out, /block 1.*src\\win\.txt/);
+});
+
+const RENDER = 'plugins/flows/skills/diagrams/scripts/render.mjs';
+const OUTLINE = 'plugins/flows/skills/diagrams/scripts/outline.mjs';
+
+test('parseFilesBlock reads why, symbols, a symbol move and uses', () => {
+  const block = [
+    `~ ${RENDER}  draw the overview and cards`,
+    '    + overviewMermaid  builds the flowchart text',
+    '    ~ listHtml  becomes the file cards',
+    '    - planMapHtml',
+    '    > treeHtml -> plugins/flows/skills/diagrams/scripts/cards.mjs',
+    `+ ${OUTLINE}  tree-sitter outlines`,
+    `${RENDER} uses ${OUTLINE}`,
+  ].join('\n');
+  assert.deepEqual(parseFilesBlock(block), [
+    {
+      marker: '~',
+      path: RENDER,
+      why: 'draw the overview and cards',
+      symbols: [
+        { marker: '+', name: 'overviewMermaid', why: 'builds the flowchart text' },
+        { marker: '~', name: 'listHtml', why: 'becomes the file cards' },
+        { marker: '-', name: 'planMapHtml' },
+        { marker: '>', name: 'treeHtml', to: 'plugins/flows/skills/diagrams/scripts/cards.mjs' },
+      ],
+      uses: [OUTLINE],
+    },
+    { marker: '+', path: OUTLINE, why: 'tree-sitter outlines', symbols: [], uses: [] },
+  ]);
+});
+
+test('a why needs two spaces, so a path with one space is still an error', () => {
+  assert.deepEqual(parseFilesBlock('+ new.txt  a why'), [
+    { marker: '+', path: 'new.txt', why: 'a why', symbols: [], uses: [] },
+  ]);
+  const r = check(fence('files', '+ my file.txt'));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /error.*block 1.*bad files line.*my file\.txt/);
+});
+
+test('a fence nested in a list keeps its file lines as files', () => {
+  const root = temp();
+  put(root, 'b.txt');
+  const r = check(`- an item\n\n  \`\`\`files\n  + a.txt\n  ~ b.txt\n      ~ sym\n  \`\`\`\n`, { root });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
+test('a uses line naming a path not in the block is an error', () => {
+  const r = check(fence('files', '+ a.txt\n+ b.txt\na.txt uses c.txt'));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /error.*block 1.*uses names a path not in the block.*c\.txt/);
+  const source = check(fence('files', '+ a.txt\nc.txt uses a.txt'));
+  assert.equal(source.code, 1);
+  assert.match(source.out, /error.*block 1.*uses names a path not in the block.*c\.txt/);
+});
+
+test('a ~ file without symbols is a warning', () => {
+  const root = temp();
+  put(root, 'x.txt');
+  const r = check(fence('files', '~ x.txt'), { root });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /warning.*block 1.*x\.txt.*no symbols/);
+  assert.equal(check(fence('files', '~ x.txt\n  ~ f'), { root }).out.trim(), '');
+});
+
+test('an old paths-only block still passes', () => {
+  const root = temp();
+  put(root, 'a.txt', 'b.txt', 'c.txt');
+  const r = check(fence('files', '~ a.txt\n- b.txt\n> c.txt -> d.txt\n+ e.txt'), { root });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /^error/m);
+});
+
+test("planMap takes a task's files fence", () => {
+  const md = plan(
+    [1, 'none', '- Modify: `a.txt`', '', fence('files', '~ a.txt  why\n    + f  new\na.txt uses b.txt')],
+    [2, 'Task 1', '- Create: `b.txt`'],
+  );
+  assert.deepEqual(planMap(md), [
+    {
+      task: 'Task 1: t1',
+      marker: '~',
+      path: 'a.txt',
+      why: 'why',
+      symbols: [{ marker: '+', name: 'f', why: 'new' }],
+      uses: ['b.txt'],
+    },
+    { task: 'Task 2: t2', marker: '+', path: 'b.txt', symbols: [], uses: [] },
+  ]);
+  const root = temp();
+  put(root, 'a.txt');
+  const r = check(md, { root });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
+test("a task's fence naming a path outside its Files list is an error and the path checks still run", () => {
+  const r = check(
+    plan([1, 'none', '- Modify: `gone.txt`', '', fence('files', '~ gone.txt\n  ~ f\n~ other.txt\n  ~ g')]),
+  );
+  assert.equal(r.code, 1);
+  assert.match(r.out, /error.*block 1.*Task 1.*other\.txt.*Files list/);
+  assert.match(r.out, /error.*Task 1.*gone\.txt does not exist/);
+  assert.doesNotMatch(r.out, /warning.*does not exist/);
+});
+
+test('a Files bullet wrapped onto an indented line is still one entry', () => {
+  const files = '- Modify: `a.txt` (one note)\n  continues the note, naming `nope.txt` and + b.txt';
+  const md = plan([1, 'none', files, '', fence('files', '~ a.txt\n    ~ f')]);
+  assert.deepEqual(planMap(md), [
+    { task: 'Task 1: t1', marker: '~', path: 'a.txt', symbols: [{ marker: '~', name: 'f' }], uses: [] },
+  ]);
+  const root = temp();
+  put(root, 'a.txt');
+  const r = check(md, { root });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
 });

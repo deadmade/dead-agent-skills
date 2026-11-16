@@ -21,14 +21,16 @@ const PARSE_MS = 60_000;
 
 const OPEN = /^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)/;
 
-// Every top-level `mermaid` and `files` fence, in order. A fence inside a longer one is text, not a block.
+// Every top-level `mermaid` and `files` fence, in order. A fence inside a longer one is text, not a block. The opening
+// fence's indent (a fence nested in a list) is stripped from the block's lines.
 export function extractBlocks(markdown) {
   const blocks = [];
   let open;
   markdown.split(/\r?\n/).forEach((line, i) => {
     if (!open) {
       const m = line.match(OPEN);
-      if (m) open = { fence: m[1], kind: m[2], line: i + 1, lines: [] };
+      const indent = m && new RegExp(`^ {0,${line.length - line.trimStart().length}}`);
+      if (m) open = { fence: m[1], kind: m[2], line: i + 1, lines: [], indent };
       return;
     }
     const close = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
@@ -36,7 +38,7 @@ export function extractBlocks(markdown) {
       if (open.kind === 'mermaid' || open.kind === 'files')
         blocks.push({ kind: open.kind, text: open.lines.join('\n'), line: open.line });
       open = undefined;
-    } else open.lines.push(line);
+    } else open.lines.push(line.replace(open.indent, ''));
   });
   // A fence left open runs to the end of the file.
   if (open && (open.kind === 'mermaid' || open.kind === 'files'))
@@ -44,31 +46,98 @@ export function extractBlocks(markdown) {
   return blocks;
 }
 
+// `<+|~|-> <name>` or `> <a> -> <b>`, then optionally two or more spaces and the why.
+const ITEM = /^(?:([+~-])\s+(\S+)|>\s+(\S+)\s+->\s+(\S+))(?:\s{2,}(\S.*))?$/;
+const USES = /^(\S+)\s+uses\s+(\S+)$/;
+
+// File lines, the symbol lines indented under each and unindented `<a> uses <b>` lines. Throws on any other line and
+// on a `uses` whose first path is not a file of the block; the caller checks the second path.
 export function parseFilesBlock(text) {
   const entries = [];
+  const relations = [];
+  let fileIndent;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
-    const move = line.match(/^>\s+(\S+)\s+->\s+(\S+)$/);
-    const one = line.match(/^([+~-])\s+(\S+)$/);
-    const [from, path] = move ? [move[1], move[2]] : [undefined, one?.[2]];
-    if (!path || path.includes('\\')) throw new Error(`bad files line (use / in paths, no spaces): ${line}`);
-    entries.push(move ? { marker: '>', path, from } : { marker: one[1], path });
+    const indent = raw.length - raw.trimStart().length;
+    const uses = !indent && line.match(USES);
+    if (uses) {
+      relations.push(uses);
+      continue;
+    }
+    const m = line.match(ITEM);
+    const bad = () => new Error(`bad files line (use / in paths, no spaces): ${line}`);
+    if (!m || (indent && !entries.length)) throw bad();
+    const [, marker = '>', name, from, to, why] = m;
+    const symbol = indent > fileIndent;
+    if ([to, symbol ? undefined : (name ?? from)].some((p) => p?.includes('\\'))) throw bad();
+    if (symbol) entries.at(-1).symbols.push({ marker, name: name ?? from, ...(why && { why }), ...(to && { to }) });
+    else {
+      fileIndent = indent;
+      entries.push({ marker, path: name ?? to, ...(from && { from }), ...(why && { why }), symbols: [], uses: [] });
+    }
+  }
+  for (const [line, a, b] of relations) {
+    const source = entries.find((e) => e.path === a);
+    if (!source) throw new Error(`uses names a path not in the block: ${line}`);
+    source.uses.push(b);
   }
   return entries;
 }
 
 const MARKER = { Create: '+', Modify: '~', Delete: '-' };
+const TASK = /^### Task (\d+[a-z]?)/;
 
-// Each task's files as `+`, `~`, `-`, from glance.mjs's parse. Throws, with the reason, when the document is not a
-// plan that parses or a Files item has no backticked path.
-export function planMap(markdown) {
-  const map = [];
-  for (const t of parse(markdown.replace(/\r\n?/g, '\n')).tasks)
-    for (const { verb, path } of t.entries) {
+// Block number (in extractBlocks' order) -> task id, for the first `files` fence in each `### Task` section.
+function taskFences(markdown) {
+  const heads = [];
+  let fence = false;
+  markdown.split(/\r?\n/).forEach((line, i) => {
+    if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+    else if (!fence && /^#{2,3} /.test(line)) heads.push({ id: line.match(TASK)?.[1], line: i + 1 });
+  });
+  const fences = new Map();
+  extractBlocks(markdown).forEach((b, i) => {
+    const id = heads.findLast((h) => h.line < b.line)?.id;
+    if (b.kind === 'files' && id && ![...fences.values()].includes(id)) fences.set(i + 1, id);
+  });
+  return fences;
+}
+
+// Each task's files as `+`, `~`, `-`, from glance.mjs's parse, with the why, symbols and `uses` of the task's own
+// `files` fence. Throws, with the reason, when the document is not a plan that parses or a Files item has no
+// backticked path; a problem in a task's fence goes to `add(level, block, message)` instead.
+export function planMap(markdown, add = () => {}) {
+  const tasks = parse(markdown.replace(/\r\n?/g, '\n')).tasks.map((t) => ({
+    id: t.id,
+    entries: t.entries.map(({ verb, path }) => {
       if (!path) throw new Error(`Task ${t.id}: a ${verb} item has no backticked path`);
-      map.push({ task: `Task ${t.id}: ${t.title}`, marker: MARKER[verb], path });
+      return { task: `Task ${t.id}: ${t.title}`, marker: MARKER[verb], path, symbols: [], uses: [] };
+    }),
+  }));
+  const blocks = extractBlocks(markdown);
+  const fences = [...taskFences(markdown)];
+  const map = tasks.flatMap((t) => t.entries);
+  const paths = new Set(map.map((e) => e.path));
+  for (const { id, entries } of tasks) {
+    const number = fences.find(([, fenced]) => fenced === id)?.[0];
+    if (!number) continue;
+    const task = `Task ${id}`;
+    let fenced;
+    try {
+      fenced = parseFilesBlock(blocks[number - 1].text);
+    } catch (e) {
+      add('error', number, `${task}: ${e.message}`);
+      continue;
     }
+    for (const { path, why, symbols, uses } of fenced) {
+      const entry = entries.find((e) => e.path === path);
+      if (!entry) add('error', number, `${task}: its files block names ${path}, which its Files list doesn't`);
+      else Object.assign(entry, why && { why }, { symbols, uses });
+      for (const to of uses)
+        if (!paths.has(to)) add('error', number, `${task}: uses names a path not in the plan's map: ${to}`);
+    }
+  }
   return map;
 }
 
@@ -176,11 +245,14 @@ export async function checkMarkdown(markdown, root) {
   const add = (level, block, message) => problems.push({ level, block, message });
   const here = (path) => existsSync(join(root, path));
   const blocks = extractBlocks(markdown);
+  const fences = taskFences(markdown);
 
   const diagrams = [];
   blocks.forEach((b, i) => {
     const number = i + 1;
     if (b.kind === 'mermaid') return diagrams.push({ number, text: b.text });
+    // A task's own fence is checked with the plan map below.
+    if (fences.has(number)) return;
     let entries;
     try {
       entries = parseFilesBlock(b.text);
@@ -188,7 +260,11 @@ export async function checkMarkdown(markdown, root) {
       return add('error', number, e.message);
     }
     // A block a person wrote predicts the repository, so a mismatch is only a warning.
-    for (const { marker, path, from } of entries) {
+    const paths = new Set(entries.map((e) => e.path));
+    for (const { marker, path, from, symbols, uses } of entries) {
+      for (const to of uses)
+        if (!paths.has(to)) add('error', number, `uses names a path not in the block: ${path} uses ${to}`);
+      if (marker === '~' && !symbols.length) add('warning', number, `~ ${path} has no symbols`);
       if (marker === '+' && here(path)) add('warning', number, `+ ${path} already exists`);
       if (marker === '>') {
         if (!here(from)) add('warning', number, `> ${from} does not exist`);
@@ -216,7 +292,8 @@ export async function checkMarkdown(markdown, root) {
   // A plan's file map is exact, so it is checked in task order: a file an earlier task creates may be modified.
   try {
     const created = new Set();
-    for (const { task, marker, path } of planMap(markdown)) {
+    for (const { task, marker, path, symbols } of planMap(markdown, add)) {
+      if (marker === '~' && !symbols.length) add('warning', 0, `${task}: ~ ${path} has no symbols`);
       if (marker === '+') {
         if (here(path)) add('warning', 0, `${task}: + ${path} already exists`);
         created.add(path);
