@@ -9,9 +9,10 @@ colours per base theme (Monokai for dark), so the installer always turns highlig
 `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude Code otherwise draws in 256 colours and the theme's indigos turn
 grey.
 
-The installer always sets `outputStyle: "concise"` unless the user chose a style, and `steps/output-style.ts` writes
-`tools/installer/assets/concise-output-style.md` to `~/.claude/output-styles/concise.md` (after a clean slate's delete,
-a differing file only replaced on a yes). It is part of the Claude Code setup only; the Codex step does not touch it.
+The installer always sets `outputStyle: "Concise"` (Claude Code's built-in style) unless the user chose a style. Earlier
+installers shipped their own `concise` style: the setting moves to `Concise`, and that style's file
+(`~/.claude/output-styles/concise.md`) is deleted when its frontmatter still matches. It is part of the Claude Code
+setup only; the Codex step does not touch it.
 
 The ccstatusline toggle writes `tools/installer/assets/ccstatusline-night-city.json` (`ccstatusline.json`, the old stock
 config, is kept only so the installer recognises and replaces it): Powerline (needs a Nerd Font), and since Powerline

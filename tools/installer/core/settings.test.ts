@@ -41,10 +41,11 @@ test('auto-compact window defaults to 350k and keeps a number the user set', () 
   assert.equal(resetSettings({ autoCompactWindow: 500000 }, {}).autoCompactWindow, 350000);
 });
 
-test('output style defaults to concise and keeps one the user chose', () => {
-  assert.equal(mergeSettings({}, {}).outputStyle, 'concise');
+test('output style defaults to the built-in Concise, moves the old shipped one and keeps one the user chose', () => {
+  assert.equal(mergeSettings({}, {}).outputStyle, 'Concise');
+  assert.equal(mergeSettings({ outputStyle: 'concise' }, {}).outputStyle, 'Concise');
   assert.equal(mergeSettings({ outputStyle: 'Explanatory' }, {}).outputStyle, 'Explanatory');
-  assert.equal(resetSettings({ outputStyle: 'Explanatory' }, {}).outputStyle, 'concise');
+  assert.equal(resetSettings({ outputStyle: 'Explanatory' }, {}).outputStyle, 'Concise');
 });
 
 test('merge is idempotent', () => {

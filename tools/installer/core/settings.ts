@@ -126,8 +126,9 @@ export function mergeSettings(settings: Settings, { statusLine, webBuiltinsOff }
   if (out.theme === 'custom:night-city:night-city') out.theme = 'custom:dead-skills:night-city';
   // dead-skills raises its own popups; Claude Code's built-in one would double them.
   out.preferredNotifChannel = 'notifications_disabled';
-  // The concise style (steps/output-style.ts writes its file); a style chosen by hand wins.
-  out.outputStyle ??= 'concise';
+  // Claude Code's built-in Concise style; a style chosen by hand wins. 'concise' was the style the installer used to ship.
+  if (out.outputStyle === 'concise') out.outputStyle = 'Concise';
+  out.outputStyle ??= 'Concise';
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
   let denied = [...deny, ...SECRET_DENIES.filter((d) => !deny.includes(d))];
