@@ -244,7 +244,7 @@ async function runInCache(script, input) {
 }
 
 // One result per diagram text, from parse.mjs.
-async function parseDiagrams(texts) {
+export async function parseDiagrams(texts) {
   const results = await runInCache('parse.mjs', texts);
   if (!Array.isArray(results) || results.length !== texts.length || results.some((r) => typeof r?.ok !== 'boolean'))
     throw new Error('parse.mjs printed JSON of the wrong shape');

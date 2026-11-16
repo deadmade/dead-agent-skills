@@ -15,7 +15,8 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { outlineFiles, parseFilesBlock, planMap } from '../scripts/check.mjs';
+import { outlineFiles, parseDiagrams, parseFilesBlock, planMap } from '../scripts/check.mjs';
+import { overviewMermaid } from '../scripts/render.mjs';
 
 const SKILL = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = join(SKILL, 'scripts', 'check.mjs');
@@ -551,4 +552,19 @@ test('check.mjs on a doc with only a .md files block installs nothing', () => {
   const r = isolated(fence('files', '~ notes.md\n    ~ Intro'), temp(), root);
   assert.equal(r.code, 0, r.out);
   assert.equal(r.out.trim(), '');
+});
+
+test('parseDiagrams accepts generated overviews of 3 and 13 files', { skip: NEEDS_PARSER }, async () => {
+  const small = parseFilesBlock(
+    '~ a/x.ts  why\n    + f\n    > g -> lib/"q".ts\n> a/old.ts -> b/new.ts\n- <c>.md\na/x.ts uses b/new.ts',
+  );
+  const big = parseFilesBlock(
+    [...Array.from({ length: 13 }, (_, i) => `+ d${i % 3}/f${i}.ts`), 'd0/f0.ts uses d1/f1.ts'].join('\n'),
+  );
+  const results = await parseDiagrams([overviewMermaid(small, 'b1'), overviewMermaid(big, 'p')]);
+  assert.deepEqual(
+    results.map((r) => r.ok),
+    [true, true],
+    JSON.stringify(results),
+  );
 });

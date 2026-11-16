@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Writes a markdown file as one self-contained HTML page: the text, each `mermaid` block drawn by Mermaid in the
-// browser and each `files` block (and a plan's file map) drawn as a folder tree here in Node:
+// browser, and each `files` block (and a plan's file map) as an overview flowchart plus one card per file:
 //   node render.mjs <doc.md> <out.html>
 // It runs the checker first and, when that finds an error, prints the checker's lines, exits 1 and writes nothing.
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { checkMarkdown, extractBlocks, parseFilesBlock, planMap } from './check.mjs';
+import { checkMarkdown, extractBlocks, parseDiagrams, parseFilesBlock, planMap } from './check.mjs';
 
 // Bumped by hand: Dependabot cannot read these.
 const MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@12.3.0/dist/mermaid.esm.min.mjs';
@@ -49,66 +49,158 @@ const escapeHtml = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const MARKS = { '+': 'add', '~': 'mod', '-': 'del', '>': 'move' };
+const MAX_FILES = 12;
 
-function tally(dir, counts = {}) {
-  for (const f of dir.files) counts[f.marker] = (counts[f.marker] ?? 0) + 1;
-  for (const d of dir.dirs.values()) tally(d, counts);
-  return counts;
-}
+// The marker of a file or symbol named again by a later task: + then - drops it (null), - then + is ~, + then ~ is +.
+const net = (a, b) =>
+  !a ? b : a === '+' ? (b === '-' ? null : '+') : a === '-' ? (b === '-' ? '-' : '~') : b === '+' ? a : b;
 
-function dirHtml(name, dir) {
-  // A folder with no file of its own and one subfolder holds no change itself, so it folds into the line below it.
-  while (!dir.files.length && dir.dirs.size === 1) {
-    const [[child, sub]] = dir.dirs;
-    name += `/${child}`;
-    dir = sub;
-  }
-  const counts = Object.entries(MARKS)
-    .filter(([m]) => tally(dir)[m])
-    .map(([m, cls]) => `<span class="count m-${cls}">${escapeHtml(m)}${tally(dir)[m]}</span>`)
-    .join(' ');
-  return `<li><details class="dir" open><summary><span class="name">${escapeHtml(name)}/</span> ${counts}</summary>${listHtml(dir)}</details></li>`;
-}
-
-function listHtml(dir) {
-  const dirs = [...dir.dirs].sort(([a], [b]) => a.localeCompare(b)).map(([name, d]) => dirHtml(name, d));
-  const files = [...dir.files]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map(
-      (f) =>
-        `<li class="file m-${MARKS[f.marker]}"><span class="mark">${escapeHtml(f.marker)}</span> <span class="name">${escapeHtml(f.name)}</span>${f.from ? ` <span class="from">from ${escapeHtml(f.from)}</span>` : ''}</li>`,
-    );
-  return `<ul>${[...dirs, ...files].join('')}</ul>`;
-}
-
-// A folder tree as HTML, built from `files` entries ({ marker, path, from? }).
-function treeHtml(entries) {
-  const root = { dirs: new Map(), files: [] };
+// One file per path, in first-seen order, with its net marker, the task ids naming it, and its symbols merged by name;
+// a plan names a path once per task, a files block once.
+function merge(entries) {
+  const files = new Map();
   for (const e of entries) {
-    const parts = e.path.split('/').filter(Boolean);
-    let dir = root;
-    for (const p of parts.slice(0, -1)) {
-      if (!dir.dirs.has(p)) dir.dirs.set(p, { dirs: new Map(), files: [] });
-      dir = dir.dirs.get(p);
+    if (!files.has(e.path)) files.set(e.path, { path: e.path, tasks: [], symbols: new Map(), uses: new Set() });
+    const f = files.get(e.path);
+    f.marker = net(f.marker, e.marker);
+    Object.assign(f, e.from && { from: e.from }, e.why && { why: e.why });
+    const task = e.task?.match(/^Task ([^:]+)/)[1];
+    if (task && !f.tasks.includes(task)) f.tasks.push(task);
+    for (const u of e.uses) f.uses.add(u);
+    for (const s of e.symbols) {
+      const before = f.symbols.get(s.name);
+      f.symbols.set(s.name, { ...before, ...s, marker: net(before?.marker, s.marker) });
     }
-    dir.files.push({ ...e, name: parts.at(-1) ?? e.path });
   }
-  return `<div class="tree">${listHtml(root)}</div>`;
+  return [...files.values()]
+    .filter((f) => f.marker)
+    .map((f) => ({ ...f, symbols: [...f.symbols.values()].filter((s) => s.marker), uses: [...f.uses] }));
 }
 
-// The plan's file map, grouped under each task's heading; '' for a document that is not a plan.
-function planMapHtml(markdown) {
-  let map;
-  try {
-    map = planMap(markdown);
-  } catch {
-    return ''; // the checker has already said why
+// An author string inside a quoted Mermaid label.
+const label = (s) => String(s).replace(/["<>`]/g, (c) => ({ '"': '#quot;', '<': '#lt;', '>': '#gt;', '`': '#96;' })[c]);
+const counts = (markers) =>
+  Object.keys(MARKS)
+    .filter((m) => markers.includes(m))
+    .map((m) => `${m}${markers.filter((x) => x === m).length}`)
+    .join(' ');
+const parts = (path) => path.split('/').filter(Boolean);
+const folder = (path) => parts(path).slice(0, -1).join('/');
+
+// The overview of a map as a Mermaid flowchart. Node ids are `<prefix>f<n>` (the n-th file, as in cardsHtml),
+// `<prefix>d<n>` (a folder) and `<prefix>x<n>` (a grey path outside the map); only quoted labels carry paths.
+export function overviewMermaid(entries, prefix) {
+  const files = merge(entries);
+  const out = ['flowchart LR'];
+  const others = new Map();
+  const other = (path) => {
+    if (!others.has(path)) others.set(path, `${prefix}x${others.size}`);
+    return others.get(path);
+  };
+  const edges = files.flatMap((f) => [
+    ...f.uses.map((u) => [f.path, '-->', u]),
+    ...(f.from ? [[f.from, '-.->|moved|', f.path]] : []),
+    ...f.symbols.filter((s) => s.to).map((s) => [f.path, `-.->|"${label(s.name)}"|`, s.to]),
+  ]);
+  const classes = { add: [], mod: [], del: [], move: [] };
+  let node;
+  if (files.length > MAX_FILES) {
+    // One node per folder that holds files, and the edges between folders, without their labels.
+    const dirs = new Map();
+    for (const [dir, held] of Map.groupBy(files, (f) => folder(f.path))) {
+      dirs.set(dir, `${prefix}d${dirs.size}`);
+      out.push(`  ${dirs.get(dir)}["${label(dir ? `${dir}/` : './')}<br>${label(counts(held.map((f) => f.marker)))}"]`);
+    }
+    node = (path) => dirs.get(folder(path)) ?? other(`${folder(path) || '.'}/`);
+    edges.forEach((e) => (e[1] = e[1].startsWith('-.->') ? '-.->' : '-->'));
+  } else {
+    const root = { dirs: new Map(), files: [] };
+    files.forEach((f, n) => {
+      let dir = root;
+      for (const p of parts(f.path).slice(0, -1)) {
+        if (!dir.dirs.has(p)) dir.dirs.set(p, { dirs: new Map(), files: [] });
+        dir = dir.dirs.get(p);
+      }
+      dir.files.push(n);
+    });
+    let d = 0;
+    const draw = (dir, pad) => {
+      for (let [name, sub] of dir.dirs) {
+        // A folder with no file of its own and one subfolder holds no change itself, so it folds into the one below.
+        while (!sub.files.length && sub.dirs.size === 1) {
+          const [[child, next]] = sub.dirs;
+          name += `/${child}`;
+          sub = next;
+        }
+        out.push(`${pad}subgraph ${prefix}d${d++}["${label(`${name}/`)}"]`);
+        draw(sub, `${pad}  `);
+        out.push(`${pad}end`);
+      }
+      for (const n of dir.files) {
+        const f = files[n];
+        const symbols = counts(f.symbols.map((s) => s.marker));
+        out.push(
+          `${pad}${prefix}f${n}["${label(`${f.marker} ${parts(f.path).at(-1) ?? f.path}`)}${symbols ? `<br>${label(symbols)}` : ''}"]`,
+        );
+        classes[MARKS[f.marker]].push(`${prefix}f${n}`);
+      }
+    };
+    draw(root, '  ');
+    const ids = new Map(files.map((f, n) => [f.path, `${prefix}f${n}`]));
+    node = (path) => ids.get(path) ?? other(path);
   }
-  const tasks = Map.groupBy(map, (m) => m.task);
-  if (!tasks.size) return '';
-  return `<section class="plan-map"><h2>File map</h2>${[...tasks]
-    .map(([task, entries]) => `<h3>${escapeHtml(task)}</h3>${treeHtml(entries)}`)
-    .join('')}</section>`;
+  const lines = new Set();
+  for (const [a, arrow, b] of edges) {
+    const [from, to] = [node(a), node(b)];
+    if (from !== to || files.length <= MAX_FILES) lines.add(`  ${from} ${arrow} ${to}`);
+  }
+  for (const [path, id] of others) out.push(`  ${id}["${label(path)}"]`);
+  out.push(...lines);
+  // Colours come from the page's THEME tokens (CSS, by class): a classDef cannot name a CSS variable.
+  out.push(
+    '  classDef add stroke-width:2px',
+    '  classDef mod stroke-width:2px',
+    '  classDef del stroke-width:2px',
+    '  classDef move stroke-width:2px',
+    '  classDef other stroke-dasharray:4 3',
+  );
+  for (const [cls, ids] of Object.entries(classes)) if (ids.length) out.push(`  class ${ids.join(',')} ${cls}`);
+  if (others.size) out.push(`  class ${[...others.values()].join(',')} other`);
+  return out.join('\n');
+}
+
+// One collapsible card per file of a map, its class `c-<prefix>f<n>` matching the file's overview node: the file's
+// outline in file order with the change marked and untouched rows `same`, then predicted `+` symbols the outline lacks.
+// `outlines` is checkMarkdown's: null when nothing was outlined, else path -> outline, null or missing for a file
+// without one.
+export function cardsHtml(entries, outlines, prefix) {
+  const row = (line, s, name) =>
+    `<div class="row ${s ? `m-${MARKS[s.marker]}` : 'same'}"><span class="ln">${line}</span><span class="mark">${s ? escapeHtml(s.marker) : ''}</span><span class="name">${escapeHtml(name)}</span><span class="why">${s ? escapeHtml([s.to && `→ ${s.to}`, s.why].filter(Boolean).join('  ')) : ''}</span></div>`;
+  return merge(entries)
+    .map((f, n) => {
+      const outline = outlines?.get(f.marker === '>' ? f.from : f.path);
+      const shown = new Set();
+      // A symbol names a declaration by its full name or its last segment, as the checker matches them.
+      const match = (o) =>
+        f.symbols.find((s) => s.name === o.name) ?? f.symbols.find((s) => s.name === o.name.split('.').at(-1));
+      const rows = (outline ?? []).map((o) => {
+        const s = match(o);
+        if (s) shown.add(s);
+        return row(o.line, s, o.name);
+      });
+      for (const s of f.symbols) if (!shown.has(s) && (!outline || s.marker === '+')) rows.push(row('', s, s.name));
+      const note = outlines && !outline && f.marker !== '+' ? '<p class="note">no outline for this file type</p>' : '';
+      const summary = [
+        `<span class="mark m-${MARKS[f.marker]}">${escapeHtml(f.marker)}</span> <span class="path">${escapeHtml(f.path)}</span>`,
+        f.from && `<span class="from">from ${escapeHtml(f.from)}</span>`,
+        f.why && `<span class="why">${escapeHtml(f.why)}</span>`,
+        f.tasks.length && `<span class="tasks">Task ${escapeHtml(f.tasks.join(', '))}</span>`,
+      ]
+        .filter(Boolean)
+        .join(' ');
+      return `<details class="card c-${prefix}f${n}"><summary>${summary}</summary><div class="outline">${rows.join('')}</div>${note}</details>`;
+    })
+    .join('');
 }
 
 const tokens = (o) =>
@@ -144,19 +236,30 @@ figure { margin: 1.6rem 0; }
 .diagram svg { max-width: 100%; height: auto; }
 .diagram-error { border: 1px solid var(--del); color: var(--del); border-radius: 8px; padding: 0.8rem 1rem; text-align: left; }
 .diagram-error pre { color: var(--text); margin-bottom: 0; }
-.tree { max-width: 46rem; border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem 1rem; font: 0.9375rem/1.7 var(--mono); overflow-x: auto; }
-.tree ul { list-style: none; margin: 0; padding-left: 1.4rem; }
-.tree > ul { padding-left: 0; }
-.tree summary { cursor: pointer; }
-.tree summary:active { opacity: 0.7; }
-.tree .mark { display: inline-block; width: 1.2em; font-weight: 700; }
-.tree .from { color: var(--muted); }
-.count { margin-left: 0.4em; font-weight: 700; }
+.overview .node { cursor: pointer; }
+.overview .node.add :is(rect, path, polygon) { stroke: var(--add) !important; }
+.overview .node.mod :is(rect, path, polygon) { stroke: var(--mod) !important; }
+.overview .node.del :is(rect, path, polygon) { stroke: var(--del) !important; }
+.overview .node.move :is(rect, path, polygon) { stroke: var(--move) !important; }
+.overview .node.other { opacity: 0.7; }
+.card { max-width: 46rem; border: 1px solid var(--line); border-radius: 8px; margin: 0.5rem 0; padding: 0 1rem; }
+.card[open] { padding-bottom: 0.6rem; }
+.card summary { cursor: pointer; padding: 0.5rem 0; font: 0.9375rem/1.5 var(--mono); overflow-wrap: anywhere; }
+.card summary:active { opacity: 0.7; }
+.card summary .mark { font-weight: 700; }
+.card summary :is(.from, .why, .tasks) { margin-left: 0.5em; color: var(--muted); font-family: var(--sans); }
+.outline { display: grid; grid-template-columns: 3em 1.2em minmax(0, max-content) 1fr; column-gap: 0.5rem; font: 0.875rem/1.75 var(--mono); }
+.outline .row { display: contents; }
+.outline .ln { color: var(--muted); text-align: right; }
+.outline .name { overflow-wrap: anywhere; }
+.outline .row:not(.same) :is(.mark, .name) { font-weight: 700; }
+.outline .why { color: var(--muted); font-family: var(--sans); }
+.outline .same > * { color: var(--muted); opacity: 0.7; }
+.card .note { margin: 0.3rem 0 0; color: var(--muted); font-size: 0.875rem; }
 .m-add { color: var(--add); }
 .m-mod { color: var(--mod); }
 .m-del { color: var(--del); }
 .m-move { color: var(--move); }
-.plan-map h3 { margin-bottom: 0.4em; }
 `;
 
 const mermaidConfig = () => {
@@ -190,8 +293,8 @@ mermaid.initialize({
 });
 
 const esc = (s) => s.replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
-// Trees are keyed by the fence text, so a fence nested in a list or quote cannot pick another block's tree.
-const trees = new Map([...document.querySelectorAll('template[data-tree]')].map((t) => [t.dataset.key, t.innerHTML]));
+// Maps are keyed by the fence text, so a fence nested in a list or quote cannot pick another block's map.
+const maps = new Map([...document.querySelectorAll('template[data-files]')].map((t) => [t.dataset.key, t.innerHTML]));
 // A scheme other than http, https or mailto (javascript:, data:, ...) is dropped; browsers skip control characters in
 // it. marked leaves character references in an href alone and browsers decode them (&#106;avascript:, java&Tab;script:),
 // so any & before the first / ? or # counts as unsafe. Two leading slashes or backslashes name a host, and from a page
@@ -223,15 +326,15 @@ marked.use({
     code({ text, lang }) {
       const kind = (lang ?? '').split(/\\s/)[0];
       if (kind === 'mermaid') return '<figure class="diagram"><pre class="source">' + esc(text) + '</pre></figure>';
-      if (kind === 'files' && trees.has(text.trim())) return '<figure>' + trees.get(text.trim()) + '</figure>';
+      if (kind === 'files' && maps.has(text.trim())) return '<figure class="change-map">' + maps.get(text.trim()) + '</figure>';
       return false;
     },
   },
 });
 
 // A second layer behind the renderers: no script-like element survives marked, and an element keeps only the attributes
-// marked itself writes (href, src, alt, title, class, type, checked, disabled, open, start, align) plus the tree's
-// own (class, open); style, id, srcset, data-* and event handlers are dropped, and an address must pass safe().
+// marked itself writes (href, src, alt, title, class, type, checked, disabled, open, start, align), which cover the
+// cards' own (class); style, id, srcset, data-* and event handlers are dropped, and an address must pass safe().
 const KEEP = new Set(['href', 'src', 'alt', 'title', 'class', 'type', 'checked', 'disabled', 'open', 'start', 'align']);
 function clean(html) {
   const t = document.createElement('template');
@@ -262,6 +365,22 @@ for (const pre of doc.querySelectorAll('.diagram > pre.source')) {
       '<div class="diagram-error" role="alert">This diagram did not draw: ' + esc(String(e.message ?? e)) + '<pre>' + esc(pre.textContent) + '</pre></div>';
   }
 }
+
+// shortcut: Mermaid 12.3.0 ids a node's element \`\${diagramId}-flowchart-\${id}-\${counter}\`, an internal format; recheck
+// on a Mermaid bump.
+function cardFor(element) {
+  const id = /-flowchart-([^-]+)-\\d+$/.exec(element.id)?.[1];
+  return id ? 'c-' + id : null;
+}
+doc.addEventListener('click', (e) => {
+  const node = e.target.closest?.('.overview [id*="-flowchart-"]');
+  const card = node && cardFor(node);
+  const target = card && doc.querySelector('.' + card);
+  if (!target) return;
+  target.open = true;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  target.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'nearest' });
+});
 `;
 
 const line = (p) => `${p.level}: ${p.block ? `block ${p.block}: ` : ''}${p.message}`;
@@ -269,17 +388,47 @@ const line = (p) => `${p.level}: ${p.block ? `block ${p.block}: ` : ''}${p.messa
 // The page for `markdown`; `root` is the repository the checker compares file maps with. Throws, with the checker's
 // lines as the message, when the checker finds an error; its warnings go to stderr.
 export async function renderPage(markdown, root) {
-  const { problems } = await checkMarkdown(markdown, root);
+  const { problems, outlines } = await checkMarkdown(markdown, root);
   if (problems.some((p) => p.level === 'error')) throw new Error(problems.map(line).join('\n'));
   for (const p of problems) console.error(line(p));
 
-  const trees = extractBlocks(markdown)
-    .filter((b) => b.kind === 'files')
-    .map(
-      (b) =>
-        `<template data-tree data-key="${escapeHtml(b.text.trim())}">${treeHtml(parseFilesBlock(b.text))}</template>`,
-    );
-  const map = planMapHtml(markdown);
+  // Each files block's map and the plan's, with its overview.
+  const maps = [];
+  extractBlocks(markdown).forEach((b, i) => {
+    if (b.kind === 'files')
+      maps.push({
+        name: `block ${i + 1}`,
+        key: b.text.trim(),
+        prefix: `b${maps.length + 1}`,
+        entries: parseFilesBlock(b.text),
+      });
+  });
+  let plan = [];
+  try {
+    plan = planMap(markdown);
+  } catch {
+    // the checker has already said why
+  }
+  if (plan.length) maps.push({ name: 'plan map', prefix: 'p', entries: plan });
+  for (const m of maps) m.mermaid = overviewMermaid(m.entries, m.prefix);
+  // The overviews are parse-checked like a hand-written diagram, without the node-count and orphan rules.
+  let results = [];
+  if (maps.length) {
+    try {
+      results = await parseDiagrams(maps.map((m) => m.mermaid));
+    } catch (e) {
+      if (!problems.some((p) => p.message.startsWith('not parser-checked')))
+        console.error(`warning: not parser-checked: ${e.message}`);
+    }
+  }
+  const failed = results.flatMap((r, i) => (r.ok ? [] : [`error: ${maps[i].name}: overview: ${r.error}`]));
+  if (failed.length) throw new Error(failed.join('\n'));
+  const figure = (m) =>
+    `<figure class="diagram overview"><pre class="source">${escapeHtml(m.mermaid)}</pre></figure>${cardsHtml(m.entries, outlines, m.prefix)}`;
+  const templates = maps
+    .filter((m) => m.key !== undefined)
+    .map((m) => `<template data-files data-key="${escapeHtml(m.key)}">${figure(m)}</template>`);
+  const map = plan.length ? `<section class="plan-map"><h2>File map</h2>${figure(maps.at(-1))}</section>` : '';
   const title = escapeHtml(markdown.match(/^# (.+)$/m)?.[1].trim() ?? 'Document');
   // `<` is escaped so quoted HTML such as </script> cannot end the script early.
   const json = JSON.stringify(markdown).replaceAll('<', '\\u003c');
@@ -297,7 +446,7 @@ ${css()}</style>
 <main>
 <article id="doc"><noscript><pre>${escapeHtml(markdown)}</pre></noscript></article>
 </main>
-${trees.join('\n')}
+${templates.join('\n')}
 ${map ? `<template id="plan-map">${map}</template>` : ''}
 <script type="application/json" id="md">${json}</script>
 <script type="module">
