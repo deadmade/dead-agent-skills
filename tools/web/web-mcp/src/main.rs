@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = config::Config::from_env()?;
     // ring, not aws-lc-rs: no cmake or C toolchain needed to build.
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let archive = archive::Archive::open(&cfg.project, &jiff::Zoned::now())?;
+    let archive = archive::Archive::open(&cfg.project, &jiff::ZonedDateTime::now())?;
     let http = fetch::client(false)?;
     let profiles = Profiles::new(cfg.search_dir.clone()).map(Arc::new);
     let ctx = Ctx {

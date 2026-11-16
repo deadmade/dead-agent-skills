@@ -345,7 +345,7 @@ mod tests {
     fn scholar_year_starts_last_year() {
         let ylo = param(&Engine::Scholar.url("x", Some(Year)), "as_ylo").unwrap();
         let this_year = jiff::Timestamp::now()
-            .to_zoned(jiff::tz::TimeZone::UTC)
+            .to_zoned_datetime(jiff::tz::TimeZone::UTC)
             .year();
         assert_eq!(ylo, (this_year - 1).to_string());
     }

@@ -308,7 +308,7 @@ fn scholar_blocked_still_answers_from_apis() {
 fn since_reaches_openalex_and_arxiv() {
     let fx = Fixture::start(PUBLIC);
     let day = jiff::Timestamp::now()
-        .to_zoned(jiff::tz::TimeZone::UTC)
+        .to_zoned_datetime(jiff::tz::TimeZone::UTC)
         .date()
         .saturating_sub(jiff::ToSpan::year(1));
     // The server may read the clock just after UTC midnight: route the next day too.

@@ -516,8 +516,13 @@ test('Mermaid runs at the strict security level', () => {
   const { html } = render('# T\n');
   assert.match(html, /securityLevel: 'strict'/);
   assert.doesNotMatch(html, /securityLevel: '(loose|antiscript|sandbox)'/);
-  assert.match(html, /cdn\.jsdelivr\.net\/npm\/mermaid@12\.3\.0\//);
-  assert.match(html, /cdn\.jsdelivr\.net\/npm\/marked@18\.1\.3\//);
+});
+
+test('the page loads the Mermaid the checker parses with, and an exact marked', () => {
+  const { html } = render('# T\n');
+  const { mermaid } = JSON.parse(readFileSync(join(SKILL, 'package.json'), 'utf8')).dependencies;
+  assert.ok(html.includes(`cdn.jsdelivr.net/npm/mermaid@${mermaid}/`), `page must load mermaid@${mermaid}`);
+  assert.match(html, /cdn\.jsdelivr\.net\/npm\/marked@\d+\.\d+\.\d+\//);
 });
 
 test('ELK is set once for the page', () => {

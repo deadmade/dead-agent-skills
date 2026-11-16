@@ -22,7 +22,7 @@ pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     .expect("static URL");
     if since == Some(Since::Year) {
         let year = jiff::Timestamp::now()
-            .to_zoned(jiff::tz::TimeZone::UTC)
+            .to_zoned_datetime(jiff::tz::TimeZone::UTC)
             .year();
         u.query_pairs_mut()
             .append_pair("as_ylo", &(year - 1).to_string());
