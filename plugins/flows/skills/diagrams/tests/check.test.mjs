@@ -353,6 +353,28 @@ test('an old paths-only block still passes', () => {
   assert.doesNotMatch(r.out, /^error/m);
 });
 
+test('an old block whose file lines are all indented still passes', () => {
+  const root = temp();
+  put(root, 'b.txt');
+  assert.deepEqual(parseFilesBlock('  + a.txt\n  ~ b.txt\n      ~ f'), [
+    { marker: '+', path: 'a.txt', symbols: [], uses: [] },
+    { marker: '~', path: 'b.txt', symbols: [{ marker: '~', name: 'f' }], uses: [] },
+  ]);
+  const r = check(fence('files', '  + a.txt\n  ~ b.txt'), { root });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /^error/m);
+});
+
+test("a task's uses naming a path not in the plan's map is an error", () => {
+  const root = temp();
+  put(root, 'a.txt');
+  const r = check(plan([1, 'none', '- Modify: `a.txt`', '', fence('files', '~ a.txt\n  ~ f\na.txt uses c.txt')]), {
+    root,
+  });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /error.*block 1.*Task 1.*uses names a path not in the plan's map.*c\.txt/);
+});
+
 test("planMap takes a task's files fence", () => {
   const md = plan(
     [1, 'none', '- Modify: `a.txt`', '', fence('files', '~ a.txt  why\n    + f  new\na.txt uses b.txt')],

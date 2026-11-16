@@ -60,16 +60,17 @@ export function parseFilesBlock(text) {
     const line = raw.trim();
     if (!line) continue;
     const indent = raw.length - raw.trimStart().length;
-    const uses = !indent && line.match(USES);
+    // The first line is a file line, whatever its indent; a symbol line is indented deeper than its file line.
+    const symbol = indent > fileIndent;
+    const uses = !symbol && line.match(USES);
     if (uses) {
       relations.push(uses);
       continue;
     }
     const m = line.match(ITEM);
     const bad = () => new Error(`bad files line (use / in paths, no spaces): ${line}`);
-    if (!m || (indent && !entries.length)) throw bad();
+    if (!m) throw bad();
     const [, marker = '>', name, from, to, why] = m;
-    const symbol = indent > fileIndent;
     if ([to, symbol ? undefined : (name ?? from)].some((p) => p?.includes('\\'))) throw bad();
     if (symbol) entries.at(-1).symbols.push({ marker, name: name ?? from, ...(why && { why }), ...(to && { to }) });
     else {
