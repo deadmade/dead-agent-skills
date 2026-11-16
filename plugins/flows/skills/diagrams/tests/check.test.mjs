@@ -474,6 +474,31 @@ test('outlineFiles lists the declarations of a TS, Rust, C# and Python file', { 
   );
 });
 
+test('a C# file-scoped namespace names the declarations after it', { skip: NEEDS_PARSER }, async () => {
+  assert.deepEqual(
+    await outlineFiles(['Scoped.cs'], OUTLINED),
+    new Map([
+      [
+        'Scoped.cs',
+        outline([
+          ['Demo', 'namespace', 1],
+          ['Demo.Runner', 'class', 3],
+          ['Demo.Runner.Run', 'method', 5],
+        ]),
+      ],
+    ]),
+  );
+});
+
+test('a ~ ../ path outside the root gets no outline', { skip: NEEDS_PARSER }, () => {
+  const dir = temp();
+  writeFileSync(join(dir, 'outside.ts'), 'export function secret() {}\n');
+  mkdirSync(join(dir, 'root'));
+  const r = check(fence('files', '~ ../outside.ts\n    + secret'), { root: join(dir, 'root') });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
 test('a .md file has no outline (null)', { skip: NEEDS_PARSER }, async () => {
   assert.deepEqual(await outlineFiles(['README.md'], temp()), new Map([['README.md', null]]));
 });

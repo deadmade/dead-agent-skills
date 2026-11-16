@@ -79,7 +79,9 @@ function walk(node, parent, out) {
     if (kind === 'function' && parent && parent.kind !== 'namespace' && parent.kind !== 'mod') kind = 'method';
     const full = parent ? `${parent.name}.${name}` : name;
     out.push({ name: full, kind, line: child.startPosition.row + 1 });
-    if (CONTAINERS.has(kind)) walk(child, { name: full, kind }, out);
+    // A C# `namespace X;` has no body: the declarations after it, its siblings, are its members.
+    if (child.type === 'file_scoped_namespace_declaration') parent = { name: full, kind };
+    else if (CONTAINERS.has(kind)) walk(child, { name: full, kind }, out);
   }
 }
 

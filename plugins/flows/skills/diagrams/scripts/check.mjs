@@ -8,7 +8,7 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, extname, isAbsolute, join, resolve } from 'node:path';
+import { delimiter, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from '../../build-feature/scripts/glance.mjs';
 import { LANGS } from './outline.mjs';
@@ -331,10 +331,11 @@ export async function checkMarkdown(markdown, root) {
   }
 
   // The file whose real outline an entry's symbols are checked against: an existing `~` or `-` file with a grammar,
-  // or a `>` file's source.
+  // or a `>` file's source, inside the root (a `../` path is never read).
+  const inside = (file) => relative(resolve(root), join(resolve(root), file)).split(sep)[0] !== '..';
   const source = ({ marker, path, from }) => {
     const file = marker === '>' ? from : marker !== '+' && path;
-    return file && Object.hasOwn(LANGS, extname(file)) && here(file) ? file : undefined;
+    return file && Object.hasOwn(LANGS, extname(file)) && inside(file) && here(file) ? file : undefined;
   };
   const files = [...new Set([...written.flatMap((w) => w.entries), ...plan].map(source).filter(Boolean))];
   let outlines = new Map();
