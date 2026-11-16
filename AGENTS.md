@@ -131,6 +131,9 @@ Read `docs/components/ci.md` for how a release is built and published.
 - `flows:diagrams`' checker installs into one user cache folder (`dead-agent-skills/diagrams-node`) shared by every
   checkout: running its tests in a worktree whose `package.json` or `outline.mjs` differs reinstalls the cache for all
   of them, so the next run elsewhere reinstalls again (minutes, about 350 MB).
+- On Windows without symlink rights (no Developer Mode), five node tests fail with `EPERM ... symlink` (glance's
+  symlinked-folder test and four installer tests). That's the machine, not your change: compare with the base commit
+  in a scratch worktree before chasing them.
 - Don't share `CARGO_TARGET_DIR` between worktrees: a test binary keeps the `CARGO_MANIFEST_DIR` of the worktree that
   built it, and web-mcp's integration tests start whichever server binary was built last.
 - mod tests: after a build, copy `plugins/default/hooks/*.test.*` into `.claude-plugin/dead-skills/hooks/` and run `claude plugin test .`
