@@ -35,19 +35,37 @@ Both are fenced blocks in the document's markdown, so the document stays the one
   default; `classDiagram` and `stateDiagram-v2` are allowed when they fit. At most 8 nodes in a flowchart and 6
   participants in a sequence diagram; a diagram that needs more is split into two, not enlarged. Every node has an edge.
   Other diagram types parse-check only.
-- **File map** (` ```files `), for layout and change. One line per file: a marker, then the path with `/` and no
-  spaces. Markers: `+` new, `~` changed, `-` deleted, and `> old-path -> new-path` for a move.
+- **File map** (` ```files `), for layout and change. One line per file: a marker, the path with `/` and no spaces,
+  then two or more spaces and why the file changes. Markers: `+` new, `~` changed, `-` deleted, and
+  `> old-path -> new-path` for a move. Under a file, indent the symbols that change (`+`, `~`, `-`, or
+  `> old-name -> new-name`), each with its own two-space why. An unindented `<a> uses <b>` line says file `a` uses file
+  `b`; both must be files of the block.
 
 ```files
-+ plugins/example/new.mjs
-~ plugins/example/old.mjs
++ plugins/example/new.mjs  the new entry point
+    + run  starts it
+~ plugins/example/old.mjs  calls the new entry point
+    ~ main  hands over to run
 - plugins/example/gone.mjs
 > plugins/example/a.mjs -> plugins/example/b.mjs
+plugins/example/old.mjs uses plugins/example/new.mjs
 ```
+
+Every plain `+ path` line stays valid; the why, symbols and `uses` are optional. A `~` file with no symbols gets a
+warning.
 
 In a spec the map is a prediction from your grounding, so the checker only warns when a path disagrees with the
 repository. A plan needs no `files` block: the renderer builds its map from the tasks' **Files** lists, and the
-checker holds that map to the repository as an error.
+checker holds that map to the repository as an error. To give a plan's file a why, symbols or relations, put a
+` ```files ` block in that task, below the plain-path **Files** list (not indented under it: prettier rewrites lines
+under a bullet). It may name only files the task lists, and `uses` may name any file in the plan's map.
+
+Each map is drawn as one panel. The Files view lists the files by folder, with each file's marker and symbol counts; the
+selected file shows its real outline with the change marked and the untouched symbols greyed, its why, and links to the
+files it uses and is used by (the up and down keys step through the files). The Relations tab draws only the files that
+relate, with their folders and labelled arrows, and lists the rest as "Not related"; a click on a file opens it in
+Files. The outlines come from tree-sitter, for JavaScript and TypeScript, Rust, C# and Python files. The checker also
+compares the symbols with them: a `+` symbol that exists, or a `~` or `-` symbol that doesn't, is a warning.
 
 ## Steps
 
@@ -67,9 +85,11 @@ checker holds that map to the repository as an error.
 4. Show the page: inline if the host has a tool that renders an HTML page in the conversation, and otherwise print
    the file's path for the user to open in a browser. The gate shows it beside its usual summary.
 
-The first check downloads the Mermaid parser into the user's cache folder (about 150 MB), so it can take a minute.
-When it cannot run (no npm, offline), the checker prints `warning: not parser-checked: <reason>` and checks only the
-rest. Pass that warning on to the user with the gate summary, so they know the syntax was not checked.
+The first check downloads the Mermaid parser and the tree-sitter grammars into the user's cache folder (about 150 MB),
+so it can take a minute. When Mermaid cannot run (no npm, offline), the checker prints
+`warning: not parser-checked: <reason>` and checks only the rest. Pass that warning on to the user with the gate
+summary, so they know the syntax was not checked. A file it cannot outline gets `warning: not outlined: <reason>`; the
+page still renders, without that file's outline. Pass this one on too.
 
 A document you may not edit (a plan the run was given, flow.md) is rendered but never changed. If its check fails,
 show the user the failing lines as text beside the summary instead of a page, and leave the document as it is.
