@@ -2,14 +2,16 @@
 // Checks the `mermaid` and `files` blocks of a markdown file and prints one line per problem:
 //   node check.mjs <doc.md> [--root <dir>]
 // Exits 1 when any problem is an error. The Mermaid syntax check and the node and participant counts come from
-// Mermaid itself (parse.mjs); it runs from a cache folder, never from the plugin folder.
+// Mermaid itself (parse.mjs), the files' real outlines from tree-sitter (outline.mjs); both run from a cache folder,
+// never from the plugin folder.
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, isAbsolute, join } from 'node:path';
+import { delimiter, extname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from '../../build-feature/scripts/glance.mjs';
+import { LANGS } from './outline.mjs';
 
 const HERE = import.meta.dirname;
 const SKILL = join(HERE, '..');
@@ -189,14 +191,18 @@ const cacheDir = () => {
   return join(base, 'dead-agent-skills', 'diagrams-node');
 };
 
-// The cache folder holding parse.mjs and an install of the pinned packages. The install is redone when the hash of
-// the three files differs from the stamp, and never touches the plugin folder. The three files are copied afresh on
-// every run, so a stale or planted copy in the cache is never what runs.
-async function parserFolder() {
+// The cache folder holding parse.mjs, outline.mjs and an install of the pinned packages. The install is redone when
+// the hash of the four files differs from the stamp, and never touches the plugin folder. The four files are copied
+// afresh on every run, so a stale or planted copy in the cache is never what runs.
+// One install per run: the diagrams and the outlines share it, and a failed install is not tried twice.
+let folder;
+const parserFolder = () => (folder ??= installParser());
+async function installParser() {
   const files = [
     [join(SKILL, 'package.json'), 'package.json'],
     [join(SKILL, 'package-lock.json'), 'package-lock.json'],
     [join(HERE, 'parse.mjs'), 'parse.mjs'],
+    [join(HERE, 'outline.mjs'), 'outline.mjs'],
   ];
   const hash = createHash('sha256');
   for (const [from, name] of files) hash.update(`${name}\0`).update(readFileSync(from));
@@ -221,24 +227,39 @@ async function parserFolder() {
   return dir;
 }
 
-// One result per diagram text, from parse.mjs.
-async function parseDiagrams(texts) {
+// Runs `script` of the cache folder with `input` as JSON on stdin; resolves with the JSON it prints.
+async function runInCache(script, input) {
   const dir = await parserFolder();
   let out;
   try {
-    out = await run(process.execPath, ['parse.mjs'], { cwd: dir, timeout: PARSE_MS, input: JSON.stringify(texts) });
+    out = await run(process.execPath, [script], { cwd: dir, timeout: PARSE_MS, input: JSON.stringify(input) });
   } catch (e) {
-    throw new Error(`parse.mjs ${e.message}`);
+    throw new Error(`${script} ${e.message}`);
   }
-  let results;
   try {
-    results = JSON.parse(out);
+    return JSON.parse(out);
   } catch {
-    throw new Error(`parse.mjs printed text that is not JSON: ${firstLine(out).slice(0, 80)}`);
+    throw new Error(`${script} printed text that is not JSON: ${firstLine(out).slice(0, 80)}`);
   }
+}
+
+// One result per diagram text, from parse.mjs.
+async function parseDiagrams(texts) {
+  const results = await runInCache('parse.mjs', texts);
   if (!Array.isArray(results) || results.length !== texts.length || results.some((r) => typeof r?.ok !== 'boolean'))
     throw new Error('parse.mjs printed JSON of the wrong shape');
   return results;
+}
+
+// Each path (relative to `root`) -> its declarations [{ name, kind, line }] from outline.mjs, or null when its
+// extension has no grammar. Rejects with a one-line reason.
+export async function outlineFiles(paths, root) {
+  // join, as checkMarkdown's `here` does, so a path written with a leading / stays under the root.
+  const files = paths.map((p) => join(resolve(root), p));
+  const results = await runInCache('outline.mjs', files);
+  if (!results || files.some((f) => results[f] !== null && !Array.isArray(results[f])))
+    throw new Error('outline.mjs printed JSON of the wrong shape');
+  return new Map(paths.map((p, i) => [p, results[files[i]]]));
 }
 
 export async function checkMarkdown(markdown, root) {
@@ -249,6 +270,7 @@ export async function checkMarkdown(markdown, root) {
   const fences = taskFences(markdown);
 
   const diagrams = [];
+  const written = [];
   blocks.forEach((b, i) => {
     const number = i + 1;
     if (b.kind === 'mermaid') return diagrams.push({ number, text: b.text });
@@ -260,6 +282,7 @@ export async function checkMarkdown(markdown, root) {
     } catch (e) {
       return add('error', number, e.message);
     }
+    written.push({ number, entries });
     // A block a person wrote predicts the repository, so a mismatch is only a warning.
     const paths = new Set(entries.map((e) => e.path));
     for (const { marker, path, from, symbols, uses } of entries) {
@@ -291,20 +314,57 @@ export async function checkMarkdown(markdown, root) {
   }
 
   // A plan's file map is exact, so it is checked in task order: a file an earlier task creates may be modified.
+  let plan = [];
   try {
-    const created = new Set();
-    for (const { task, marker, path, symbols } of planMap(markdown, add)) {
-      if (marker === '~' && !symbols.length) add('warning', 0, `${task}: ~ ${path} has no symbols`);
-      if (marker === '+') {
-        if (here(path)) add('warning', 0, `${task}: + ${path} already exists`);
-        created.add(path);
-      } else if (!created.has(path) && !here(path)) add('error', 0, `${task}: ${marker} ${path} does not exist`);
-    }
+    plan = planMap(markdown, add);
   } catch (e) {
     // glance.mjs's parse says so when the document has no `### Task` headings; a spec or flow.md has no map to check.
     if (!/^no `### Task/.test(e.message)) add('warning', 0, `no plan map: ${e.message}`);
   }
-  return problems;
+  const created = new Set();
+  for (const { task, marker, path, symbols } of plan) {
+    if (marker === '~' && !symbols.length) add('warning', 0, `${task}: ~ ${path} has no symbols`);
+    if (marker === '+') {
+      if (here(path)) add('warning', 0, `${task}: + ${path} already exists`);
+      created.add(path);
+    } else if (!created.has(path) && !here(path)) add('error', 0, `${task}: ${marker} ${path} does not exist`);
+  }
+
+  // The file whose real outline an entry's symbols are checked against: an existing `~` or `-` file with a grammar,
+  // or a `>` file's source.
+  const source = ({ marker, path, from }) => {
+    const file = marker === '>' ? from : marker !== '+' && path;
+    return file && Object.hasOwn(LANGS, extname(file)) && here(file) ? file : undefined;
+  };
+  const files = [...new Set([...written.flatMap((w) => w.entries), ...plan].map(source).filter(Boolean))];
+  let outlines = new Map();
+  if (files.length) {
+    try {
+      outlines = await outlineFiles(files, root);
+    } catch (e) {
+      add('warning', 0, `not outlined: ${e.message}`);
+      return { problems, outlines: null };
+    }
+  }
+  // A symbol matches a declaration by its full name or its last segment; `added` holds what earlier tasks add.
+  const checkSymbols = (number, prefix, entry, added) => {
+    const file = source(entry);
+    const outline = file && outlines.get(file);
+    if (!outline) return;
+    for (const { marker, name } of entry.symbols) {
+      const found = added.has(name) || outline.some((o) => o.name === name || o.name.split('.').at(-1) === name);
+      if (marker === '+' && found) add('warning', number, `${prefix}+ ${file}: ${name} already exists`);
+      if (marker !== '+' && !found) add('warning', number, `${prefix}${marker} ${file}: ${name} not found`);
+    }
+  };
+  for (const { number, entries } of written) for (const entry of entries) checkSymbols(number, '', entry, new Set());
+  const added = new Map();
+  for (const entry of plan) {
+    if (!added.has(entry.path)) added.set(entry.path, new Set());
+    checkSymbols(0, `${entry.task}: `, entry, added.get(entry.path));
+    for (const { marker, name } of entry.symbols) if (marker === '+') added.get(entry.path).add(name);
+  }
+  return { problems, outlines };
 }
 
 // realpath: argv[1] keeps a symlinked folder while import.meta.url resolves it.
@@ -319,7 +379,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     console.log(`error: cannot read ${args[0]}: ${e.message}`);
     process.exit(2);
   }
-  const problems = await checkMarkdown(markdown, root);
+  const { problems } = await checkMarkdown(markdown, root);
   for (const p of problems) console.log(`${p.level}: ${p.block ? `block ${p.block}: ` : ''}${p.message}`);
   process.exitCode = problems.some((p) => p.level === 'error') ? 1 : 0;
 }

@@ -15,11 +15,12 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseFilesBlock, planMap } from '../scripts/check.mjs';
+import { outlineFiles, parseFilesBlock, planMap } from '../scripts/check.mjs';
 
 const SKILL = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = join(SKILL, 'scripts', 'check.mjs');
 const FIXTURE = readFileSync(join(SKILL, 'tests', 'fixtures', 'api-mcp-diagrams.md'), 'utf8');
+const OUTLINED = join(SKILL, 'tests', 'fixtures', 'outline');
 const WIN = process.platform === 'win32';
 
 const temp = () => mkdtempSync(join(tmpdir(), 'diagrams-'));
@@ -45,9 +46,10 @@ const READY = !check(fence('mermaid', 'flowchart LR\n  a --> b')).out.includes('
 const NEEDS_PARSER = READY ? false : 'the parser cannot be installed (offline)';
 
 // A checker run whose cache is an empty folder and whose PATH holds only `bin`.
-function isolated(markdown, bin) {
+function isolated(markdown, bin, root) {
   const cache = temp();
   return check(markdown, {
+    root,
     env: { PATH: bin, HOME: cache, USERPROFILE: cache, XDG_CACHE_HOME: cache, LOCALAPPDATA: cache },
   });
 }
@@ -417,6 +419,111 @@ test('a Files bullet wrapped onto an indented line is still one entry', () => {
   const root = temp();
   put(root, 'a.txt');
   const r = check(md, { root });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), '');
+});
+
+const outline = (rows) => rows.map(([name, kind, line]) => ({ name, kind, line }));
+
+test('outlineFiles lists the declarations of a TS, Rust, C# and Python file', { skip: NEEDS_PARSER }, async () => {
+  const outlines = await outlineFiles(['sample.ts', 'sample.rs', 'Sample.cs', 'sample.py'], OUTLINED);
+  assert.deepEqual(
+    outlines,
+    new Map([
+      [
+        'sample.ts',
+        outline([
+          ['load', 'function', 1],
+          ['save', 'function', 5],
+          ['Store', 'class', 7],
+          ['Store.get', 'method', 8],
+          ['Shape', 'interface', 13],
+          ['Shape.area', 'method', 14],
+        ]),
+      ],
+      [
+        'sample.rs',
+        outline([
+          ['Counter', 'struct', 1],
+          ['Counter', 'impl', 5],
+          ['Counter.bump', 'method', 6],
+          ['start', 'function', 12],
+          ['tests', 'mod', 17],
+          ['tests.bumps', 'function', 21],
+        ]),
+      ],
+      [
+        'Sample.cs',
+        outline([
+          ['Demo', 'namespace', 1],
+          ['Demo.Runner', 'class', 3],
+          ['Demo.Runner.Run', 'method', 5],
+          ['Demo.Runner.Run', 'method', 9],
+        ]),
+      ],
+      [
+        'sample.py',
+        outline([
+          ['load', 'function', 5],
+          ['Store', 'class', 9],
+          ['Store.size', 'method', 11],
+          ['Store.get', 'method', 14],
+        ]),
+      ],
+    ]),
+  );
+});
+
+test('a .md file has no outline (null)', { skip: NEEDS_PARSER }, async () => {
+  assert.deepEqual(await outlineFiles(['README.md'], temp()), new Map([['README.md', null]]));
+});
+
+test('a ~, - and > symbol missing from the outline is a warning', { skip: NEEDS_PARSER }, () => {
+  const block =
+    '~ sample.ts\n    ~ load\n    ~ missing\n- sample.py\n    - Store.gone\n> sample.rs -> moved.rs\n    ~ absent';
+  const r = check(fence('files', block), { root: OUTLINED });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /warning: block 1: ~ sample\.ts: missing not found/);
+  assert.match(r.out, /warning: block 1: - sample\.py: Store\.gone not found/);
+  assert.match(r.out, /warning: block 1: ~ sample\.rs: absent not found/);
+  assert.doesNotMatch(r.out, /load/);
+});
+
+test('a + symbol already in the outline is a warning', { skip: NEEDS_PARSER }, () => {
+  const r = check(fence('files', '~ sample.ts\n    + get\n    + fresh'), { root: OUTLINED });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /warning: block 1: \+ sample\.ts: get already exists/);
+  assert.doesNotMatch(r.out, /fresh/);
+});
+
+test('an overloaded name marks every match', { skip: NEEDS_PARSER }, () => {
+  const r = check(fence('files', '~ Sample.cs\n    ~ Run\n    ~ Demo.Runner.Run\n    + Run'), { root: OUTLINED });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), 'warning: block 1: + Sample.cs: Run already exists');
+});
+
+test('a symbol an earlier task adds is not reported missing in a later task', { skip: NEEDS_PARSER }, () => {
+  const md = plan(
+    [1, 'none', '- Modify: `sample.ts`', '', fence('files', '~ sample.ts\n    + fresh')],
+    [2, 'Task 1', '- Modify: `sample.ts`', '', fence('files', '~ sample.ts\n    ~ fresh\n    ~ other')],
+  );
+  const r = check(md, { root: OUTLINED });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out.trim(), 'warning: Task 2: t2: ~ sample.ts: other not found');
+});
+
+test('no npm gives "not outlined" and exit 0', { skip: WIN }, () => {
+  const root = temp();
+  put(root, 'a.ts');
+  const r = isolated(fence('files', '~ a.ts\n    ~ f'), temp(), root);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /warning: not outlined: npm was not found/);
+});
+
+test('check.mjs on a doc with only a .md files block installs nothing', () => {
+  const root = temp();
+  put(root, 'notes.md');
+  const r = isolated(fence('files', '~ notes.md\n    ~ Intro'), temp(), root);
   assert.equal(r.code, 0, r.out);
   assert.equal(r.out.trim(), '');
 });

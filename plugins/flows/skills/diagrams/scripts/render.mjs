@@ -269,7 +269,7 @@ const line = (p) => `${p.level}: ${p.block ? `block ${p.block}: ` : ''}${p.messa
 // The page for `markdown`; `root` is the repository the checker compares file maps with. Throws, with the checker's
 // lines as the message, when the checker finds an error; its warnings go to stderr.
 export async function renderPage(markdown, root) {
-  const problems = await checkMarkdown(markdown, root);
+  const { problems } = await checkMarkdown(markdown, root);
   if (problems.some((p) => p.level === 'error')) throw new Error(problems.map(line).join('\n'));
   for (const p of problems) console.error(line(p));
 
