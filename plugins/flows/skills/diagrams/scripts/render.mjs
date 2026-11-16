@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Writes a markdown file as one self-contained HTML page: the text, each `mermaid` block drawn by Mermaid in the
-// browser, and each `files` block (and a plan's file map) as an overview flowchart plus one card per file:
+// browser, and each `files` block (and a plan's file map) as a panel of its files beside the selected file's outline,
+// with an overview flowchart in a second tab:
 //   node render.mjs <doc.md> <out.html>
 // It runs the checker first and, when that finds an error, prints the checker's lines, exits 1 and writes nothing.
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
@@ -79,15 +80,47 @@ function merge(entries) {
 
 // An author string inside a quoted Mermaid label.
 const label = (s) => String(s).replace(/["<>`]/g, (c) => ({ '"': '#quot;', '<': '#lt;', '>': '#gt;', '`': '#96;' })[c]);
-const counts = (markers) =>
+// [marker, how many] for each marker present, in MARKS order.
+const tally = (markers) =>
   Object.keys(MARKS)
     .filter((m) => markers.includes(m))
-    .map((m) => `${m}${markers.filter((x) => x === m).length}`)
+    .map((m) => [m, markers.filter((x) => x === m).length]);
+const counts = (markers) =>
+  tally(markers)
+    .map(([m, k]) => `${m}${k}`)
     .join(' ');
 const parts = (path) => path.split('/').filter(Boolean);
 const folder = (path) => parts(path).slice(0, -1).join('/');
 
-// The overview of a map as a Mermaid flowchart. Node ids are `<prefix>f<n>` (the n-th file, as in cardsHtml),
+// The files' indexes by folder, `{ dirs: Map(name -> folder), files }`. A folder with no file of its own and one
+// subfolder holds no change itself, so it folds into the one below (`a/b`).
+function folders(files) {
+  const root = { dirs: new Map(), files: [] };
+  files.forEach((f, n) => {
+    let dir = root;
+    for (const p of parts(f.path).slice(0, -1)) {
+      if (!dir.dirs.has(p)) dir.dirs.set(p, { dirs: new Map(), files: [] });
+      dir = dir.dirs.get(p);
+    }
+    dir.files.push(n);
+  });
+  const fold = (dir) => ({
+    files: dir.files,
+    dirs: new Map(
+      [...dir.dirs].map(([name, sub]) => {
+        while (!sub.files.length && sub.dirs.size === 1) {
+          const [[child, next]] = sub.dirs;
+          name += `/${child}`;
+          sub = next;
+        }
+        return [name, fold(sub)];
+      }),
+    ),
+  });
+  return fold(root);
+}
+
+// The overview of a map as a Mermaid flowchart. Node ids are `<prefix>f<n>` (the n-th file, as in mapHtml),
 // `<prefix>d<n>` (a folder) and `<prefix>x<n>` (a grey path outside the map); only quoted labels carry paths.
 export function overviewMermaid(entries, prefix) {
   const files = merge(entries);
@@ -114,24 +147,9 @@ export function overviewMermaid(entries, prefix) {
     node = (path) => dirs.get(folder(path)) ?? other(`${folder(path) || '.'}/`);
     edges.forEach((e) => (e[1] = e[1].startsWith('-.->') ? '-.->' : '-->'));
   } else {
-    const root = { dirs: new Map(), files: [] };
-    files.forEach((f, n) => {
-      let dir = root;
-      for (const p of parts(f.path).slice(0, -1)) {
-        if (!dir.dirs.has(p)) dir.dirs.set(p, { dirs: new Map(), files: [] });
-        dir = dir.dirs.get(p);
-      }
-      dir.files.push(n);
-    });
     let d = 0;
     const draw = (dir, pad) => {
-      for (let [name, sub] of dir.dirs) {
-        // A folder with no file of its own and one subfolder holds no change itself, so it folds into the one below.
-        while (!sub.files.length && sub.dirs.size === 1) {
-          const [[child, next]] = sub.dirs;
-          name += `/${child}`;
-          sub = next;
-        }
+      for (const [name, sub] of dir.dirs) {
         out.push(`${pad}subgraph ${prefix}d${d++}["${label(`${name}/`)}"]`);
         draw(sub, `${pad}  `);
         out.push(`${pad}end`);
@@ -145,7 +163,7 @@ export function overviewMermaid(entries, prefix) {
         classes[MARKS[f.marker]].push(`${prefix}f${n}`);
       }
     };
-    draw(root, '  ');
+    draw(folders(files), '  ');
     const ids = new Map(files.map((f, n) => [f.path, `${prefix}f${n}`]));
     node = (path) => ids.get(path) ?? other(path);
   }
@@ -169,38 +187,84 @@ export function overviewMermaid(entries, prefix) {
   return out.join('\n');
 }
 
-// One collapsible card per file of a map, its class `c-<prefix>f<n>` matching the file's overview node: the file's
-// outline in file order with the change marked and untouched rows `same`, then predicted `+` symbols the outline lacks.
-// `outlines` is checkMarkdown's: null when nothing was outlined, else path -> outline, null or missing for a file
-// without one.
-export function cardsHtml(entries, outlines, prefix) {
+const TOTALS = { '+': 'new', '~': 'changed', '-': 'removed', '>': 'moved' };
+
+// One panel per map: a bar with the file totals and the Files and Relations tabs; the files by folder, each a button
+// `f-<prefix>f<n>`, beside one pane per file, its class `c-<prefix>f<n>` matching the file's button and overview node;
+// and the overview. A pane holds the file's outline in file order with the change marked and untouched rows `same`,
+// then predicted `+` symbols the outline lacks, and the files it uses and is used by. `outlines` is checkMarkdown's:
+// null when nothing was outlined, else path -> outline, null or missing for a file without one. State is the class `on`
+// (the first file's button and pane), since clean() keeps only `class` and `type`; the page script sets the rest.
+export function mapHtml(entries, outlines, prefix) {
+  const files = merge(entries);
+  const mark = (m) => `<span class="mark m-${MARKS[m]}">${escapeHtml(m)}</span>`;
+  const index = new Map(files.map((f, n) => [f.path, n]));
+  // A path a plan's later task dropped from the map stays text.
+  const link = (path) =>
+    index.has(path)
+      ? `<button type="button" class="file f-${prefix}f${index.get(path)}">${escapeHtml(parts(path).at(-1))}</button>`
+      : escapeHtml(path);
+  const totals = tally(files.map((f) => f.marker));
+  const bar = `<div class="bar"><span class="totals">${Object.keys(MARKS)
+    .map((m) => [m, totals.find((t) => t[0] === m)?.[1] ?? 0])
+    .filter(([m, k]) => k || m === '-')
+    .map(([m, k]) => `<span class="m-${MARKS[m]}">${m === '-' ? '−' : escapeHtml(m)}${k} ${TOTALS[m]}</span>`)
+    .join(
+      ' ',
+    )}</span><span class="tabs"><button type="button" class="tab">Files</button><button type="button" class="tab">Relations</button></span></div>`;
+  const list = (dir, cls = '') =>
+    `<ul${cls}>${[...dir.dirs]
+      .map(([name, sub]) => `<li><span class="dir">${escapeHtml(name)}/</span>${list(sub)}</li>`)
+      .join('')}${dir.files
+      .map((n) => {
+        const f = files[n];
+        const symbols = tally(f.symbols.map((s) => s.marker))
+          .map(([m, k]) => `<span class="m-${MARKS[m]}">${escapeHtml(m)}${k}</span>`)
+          .join(' ');
+        const inner = [
+          `${mark(f.marker)} <span class="name">${escapeHtml(parts(f.path).at(-1) ?? f.path)}</span>`,
+          symbols && `<span class="n">${symbols}</span>`,
+          f.tasks.length && `<span class="tasks">Task ${escapeHtml(f.tasks.join(', '))}</span>`,
+        ];
+        return `<li><button type="button" class="file f-${prefix}f${n}${n ? '' : ' on'}">${inner.filter(Boolean).join(' ')}</button></li>`;
+      })
+      .join('')}</ul>`;
   const row = (line, s, name) =>
     `<div class="row ${s ? `m-${MARKS[s.marker]}` : 'same'}"><span class="ln">${line}</span><span class="mark">${s ? escapeHtml(s.marker) : ''}</span><span class="name">${escapeHtml(name)}</span><span class="why">${s ? escapeHtml([s.to && `→ ${s.to}`, s.why].filter(Boolean).join('  ')) : ''}</span></div>`;
-  return merge(entries)
-    .map((f, n) => {
-      const outline = outlines?.get(f.marker === '>' ? f.from : f.path);
-      const shown = new Set();
-      // A symbol names a declaration by its full name or its last segment, as the checker matches them.
-      const match = (o) =>
-        f.symbols.find((s) => s.name === o.name) ?? f.symbols.find((s) => s.name === o.name.split('.').at(-1));
-      const rows = (outline ?? []).map((o) => {
-        const s = match(o);
-        if (s) shown.add(s);
-        return row(o.line, s, o.name);
-      });
-      for (const s of f.symbols) if (!shown.has(s) && (!outline || s.marker === '+')) rows.push(row('', s, s.name));
-      const note = outlines && !outline && f.marker !== '+' ? '<p class="note">no outline for this file type</p>' : '';
-      const summary = [
-        `<span class="mark m-${MARKS[f.marker]}">${escapeHtml(f.marker)}</span> <span class="path">${escapeHtml(f.path)}</span>`,
-        f.from && `<span class="from">from ${escapeHtml(f.from)}</span>`,
-        f.why && `<span class="why">${escapeHtml(f.why)}</span>`,
-        f.tasks.length && `<span class="tasks">Task ${escapeHtml(f.tasks.join(', '))}</span>`,
-      ]
-        .filter(Boolean)
-        .join(' ');
-      return `<details class="card c-${prefix}f${n}"><summary>${summary}</summary><div class="outline">${rows.join('')}</div>${note}</details>`;
-    })
-    .join('');
+  const panes = files.map((f, n) => {
+    const outline = outlines?.get(f.marker === '>' ? f.from : f.path);
+    const shown = new Set();
+    // A symbol names a declaration by its full name or its last segment, as the checker matches them.
+    const match = (o) =>
+      f.symbols.find((s) => s.name === o.name) ?? f.symbols.find((s) => s.name === o.name.split('.').at(-1));
+    const rows = (outline ?? []).map((o) => {
+      const s = match(o);
+      if (s) shown.add(s);
+      return row(o.line, s, o.name);
+    });
+    for (const s of f.symbols) if (!shown.has(s) && (!outline || s.marker === '+')) rows.push(row('', s, s.name));
+    const usedBy = files.filter((g) => g.uses.includes(f.path)).map((g) => g.path);
+    const uses = [
+      f.uses.length && `uses ${f.uses.map(link).join(', ')}`,
+      usedBy.length && `used by ${usedBy.map(link).join(', ')}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    return [
+      `<section class="pane c-${prefix}f${n}${n ? '' : ' on'}">`,
+      `<p class="head">${mark(f.marker)} <span class="path">${escapeHtml(f.path)}</span></p>`,
+      f.from && `<p class="from">from ${escapeHtml(f.from)}</p>`,
+      f.why && `<p class="why">${escapeHtml(f.why)}</p>`,
+      `<div class="outline">${rows.join('')}</div>`,
+      outlines && !outline && f.marker !== '+' && '<p class="note">no outline for this file type</p>',
+      uses && `<p class="uses">${uses}</p>`,
+      '</section>',
+    ]
+      .filter(Boolean)
+      .join('');
+  });
+  const overview = `<figure class="diagram overview"><pre class="source">${escapeHtml(overviewMermaid(entries, prefix))}</pre></figure>`;
+  return `<div class="cmap">${bar}<div class="files">${list(folders(files), ' class="tree"')}${panes.join('')}</div><div class="relations">${overview}</div></div>`;
 }
 
 const tokens = (o) =>
@@ -242,12 +306,41 @@ figure { margin: 1.6rem 0; }
 .overview .node.del :is(rect, path, polygon) { stroke: var(--del) !important; }
 .overview .node.move :is(rect, path, polygon) { stroke: var(--move) !important; }
 .overview .node.other { opacity: 0.7; }
-.card { max-width: 46rem; border: 1px solid var(--line); border-radius: 8px; margin: 0.5rem 0; padding: 0 1rem; }
-.card[open] { padding-bottom: 0.6rem; }
-.card summary { cursor: pointer; padding: 0.5rem 0; font: 0.9375rem/1.5 var(--mono); overflow-wrap: anywhere; }
-.card summary:active { opacity: 0.7; }
-.card summary .mark { font-weight: 700; }
-.card summary :is(.from, .why, .tasks) { margin-left: 0.5em; color: var(--muted); font-family: var(--sans); }
+.cmap { border: 1px solid var(--line); border-radius: 8px; margin: 1.6rem 0; }
+.cmap [hidden] { display: none !important; }
+.cmap button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.cmap .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--line); font: 0.875rem/1.5 var(--mono); }
+.cmap .totals { display: flex; flex-wrap: wrap; gap: 0 0.75rem; }
+.cmap .tabs { display: flex; gap: 0.25rem; margin-left: auto; font-family: var(--sans); }
+.cmap .tab { border: 1px solid var(--line); border-radius: 6px; padding: 0.1rem 0.7rem; }
+.cmap .tab.on { background: var(--panel); font-weight: 650; }
+.cmap :is(.files, .relations) { height: min(70vh, 34rem); }
+.cmap .files { display: grid; grid-template-columns: minmax(12rem, 34%) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.cmap .tree { margin: 0; padding: 0.4rem 0; overflow: auto; border-right: 1px solid var(--line); font: 0.8125rem/1.9 var(--mono); }
+.cmap .tree, .cmap .tree ul { list-style: none; }
+.cmap .tree ul { margin: 0; padding-left: 0.9rem; }
+.cmap .tree .dir { display: block; padding: 0 0.6rem; color: var(--muted); white-space: nowrap; }
+.cmap .tree .file { display: flex; gap: 0.4rem; align-items: baseline; width: 100%; padding: 0 0.6rem; text-align: left; white-space: nowrap; outline-offset: -2px; }
+.cmap .tree .file:hover, .cmap .tree .file.on { background: var(--panel); }
+.cmap .tree .file.on { box-shadow: inset 3px 0 0 var(--link); }
+.cmap .tree .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.cmap .tree :is(.n, .tasks) { font-size: 0.75rem; }
+.cmap .tree .tasks { color: var(--muted); font-family: var(--sans); }
+.cmap .pane { overflow: auto; padding: 0.75rem 1rem; }
+.cmap .pane:not(.on) { display: none; }
+.cmap .pane > p { margin: 0 0 0.25rem; font-size: 0.875rem; }
+.cmap .pane > .head { font: 650 0.9375rem/1.5 var(--mono); overflow-wrap: anywhere; }
+.cmap .pane > :is(.from, .why, .note, .uses) { color: var(--muted); }
+.cmap .pane > .outline { margin: 0.6rem 0; }
+.cmap .pane > .uses { margin-top: 0.8rem; padding-top: 0.5rem; border-top: 1px dashed var(--line); }
+.cmap .uses .file { font-family: var(--mono); text-decoration: underline dotted; text-underline-offset: 0.2em; }
+.cmap .relations { overflow: auto; }
+.cmap .relations .diagram { margin: 0; border: 0; }
+@media (max-width: 560px) {
+  .cmap :is(.files, .relations) { height: auto; }
+  .cmap .files { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .cmap .tree { max-height: 12rem; border-right: 0; border-bottom: 1px solid var(--line); }
+}
 .outline { display: grid; grid-template-columns: 3em 1.2em minmax(0, max-content) 1fr; column-gap: 0.5rem; font: 0.875rem/1.75 var(--mono); }
 .outline .row { display: contents; }
 .outline .ln { color: var(--muted); text-align: right; }
@@ -255,7 +348,6 @@ figure { margin: 1.6rem 0; }
 .outline .row:not(.same) :is(.mark, .name) { font-weight: 700; }
 .outline .why { color: var(--muted); font-family: var(--sans); }
 .outline .same > * { color: var(--muted); opacity: 0.7; }
-.card .note { margin: 0.3rem 0 0; color: var(--muted); font-size: 0.875rem; }
 .m-add { color: var(--add); }
 .m-mod { color: var(--mod); }
 .m-del { color: var(--del); }
@@ -334,7 +426,7 @@ marked.use({
 
 // A second layer behind the renderers: no script-like element survives marked, and an element keeps only the attributes
 // marked itself writes (href, src, alt, title, class, type, checked, disabled, open, start, align), which cover the
-// cards' own (class); style, id, srcset, data-* and event handlers are dropped, and an address must pass safe().
+// maps' own (class, type); style, id, srcset, data-* and event handlers are dropped, and an address must pass safe().
 const KEEP = new Set(['href', 'src', 'alt', 'title', 'class', 'type', 'checked', 'disabled', 'open', 'start', 'align']);
 function clean(html) {
   const t = document.createElement('template');
@@ -366,6 +458,30 @@ for (const pre of doc.querySelectorAll('.diagram > pre.source')) {
   }
 }
 
+// A map's selected file and shown view are the class \`on\` (the markup's only state); the ARIA states follow it.
+const fileOf = (button) => /\\bf-(\\S+)/.exec(button.className)[1];
+function select(cmap, id) {
+  for (const el of cmap.querySelectorAll('.tree .file, .pane')) {
+    const on = el.classList.contains('f-' + id) || el.classList.contains('c-' + id);
+    el.classList.toggle('on', on);
+    if (el.localName === 'button') el.setAttribute('aria-selected', on);
+  }
+}
+function show(cmap, files) {
+  cmap.querySelector('.files').hidden = !files;
+  cmap.querySelector('.relations').hidden = files;
+  cmap.querySelectorAll('.tab').forEach((tab, i) => {
+    tab.classList.toggle('on', (i === 0) === files);
+    tab.setAttribute('aria-pressed', (i === 0) === files);
+  });
+}
+// The overviews drew while shown (Mermaid measures text in the document); each map now opens on its files.
+for (const cmap of doc.querySelectorAll('.cmap')) {
+  show(cmap, true);
+  const first = cmap.querySelector('.tree .file');
+  if (first) select(cmap, fileOf(first));
+}
+
 // shortcut: Mermaid 12.3.0 ids a node's element \`\${diagramId}-flowchart-\${id}-\${counter}\`, an internal format; recheck
 // on a Mermaid bump.
 function cardFor(element) {
@@ -373,13 +489,25 @@ function cardFor(element) {
   return id ? 'c-' + id : null;
 }
 doc.addEventListener('click', (e) => {
-  const node = e.target.closest?.('.overview [id*="-flowchart-"]');
-  const card = node && cardFor(node);
-  const target = card && doc.querySelector('.' + card);
-  if (!target) return;
-  target.open = true;
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  target.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'nearest' });
+  const cmap = e.target.closest?.('.cmap');
+  if (!cmap) return;
+  const tab = e.target.closest('.tab');
+  if (tab) return show(cmap, tab === cmap.querySelector('.tab'));
+  const file = e.target.closest('.file');
+  const node = !file && e.target.closest('.overview [id*="-flowchart-"]');
+  const id = file ? fileOf(file) : node && cardFor(node)?.slice(2);
+  if (!id || !cmap.querySelector('.pane.c-' + id)) return;
+  show(cmap, true);
+  select(cmap, id);
+  // A button in a pane or a node in the overview leaves view now, so the file's button in the tree takes the focus.
+  cmap.querySelector('.tree .f-' + id).focus();
+});
+doc.addEventListener('keydown', (e) => {
+  const file = (e.key === 'ArrowDown' || e.key === 'ArrowUp') && e.target.closest?.('.tree .file');
+  if (!file) return;
+  const all = [...file.closest('.tree').querySelectorAll('.file')];
+  e.preventDefault();
+  all[(all.indexOf(file) + (e.key === 'ArrowDown' ? 1 : all.length - 1)) % all.length].click();
 });
 `;
 
@@ -423,12 +551,13 @@ export async function renderPage(markdown, root) {
   }
   const failed = results.flatMap((r, i) => (r.ok ? [] : [`error: ${maps[i].name}: overview: ${r.error}`]));
   if (failed.length) throw new Error(failed.join('\n'));
-  const figure = (m) =>
-    `<figure class="diagram overview"><pre class="source">${escapeHtml(m.mermaid)}</pre></figure>${cardsHtml(m.entries, outlines, m.prefix)}`;
   const templates = maps
     .filter((m) => m.key !== undefined)
-    .map((m) => `<template data-files data-key="${escapeHtml(m.key)}">${figure(m)}</template>`);
-  const map = plan.length ? `<section class="plan-map"><h2>File map</h2>${figure(maps.at(-1))}</section>` : '';
+    .map(
+      (m) =>
+        `<template data-files data-key="${escapeHtml(m.key)}">${mapHtml(m.entries, outlines, m.prefix)}</template>`,
+    );
+  const map = plan.length ? `<section class="plan-map"><h2>File map</h2>${mapHtml(plan, outlines, 'p')}</section>` : '';
   const title = escapeHtml(markdown.match(/^# (.+)$/m)?.[1].trim() ?? 'Document');
   // `<` is escaped so quoted HTML such as </script> cannot end the script early.
   const json = JSON.stringify(markdown).replaceAll('<', '\\u003c');

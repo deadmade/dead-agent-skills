@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { JSDOM } from 'jsdom';
 import { parseFilesBlock, planMap as planEntries } from '../scripts/check.mjs';
-import { cardsHtml, overviewMermaid } from '../scripts/render.mjs';
+import { mapHtml, overviewMermaid } from '../scripts/render.mjs';
 
 const SKILL = join(import.meta.dirname, '..');
 const RENDER = join(SKILL, 'scripts', 'render.mjs');
@@ -127,8 +127,8 @@ test('ids differ between two maps on one page, and paths are escaped', () => {
   assert.equal(r.code, 0, r.text);
   assert.match(r.html, /b1f0\[&quot;\+ a\.ts&quot;\]/);
   assert.match(r.html, /b2f0\[&quot;\+ b\.ts&quot;\]/);
-  assert.match(r.html, /<details class="card c-b1f0">/);
-  assert.match(r.html, /<details class="card c-b2f0">/);
+  assert.match(r.html, /<section class="pane c-b1f0 on">/);
+  assert.match(r.html, /<section class="pane c-b2f0 on">/);
   assert.match(r.html, /<figure class="diagram overview"><pre class="source">flowchart LR/);
   assert.match(r.html, /&lt;i&gt;\.ts/);
   assert.doesNotMatch(r.html, /<i>\.ts/);
@@ -155,28 +155,87 @@ test('a plan’s overview uses net markers', () => {
   assert.ok(!l.some((x) => x.includes('b.ts')));
 });
 
-test('a plan’s page shows one overview and a card per file with its tasks', () => {
+const dom = (html) => new JSDOM(html).window.document;
+// The text of each outline row's cells, and whether the row is untouched.
+const rows = (html) =>
+  [...dom(html).querySelectorAll('.row')].map((r) => [
+    ...[...r.children].map((c) => c.textContent),
+    r.classList.contains('same'),
+  ]);
+// Each pane's html, in order.
+const panes = (html) => [...dom(html).querySelectorAll('.pane')].map((p) => p.outerHTML);
+// The tree as lines: a folder's label or a file button's class and text, indented by its folder depth.
+const tree = (html) =>
+  [...dom(html).querySelectorAll('.tree .dir, .tree .file')].map((e) => {
+    let depth = 0;
+    for (let li = e.closest('li').parentElement.closest('li'); li; li = li.parentElement.closest('li')) depth++;
+    return `${'  '.repeat(depth)}${e.className}: ${e.textContent}`;
+  });
+
+test('a plan’s tree shows the tasks per file', () => {
   const r = render(plan([1, '- Create: `src/new.ts`, `docs/a.md`'], [2, '- Modify: `src/new.ts` (again)'], [3]));
   assert.equal(r.code, 0, r.text);
   const map = planMap(r.html);
   assert.equal(map.match(/class="diagram overview"/g).length, 1);
   assert.match(map, /pf0\[&quot;\+ new\.ts&quot;\]/);
-  assert.match(map, /<details class="card c-pf0">.*?src\/new\.ts.*?Task 1, 2/);
-  assert.match(map, /<details class="card c-pf1">.*?docs\/a\.md.*?Task 1</);
+  assert.deepEqual(
+    [...dom(map).querySelectorAll('.tree .file')].map((b) => [b.className, b.querySelector('.tasks')?.textContent]),
+    [
+      ['file f-pf0 on', 'Task 1, 2'],
+      ['file f-pf1', 'Task 1'],
+    ],
+  );
   assert.doesNotMatch(map, /Task 3/);
   assert.equal(planMap(render('# Notes\n\nNo tasks here.\n').html), '');
 });
 
-// The text of each outline row's cells, and whether the row is untouched.
-const rows = (html) =>
-  [...new JSDOM(html).window.document.querySelectorAll('.row')].map((r) => [
-    ...[...r.children].map((c) => c.textContent),
-    r.classList.contains('same'),
-  ]);
-
-test('cardsHtml lists the outline in order, marks touched symbols and greys the rest', () => {
+test('mapHtml lists every file in the tree with its marker and symbol counts, grouped by folder', () => {
   const entries = parseFilesBlock(
-    '~ a.ts  why here\n    ~ load  reads more\n    + fresh  new one\n    - get\n    ~ nowhere',
+    [
+      '~ a/b/c/x.ts  why',
+      '    + f',
+      '    ~ g',
+      '    ~ k',
+      '    - h',
+      '+ a/b/c/y.ts',
+      '> a/b/e/old.ts -> a/b/e/new.ts',
+      '- top.md',
+    ].join('\n'),
+  );
+  const html = mapHtml(entries, null, 'b1');
+  assert.match(html, /^<div class="cmap">/);
+  // a/ and a/b/ hold no file of their own, so they fold into one folder line.
+  assert.deepEqual(tree(html), [
+    'dir: a/b/',
+    '  dir: c/',
+    '    file f-b1f0 on: ~ x.ts +1 ~2 -1',
+    '    file f-b1f1: + y.ts',
+    '  dir: e/',
+    '    file f-b1f2: > new.ts',
+    'file f-b1f3: - top.md',
+  ]);
+  for (const b of dom(html).querySelectorAll('.file')) assert.equal(b.getAttribute('type'), 'button');
+});
+
+test('the bar counts files by marker', () => {
+  const map = (block) => dom(mapHtml(parseFilesBlock(block), null, 'b1'));
+  const totals = (block) => [...map(block).querySelectorAll('.bar .totals > *')].map((e) => e.textContent);
+  assert.deepEqual(totals('+ a.ts\n~ b.ts\n~ c.ts\n~ d.ts\n~ e.ts'), ['+1 new', '~4 changed', '−0 removed']);
+  assert.deepEqual(totals('~ b.ts\n- c.ts\n> x.ts -> y.ts'), ['~1 changed', '−1 removed', '>1 moved']);
+  const page = map('+ a.ts');
+  assert.deepEqual(
+    [...page.querySelectorAll('.bar .tabs > .tab')].map((t) => [t.textContent, t.getAttribute('type')]),
+    [
+      ['Files', 'button'],
+      ['Relations', 'button'],
+    ],
+  );
+  assert.ok(page.querySelector('.cmap > .relations > figure.diagram.overview > pre.source'));
+});
+
+test('mapHtml has one pane per file with the outline rows (touched marked, the rest same) and the first selected', () => {
+  const entries = parseFilesBlock(
+    '~ a.ts  why here\n    ~ load  reads more\n    + fresh  new one\n    - get\n    ~ nowhere\n> old.ts -> b.ts  moved out',
   );
   const outline = [
     ['load', 'function', 1],
@@ -184,18 +243,21 @@ test('cardsHtml lists the outline in order, marks touched symbols and greys the 
     ['Store', 'class', 7],
     ['Store.get', 'method', 8],
   ].map(([name, kind, line]) => ({ name, kind, line }));
-  const html = cardsHtml(entries, new Map([['a.ts', outline]]), 'b1');
-  assert.match(html, /^<details class="card c-b1f0"><summary>.*~.*a\.ts.*why here.*<\/summary>/);
-  assert.deepEqual(rows(html), [
+  const html = mapHtml(entries, new Map([['a.ts', outline]]), 'b1');
+  const [a, b] = panes(html);
+  assert.match(a, /^<section class="pane c-b1f0 on">.*~.*a\.ts.*why here/);
+  assert.match(b, /^<section class="pane c-b1f1">.*b\.ts.*from old\.ts.*moved out/);
+  assert.equal(dom(html).querySelectorAll('.on').length, 2, 'the first file’s button and pane');
+  assert.deepEqual(rows(a), [
     ['1', '~', 'load', 'reads more', false],
     ['5', '', 'save', '', true],
     ['7', '', 'Store', '', true],
     ['8', '-', 'Store.get', '', false],
     ['', '+', 'fresh', 'new one', false],
   ]);
-  assert.doesNotMatch(html, /no outline/);
+  assert.doesNotMatch(a, /no outline/);
   // No outline at all (not outlined): the predicted symbols only.
-  const bare = cardsHtml(entries, null, 'b1');
+  const bare = panes(mapHtml(entries, null, 'b1'))[0];
   assert.deepEqual(
     rows(bare).map((r) => r[2]),
     ['load', 'fresh', 'get', 'nowhere'],
@@ -203,11 +265,30 @@ test('cardsHtml lists the outline in order, marks touched symbols and greys the 
   assert.doesNotMatch(bare, /no outline/);
 });
 
+test('a pane lists the files it uses and is used by', () => {
+  const html = mapHtml(
+    parseFilesBlock('~ a.ts\n~ b.ts\n+ c.ts\n- d.ts\na.ts uses b.ts\nc.ts uses b.ts\nb.ts uses a.ts'),
+    null,
+    'b1',
+  );
+  const uses = panes(html).map((p) =>
+    [...dom(p).querySelectorAll('.uses')].map((u) =>
+      [...u.childNodes].map((n) => (n.nodeType === 1 ? `[${n.className}: ${n.textContent}]` : n.textContent)).join(''),
+    ),
+  );
+  assert.deepEqual(uses, [
+    ['uses [file f-b1f1: b.ts] · used by [file f-b1f1: b.ts]'],
+    ['uses [file f-b1f0: a.ts] · used by [file f-b1f0: a.ts], [file f-b1f2: c.ts]'],
+    ['uses [file f-b1f1: b.ts]'],
+    [],
+  ]);
+  for (const b of dom(html).querySelectorAll('.uses .file')) assert.equal(b.getAttribute('type'), 'button');
+});
+
 test('a file with no grammar says so', () => {
   const entries = parseFilesBlock('~ README.md\n    ~ Intro  reworded\n+ new.ts\n    + f');
   for (const outlines of [new Map(), new Map([['README.md', null]])]) {
-    const html = cardsHtml(entries, outlines, 'b1');
-    const [readme, created] = html.split('</details>');
+    const [readme, created] = panes(mapHtml(entries, outlines, 'b1'));
     assert.match(readme, /no outline for this file type/);
     assert.deepEqual(rows(readme), [['', '~', 'Intro', 'reworded', false]]);
     assert.doesNotMatch(created, /no outline/);
@@ -221,8 +302,8 @@ test('a symbol two tasks name is one row with its net marker (+ then ~ is +, + t
     { task: 'Task 1: t1', marker: '~', path: 'a.ts', symbols: symbols(['+', 'f'], ['+', 'g'], ['-', 'h']), uses: [] },
     { task: 'Task 2: t2', marker: '~', path: 'a.ts', symbols: symbols(['~', 'f'], ['-', 'g'], ['+', 'h']), uses: [] },
   ];
-  const html = cardsHtml(entries, null, 'p');
-  assert.equal(html.match(/<details/g).length, 1);
+  const html = mapHtml(entries, null, 'p');
+  assert.equal(panes(html).length, 1);
   assert.match(html, /Task 1, 2/);
   assert.deepEqual(rows(html), [
     ['', '+', 'f', '', false],
@@ -230,7 +311,7 @@ test('a symbol two tasks name is one row with its net marker (+ then ~ is +, + t
   ]);
 });
 
-test('cardFor maps a node element id of Mermaid 12.3.0’s shape to its card class, and anything else to null', () => {
+test('cardFor maps a node element id of Mermaid 12.3.0’s shape to its pane class, and anything else to null', () => {
   const html = render('# T\n').html;
   const cardFor = new Function(`${html.match(/function cardFor[^]*?\n\}/)[0]}; return cardFor;`)();
   assert.equal(cardFor({ id: 'diagram-0-flowchart-b1f0-0' }), 'c-b1f0');
@@ -267,10 +348,14 @@ test('the page’s clean pass strips script-like elements, handlers and unsafe a
       '<p onclick="x()">t</p><img src=x onerror=alert(1)><script>alert(1)</script><iframe src="https://e"></iframe>' +
         '<svg onload=x></svg><a href="javascript:x" onclick="y()">l</a><a href="&#106;avascript:x">m</a>' +
         '<form action="/x"></form><style>p{}</style><a href="https://e.com/?a=1&amp;b=2" title="k">ok</a>' +
-        '<figure class="diagram"><pre class="source">d</pre></figure><details class="card c-b1f0" open><summary>s</summary></details>',
+        '<figure class="diagram"><pre class="source">d</pre></figure>',
     ),
   ).window.document;
   for (const tag of ['script', 'iframe', 'form', 'style']) assert.equal(out.querySelector(tag), null, tag);
+  // A map comes through whole: the same elements, classes and button types.
+  const map = mapHtml(parseFilesBlock('~ src/a.ts  w\n    ~ f\n+ src/b.ts\nsrc/a.ts uses src/b.ts'), null, 'b1');
+  assert.equal(clean(map), dom(map).body.innerHTML);
+  assert.ok(dom(clean(map)).querySelector('.cmap .files .tree button.file.f-b1f0.on[type=button]'));
   assert.deepEqual(
     [...out.querySelectorAll('*')].flatMap((e) => [...e.attributes].map((a) => a.name)).filter((n) => /^on/.test(n)),
     [],
@@ -279,12 +364,10 @@ test('the page’s clean pass strips script-like elements, handlers and unsafe a
     [...out.querySelectorAll('a')].map((a) => a.getAttribute('href')),
     [null, null, 'https://e.com/?a=1&b=2'],
   );
-  assert.ok(
-    out.querySelector('figure.diagram > pre.source') && out.querySelector('details.card.c-b1f0[open] > summary'),
-  );
+  assert.ok(out.querySelector('figure.diagram > pre.source'));
 });
 
-test('the clean pass keeps only the attributes marked and the cards write, so an alt-text injection loses its id and style', () => {
+test('the clean pass keeps only the attributes marked and the maps write, so an alt-text injection loses its id and style', () => {
   const html = render('# T\n').html;
   const source = `${html.match(/const safe = [^]*?\n\};/)[0]}\n${html.match(/const KEEP = [^]*?\n\}\n/)[0]}\nreturn clean;`;
   const { document } = new JSDOM('').window;
@@ -294,15 +377,20 @@ test('the clean pass keeps only the attributes marked and the cards write, so an
     clean(
       '<img src="https://ok/x.png" alt="a" style="position:fixed;inset:0" id="plan-map" srcset="https://e/x 1x" data-k="1" x"="">' +
         '<ol start="3"><li><input type="checkbox" checked disabled></li></ol><table><tr><td align="center" class="c">1</td></tr></table>' +
-        '<details class="card c-pf0" id="x" data-k="1"><summary>s</summary><div class="row same">r</div></details>',
+        '<section class="pane c-pf0" id="x" data-k="1" hidden aria-selected="true"><div class="row same">r</div></section>' +
+        '<button type="button" class="file f-pf0" aria-pressed="true" onclick="x()">f</button>',
     ),
   ).window.document;
-  const card = out.querySelector('details.card.c-pf0');
+  const pane = out.querySelector('section.pane.c-pf0');
   assert.deepEqual(
-    [...card.attributes].map((a) => a.name),
+    [...pane.attributes].map((a) => a.name),
     ['class'],
   );
-  assert.ok(card.querySelector('.row.same'));
+  assert.ok(pane.querySelector('.row.same'));
+  assert.deepEqual(
+    [...out.querySelector('button.file').attributes].map((a) => a.name),
+    ['type', 'class'],
+  );
   const img = out.querySelector('img');
   assert.deepEqual(
     [...img.attributes].map((a) => a.name),
