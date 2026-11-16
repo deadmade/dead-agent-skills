@@ -269,13 +269,24 @@ export async function checkMarkdown(markdown, root) {
   const blocks = extractBlocks(markdown);
   const fences = taskFences(markdown);
 
+  // A plan's file map is exact, so it is checked in task order: a file an earlier task creates may be modified.
+  let plan = [];
+  let mapped = false;
+  try {
+    plan = planMap(markdown, add);
+    mapped = true;
+  } catch (e) {
+    // glance.mjs's parse says so when the document has no `### Task` headings; a spec or flow.md has no map to check.
+    if (!/^no `### Task/.test(e.message)) add('warning', 0, `no plan map: ${e.message}`);
+  }
+
   const diagrams = [];
   const written = [];
   blocks.forEach((b, i) => {
     const number = i + 1;
     if (b.kind === 'mermaid') return diagrams.push({ number, text: b.text });
-    // A task's own fence is checked with the plan map below.
-    if (fences.has(number)) return;
+    // A task's own fence is checked with the plan map, unless that failed: then it is checked like a spec block.
+    if (mapped && fences.has(number)) return;
     let entries;
     try {
       entries = parseFilesBlock(b.text);
@@ -313,14 +324,6 @@ export async function checkMarkdown(markdown, root) {
     }
   }
 
-  // A plan's file map is exact, so it is checked in task order: a file an earlier task creates may be modified.
-  let plan = [];
-  try {
-    plan = planMap(markdown, add);
-  } catch (e) {
-    // glance.mjs's parse says so when the document has no `### Task` headings; a spec or flow.md has no map to check.
-    if (!/^no `### Task/.test(e.message)) add('warning', 0, `no plan map: ${e.message}`);
-  }
   const created = new Set();
   for (const { task, marker, path, symbols } of plan) {
     if (marker === '~' && !symbols.length) add('warning', 0, `${task}: ~ ${path} has no symbols`);

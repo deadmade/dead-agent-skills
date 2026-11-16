@@ -43,7 +43,8 @@ and `files` blocks of a spec or plan, `render.mjs` writes it and its pictures as
 has every gate that shows a spec or plan run both. The checker installs Mermaid and jsdom (`package.json` and
 `package-lock.json` beside `SKILL.md`) into the user's cache folder, never into the plugin; tests that need them skip
 offline. `outline.mjs` reads each mapped file's real symbols with web-tree-sitter and the grammars (JavaScript,
-TypeScript, Rust, C#, Python), installed from the same `package.json`; a file it can't outline is the warning
-`not outlined: <reason>`, never an error. The page's script is a template literal in `render.mjs`, so each backslash in its regexes is written twice
-(`/^[\\\\/]{2}/` produces `/^[\\/]{2}/`); the tests run the produced page's `safe` and `clean` source, so check the
-output, not the template.
+TypeScript, Rust, C#, Python), installed from the same `package.json`. When the outlines can't be read at all (no npm,
+offline, install or parse failure) the checker warns `not outlined: <reason>` once, never an error; a file type with no
+grammar gets no warning, only a note in its pane. The page's script is a template literal in `render.mjs`, so each
+backslash in its regexes is written twice (`/^[\\\\/]{2}/` produces `/^[\\/]{2}/`); the tests run the produced page's
+`safe` and `clean` source, so check the output, not the template.

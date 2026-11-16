@@ -256,7 +256,7 @@ export function mapHtml(entries, outlines, prefix) {
       f.from && `<p class="from">from ${escapeHtml(f.from)}</p>`,
       f.why && `<p class="why">${escapeHtml(f.why)}</p>`,
       `<div class="outline">${rows.join('')}</div>`,
-      outlines && !outline && f.marker !== '+' && '<p class="note">no outline for this file type</p>',
+      outlines && !outline && f.marker !== '+' && '<p class="note">no outline for this file</p>',
       uses && `<p class="uses">${uses}</p>`,
       '</section>',
     ]

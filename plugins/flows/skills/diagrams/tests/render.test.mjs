@@ -327,7 +327,7 @@ test('a file with no grammar says so', () => {
   const entries = parseFilesBlock('~ README.md\n    ~ Intro  reworded\n+ new.ts\n    + f');
   for (const outlines of [new Map(), new Map([['README.md', null]])]) {
     const [readme, created] = panes(mapHtml(entries, outlines, 'b1'));
-    assert.match(readme, /no outline for this file type/);
+    assert.match(readme, /no outline for this file/);
     assert.deepEqual(rows(readme), [['', '~', 'Intro', 'reworded', false]]);
     assert.doesNotMatch(created, /no outline/);
     assert.deepEqual(rows(created), [['', '+', 'f', '', false]]);

@@ -270,6 +270,13 @@ test('files block: a Files item with no backticked path gives "no plan map"', ()
   assert.match(r.out, /warning.*no plan map/);
 });
 
+test('a malformed task fence is an error even when the plan map cannot be built', () => {
+  const r = check(plan([1, 'none', '- Modify: src/a.ts', '', fence('files', '~ src/a.ts\nmove it')]));
+  assert.match(r.out, /warning.*no plan map/);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /error: block 1.*move it/);
+});
+
 test('files block: a + path that exists, a malformed line and a backslash path are each reported', () => {
   const root = temp();
   put(root, 'here.txt');

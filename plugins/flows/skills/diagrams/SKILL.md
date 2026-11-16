@@ -38,7 +38,7 @@ Both are fenced blocks in the document's markdown, so the document stays the one
 - **File map** (` ```files `), for layout and change. One line per file: a marker, the path with `/` and no spaces,
   then two or more spaces and why the file changes. Markers: `+` new, `~` changed, `-` deleted, and
   `> old-path -> new-path` for a move. Under a file, indent the symbols that change (`+`, `~`, `-`, or
-  `> old-name -> new-name`), each with its own two-space why. An unindented `<a> uses <b>` line says file `a` uses file
+  `> name -> path`, the symbol moves to that file), each with its own two-space why. An unindented `<a> uses <b>` line says file `a` uses file
   `b`; both must be files of the block.
 
 ```files
@@ -51,8 +51,8 @@ Both are fenced blocks in the document's markdown, so the document stays the one
 plugins/example/old.mjs uses plugins/example/new.mjs
 ```
 
-Every plain `+ path` line stays valid; the why, symbols and `uses` are optional. A `~` file with no symbols gets a
-warning.
+Every plain `+ path` line stays valid; the why, symbols and `uses` are optional. Symbols are expected for every `~`
+file, not enforced: a `~` file with none gets a warning, in a plan's task too.
 
 In a spec the map is a prediction from your grounding, so the checker only warns when a path disagrees with the
 repository. A plan needs no `files` block: the renderer builds its map from the tasks' **Files** lists, and the
@@ -65,7 +65,7 @@ selected file shows its real outline with the change marked and the untouched sy
 files it uses and is used by (the up and down keys step through the files). The Relations tab draws only the files that
 relate, with their folders and labelled arrows, and lists the rest as "Not related"; a click on a file opens it in
 Files. The outlines come from tree-sitter, for JavaScript and TypeScript, Rust, C# and Python files. The checker also
-compares the symbols with them: a `+` symbol that exists, or a `~` or `-` symbol that doesn't, is a warning.
+compares the symbols with them: a `+` symbol that exists, or a `~`, `-` or `>` symbol that doesn't, is a warning.
 
 ## Steps
 
@@ -88,8 +88,9 @@ compares the symbols with them: a `+` symbol that exists, or a `~` or `-` symbol
 The first check downloads the Mermaid parser and the tree-sitter grammars into the user's cache folder (about 150 MB),
 so it can take a minute. When Mermaid cannot run (no npm, offline), the checker prints
 `warning: not parser-checked: <reason>` and checks only the rest. Pass that warning on to the user with the gate
-summary, so they know the syntax was not checked. A file it cannot outline gets `warning: not outlined: <reason>`; the
-page still renders, without that file's outline. Pass this one on too.
+summary, so they know the syntax was not checked. When the outlines cannot be read at all (no npm, offline, install or parse
+failure), it prints `warning: not outlined: <reason>` once and the page still renders, without outlines. Pass this one
+on too. A file type with no grammar gets no warning, only a note in its pane.
 
 A document you may not edit (a plan the run was given, flow.md) is rendered but never changed. If its check fails,
 show the user the failing lines as text beside the summary instead of a page, and leave the document as it is.
