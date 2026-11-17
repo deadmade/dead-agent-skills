@@ -322,7 +322,7 @@ wheels = [
 
 [[package]]
 name = "headroom-ai"
-version = "0.43.1"
+version = "0.44.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ast-grep-cli" },
@@ -338,13 +338,13 @@ dependencies = [
     { name = "tomlkit" },
     { name = "truststore" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/56/3c/596d8c291db976aa812ccc169b31b0b1e53b774c5357ea59aec60ce93709/headroom_ai-0.43.1.tar.gz", hash = "sha256:9cc0780aea3f9ba5918739b280dbe21fad6a6151f947801ad9574cb0450906c9", size = 3545870, upload-time = "2026-11-05T19:48:31.077Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0e/4e/7d86706ccca125d01ccf2ca903ebeca9f131d8b9149ebaa9e3f3a90acc0e/headroom_ai-0.44.0.tar.gz", hash = "sha256:4fa74895947905acc54564c1a24f67adefc71c2e4d1b599d723db46177f02e42", size = 3587180, upload-time = "2026-11-10T02:20:45.883Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/69/4b/04f0a326de5939a1edb435db647ba1ab91c941fe724c337491097e80eed6/headroom_ai-0.43.1-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:a35c3bbbe13b8f46abb5e7007d710ce6916c4f028d72fe9e57cba62c7fc9367a", size = 15683774, upload-time = "2026-11-05T19:48:15.206Z" },
-    { url = "https://files.pythonhosted.org/packages/fe/02/0b426d6b9506437f380047f90d95bbb3e4622f942b10a4b243cea479c8c4/headroom_ai-0.43.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:91d100d88d960b9c8110487cde6c71da635653d0b02f66acacdd6d58a5ccee65", size = 15679342, upload-time = "2026-11-05T19:48:18.497Z" },
-    { url = "https://files.pythonhosted.org/packages/e9/9b/4fae8fd0a0f3403c9c9e0a36fd5cd48bb80729d0e7713afc73cb0a4233c2/headroom_ai-0.43.1-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:12bf1314ff0b3d6f0860b41578422b77949203a93c14bec9f692c7e5b36a862f", size = 15673874, upload-time = "2026-11-05T19:48:22.982Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/88/5a473fbf45b7df0d71fe286106f6a9a7cfac704a45d4f62bd0810672ef3e/headroom_ai-0.43.1-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:2e9cd1a9aab42f60b00a9f7c8a85cf82815b51b1989179e5fdd40ddd09915d6e", size = 15851102, upload-time = "2026-11-05T19:48:26.008Z" },
-    { url = "https://files.pythonhosted.org/packages/39/ad/11228dc80b4244cef1d442df05c7be51505d132dacc75a2dfb2e0d424b2e/headroom_ai-0.43.1-cp310-abi3-win_amd64.whl", hash = "sha256:25c744b5149bf8271317c3c932206aec9e7a7054d9c11d5018e301d2711c63d3", size = 15802839, upload-time = "2026-11-05T19:48:28.677Z" },
+    { url = "https://files.pythonhosted.org/packages/37/58/cb856a12253468d2c70ea6223531a34558f57f294196f75172343833f164/headroom_ai-0.44.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:2ab9d0c7ced1b94220597b2a48996693ebc0a61dd1ce38749709ae299b3f51da", size = 15729771, upload-time = "2026-11-10T02:20:32.689Z" },
+    { url = "https://files.pythonhosted.org/packages/42/b7/1ab4da6f7a091fd1a102b5194828f9a588b6b4f11b522f38b86b125770a3/headroom_ai-0.44.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:9b084f4cd9918af2d0970450ff3e990fffc29a8220dc5e24fa0f33a4dd0359cc", size = 15722772, upload-time = "2026-11-10T02:20:35.546Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/d9/2ff01892de67c0824d024cdb0152e371bb8cd5ced8ed6c2a66ad5c5f13a4/headroom_ai-0.44.0-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:58f2e6ac736fe882f83cae0a3bffad7ce574d12587eb999d6501bffd053a75cd", size = 15716227, upload-time = "2026-11-10T02:20:37.865Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/63/39c8f6bd317714bc6a68775be5da5e15bca9e91d5f95e259bc00e6de6f7f/headroom_ai-0.44.0-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:3b5c7fd289e7d227dcd9b896615541ea9d3d37388bd97b3257fc8769c4b7ef70", size = 15897033, upload-time = "2026-11-10T02:20:40.288Z" },
+    { url = "https://files.pythonhosted.org/packages/67/05/3e61efd4aff135c053ac2d3f5fa51f1ab458758d03229656194aa7ef409e/headroom_ai-0.44.0-cp310-abi3-win_amd64.whl", hash = "sha256:a7853a0d81f1e3f6d4b00de6114791732ff458c09b8af05a06c4ae2d8c492d68", size = 15845810, upload-time = "2026-11-10T02:20:43.438Z" },
 ]
 
 [[package]]
@@ -356,7 +356,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "headroom-ai", specifier = "==0.43.1" }]
+requires-dist = [{ name = "headroom-ai", specifier = "==0.44.0" }]
 
 [[package]]
 name = "hf-xet"
