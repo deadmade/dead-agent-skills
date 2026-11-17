@@ -153,12 +153,7 @@ mod tests {
 
     /// The fake agent-browser, with a window of its own that these tests never start.
     fn fake() -> Browser {
-        let exe = std::env::current_exe().unwrap();
-        let fake = exe.parent().and_then(Path::parent).unwrap().join(format!(
-            "fake-agent-browser{}",
-            std::env::consts::EXE_SUFFIX
-        ));
-        assert!(fake.is_file(), "build the fake first: cargo build --bins");
+        let fake = crate::browser::fake_agent_browser();
         Browser::new(&fake.to_string_lossy(), Window::new(Err("unused".into())))
     }
 

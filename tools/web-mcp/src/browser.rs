@@ -849,6 +849,20 @@ fn resolve_in(name: &str, path: &OsStr, pathext: Option<&str>) -> Option<PathBuf
     std::env::split_paths(path).find_map(|d| find(&d))
 }
 
+/// The fake agent-browser that `cargo build --bins` puts in the profile folder (`target/debug`). Unit tests can't
+/// use `CARGO_BIN_EXE`, so they look in each folder above the test binary: cargo keeps that in `debug/deps/` up to
+/// Rust 1.99 and in `debug/build/<package>/<hash>/out/` from 1.100.
+#[cfg(test)]
+pub(crate) fn fake_agent_browser() -> PathBuf {
+    let name = format!("fake-agent-browser{}", std::env::consts::EXE_SUFFIX);
+    let exe = std::env::current_exe().unwrap();
+    exe.ancestors()
+        .skip(1)
+        .map(|dir| dir.join(&name))
+        .find(|bin| bin.is_file())
+        .expect("build the fake first: cargo build --bins")
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -873,13 +887,7 @@ mod tests {
     /// socket dir). The fake logs beside each call's config: the owner's in `profiles/1/calls.jsonl`, attached
     /// calls in `calls.jsonl`.
     fn fake(tag: &str) -> (PathBuf, Browser) {
-        // The fake sits next to the test binary's deps/ folder; cargo builds it for the integration tests.
-        let exe = std::env::current_exe().unwrap();
-        let bin = exe.parent().and_then(Path::parent).unwrap().join(format!(
-            "fake-agent-browser{}",
-            std::env::consts::EXE_SUFFIX
-        ));
-        assert!(bin.is_file(), "build the fake first: cargo build --bins");
+        let bin = fake_agent_browser();
         let dir =
             std::env::temp_dir().join(format!("web-mcp-browser-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
