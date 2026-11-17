@@ -23,16 +23,16 @@
       "source": "github",
       "repo": "vercel-labs/agent-browser",
       "tagPrefix": "v",
-      "version": "0.41.2",
+      "version": "0.43.0",
       "raw": true,
       "files": {
         "win32-x64": {
           "file": "agent-browser-win32-x64.exe",
-          "sha256": "c2eadee7b67e326dfff02d5dd51a16ce7673eb165699d134b3ea5f05b4a7a9d0"
+          "sha256": "ebcef5ebea93c7ccf0fe3f8c18eee908ae9174dfef8e52a3dda6f24a59f630dc"
         },
         "linux-x64": {
           "file": "agent-browser-linux-musl-x64",
-          "sha256": "5d452d57772330fe4cef9b7aeb5e7137890dde20bbb65e82b990e0bc0b35d9cd"
+          "sha256": "10b3b1d5fa8f53f7bc44273bcefaa64299ab77071bc83e75d96de5ed66025c89"
         }
       }
     },
@@ -40,17 +40,17 @@
       "source": "github",
       "repo": "astral-sh/uv",
       "tagPrefix": "",
-      "version": "0.13.7",
+      "version": "0.13.8",
       "files": {
         "win32-x64": {
           "file": "uv-x86_64-pc-windows-msvc.zip",
           "inner": "uv.exe",
-          "sha256": "0cdc5b38fe5a8168ed6a25814f5ba43c21d313dd3187314fccb37b7cec46e021"
+          "sha256": "529e78a9cec6cd7e3e014f7ecd8bda0c113969d4ed0f2efeedb85c30943325b8"
         },
         "linux-x64": {
           "file": "uv-x86_64-unknown-linux-musl.tar.gz",
           "inner": "uv-x86_64-unknown-linux-musl/uv",
-          "sha256": "287491da03f2a785c70fa75b13e1f849918c2f2b5415fe84876b8214eeb792f9"
+          "sha256": "61fb26dabc4f0cf1d050fc6c67d40e43e4fae2994af21ebc1e050b233bf2b5ed"
         }
       }
     },
