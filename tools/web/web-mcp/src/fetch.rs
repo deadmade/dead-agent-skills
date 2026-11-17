@@ -931,13 +931,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn fallback_landing_on_private_url_is_dropped() {
-        // The fake sits next to the test binary's deps/ folder; cargo builds it for the integration tests.
-        let exe = std::env::current_exe().unwrap();
-        let fake = exe.parent().and_then(Path::parent).unwrap().join(format!(
-            "fake-agent-browser{}",
-            std::env::consts::EXE_SUFFIX
-        ));
-        assert!(fake.is_file(), "build the fake first: cargo build --bins");
+        let fake = browser_core::browser::fake_agent_browser();
         let ctx = test_ctx_with(&fake.to_string_lossy());
         let url = Url::parse("http://example.com/redirect-private").unwrap();
         let dropped = browser_page(&ctx, &url, false).await.unwrap_err();

@@ -29,7 +29,8 @@ test('a release updates the workspace and all local lock entries without changin
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { spawnSync } = await import('node:child_process');
-  const { versionBumps } = await import('./release.mjs');
+  const { versionBumps, workspacePackages } = await import('./release.mjs');
+  const { parse: parseToml } = await import('smol-toml');
   const root = mkdtempSync(join(tmpdir(), 'workspace-release-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const file of new Set(versionBumps().map(([file]) => file))) {
@@ -56,16 +57,18 @@ test('a release updates the workspace and all local lock entries without changin
   assert.equal(JSON.parse(readFileSync(join(root, 'package.json'))).version, '9.8.7');
   // Cargo itself verifies inherited package versions when it is available. npm tests also run without Rust.
   if (spawnSync('cargo', ['--version']).status !== 0) return;
-  const members = ['web-mcp', 'ado-mcp', 'http-runner', 'browser-core'];
-  for (const member of members) {
-    const dir = join(root, 'tools', member);
+  // One stub per workspace member, at the member's own path and with its package name.
+  const members = parseToml(readFileSync(join(root, 'Cargo.toml'), 'utf8')).workspace.members;
+  const names = workspacePackages();
+  members.forEach((member, i) => {
+    const dir = join(root, member);
     mkdirSync(join(dir, 'src'), { recursive: true });
     writeFileSync(
       join(dir, 'Cargo.toml'),
-      `[package]\nname = "${member}"\nversion.workspace = true\nedition.workspace = true\n`,
+      `[package]\nname = "${names[i]}"\nversion.workspace = true\nedition.workspace = true\n`,
     );
     writeFileSync(join(dir, 'src/lib.rs'), '');
-  }
+  });
   // The isolated fixture has no dependencies; generate its initial resolution, then require it to stay locked.
   assert.equal(spawnSync('cargo', ['generate-lockfile', '--offline'], { cwd: root }).status, 0);
   const metadata = spawnSync('cargo', ['metadata', '--offline', '--locked', '--format-version', '1'], {
