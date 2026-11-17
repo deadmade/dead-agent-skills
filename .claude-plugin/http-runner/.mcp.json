@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "http": {
+      "command": "${user_config.binPath}"
+    }
+  }
+}
