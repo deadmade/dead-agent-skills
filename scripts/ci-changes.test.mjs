@@ -10,7 +10,19 @@ const all = ['web-mcp', 'ado-mcp', 'http-runner'];
 
 test('full runs select exactly the remaining binaries and workspace packages', () => {
   assert.deepEqual(selectChecks([], true).binaries, all);
-  assert.deepEqual(selectChecks([], true).packages, ['web-mcp', 'ado-mcp', 'http-runner']);
+  assert.deepEqual(selectChecks([], true).packages, ['web-mcp', 'ado-mcp', 'http-runner', 'browser-core']);
+});
+
+test('a browser-core change selects web-mcp, and browser-core is a package, never a binary', () => {
+  assert.deepEqual(selectChecks(['tools/web/browser-core/src/browser.rs']), {
+    node: false,
+    skills: false,
+    rust: true,
+    binaries: ['web-mcp'],
+    packages: ['web-mcp', 'browser-core'],
+  });
+  assert.equal(selectChecks(['tools/web/browser-core/Cargo.toml']).node, true);
+  assert.ok(!selectChecks([], true).binaries.includes('browser-core'));
 });
 
 test('an ado implementation change selects only ado checks', () => {
@@ -25,9 +37,9 @@ test('an ado implementation change selects only ado checks', () => {
 
 test('each crate selects its checks', () => {
   for (const crate of all) {
-    const result = selectChecks([`tools/${crate}/src/lib.rs`]);
+    const result = selectChecks([`tools/${crate === 'web-mcp' ? 'web/web-mcp' : crate}/src/lib.rs`]);
     assert.deepEqual(result.binaries, [crate]);
-    assert.deepEqual(result.packages, [crate]);
+    assert.deepEqual(result.packages, crate === 'web-mcp' ? [crate, 'browser-core'] : [crate]);
   }
 });
 
@@ -88,12 +100,12 @@ test('docs skip expensive checks, but root readmes and crate manifests get consi
   assert.equal(selectChecks(['docs/adr/example.md']).node, false);
   assert.equal(selectChecks(['README.md']).node, true);
   assert.equal(selectChecks(['tools/ado-mcp/Cargo.toml']).node, true);
-  assert.equal(selectChecks(['tools/web-mcp/Cargo.lock']).node, true);
+  assert.equal(selectChecks(['tools/web/web-mcp/Cargo.lock']).node, true);
 });
 
 test('mixed changes take a deterministic union', () => {
   assert.deepEqual(
-    selectChecks(['tools/ado-mcp/src/wi.rs', 'tools/web-mcp/src/lib.rs', 'tools/ado-mcp/tests/mcp.rs']).binaries,
+    selectChecks(['tools/ado-mcp/src/wi.rs', 'tools/web/web-mcp/src/lib.rs', 'tools/ado-mcp/tests/mcp.rs']).binaries,
     ['web-mcp', 'ado-mcp'],
   );
 });
@@ -103,7 +115,7 @@ test('manual runs and initial pushes select all; PR and push use their complete 
   assert.equal(changedPaths('push', { before: '0'.repeat(40) }), null);
   const git = (expected) => (args) => {
     assert.deepEqual(args, ['diff', '--name-only', '--no-renames', '-z', expected, '--']);
-    return 'tools/ado-mcp/a b.rs\0tools/web-mcp/deleted.rs\0';
+    return 'tools/ado-mcp/a b.rs\0tools/web/web-mcp/deleted.rs\0';
   };
   assert.equal(
     changedPaths('pull_request', { pull_request: { base: { sha: 'base' }, head: { sha: 'head' } } }, git('base...head'))
@@ -157,7 +169,7 @@ test('PR 122 selects only web-mcp', () => {
     skills: true,
     rust: true,
     binaries: ['web-mcp'],
-    packages: ['web-mcp'],
+    packages: ['web-mcp', 'browser-core'],
   });
 });
 
@@ -168,7 +180,7 @@ for (const path of ['Cargo.toml', 'flake.nix']) {
 }
 
 test('the web API slug participates in Node repository checks', () => {
-  assert.equal(selectChecks(['tools/web-mcp/src/api.rs']).node, true);
+  assert.equal(selectChecks(['tools/web/web-mcp/src/api.rs']).node, true);
 });
 
 test("test files and fixtures route like their component, at today's path and in its tests/ folder", () => {

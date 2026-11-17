@@ -1,8 +1,8 @@
 # web-mcp
 
-`plugins/shared/web-mcp/` and `tools/web-mcp/`.
+`plugins/shared/web-mcp/` and `tools/web/web-mcp/`.
 
-`plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web-mcp/`) with `search`, `fetch`, `browser`, `rows` and
+`plugins/shared/web-mcp/`: a stdio MCP server (Rust, `tools/web/web-mcp/`) with `search`, `fetch`, `browser`, `rows` and
 `lookup`, built for Windows and Linux x64 only (`crates-build.yml`, `targets` in `assets/tools.json`; no macOS or ARM
 builds); the installer downloads it and sets `binPath`. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
 feature) showed embeddings don't lift recall over BM25 on BEIR, so none ship.
@@ -13,6 +13,10 @@ One browser window per server, every engine, `browser` session and fetch fallbac
 `docs/solutions/click-and-press-reach-nothing-in-a-hidden-tab.md`, the engine and daemon timings in
 `docs/features/web-mcp-search/findings.md`, and specific bugs in `docs/solutions/` (Google's `/goto` links, a hidden
 tab's `click`/`press`, agent-browser's install and a Windows Chrome quirk).
+
+The browser, window and profile code (the agent-browser driver, the one window, the profile slots and the cookie
+extension download) lives in the `tools/web/browser-core/` library crate, which web-mcp depends on
+(`docs/components/browser-core.md`). The search policy (engines, their turns, rests and deadlines) stays here.
 
 `rows` opens its pages as a tab of that window too, holds a 1 s gap per host, and its group detection is tested on
 captured pages in `tests/fixtures/rows/` (`docs/adr/0013-rows-tool-and-shop-skill.md`). Its tree walk is bounded by a

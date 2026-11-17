@@ -5,13 +5,13 @@
   "docs/solutions/click-and-press-reach-nothing-in-a-hidden-tab.md",
   "docs/solutions/google-results-are-goto-links-that-resolve-only-a-few-times.md",
   "plugins/shared/web-mcp/README.md",
-  "tools/web-mcp/src/api.rs",
-  "tools/web-mcp/src/browser.rs",
-  "tools/web-mcp/src/engines/google.rs",
-  "tools/web-mcp/src/fetch.rs",
-  "tools/web-mcp/src/search.rs",
-  "tools/web-mcp/tests/bin/fake_agent_browser.rs",
-  "tools/web-mcp/tests/browser.rs",
-  "tools/web-mcp/tests/common/mod.rs",
-  "tools/web-mcp/tests/search.rs"
+  "tools/web/web-mcp/src/api.rs",
+  "tools/web/web-mcp/src/browser.rs",
+  "tools/web/web-mcp/src/engines/google.rs",
+  "tools/web/web-mcp/src/fetch.rs",
+  "tools/web/web-mcp/src/search.rs",
+  "tools/web/web-mcp/tests/bin/fake_agent_browser.rs",
+  "tools/web/web-mcp/tests/browser.rs",
+  "tools/web/web-mcp/tests/common/mod.rs",
+  "tools/web/web-mcp/tests/search.rs"
 ]

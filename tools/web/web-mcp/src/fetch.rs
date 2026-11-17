@@ -807,11 +807,11 @@ pub(crate) mod tests {
         std::fs::create_dir_all(&ext).unwrap();
         std::fs::write(ext.join("manifest.json"), "{}").unwrap();
         std::fs::write(search.join("browser"), "").unwrap();
-        let profiles = crate::profile::Profiles::new(Some(search.clone()))
+        let profiles = browser_core::profile::Profiles::new(Some(search.clone()))
             .map(|p| Arc::new(p.with_chrome(search.join("browser"))));
-        let browser = crate::browser::Browser::new(
+        let browser = browser_core::browser::Browser::new(
             agent_browser,
-            crate::window::Window::new(profiles.clone()),
+            browser_core::window::Window::new(profiles.clone()),
         );
         let project = std::env::temp_dir().join(format!(
             "web-mcp-fetch-unit-{}-{}-{}",
@@ -860,6 +860,7 @@ pub(crate) mod tests {
             inflight: Inflight::default(),
             lookup: crate::lookup::Cache::default(),
             browser,
+            turns: crate::engines::Turns::new(),
         })
     }
 
@@ -930,7 +931,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn fallback_landing_on_private_url_is_dropped() {
-        let fake = crate::browser::fake_agent_browser();
+        let fake = browser_core::browser::fake_agent_browser();
         let ctx = test_ctx_with(&fake.to_string_lossy());
         let url = Url::parse("http://example.com/redirect-private").unwrap();
         let dropped = browser_page(&ctx, &url, false).await.unwrap_err();

@@ -29,7 +29,7 @@ they pull is archived in `.web/` in the project before Claude sees it.
   pagination, and keeps a 1 s gap between its pages to one host (a `fetch` to that host right after it waits for the
   rest). The page is archived under `.web/`. With no group found it gives the first heading, the text length and two
   hints: try `item`, or the page may still be loading. It does not detect bot walls. Detection is tested on captured pages
-  in `tools/web-mcp/tests/fixtures/rows/`.
+  in `tools/web/web-mcp/tests/fixtures/rows/`.
 - `lookup { kind, target, record?, at?, ecosystem? }`: one record about a target from public sources, each reply kept
   as the source sent it. `dns`: Cloudflare DNS over HTTPS (`record` such as MX or TXT; default A, AAAA, CNAME, MX, NS and
   TXT). `whois`: RDAP for a domain, IP or AS number, from the registry IANA's bootstrap files name. `certs`: crt.sh

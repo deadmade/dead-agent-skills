@@ -3,7 +3,7 @@
 - **Seen:** 2026-11-09, the fix check of the shopping-search review. 3,000 nested `div`s around one 3.9 MB text node
   (spaces, one long word or newlines) took 23 to 88 s in a debug build, after a node-count budget and a 400-character
   cap on each item's text were already in place. Before the cap, 3,000 nested `div`s around 200 KB of text took 25 s.
-- **Cause:** `text_of` (`tools/web-mcp/src/rows.rs`) runs once per child of every parent, so a text node is read once
+- **Cause:** `text_of` (`tools/web/web-mcp/src/rows.rs`) runs once per child of every parent, so a text node is read once
   per ancestor. A budget of nodes visited bounds the walk, and a cap on the output bounds the result, but neither
   bounds the cost of reading one node: `NodeRef::text()` copies it and `split_whitespace` scans all of it. Two traps
   came with it: a cap tested with `==` is stepped over when the separator pushes the count past it, and html5ever

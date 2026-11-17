@@ -421,6 +421,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "browser-core"
+version = "0.6.0"
+dependencies = [
+ "futures",
+ "jiff",
+ "libc",
+ "reqwest",
+ "rustls",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "url",
+ "windows-sys 0.61.2",
+ "zip",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4657,6 +4674,7 @@ version = "0.6.0"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
+ "browser-core",
  "criterion",
  "dom_query",
  "dom_smoothie",
@@ -4664,7 +4682,6 @@ dependencies = [
  "htmd",
  "image",
  "jiff",
- "libc",
  "model2vec-rs",
  "pdf_oxide",
  "quick-xml",
@@ -4677,8 +4694,6 @@ dependencies = [
  "tantivy",
  "tokio",
  "url",
- "windows-sys 0.61.2",
- "zip",
 ]
 
 [[package]]

@@ -69,7 +69,7 @@ test('releases require plugin/tool changes or shared build inputs', () => {
     'plugins/default/hooks/notify.mjs',
     'plugins/catalog.json',
     'tools/ado-mcp/src/wi.rs',
-    'tools/web-mcp/src/search.rs',
+    'tools/web/web-mcp/src/search.rs',
     'tools/installer/install.ts',
     'tools/harness-compiler/src/cli.ts',
     'Cargo.toml',
@@ -100,11 +100,11 @@ test('releases require plugin/tool changes or shared build inputs', () => {
   assert.equal(triggers(maintenance), false);
   assert.equal(triggers([...maintenance, 'tools/ado-mcp/src/wi.rs']), true);
   const testsOnly = [
-    'tools/web-mcp/tests/search.rs',
+    'tools/web/web-mcp/tests/search.rs',
     'tools/ado-mcp/tests/fixtures/pr-threads.json',
     'plugins/flows/skills/diagrams/tests/check.test.mjs',
     'plugins/opt-in/headroom-trim/server/tests/test_server.py',
   ];
   for (const path of testsOnly) assert.equal(triggers([path]), false, path);
-  assert.equal(triggers([...testsOnly, 'tools/web-mcp/src/search.rs']), true);
+  assert.equal(triggers([...testsOnly, 'tools/web/web-mcp/src/search.rs']), true);
 });

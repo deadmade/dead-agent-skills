@@ -1,9 +1,10 @@
 //! The search folder: the browser and cookie extension the window runs with, the profile slots (one
 //! persistent browser profile per web-mcp process, held under a lock, with its own consent marks), the config files,
-//! the engines' turns, and their rests, shared by every web-mcp process on the machine.
+//! and the rests, shared by every web-mcp process on the machine. Marks are keyed by a name the caller picks.
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
+use std::fmt::Write as _;
 use std::fs::{File, TryLockError};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -13,19 +14,14 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use jiff::Timestamp;
+use sha2::{Digest, Sha256};
 use tokio::process::Command;
 
 use crate::browser::Browser;
-use crate::engines::Engine;
 
-pub const EXTENSION_URL: &str = "https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies/releases/download/v1.1.9/ISDCAC-chrome-source.zip";
-pub const EXTENSION_SHA256: &str =
-    "8f70ab947cb2d274f4022a970f5dd3cecd8ec02b060e05187bef9ee3cb18bbcb";
+const EXTENSION_URL: &str = "https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies/releases/download/v1.1.9/ISDCAC-chrome-source.zip";
+const EXTENSION_SHA256: &str = "8f70ab947cb2d274f4022a970f5dd3cecd8ec02b060e05187bef9ee3cb18bbcb";
 
-/// How long a blocked engine sits out.
-pub const REST: Duration = Duration::from_mins(30);
-/// Each engine's whole budget in a search, from the moment it wins its turn.
-pub const ENGINE_DEADLINE: Duration = Duration::from_secs(10);
 /// The cookie extension download's budget.
 const DOWNLOAD: Duration = Duration::from_secs(20);
 /// The zip is under 2 MiB.
@@ -38,8 +34,8 @@ const DOWNLOAD_MAX: usize = 2 << 20;
 /// # Errors
 /// When the hash isn't `expected_sha256`, an entry is a symlink or would land outside the folder (nothing is
 /// written then), or writing fails.
-pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, String> {
-    let sha = crate::archive::sha(zip);
+fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, String> {
+    let sha = sha(zip);
     if !sha.eq_ignore_ascii_case(expected_sha256) {
         return Err(format!("its sha256 is {sha}, not {expected_sha256}"));
     }
@@ -91,32 +87,29 @@ pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, 
 
 /// What the window's owner config needs, found when the window starts.
 #[derive(Debug)]
-pub struct Ready {
+pub(crate) struct Ready {
     /// The browser agent-browser launches (`executablePath`).
     pub chrome: PathBuf,
     /// The unpacked cookie extension.
     pub extension: PathBuf,
 }
 
-/// The search folder: per engine `<engine>/rest`, plus the shared `extensions/` and, for Helium,
+/// The search folder: per name `<name>/rest`, plus the shared `extensions/` and, for Helium,
 /// `helium-wrap.sh`; the profile slots `profiles/<n>/` (`lock`, `owner`, `agent-browser.json`, `profile/`,
-/// `<engine>/consent-seen`) and the attached calls' `attach.json`.
+/// `<name>/consent-seen`) and the attached calls' `attach.json`.
 pub struct Profiles {
     dir: PathBuf,
     /// For the cookie extension download: https only, at most 5 redirects (GitHub redirects release assets).
     http: reqwest::Client,
     /// `profiles/<n>` and its held lock, taken on the first `slot()` and kept until exit.
     slot: OnceLock<(PathBuf, File)>,
-    /// One turn per engine, indexed by its discriminant: an engine's tab serves one search at a time. Each holds the
-    /// engine's last query without `since` that parsed as results, in this process.
-    turns: [tokio::sync::Mutex<Option<String>>; Engine::ALL.len()],
-    /// The browser `ready()` uses in tests instead of looking for one.
-    #[cfg(test)]
+    /// The browser `ready()` uses in tests (this crate's, and with `test-support` another's) instead of looking for one.
+    #[cfg(any(test, feature = "test-support"))]
     chrome: Option<PathBuf>,
 }
 
 impl Profiles {
-    /// `dir` is `Config::search_dir`.
+    /// `dir` is the search folder (web-mcp passes `WEB_MCP_SEARCH_DIR`).
     ///
     /// # Errors
     /// When there is no `dir` or the HTTP client can't be built.
@@ -134,29 +127,24 @@ impl Profiles {
             dir,
             http,
             slot: OnceLock::new(),
-            turns: std::array::from_fn(|_| tokio::sync::Mutex::new(None)),
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             chrome: None,
         })
     }
 
     /// `ready()` then uses `chrome` instead of `WEB_MCP_CHROME`, HOME and PATH.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
+    #[must_use]
     pub fn with_chrome(mut self, chrome: PathBuf) -> Self {
         self.chrome = Some(chrome);
         self
-    }
-
-    /// The search folder.
-    pub fn dir(&self) -> &Path {
-        &self.dir
     }
 
     /// This process's profile slot: the first `profiles/<n>` (n = 1, 2, …) whose lock is free, held until exit.
     ///
     /// # Errors
     /// When a lock can't be opened.
-    pub fn slot(&self) -> Result<&Path, String> {
+    pub(crate) fn slot(&self) -> Result<&Path, String> {
         if let Some((slot, _)) = self.slot.get() {
             return Ok(slot);
         }
@@ -181,13 +169,13 @@ impl Profiles {
     }
 
     /// The owner session named in `<slot>/owner`, left by the slot's last holder.
-    pub fn previous_owner(&self) -> Option<String> {
+    pub(crate) fn previous_owner(&self) -> Option<String> {
         let owner = std::fs::read_to_string(self.slot().ok()?.join("owner")).ok()?;
         Some(owner.trim().to_owned()).filter(|o| !o.is_empty())
     }
 
     /// Names `session` in `<slot>/owner`. Best effort: a lost name only leaves an old owner's Chrome running.
-    pub fn set_owner(&self, session: &str) {
+    pub(crate) fn set_owner(&self, session: &str) {
         if let Ok(slot) = self.slot() {
             let _ = write_if_changed(&slot.join("owner"), session.as_bytes(), false);
         }
@@ -197,7 +185,7 @@ impl Profiles {
     ///
     /// # Errors
     /// When there is no slot, a path isn't UTF-8 or it can't be written.
-    pub fn owner_config(&self, r: &Ready) -> Result<PathBuf, String> {
+    pub(crate) fn owner_config(&self, r: &Ready) -> Result<PathBuf, String> {
         let slot = self.slot()?;
         let json = serde_json::json!({
             "profile": utf8(&slot.join("profile"))?,
@@ -215,31 +203,19 @@ impl Profiles {
     ///
     /// # Errors
     /// When it can't be written.
-    pub fn attach_config(&self) -> Result<PathBuf, String> {
+    pub(crate) fn attach_config(&self) -> Result<PathBuf, String> {
         write_json(
             &self.dir.join("attach.json"),
             &serde_json::json!({"idleTimeout": "3600s"}),
         )
     }
 
-    /// The engine's turn in this process, waited for until `until`; dropping it ends the turn. It holds the engine's
-    /// last query without `since` that parsed as results, in this process.
-    pub async fn turn(
-        &self,
-        e: Engine,
-        until: Instant,
-    ) -> Option<tokio::sync::MutexGuard<'_, Option<String>>> {
-        tokio::time::timeout_at(until.into(), self.turns[e as usize].lock())
-            .await
-            .ok()
-    }
-
-    /// The engine's consent mark: per slot once one is held (each has its own cookies), machine-wide before.
-    fn consent_mark(&self, e: Engine) -> PathBuf {
+    /// The consent mark of `name`: per slot once one is held (each has its own cookies), machine-wide before.
+    fn consent_mark(&self, name: &str) -> PathBuf {
         self.slot
             .get()
             .map_or(self.dir.as_path(), |(slot, _)| slot)
-            .join(e.name())
+            .join(name)
             .join("consent-seen")
     }
 
@@ -248,8 +224,8 @@ impl Profiles {
     ///
     /// # Errors
     /// When the search folder isn't the user's, no browser is found or the extension can't be had.
-    pub async fn ready(&self) -> Result<Ready, String> {
-        #[cfg(test)]
+    pub(crate) async fn ready(&self) -> Result<Ready, String> {
+        #[cfg(any(test, feature = "test-support"))]
         if let Some(chrome) = &self.chrome {
             return self
                 .ready_with(Some(chrome.clone()), None, OsStr::new(""))
@@ -344,9 +320,8 @@ impl Profiles {
                 .await
                 .and_then(reqwest::Response::error_for_status)
                 .map_err(|e| e.to_string())?;
-            crate::fetch::read_capped(resp, DOWNLOAD_MAX)
-                .await
-                .map_err(|e| e.to_string())?
+            read_capped(resp, DOWNLOAD_MAX)
+                .await?
                 .ok_or_else(|| "it is over 2 MiB".to_owned())
         };
         let zip = tokio::time::timeout(DOWNLOAD, get)
@@ -356,36 +331,59 @@ impl Profiles {
         unpack(&zip, EXTENSION_SHA256, &extensions).map_err(|e| why(&e))
     }
 
-    /// When the engine's rest ends, if it is resting at `now`.
-    pub fn resting(&self, e: Engine, now: Timestamp) -> Option<Timestamp> {
-        let rest = std::fs::read_to_string(self.dir.join(e.name()).join("rest")).ok()?;
+    /// When the rest of `name` ends, if it is resting at `now`.
+    pub fn resting(&self, name: &str, now: Timestamp) -> Option<Timestamp> {
+        let rest = std::fs::read_to_string(self.dir.join(name).join("rest")).ok()?;
         let until: Timestamp = rest.trim().parse().ok()?;
         (until > now).then_some(until)
     }
 
-    /// Rests the engine until `until`, for every web-mcp process on the machine.
-    pub fn rest(&self, e: Engine, until: Timestamp) {
-        // Best effort: an engine that can't rest is only asked again.
-        let path = self.dir.join(e.name()).join("rest");
+    /// Rests `name` until `until`, for every web-mcp process on the machine.
+    pub fn rest(&self, name: &str, until: Timestamp) {
+        // Best effort: a name that can't rest is only asked again.
+        let path = self.dir.join(name).join("rest");
         let _ = write_if_changed(&path, until.to_string().as_bytes(), false);
     }
 
-    /// Whether the last search of the engine met a consent page.
-    pub fn consent_seen(&self, e: Engine) -> bool {
-        self.consent_mark(e).exists()
+    /// Whether the last search under `name` met a consent page.
+    pub fn consent_seen(&self, name: &str) -> bool {
+        self.consent_mark(name).exists()
     }
 
-    /// Marks (or clears) that the engine met a consent page, in the mark `consent_seen` reads. The caller holds the
-    /// engine's turn.
-    pub fn set_consent_seen(&self, e: Engine, seen: bool) {
+    /// Marks (or clears) that `name` met a consent page, in the mark `consent_seen` reads.
+    pub fn set_consent_seen(&self, name: &str, seen: bool) {
         // Best effort, like `rest`: a lost mark costs one more `consent (clearing)`.
-        let path = self.consent_mark(e);
+        let path = self.consent_mark(name);
         if seen {
             let _ = write_if_changed(&path, b"", false);
         } else {
             let _ = std::fs::remove_file(&path);
         }
     }
+}
+
+fn sha(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .fold(String::with_capacity(64), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
+}
+
+/// The body of `resp`, or `None` when it is over `max` bytes.
+async fn read_capped(mut resp: reqwest::Response, max: usize) -> Result<Option<Vec<u8>>, String> {
+    if resp.content_length().is_some_and(|n| n > max as u64) {
+        return Ok(None);
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
+        if body.len() + chunk.len() > max {
+            return Ok(None);
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(Some(body))
 }
 
 /// A path for a config file or script: written lossily, it would name another file.
@@ -584,7 +582,7 @@ mod tests {
     fn broken_existing_version_is_replaced() {
         let dir = tempdir("broken");
         let zip = zip_of(&[("manifest.json", "{}")], None);
-        let sha = crate::archive::sha(&zip);
+        let sha = sha(&zip);
         let target = dir.join(format!("idcac-{}", &sha[..8]));
         std::fs::create_dir_all(target.join("half")).unwrap();
         assert_eq!(unpack(&zip, &sha, &dir).unwrap(), target);
@@ -654,7 +652,7 @@ mod tests {
         .iter()
         .enumerate()
         {
-            let sha = crate::archive::sha(zip);
+            let sha = sha(zip);
             let got = unpack(zip, &sha, &dir);
             assert!(got.is_err(), "zip {i}: {got:?}");
             assert_eq!(files_in(&dir), Vec::<String>::new());
@@ -666,7 +664,7 @@ mod tests {
     fn unpack_keeps_existing_version() {
         let dir = tempdir("keep");
         let zip = zip_of(&[("manifest.json", "{\"v\":1}"), ("sub/a.js", "a")], None);
-        let sha = crate::archive::sha(&zip);
+        let sha = sha(&zip);
         let got = unpack(&zip, &sha, &dir).unwrap();
         assert_eq!(got, dir.join(format!("idcac-{}", &sha[..8])));
         assert_eq!(std::fs::read_to_string(got.join("sub/a.js")).unwrap(), "a");
@@ -684,12 +682,12 @@ mod tests {
         let dir = tempdir("rest");
         let p = profiles(&dir);
         let now = Timestamp::now();
-        assert_eq!(p.resting(Engine::Google, now), None);
-        let until = now + REST;
-        p.rest(Engine::Google, until);
-        assert_eq!(p.resting(Engine::Google, now), Some(until));
-        assert_eq!(p.resting(Engine::Bing, now), None);
-        assert_eq!(p.resting(Engine::Google, until), None);
+        assert_eq!(p.resting("google", now), None);
+        let until = now + Duration::from_mins(30);
+        p.rest("google", until);
+        assert_eq!(p.resting("google", now), Some(until));
+        assert_eq!(p.resting("bing", now), None);
+        assert_eq!(p.resting("google", until), None);
     }
 
     #[test]
@@ -698,7 +696,7 @@ mod tests {
         let p = profiles(&dir);
         std::fs::create_dir_all(dir.join("google")).unwrap();
         std::fs::write(dir.join("google/rest"), "soon").unwrap();
-        assert_eq!(p.resting(Engine::Google, Timestamp::now()), None);
+        assert_eq!(p.resting("google", Timestamp::now()), None);
     }
 
     #[test]
@@ -723,49 +721,24 @@ mod tests {
         assert_eq!(c.slot().unwrap(), dir.join("profiles").join("1"));
     }
 
-    #[tokio::test]
-    async fn turn_waits_then_gives_up() {
-        let dir = tempdir("turn");
-        let p = profiles(&dir);
-        let held = p.turn(Engine::Scholar, Instant::now()).await.unwrap();
-        let t = Instant::now();
-        assert!(
-            p.turn(Engine::Scholar, t + Duration::from_millis(300))
-                .await
-                .is_none()
-        );
-        assert!(t.elapsed() >= Duration::from_millis(300));
-        // Another engine's turn is its own.
-        assert!(p.turn(Engine::Brave, Instant::now()).await.is_some());
-        let release = async {
-            tokio::time::sleep(Duration::from_millis(200)).await;
-            drop(held);
-        };
-        let (got, ()) = tokio::join!(
-            p.turn(Engine::Scholar, Instant::now() + Duration::from_secs(3)),
-            release
-        );
-        assert!(got.is_some());
-    }
-
     #[test]
     fn consent_mark_is_per_slot() {
         let dir = tempdir("consent");
         let a = profiles(&dir);
         let b = profiles(&dir);
         // Before a slot is held: the old machine-wide mark.
-        a.set_consent_seen(Engine::Google, true);
+        a.set_consent_seen("google", true);
         assert!(dir.join("google").join("consent-seen").is_file());
-        assert!(a.consent_seen(Engine::Google));
+        assert!(a.consent_seen("google"));
         let slot = a.slot().unwrap().to_owned();
-        assert!(!a.consent_seen(Engine::Google));
-        a.set_consent_seen(Engine::Google, true);
+        assert!(!a.consent_seen("google"));
+        a.set_consent_seen("google", true);
         assert!(slot.join("google").join("consent-seen").is_file());
-        assert!(a.consent_seen(Engine::Google));
+        assert!(a.consent_seen("google"));
         b.slot().unwrap();
-        assert!(!b.consent_seen(Engine::Google));
-        a.set_consent_seen(Engine::Google, false);
-        assert!(!a.consent_seen(Engine::Google));
+        assert!(!b.consent_seen("google"));
+        a.set_consent_seen("google", false);
+        assert!(!a.consent_seen("google"));
         assert!(dir.join("google").join("consent-seen").is_file());
     }
 
@@ -827,7 +800,7 @@ mod tests {
         let p = profiles(&dir).with_chrome(chrome.clone());
         let r = p.ready().await.unwrap();
         assert_eq!(r.chrome, chrome);
-        assert_eq!(p.dir(), dir);
+        assert_eq!(p.dir, dir);
     }
 
     /// A dummy executable printing `out` for `--version`, exiting with `code`.

@@ -558,6 +558,8 @@ fn reserved_and_invalid_session_names_are_rejected() {
         "a b",
         "../x",
         "web-mcp-fetch-1-0",
+        "search-google",
+        "web-mcp-search-x",
         "window",
         too_long.as_str(),
     ] {

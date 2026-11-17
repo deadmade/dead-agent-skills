@@ -17,7 +17,8 @@ updates:
     groups:
       npm:
         patterns: ['*']
-  # The diagrams skill's checker: Mermaid and jsdom, installed into a cache folder at run time, never into the plugin.
+  # The diagrams skill's checker: Mermaid, jsdom, web-tree-sitter and the JavaScript, TypeScript, Rust, C# and Python
+  # grammars, installed into a cache folder at run time, never into the plugin.
   - package-ecosystem: npm
     directory: /plugins/flows/skills/diagrams
     schedule:
