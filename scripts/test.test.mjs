@@ -27,10 +27,11 @@ const SH =
 const CMD =
   '@echo off\r\n>> "%FAKE_LOG%" echo %cd% :: %* :: %UV_PROJECT_ENVIRONMENT% %PYTHONDONTWRITEBYTECODE%\r\nif exist fail exit /b 1\r\nexit /b 0\r\n';
 // The fake claude logs `<cwd> :: <args> :: <its hooks/ and tests/ test files>` and fails when `fail` is in its cwd.
+// The cmd loop variable is %%x: cmd would also expand a %%f inside %%files%%.
 const CLAUDE_SH =
   '#!/bin/sh\nfor f in hooks/*.test.ts* tests/*.test.ts*; do [ -f "$f" ] && files="$files $f"; done\necho "$(pwd) :: $* ::$files" >> "$FAKE_LOG"\n[ -f fail ] && exit 1\nexit 0\n';
 const CLAUDE_CMD =
-  '@echo off\r\nset files=\r\nfor %%f in (hooks\\*.test.ts* tests\\*.test.ts*) do call set files=%%files%% %%f\r\n>> "%FAKE_LOG%" echo %cd% :: %* ::%files%\r\nif exist fail exit /b 1\r\nexit /b 0\r\n';
+  '@echo off\r\nset files=\r\nfor %%x in (hooks\\*.test.ts* tests\\*.test.ts*) do call set files=%%files%% %%x\r\n>> "%FAKE_LOG%" echo %cd% :: %* ::%files%\r\nif exist fail exit /b 1\r\nexit /b 0\r\n';
 const REPO_STUB = `import { appendFileSync } from 'node:fs';
 appendFileSync(process.env.FAKE_LOG, 'check-repo :: ' + process.argv.slice(2).join(' ') + '\\n');
 process.exit(Number(process.env.REPO_EXIT ?? 0));
