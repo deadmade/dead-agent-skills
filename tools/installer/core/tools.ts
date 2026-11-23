@@ -20,11 +20,11 @@ interface GithubTool {
   raw?: boolean;
   files: Record<string, { file: string; inner?: string; sha256: string }>;
 }
-// A Python package that `uv tool install --upgrade` installs, unpinned. extras: comma-separated.
+// A Python package that `uv tool install --upgrade` installs, unpinned. python: the version uv runs it with.
 interface PypiTool {
   source: 'pypi';
   package: string;
-  extras: string;
+  python?: string;
 }
 export type Tool = ReleaseTool | GithubTool | PypiTool;
 
@@ -117,5 +117,5 @@ export function toolOfPlugin(plugin: string): [string, ReleaseTool] {
 export function pypiSpec(name: string) {
   const tool = TOOLS.tools[name];
   if (tool?.source !== 'pypi') throw new Error(`${name} is not a pypi tool`);
-  return `${tool.package}[${tool.extras}]`;
+  return tool.package;
 }

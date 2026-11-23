@@ -14,9 +14,8 @@ test('missing binaries per OS', () => {
   assert.ok(!missingBinaries('linux', ['dead-skills'], none).some((r) => r.binary === 'nixd'));
   const win = missingBinaries('win32', ['nix-lsp'], none);
   assert.ok(win.some((r) => r.binary === 'nixd' && /deselect/.test(r.command)));
-  const nix = missingBinaries('linux', ['nix-lsp', 'graphify'], none);
+  const nix = missingBinaries('linux', ['nix-lsp'], none);
   assert.ok(nix.some((r) => r.binary === 'nixd' && /nixd/.test(r.command)));
-  assert.ok(nix.some((r) => r.binary === 'graphify'));
   assert.ok(!missingBinaries('linux', ['headroom-trim'], none).some((r) => r.binary === 'uv'));
   assert.ok(!missingBinaries('linux', ['web-mcp'], none).some((r) => r.binary === 'agent-browser'));
   assert.deepEqual(
@@ -66,9 +65,4 @@ test('windowProblem: no browser, no display on Linux, and the cases that are fin
   assert.equal(windowProblem({ ...ok, display: true }), undefined);
   assert.equal(windowProblem({ ...ok, xvfb: true }), undefined);
   assert.equal(windowProblem({ ...ok, platform: 'win32' }), undefined);
-});
-
-test('graphify is installed through uv tool install with its extras', () => {
-  const r = missingBinaries('win32', ['graphify'], () => false).find((m) => m.binary === 'graphify');
-  assert.equal(r?.command, 'uv tool install "graphifyy[sql,pdf,office,watch,leiden]"');
 });

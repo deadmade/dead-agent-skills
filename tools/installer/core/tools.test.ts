@@ -85,7 +85,15 @@ test('toolAdvice, toolOfPlugin and pypiSpec', () => {
   assert.match(toolAdvice('web-mcp'), /cargo build --release --locked -p web-mcp --bin web-mcp/);
   assert.match(toolAdvice('ado-mcp'), /\/plugin configure mcp-azure/);
   assert.deepEqual(toolOfPlugin('mcp-azure'), ['ado-mcp', { source: 'release', plugin: 'mcp-azure', key: 'binPath' }]);
-  assert.equal(pypiSpec('graphify'), 'graphifyy[sql,pdf,office,watch,leiden]');
+  assert.equal(pypiSpec('serena'), 'serena-agent');
+});
+
+test('serena installs with Python 3.13 into the folder uv reports', () => {
+  const serena = TOOLS.tools.serena;
+  assert.equal(serena?.source, 'pypi');
+  if (serena?.source === 'pypi') assert.equal(serena.python, '3.13');
+  assert.equal(toolPath('C:\\Users\\x\\.local\\bin', 'serena', 'win32'), 'C:\\Users\\x\\.local\\bin\\serena.exe');
+  assert.equal(toolPath('/home/x/.local/bin', 'serena', 'linux'), '/home/x/.local/bin/serena');
 });
 
 // The installer downloads the name crates-build.yml uploads: the same target and the same file name.
