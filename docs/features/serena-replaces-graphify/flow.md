@@ -1,7 +1,7 @@
 ---
 flow: feature
-phase: execute
-now: Waiting for you: pick how the branch ends.
+phase: done
+now: Closed 2026-11-23: push and open a PR against main.
 ---
 
 # Serena replaces graphify: flow
