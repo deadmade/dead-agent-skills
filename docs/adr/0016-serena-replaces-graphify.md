@@ -31,6 +31,12 @@ was (ADR 0012), points `serenaPath` at that copy, and uninstalls the old `graphi
 
 - Serena writes `.serena/project.yml`, `project.local.yml` and `.gitignore` into each repository it activates.
 - Serena's first start in a repository downloads and starts its language servers, slower than graphify's hooks.
+- `--project-from-cwd` starts those language servers in every repository a session opens, and some run the
+  repository's build code (rust-analyzer runs `build.rs` and proc macros), so opening a repository with flows runs more
+  of it than graphify did.
+- A serena the user added themselves runs beside this one: two sets of tools and language servers.
+- Without the installer (a marketplace install), serena's CLI must be installed by hand, or every session reports a
+  failed serena server.
 - Serena is GPL-3.0-or-later; it is installed on the machine, not vendored, so nothing here redistributes it.
 - `graphifyy` is uninstalled once, in the installer run that retires the graphify plugin and only with a uv copy
   already present; a skipped or failed uninstall leaves the command in the summary and is not retried.

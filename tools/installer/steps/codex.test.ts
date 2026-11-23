@@ -217,6 +217,21 @@ test('a graphify removal Codex refuses is one failure line, and the rest of the 
     f.close();
   }
 });
+test('a failed removal of a plugin still in the catalog stops the step', async () => {
+  const f = fixture();
+  try {
+    const command = f.io.command!;
+    f.io.command = (...args) => {
+      if (args[1] === 'remove' && args[2] === 'postgres@dead-agent-skills') throw new Error('locked');
+      return command(...args);
+    };
+    f.installed(['dead-skills', 'postgres']);
+    f.select([]);
+    await assert.rejects(applyCodex(f.io), /locked/);
+  } finally {
+    f.close();
+  }
+});
 test('a machine without graphify gets no graphify cleanup', async () => {
   const f = fixture();
   try {

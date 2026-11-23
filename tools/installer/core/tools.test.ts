@@ -88,7 +88,7 @@ test('toolAdvice, toolOfPlugin and pypiSpec', () => {
   assert.equal(pypiSpec('serena'), 'serena-agent');
 });
 
-test('serena installs with Python 3.13 into the folder uv reports', () => {
+test("serena's tools.json entry names Python 3.13, and its command's file name per platform", () => {
   const serena = TOOLS.tools.serena;
   assert.equal(serena?.source, 'pypi');
   if (serena?.source === 'pypi') assert.equal(serena.python, '3.13');

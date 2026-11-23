@@ -3,7 +3,7 @@
 // each thing it applies in steps/.
 import { AGENTS, selectedAgents } from './core/agents.ts';
 import { applyCodex } from './steps/codex.ts';
-import { existsSync, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { SELF_CONFIGURED } from './core/config.ts';
 import { collectConfig } from './steps/config.ts';
@@ -328,12 +328,7 @@ if (selected.includes(HEADROOM_TRIM) || withSerena) {
       );
   }
 }
-if (graphifyRetired) {
-  const ownUv = toolPath(BIN_DIR, 'uv', process.platform);
-  const cleanup = uv ?? (existsSync(ownUv) ? ownUv : undefined);
-  if (cleanup) uninstallGraphify(cleanup);
-  else done.push('graphify: retired; if its CLI is installed, remove it with: uv tool uninstall graphifyy');
-}
+if (graphifyRetired) uninstallGraphify([uv, toolPath(BIN_DIR, 'uv', process.platform)]);
 
 const toggles = {
   statusLine: on('ccstatusline'),

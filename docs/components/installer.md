@@ -16,6 +16,14 @@ No runtime npm dependencies: Node's standard library only (`typescript` and `@ty
 `install.ts` or a step. `core/release.ts` reading `package.json` and `core/tools.ts` reading `assets/tools.json` at load
 time are the two exceptions, needed to make each the single owner of the repository slug and of the tool pins.
 
+The uv step (`steps/uv.ts`) also installs serena: `uv tool install --upgrade -p 3.13 serena-agent` with the
+installer's own uv, then `uv tool dir --bin` gives the command's path, which becomes serena's `serenaPath` on Claude Code
+(`claude plugin configure --values-stdin`) and the `codex mcp add dead-agent-skills-serena` command on Codex, where
+`startup_timeout_sec = 15` goes into that server's `config.toml` table (`mcpTableLine` in `core/codex.ts`). A failed
+install leaves the path unset and adds no Codex server. The run that retires graphify (Claude Code: `retiredPlugins`;
+Codex: `RETIRED` in `core/codex.ts`) uninstalls `graphifyy` with a uv copy already present, never one downloaded just
+for that (`uninstallGraphify`); ADR 0016.
+
 Programs start through `system/proc.ts` (`which`, `start`/`startSync`), never by bare name: on Windows that searches the
 current folder first, and a `.cmd` shim needs cmd.exe. The one exception is `system/net.ts`'s `tar` (System32's on
 Windows, elsewhere `which` with a bare `tar` as the fallback).

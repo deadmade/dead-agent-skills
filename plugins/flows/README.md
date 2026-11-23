@@ -40,7 +40,7 @@ build-feature
 ├ mattpocock-picks: codebase-design, domain-modeling, grilling, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
 ├ pstack-picks: architect, arena, blast-radius, how, interrogate, principle-boundary-discipline, principle-redesign-from-first-principles, why
-├ serena: serena
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: brainstorming, executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees, writing-plans
 └ web-mcp: fetch, search
 
@@ -50,7 +50,7 @@ evaluate
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: how, why
-├ serena: serena
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 └ web-mcp: fetch, search
 
 fix
@@ -69,7 +69,7 @@ implement
 ├ flows: diagrams
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why
-├ serena: serena
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees
 └ web-mcp: fetch
 
@@ -90,7 +90,7 @@ refactor
 ├ mattpocock-picks: codebase-design, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
 ├ pstack-picks: blast-radius, how, interrogate, principle-boundary-discipline, principle-redesign-from-first-principles, why
-├ serena: serena
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees, writing-plans
 └ web-mcp: fetch
 
@@ -102,7 +102,7 @@ research-feature
 ├ mattpocock-picks: grilling, setup-matt-pocock-skills
 ├ paper-lookup: paper-lookup
 ├ pstack-picks: how, why
-├ serena: serena
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 └ web-mcp: fetch, search
 
 review-code
@@ -126,7 +126,7 @@ understand
 ├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills, teach
 ├ pstack-picks: how, why
-├ serena: serena
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 └ web-mcp: fetch
 
 upgrade
@@ -137,7 +137,7 @@ upgrade
 ├ flows: diagrams
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why
-├ serena: serena
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, writing-plans
 └ web-mcp: fetch
 ```

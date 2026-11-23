@@ -87,8 +87,14 @@ export function installSerena(uv: string): string | undefined {
   return undefined;
 }
 
-// graphify's CLI (graphifyy), which earlier releases installed with uv; removed when uv lists it.
-export function uninstallGraphify(uv: string): void {
+// graphify's CLI (graphifyy), which earlier releases installed with uv; removed with the first of `uvs` that exists
+// (never a uv downloaded just for this) when that uv lists it.
+export function uninstallGraphify(uvs: (string | undefined)[]): void {
+  const uv = uvs.find((p) => p && existsSync(p));
+  if (!uv) {
+    done.push('graphify: retired; if its CLI is installed, remove it with: uv tool uninstall graphifyy');
+    return;
+  }
   const list = startSync(uv, ['tool', 'list']);
   if (list.status !== 0 || !list.stdout.split(/\r?\n/).some((line) => line.startsWith('graphifyy '))) return;
   const r = startSync(uv, ['tool', 'uninstall', 'graphifyy'], { stdio: 'inherit' });

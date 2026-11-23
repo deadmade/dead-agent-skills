@@ -3,7 +3,7 @@ name: understand
 description: 'Learn a codebase, a subsystem or a concept by doing: map it (pstack how, serena when present), learn why it is that way (pstack why), then a guided lesson through mattpocock teach where you write the key lines and Claude explains, and keep the terms you settled in GLOSSARY.md. Use for /understand [topic, path or concept].'
 disable-model-invocation: true
 argument-hint: 'What do you want to understand? (a path, a subsystem, a concept)'
-uses: pstack-picks:why, serena:serena, mattpocock-picks:teach, mattpocock-picks:domain-modeling
+uses: pstack-picks:why, serena:find_symbol, mattpocock-picks:teach, mattpocock-picks:domain-modeling
 ---
 
 # understand

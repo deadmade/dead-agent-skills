@@ -2,7 +2,9 @@
 uses = [
   "pstack-picks:how",
   "pstack-picks:why",
-  "serena:serena",
+  "serena:find_symbol",
+  "serena:find_referencing_symbols",
+  "serena:get_symbols_overview",
   "mattpocock-picks:setup-matt-pocock-skills",
 ]
 

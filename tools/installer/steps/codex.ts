@@ -311,15 +311,11 @@ export async function applyCodex(io: CodexIO = {}) {
   if (plan.retired.includes('graphify'))
     await (
       io.cleanup ??
-      (async () => {
-        const uv = [
+      (async () =>
+        uninstallGraphify([
           toolPath(join(base, 'bin'), 'uv', process.platform),
           toolPath(BIN_DIR, 'uv', process.platform),
-        ].find((p) => existsSync(p));
-        if (uv) uninstallGraphify(uv);
-        else
-          done.push('graphify: retired on Codex; if its CLI is installed, remove it with: uv tool uninstall graphifyy');
-      })
+        ]))
     )();
   const packaged = join(catalog, '.agents/plugins/dead-skills');
   const theme = installCodexTheme(home, join(packaged, 'themes/night-city.tmTheme'));
