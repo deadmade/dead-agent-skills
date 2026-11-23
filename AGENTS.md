@@ -146,6 +146,12 @@ Read `docs/components/ci.md` for how a release is built and published.
   changed (never a folder: it reformats files you didn't touch), then `npm run build:harnesses`, then stage.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt, taplo for TOML).
   Formatter options live in `treefmt.toml`; flow steps use `#:schema ./step.schema.json` for editor validation.
+  Without the nix shell (no `treefmt` on PATH, as on Windows), run
+  `npx -y prettier@3 --write --no-config --print-width 120 --single-quote <files>` on the files you changed: treefmt's
+  prettier settings; TOML then goes unformatted.
+- Run `npm run build:harnesses` (and `npm test`, which builds) in one process at a time: two at once, subagents
+  included, fail on Windows with `EPERM` renaming `.native-build-*` and can leave `.claude-plugin/` missing until a
+  rebuild.
 - `npm run scan-skills` (needs `pipx`) runs Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`
   and the composed flows conductors in `.claude-plugin/flows/skills/`; it fails on a high or critical finding. A
   finding judged benign gets a scoped suppression with its reason in `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR except the `uv` and `agent-browser` pin bumps (`scan: false` in `sources.ts`).
