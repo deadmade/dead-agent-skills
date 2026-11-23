@@ -99,15 +99,6 @@ Modified by `tools/upstream-sync/src/adapters/simple.ts`: a `paths:` block (`**/
 `**/*.prisma`, `**/alembic/**`) is added to each SKILL.md's frontmatter. Synced weekly via GitHub Actions
 (`sync.yml`).
 
-## graphify
-
-`plugins/shared/graphify/skills/graphify/` vendors the Claude Code skill (`graphify/skill.md`) and its `references/`
-from [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify) (Apache License 2.0, Copyright 2026
-Safi Shamsi and the Graphify contributors; `LICENSE`, `LICENSE-MIT` and `NOTICE` in `plugins/shared/graphify/`),
-unmodified. `plugins/shared/graphify/hooks/hooks.json` reproduces the hooks upstream's installer writes and calls the
-separately installed `graphifyy` CLI. Synced by `tools/upstream-sync/src/adapters/graphify.ts` (weekly via GitHub Actions); the
-synced upstream commit is in `plugins/shared/graphify/UPSTREAM`.
-
 ## review-code
 
 flows' `/review-code` (`plugins/flows/skills/review-code/`) vendors one agent from

@@ -23,7 +23,7 @@ holds only the sources, so name the branch.
 codex plugin marketplace add deadmade/dead-agent-skills --ref release
 codex plugin add flows@dead-agent-skills
 codex plugin add dead-skills@dead-agent-skills
-codex plugin add graphify@dead-agent-skills
+codex plugin add serena@dead-agent-skills
 codex plugin add web-mcp@dead-agent-skills
 ```
 
@@ -56,7 +56,7 @@ claude-security and agent-review, and itself carries Context7, Night City (a
 toned-down synthwave theme that everything else here is painted in), desktop notifications when a turn ends or Claude
 waits for you, and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, [Azure DevOps Server](plugins/opt-in/mcp/mcp-azure/README.md), http-runner, which runs `.http` files against an API and saves each real reply with its secrets masked, Atlassian on Codex), skill packs
-like hallmark and graphify, and tools such as [web-mcp](plugins/shared/web-mcp/README.md) for web search read in one browser window of its own, page fetching, a page's repeating items as numbered rows,
+like hallmark, and tools such as [Serena](https://github.com/oraios/serena) for symbol lookup over language servers (flows grounds with it; it writes `.serena/` into each repository it opens), [web-mcp](plugins/shared/web-mcp/README.md) for web search read in one browser window of its own, page fetching, a page's repeating items as numbered rows,
 passive lookups and a browser with an archive of everything it pulled, and
 [headroom-trim](plugins/opt-in/headroom-trim/README.md), which shrinks every tool result with headroom's offline compression before Claude reads it.
 
