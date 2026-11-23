@@ -79,7 +79,7 @@ test('Codex configures MCP using native CLI and emits environment-based authenti
   try {
     f.select(['flows', 'mcp-github', 'mcp-azure', 'http-runner', 'atlassian']);
     await applyCodex(f.io);
-    assert.ok(f.state().selected.includes('graphify'));
+    assert.ok(f.state().selected.includes('serena'));
     assert.ok(f.calls.some((c) => c.includes('--bearer-token-env-var')));
     assert.ok(f.calls.some((c) => c.includes('/tools/web-mcp')));
     assert.ok(f.calls.some((c) => c.includes('/tools/ado-mcp')));
@@ -236,13 +236,13 @@ test('Codex offers shared catalog choices and installs the flows dependency clos
         'atlassian',
         'csharp-skills',
         'flows',
-        'graphify',
         'hallmark',
         'http-runner',
         'mcp-azure',
         'mcp-github',
         'postgres',
         'rust-skills',
+        'serena',
         'shop',
         'web-mcp',
       ]);
@@ -256,10 +256,10 @@ test('Codex offers shared catalog choices and installs the flows dependency clos
     assert.deepEqual(additions, [
       'dead-skills@dead-agent-skills',
       'flows@dead-agent-skills',
-      'graphify@dead-agent-skills',
+      'serena@dead-agent-skills',
       'web-mcp@dead-agent-skills',
     ]);
-    assert.deepEqual(f.state().selected, ['dead-skills', 'flows', 'graphify', 'web-mcp']);
+    assert.deepEqual(f.state().selected, ['dead-skills', 'flows', 'serena', 'web-mcp']);
   } finally {
     f.close();
   }

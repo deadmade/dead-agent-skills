@@ -1,9 +1,9 @@
 ---
 name: understand
-description: 'Learn a codebase, a subsystem or a concept by doing: map it (pstack how, graphify when a graph exists), learn why it is that way (pstack why), then a guided lesson through mattpocock teach where you write the key lines and Claude explains, and keep the terms you settled in GLOSSARY.md. Use for /understand [topic, path or concept].'
+description: 'Learn a codebase, a subsystem or a concept by doing: map it (pstack how, serena when present), learn why it is that way (pstack why), then a guided lesson through mattpocock teach where you write the key lines and Claude explains, and keep the terms you settled in GLOSSARY.md. Use for /understand [topic, path or concept].'
 disable-model-invocation: true
 argument-hint: 'What do you want to understand? (a path, a subsystem, a concept)'
-uses: pstack-picks:why, graphify:graphify, mattpocock-picks:teach, mattpocock-picks:domain-modeling
+uses: pstack-picks:why, serena:serena, mattpocock-picks:teach, mattpocock-picks:domain-modeling
 ---
 
 # understand
@@ -36,7 +36,7 @@ subsystem or a concept); without one, ask for it in one line.
 
 ## Phase 1: Map
 
-<!-- runs: `pstack-picks:how`, graphify · output: a map in the scratch file: parts, flow, entry points -->
+<!-- runs: `pstack-picks:how`, serena · output: a map in the scratch file: parts, flow, entry points -->
 
 Ask the user, once: what they already know, and what they want to be able to do afterwards (change it, review it,
 explain it). Then ground the topic, which is the subsystem here; its `why` waits for Phase 2. Put the shape you
@@ -45,8 +45,8 @@ with `file:line`, as one short diagram or table, not a wall of text.
 
 [step: ground-code]
 
-Show what `pstack-picks:how` returns as it is, and write it to the scratch file. No graph: offer `/graphify` for a
-large repo (it costs a build), only on the user's yes.
+Show what `pstack-picks:how` returns as it is, and write it to the scratch file. Without serena, or when it returns
+nothing, the map comes from `pstack-picks:how` alone.
 
 ## Phase 2: Why
 

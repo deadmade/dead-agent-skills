@@ -13,7 +13,7 @@ test('neutral catalog preserves names, default and dependency closure without na
     [
       'dead-skills',
       'flows',
-      'graphify',
+      'serena',
       'hallmark',
       'rust-skills',
       'csharp-skills',
@@ -28,8 +28,8 @@ test('neutral catalog preserves names, default and dependency closure without na
   );
   assert.equal(selectTarget(all, 'claude-code').plugins.length, 15);
   assert.deepEqual(portableSelection(all, []), ['dead-skills']);
-  assert.deepEqual(portableSelection(all, ['flows']), ['dead-skills', 'flows', 'graphify', 'web-mcp']);
-  assert.deepEqual(portableSelection(all, ['flows', 'flows']), ['dead-skills', 'flows', 'graphify', 'web-mcp']);
+  assert.deepEqual(portableSelection(all, ['flows']), ['dead-skills', 'flows', 'serena', 'web-mcp']);
+  assert.deepEqual(portableSelection(all, ['flows', 'flows']), ['dead-skills', 'flows', 'serena', 'web-mcp']);
   assert.throws(() => portableSelection(all, ['nix-lsp']), /Unknown portable/);
   assert.throws(() => portableSelection(all, ['unknown']), /Unknown portable/);
 });

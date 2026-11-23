@@ -10,13 +10,13 @@
     "name": "flows",
     "source": "plugins/flows",
     "resources": ["skills", "references", "packs", "agents"],
-    "dependencies": ["dead-skills", "graphify", "web-mcp"],
+    "dependencies": ["dead-skills", "serena", "web-mcp"],
     "targets": ["claude-code", "codex"]
   },
   {
-    "name": "graphify",
-    "source": "plugins/shared/graphify",
-    "resources": ["skills"],
+    "name": "serena",
+    "source": "plugins/shared/serena",
+    "resources": [],
     "dependencies": [],
     "targets": ["claude-code", "codex"]
   },

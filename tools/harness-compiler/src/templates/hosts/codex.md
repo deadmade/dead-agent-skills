@@ -14,9 +14,7 @@ the file being read. Claude tool names in vendored instructions mean the corresp
 literal tool. Ignore a pack's feature-flag or model setup
 instructions when the current session already supplies its capabilities. Session tool schemas take precedence.
 
-Graphify is also bundled as an unregistered resource at
-`<flow-root>/resources/graphify/skills/graphify/SKILL.md`. Other optional language skills are located through
-the host's discovered skill list. The packaged resources.json indexes bundled cross-package resources.
+Optional language skills are located through the host's discovered skill list.
 
 For security review, ask the reviewer to inspect the scoped diff for exploitable vulnerabilities. Require a
 concrete input, affected code path, impact and fix for each finding; do not invent a built-in security skill.
