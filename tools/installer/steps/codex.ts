@@ -202,7 +202,16 @@ export async function applyCodex(io: CodexIO = {}) {
       ) + '\n',
     );
   for (const name of plan.remove) {
-    run('plugin', 'remove', `${name}@${CODEX_MARKETPLACE}`, '--json');
+    try {
+      run('plugin', 'remove', `${name}@${CODEX_MARKETPLACE}`, '--json');
+    } catch (error) {
+      // The new marketplace no longer lists a retired plugin; its removal must not block the rest of the step.
+      if (!plan.retired.includes(name)) throw error;
+      failures.push(
+        `Codex: could not remove ${name} (${(error as Error).message}); run: codex plugin remove ${name}@${CODEX_MARKETPLACE}`,
+      );
+      continue;
+    }
     applied.delete(name);
     save();
   }

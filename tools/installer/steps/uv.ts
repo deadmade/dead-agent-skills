@@ -74,7 +74,7 @@ export function installSerena(uv: string): string | undefined {
   const r = startSync(uv, ['tool', 'install', '--upgrade', ...python, pypiSpec('serena')], { stdio: 'inherit' });
   if (r.status !== 0) {
     failures.push(
-      `serena: uv tool install failed (${errCode(r.error) ?? `exit ${r.status}`}); close Claude Code and Codex sessions that run serena, then rerun the installer, or run: uv tool install -p 3.13 serena-agent`,
+      `serena: uv tool install failed (${errCode(r.error) ?? `exit ${r.status}`}); close Claude Code and Codex sessions that run serena, then rerun the installer, or run: uv tool install ${python.join(' ')} ${pypiSpec('serena')}`,
     );
     return undefined;
   }

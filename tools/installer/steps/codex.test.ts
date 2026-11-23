@@ -170,8 +170,14 @@ test('Codex adds serena with the path uv installed it to, the built args and a s
 test('a failed serena install adds no serena server', async () => {
   const f = fixture();
   try {
+    let asked = 0;
+    f.io.serena = async () => {
+      asked++;
+      return undefined;
+    };
     f.select(['serena']);
     await applyCodex(f.io);
+    assert.equal(asked, 1);
     assert.ok(!f.calls.some((c) => c[0] === 'mcp' && c[1] === 'add' && c[2] === 'dead-agent-skills-serena'));
   } finally {
     f.close();
@@ -189,6 +195,24 @@ test('a rerun on a machine with graphify removes it and cleans up its CLI once',
     await applyCodex(f.io);
     assert.ok(f.calls.some((c) => c[0] === 'plugin' && c[1] === 'remove' && c[2] === 'graphify@dead-agent-skills'));
     assert.equal(cleaned, 1);
+  } finally {
+    f.close();
+  }
+});
+test('a graphify removal Codex refuses is one failure line, and the rest of the step still runs', async () => {
+  const f = fixture();
+  try {
+    const command = f.io.command!;
+    f.io.command = (...args) => {
+      if (args[1] === 'remove' && args[2] === 'graphify@dead-agent-skills') throw new Error('not in marketplace');
+      return command(...args);
+    };
+    f.installed(['dead-skills', 'graphify']);
+    f.select(['flows']);
+    await applyCodex(f.io);
+    assert.ok(f.calls.some((c) => c[1] === 'add' && c[2] === 'flows@dead-agent-skills'));
+    assert.ok(failures.some((line) => line.includes('codex plugin remove graphify@dead-agent-skills')));
+    assert.equal(f.state().version, VERSION);
   } finally {
     f.close();
   }
