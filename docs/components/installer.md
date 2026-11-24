@@ -29,3 +29,13 @@ Node won't strip types under `node_modules`, so npx can't run them: `release.yml
 refuses tarball URLs without the flag). npx caches by URL and keeps running the first installer it fetched
 (`--prefer-online` too), so each run reads the tag `latest/` redirects to and, when it is newer, hands over to that
 release's versioned URL (`newerInstaller`).
+
+## Test seam: the answers file
+
+`DEAD_SKILLS_TEST_ANSWERS` names a JSON file that lets the installer run unattended; only tests set it, a user never
+does. `core/answers.ts` reads it on every call. Its fields: `chosen` (plugin ids merged into the options screen, which
+then applies at once with no key read), `prompts` (answers to `confirm`, `line` and `secret`, found by the first key
+the message starts with; an unanswered prompt throws `no answer for prompt: …` instead of waiting), `marketplace` (a
+local folder added in place of the github `release` branch, pinned as `{source: 'directory', path}`, which also skips
+adding the official marketplace) and `releases` (the release download URL, a constant read at load; it also skips the
+self-update check). With the file present the TTY guard passes. The steps read none of this.

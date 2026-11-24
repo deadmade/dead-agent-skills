@@ -30,6 +30,7 @@ import {
   shippedVersions,
   withDependencies,
 } from './core/plugins.ts';
+import { testAnswers } from './core/answers.ts';
 import { LATEST_INSTALLER, MARKETPLACE, installerUrl, newerInstaller, npxArgs } from './core/release.ts';
 import {
   hasDcgHook,
@@ -69,7 +70,7 @@ import { claude, onPath, startSync, which } from './system/proc.ts';
 import { confirm, log, note, progress, screen } from './ui/ui.ts';
 import { type Data, changeList, initial, move, paint, render } from './ui/view.ts';
 
-if (!process.stdin.isTTY || !process.stdout.isTTY) {
+if (!testAnswers() && (!process.stdin.isTTY || !process.stdout.isTTY)) {
   console.error(`Run this in a terminal: npx ${npxArgs(LATEST_INSTALLER).slice(1).join(' ')}`);
   process.exit(1);
 }
@@ -78,9 +79,11 @@ const certs = trustSystemCerts();
 if (certs) log('warn', certs);
 
 // npx caches by URL, so the README's latest/ link runs whichever installer it fetched first. Offline: run this one.
-const latest = await fetch(LATEST_INSTALLER, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(5000) })
-  .then((res) => res.headers.get('location'))
-  .catch(() => undefined);
+const latest = await (testAnswers()?.releases
+  ? Promise.resolve(undefined)
+  : fetch(LATEST_INSTALLER, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(5000) })
+      .then((res) => res.headers.get('location'))
+      .catch(() => undefined));
 const next = newerInstaller(latest, VERSION);
 const npx = next && which('npx');
 if (npx) {

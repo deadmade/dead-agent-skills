@@ -8,7 +8,7 @@ import {
   stillInstalled,
   type PluginRow,
 } from '../core/plugins.ts';
-import { MARKETPLACE, RELEASE_BRANCH, marketplaceArg } from '../core/release.ts';
+import { MARKETPLACE, RELEASE_BRANCH, addsOfficialMarketplace, marketplaceArg } from '../core/release.ts';
 import { SETTINGS, ask, failures } from '../context.ts';
 import { writeAtomic } from '../system/files.ts';
 import { claude, run } from '../system/proc.ts';
@@ -40,7 +40,7 @@ export async function addMarketplaces(marketplaces: { name: string }[]) {
     process.exit(1);
   }
   // The bundle's core plugins and some opt-ins install from Anthropic's marketplace.
-  if (!marketplaces.some((m) => m.name === OFFICIAL)) {
+  if (addsOfficialMarketplace() && !marketplaces.some((m) => m.name === OFFICIAL)) {
     await run(
       `Adding ${OFFICIAL}`,
       `added marketplace ${OFFICIAL}`,

@@ -2,6 +2,9 @@ import { test } from 'node:test';
 // readline disables editing under TERM=dumb; these tests emulate an interactive terminal.
 process.env.TERM = 'xterm';
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { confirm, line, progress, screen, secret } from './ui.ts';
 
@@ -157,3 +160,42 @@ test('keys typed before a prompt opens do not answer it', async () => {
   io.input.write('n');
   assert.equal(await done, false);
 });
+
+const withAnswers = async (answers: object, body: () => Promise<void>) => {
+  const path = join(mkdtempSync(join(tmpdir(), 'answers-')), 'answers.json');
+  writeFileSync(path, JSON.stringify(answers));
+  process.env.DEAD_SKILLS_TEST_ANSWERS = path;
+  try {
+    await body();
+  } finally {
+    delete process.env.DEAD_SKILLS_TEST_ANSWERS;
+  }
+};
+const answers = {
+  chosen: { a: true },
+  prompts: { 'Write these': true, 'Collection URL': 'https://dev.example/tfs/Coll' },
+};
+
+test('screen applies chosen from the answers file', () =>
+  withAnswers(answers, async () => {
+    const t = tty();
+    const s = await screen<{ chosen: Record<string, boolean>; result?: string }>(
+      { chosen: { b: true } },
+      { move: (st) => st, render: () => ['x'] },
+      t,
+    );
+    assert.deepEqual(s.chosen, { a: true, b: true });
+    assert.equal(s.result, 'apply');
+    assert.equal(t.written(), '');
+  }));
+
+test('confirm and line answer by message prefix', () =>
+  withAnswers(answers, async () => {
+    assert.equal(await confirm('Write these changes?'), true);
+    assert.equal(await line('Collection URL:'), 'https://dev.example/tfs/Coll');
+  }));
+
+test('an unanswered prompt throws its message', () =>
+  withAnswers(answers, async () => {
+    await assert.rejects(confirm('Uninstall them?'), /no answer for prompt: Uninstall them\?/);
+  }));

@@ -1,5 +1,6 @@
 // Our marketplace on its release branch, and the URLs of the release this installer belongs to.
 import { readFileSync } from 'node:fs';
+import { testAnswers } from './answers.ts';
 import type { Settings } from './settings.ts';
 
 export const MARKETPLACE = 'dead-claude-skills';
@@ -10,8 +11,11 @@ export const MARKETPLACE = 'dead-claude-skills';
 export const REPO = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'))
   .repository as string;
 export const RELEASE_BRANCH = 'release';
-export const marketplaceArg = () => `${REPO}@${RELEASE_BRANCH}`;
-export const marketplaceSource = () => ({ source: 'github', repo: REPO, ref: RELEASE_BRANCH });
+// The test seam's local marketplace folder replaces the github branch and skips the official add (an unpinned network clone).
+export const marketplaceArg = () => testAnswers()?.marketplace ?? `${REPO}@${RELEASE_BRANCH}`;
+export const marketplaceSource = (local = testAnswers()?.marketplace) =>
+  local ? { source: 'directory', path: local } : { source: 'github', repo: REPO, ref: RELEASE_BRANCH };
+export const addsOfficialMarketplace = () => !testAnswers()?.marketplace;
 
 // Claude Code refuses to add a marketplace whose source differs from its extraKnownMarketplaces entry, so the entry
 // is pinned before the add (an install pinned to a vX.Y.Z tag moves to the branch); the add then moves the checkout
@@ -25,7 +29,7 @@ export function pinMarketplace(settings: Settings) {
 }
 
 // Release assets: the binaries and the installer, attached to each vX.Y.Z by release.yml.
-export const RELEASES = `https://github.com/${REPO}/releases/download`;
+export const RELEASES = testAnswers()?.releases ?? `https://github.com/${REPO}/releases/download`;
 // The installer itself, built to JS and attached to every release by release.yml. npx caches by URL, so the README's
 // latest/ link keeps running the first installer it fetched: each run hands over to a newer release (newerInstaller).
 export const installerUrl = (version: string) => `${RELEASES}/v${version}/installer.tgz`;

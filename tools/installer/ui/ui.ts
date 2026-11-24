@@ -1,6 +1,7 @@
 // The installer's terminal I/O on Node's stdlib: interactive screens, a yes/no, a typed line and plain output.
 import { createInterface } from 'node:readline';
 import { Writable } from 'node:stream';
+import { testAnswers } from '../core/answers.ts';
 import { frame, paint, wrap } from './view.ts';
 
 // What the prompts use of stdin and stdout, so tests can hand them streams of their own.
@@ -28,6 +29,15 @@ for (const [sig, n] of [
   });
 }
 
+// With an answers file, the value of the first prompts key the message starts with; an unanswered prompt throws at once.
+function scripted(message: string) {
+  const answers = testAnswers();
+  if (!answers) return undefined;
+  const key = Object.keys(answers.prompts).find((k) => message.startsWith(k));
+  if (key === undefined) throw new Error(`no answer for prompt: ${message}`);
+  return answers.prompts[key];
+}
+
 // Runs one screen until move() returns a state with a result. render(state, { columns, rows }) -> lines.
 // ctrl-c resolves the state with result 'quit'.
 export function screen<S extends { result?: string }>(
@@ -38,6 +48,13 @@ export function screen<S extends { result?: string }>(
   }: { move: (s: S, key: string) => S; render: (s: S, size: { columns: number; rows: number }) => string[] },
   { input, output }: IO = STD,
 ): Promise<S> {
+  const answers = testAnswers();
+  if (answers)
+    return Promise.resolve({
+      ...state,
+      chosen: { ...(state as { chosen?: object }).chosen, ...answers.chosen },
+      result: 'apply',
+    });
   return new Promise((resolve, reject) => {
     // No output: keys aren't echoed over the frame. The interface sets up keypress events with a 50 ms esc timeout.
     const rl = createInterface({ input, escapeCodeTimeout: 50, terminal: true });
@@ -98,6 +115,8 @@ export function screen<S extends { result?: string }>(
 
 // Yes / No on one line: ←/→ to switch, y/n to pick, enter to confirm. null on ctrl-c.
 export async function confirm(message: string, initial = true, io = STD) {
+  const answered = scripted(message);
+  if (answered !== undefined) return answered === true;
   const s = await screen<{ yes: boolean; result?: 'done' | 'quit' }>(
     { yes: initial },
     {
@@ -119,6 +138,8 @@ export async function confirm(message: string, initial = true, io = STD) {
 // A typed answer in line mode; null on ctrl-c. The callback API answers synchronously, so closing there stops readline
 // before it echoes (and swallows) anything pasted after the first Enter.
 export function line(message: string, { input, output } = STD) {
+  const answered = scripted(message);
+  if (answered !== undefined) return Promise.resolve(String(answered));
   return new Promise<string | null>((resolve) => {
     const rl = createInterface({ input, output, terminal: true });
     let done = false;
@@ -142,6 +163,8 @@ export function line(message: string, { input, output } = STD) {
 
 // A typed answer that is never shown: the prompt is written here and everything line() draws (echo, redraws) is dropped.
 export async function secret(message: string, io = STD) {
+  const answered = scripted(message);
+  if (answered !== undefined) return String(answered);
   io.output.write(`${message} `);
   const answer = await line('', {
     input: io.input,

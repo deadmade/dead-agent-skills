@@ -1,8 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { CODEX_MARKETPLACE } from './agents.ts';
-import { MARKETPLACE, marketplaceArg, installerUrl, newerInstaller, pinMarketplace } from './release.ts';
+import {
+  MARKETPLACE,
+  addsOfficialMarketplace,
+  marketplaceArg,
+  marketplaceSource,
+  installerUrl,
+  newerInstaller,
+  pinMarketplace,
+} from './release.ts';
 import { type Settings } from './settings.ts';
 
 const repository = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).repository;
@@ -56,4 +66,20 @@ test('an installed old repository moves to the package owner and keeps entry set
   assert.equal(out.extraKnownMarketplaces![M].source!.repo, repository);
   assert.equal(out.extraKnownMarketplaces![M].autoUpdate, true);
   assert.equal(out.model, 'x');
+});
+
+test('marketplaceArg and addsOfficialMarketplace follow a local marketplace', () => {
+  assert.equal(addsOfficialMarketplace(), true);
+  const dir = mkdtempSync(join(tmpdir(), 'mkt-'));
+  const answers = join(dir, 'answers.json');
+  writeFileSync(answers, JSON.stringify({ chosen: {}, prompts: {}, marketplace: dir }));
+  process.env.DEAD_SKILLS_TEST_ANSWERS = answers;
+  try {
+    assert.equal(marketplaceArg(), dir);
+    assert.deepEqual(marketplaceSource(), { source: 'directory', path: dir });
+    assert.equal(addsOfficialMarketplace(), false);
+  } finally {
+    delete process.env.DEAD_SKILLS_TEST_ANSWERS;
+  }
+  assert.equal(marketplaceArg(), `${repository}@release`);
 });
