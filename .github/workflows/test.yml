@@ -39,9 +39,16 @@ jobs:
         with:
           node-version-file: package.json
 
+      # The uv the installer pins, which the headroom-trim real test starts the server with.
+      - name: uv pin
+        id: uv
+        if: needs.changes.outputs.node == 'true'
+        run: echo "version=$(node -p "require('./tools/installer/assets/tools.json').tools.uv.version")" >> "$GITHUB_OUTPUT"
+
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         if: needs.changes.outputs.node == 'true'
         with:
+          version: ${{ steps.uv.outputs.version }}
           enable-cache: true
 
       - name: Claude Code, for plugin validate and plugin test

@@ -114,21 +114,19 @@ test('findUv: config bin first, then the first absolute PATH entry, never a rela
 });
 
 test('startArgs builds uv run --locked with an absolute script, the identity and version, and the venv in data', () => {
-  const r = startArgs({
-    uv: '/u/uv',
-    serverDir: '/p/server',
-    port: 47811,
-    data: '/d',
-    identity: 'hh',
-    version: '0.6.0',
-  });
+  const args = (platform) =>
+    startArgs({
+      uv: '/u/uv',
+      serverDir: '/p/server',
+      port: 47811,
+      data: '/d',
+      identity: 'hh',
+      version: '0.6.0',
+      platform,
+    });
+  const r = args('linux');
   assert.equal(r.cmd, '/u/uv');
-  assert.deepEqual(r.args, [
-    'run',
-    '--locked',
-    '--project',
-    '/p/server',
-    'python',
+  const tail = [
     join('/p/server', 'server.py'),
     '--port',
     '47811',
@@ -138,7 +136,9 @@ test('startArgs builds uv run --locked with an absolute script, the identity and
     'hh',
     '--version',
     '0.6.0',
-  ]);
+  ];
+  assert.deepEqual(r.args, ['run', '--locked', '--project', '/p/server', 'python', ...tail]);
+  assert.deepEqual(args('win32').args, ['run', '--locked', '--project', '/p/server', '--gui-script', ...tail]);
   assert.deepEqual(r.env, { UV_PROJECT_ENVIRONMENT: join('/d', 'venv'), PYTHONDONTWRITEBYTECODE: '1' });
 });
 
@@ -169,21 +169,15 @@ function setup(over = {}) {
   const opts = {
     argv: ['47811'],
     env: { CLAUDE_PLUGIN_ROOT: root, CLAUDE_PLUGIN_DATA: data, CLAUDE_CONFIG_DIR: '/cfg', PATH: '', PYTHONPATH: '/p' },
+    // fake: a real fetch on 47811 would reach the developer's own trim server.
     fetch: async (url, init) => {
       calls.push([url, init?.method ?? 'GET']);
       throw new Error('down');
     },
+    // fake: these paths only count starts; session.real.test.mjs starts the real server.
     spawn: (cmd, args, o) => {
-      const child = {
-        pid: 4242,
-        unrefd: false,
-        unref() {
-          this.unrefd = true;
-        },
-        on() {},
-      };
-      spawned.push({ cmd, args, o, child });
-      return child;
+      spawned.push({ cmd, args, o });
+      return { pid: 4242, unref() {}, on() {} };
     },
     isFile: () => true,
     ...over,
@@ -202,6 +196,7 @@ test('main without uv writes one line to launcher.log, creating the data folder'
 
 // In virtual time, so a slow disk or a busy runner cannot fail it: the only wait is the 250 ms health timeout.
 test('main returns within 400 ms when /health never answers', async () => {
+  // fake: a /health that hangs forever, which no real server does on purpose.
   const { opts } = setup({ fetch: never });
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -215,31 +210,6 @@ test('main returns within 400 ms when /health never answers', async () => {
   }
 });
 
-test('main spawns detached and hidden into server.log, logs the start, and unrefs', async () => {
-  const { opts, spawned, data, root } = setup();
-  await main(opts);
-  assert.equal(spawned.length, 1);
-  const { o, child, cmd, args } = spawned[0];
-  const uv = join('/cfg', 'bin', process.platform === 'win32' ? 'uv.exe' : 'uv');
-  assert.equal(cmd, uv);
-  assert.equal(o.detached, process.platform !== 'win32');
-  assert.equal(o.windowsHide, true);
-  assert.equal(o.cwd, data);
-  assert.equal(o.stdio[0], 'ignore');
-  assert.equal(typeof o.stdio[1], 'number');
-  assert.equal(o.stdio[2], o.stdio[1]);
-  assert.throws(() => closeSync(o.stdio[1]), 'the launcher closed its copy of the log fd');
-  assert.ok(existsSync(join(data, 'server.log')));
-  assert.equal(o.env.UV_PROJECT_ENVIRONMENT, join(data, 'venv'));
-  assert.equal(o.env.PYTHONDONTWRITEBYTECODE, '1');
-  assert.equal(o.env.PYTHONPATH, undefined);
-  assert.deepEqual(args.slice(-4), ['--lock-hash', identityOf(join(root, 'server')), '--version', '0.6.0']);
-  assert.equal(child.unrefd, true);
-  const log = readFileSync(join(data, 'launcher.log'), 'utf8').trim().split('\n');
-  assert.equal(log.length, 1);
-  assert.ok(log[0].includes(uv) && log[0].includes('4242'), log[0]);
-});
-
 test('main does nothing when off, when the right server runs, or when a newer one does', async () => {
   const off = setup();
   off.opts.env.HEADROOM_TRIM = 'off';
@@ -247,6 +217,7 @@ test('main does nothing when off, when the right server runs, or when a newer on
   assert.equal(off.spawned.length, 0);
   assert.equal(off.calls.length, 0);
   const same = setup();
+  // fake: a running server of a chosen identity and version, here and below.
   same.opts.fetch = async () => json({ ok: true, lock: identityOf(join(same.root, 'server')), version: '0.6.0' });
   await main(same.opts);
   assert.equal(same.spawned.length, 0);
@@ -266,6 +237,7 @@ test('main replaces an outdated server: shutdown, poll until gone, spawn, under 
   let down = false;
   const posts = [];
   const { opts, spawned } = setup({
+    // fake: an outdated server that goes away 100 ms after /shutdown.
     fetch: async (url, init) => {
       if (init?.method === 'POST') {
         posts.push(url);
@@ -284,6 +256,7 @@ test('main replaces an outdated server: shutdown, poll until gone, spawn, under 
 });
 
 test('main still spawns when the old server never goes away', async () => {
+  // fake: an outdated server that ignores /shutdown.
   const { opts, spawned } = setup({ fetch: async () => json({ ok: true, lock: 'old' }) });
   const t = Date.now();
   await main(opts);
@@ -293,6 +266,7 @@ test('main still spawns when the old server never goes away', async () => {
 
 test('main never throws, and logs a spawn failure', async () => {
   const { opts, data } = setup({
+    // fake: a spawn that throws, which a real uv path does not.
     spawn: () => {
       throw new Error('boom');
     },

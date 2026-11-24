@@ -10,7 +10,8 @@ Measured on real sessions, it saves 7.0% of tool-result tokens.
 ## How it runs
 
 - A `SessionStart` hook runs `hooks/launch.mjs`, which returns within about 300 ms. It starts the server with
-  `uv run --locked` (detached and hidden, so it outlives the session) when none answers `/health`. `/health` reports
+  `uv run --locked` (detached, so it outlives the session; on Windows through `--gui-script`, so it opens no console
+  window) when none answers `/health`. `/health` reports
   the server's identity (a hash of its code and lockfile) and the plugin version it came from: a launcher replaces a
   server of another identity, unless that server came from a newer version (a session started before a plugin update
   leaves it alone). The server exits after 30 minutes without a request.
