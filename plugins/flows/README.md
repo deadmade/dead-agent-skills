@@ -46,7 +46,6 @@ build-feature
 evaluate
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: how, why
 ├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
@@ -116,7 +115,6 @@ tidy
 understand
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills, teach
 ├ pstack-picks: how, why
 ├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
