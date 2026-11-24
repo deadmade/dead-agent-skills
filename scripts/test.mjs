@@ -2,7 +2,7 @@
 // tools/installer/system/proc.ts, because crates.yml runs it without `npm ci`.
 import { createHash } from 'node:crypto';
 import { copyFileSync, cpSync, existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startSync, which } from '../tools/installer/system/proc.ts';
@@ -64,6 +64,16 @@ const COVERAGE_FLOOR = '--test-coverage-lines=84';
 const TREES = { file: process.execPath, args: ['tools/harness-compiler/src/cli.ts', 'build'] };
 
 const findTool = (name, candidates = []) => candidates.find((c) => existsSync(c)) ?? which(name);
+
+// The packages whose tests drive the real agent-browser, and where they find it (real_agent_browser in browser-core):
+// WEB_MCP_AGENT_BROWSER if set, else the installer's copy.
+const BROWSER_PACKAGES = ['web-mcp', 'browser-core', 'http-runner'];
+function agentBrowser() {
+  const set = process.env.WEB_MCP_AGENT_BROWSER;
+  const exe = process.platform === 'win32' ? 'agent-browser.exe' : 'agent-browser';
+  const path = set || join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'bin', exe);
+  return existsSync(path) ? path : undefined;
+}
 
 // What the installer's end-to-end test needs, and why it is missing: claude, codex and this checkout's debug builds.
 const BUILD = 'run cargo build --locked -p web-mcp -p http-runner -p ado-mcp';
@@ -197,15 +207,22 @@ const SUITES = {
     if (!file) return { notRun: 'cargo not on PATH' };
     // Git Bash's `link` shadows MSVC's.
     if (process.env.MSYSTEM) return { notRun: 'Git Bash (MSYSTEM is set): run cargo from PowerShell' };
-    const test = (...select) => ({ file, args: ['test', '--locked', '--no-fail-fast', ...select] });
+    const browser = agentBrowser();
+    const env = browser && { ...process.env, WEB_MCP_AGENT_BROWSER: browser };
+    const test = (...select) => ({ file, args: ['test', '--locked', '--no-fail-fast', ...select], env });
     const select = (p) => ['-p', p];
+    // Without agent-browser only the packages that don't drive it run.
+    const skipped = browser ? [] : (packages ?? BROWSER_PACKAGES).filter((p) => BROWSER_PACKAGES.includes(p));
+    const chosen = packages?.filter((p) => !skipped.includes(p));
+    const workspace = ['--workspace', ...skipped.flatMap((p) => ['--exclude', p])];
     return {
       commands: [
-        ...(!packages || packages.includes('web-mcp')
+        ...((chosen ? chosen.includes('web-mcp') : !skipped.length)
           ? [{ file, args: ['build', '--locked', '-p', 'web-mcp', '--bin', 'fake-agent-browser'] }]
           : []),
-        test(...(packages ? packages.flatMap(select) : ['--workspace'])),
-        ...(each && packages.length > 1 ? packages.map((p) => test(...select(p))) : []),
+        ...(chosen?.length === 0 ? [] : [test(...(chosen ? chosen.flatMap(select) : workspace))]),
+        ...(each && chosen.length > 1 ? chosen.map((p) => test(...select(p))) : []),
+        ...(skipped.length ? [{ notRun: `${skipped.join(', ')}: agent-browser not found` }] : []),
       ],
     };
   },

@@ -33,6 +33,8 @@ answers file and a local release source read only where it asks and where it pic
 - The slow real Node tests are `*.real.test.{mjs,ts}` and run only in the `real` suite of `scripts/test.mjs`, which also
   holds the installer's coverage floor. `npm test` and CI run it; the pre-commit hook and the release jobs run `repo node`.
 - One named download exception: Chrome for Testing, whichever version `agent-browser install` fetches; CI caches it.
+- A change to the agent-browser pin (`tools/installer/assets/tools.json`) selects the web-mcp and http-runner checks,
+  whose tests run it. The weekly sync PRs that bump the pin are not tested beyond today's checks, as now.
 - The Nix packages' checks run no test that starts a browser: `flake.nix` skips them by name, and crates.yml's rust job is
   their gate.
 - ado-mcp's doc-shaped fixtures are replaced by captures once the user has run its capture mode at work.

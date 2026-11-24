@@ -35,8 +35,23 @@ answer web-mcp reads and doesn't model every upstream quirk
 (`docs/solutions/click-and-press-reach-nothing-in-a-hidden-tab.md`). Test-only hooks: the fake's `$FAKE_AB_PAGES` folder
 serves a result page for an engine host and, for any other host, `<last path segment of the URL>.html`;
 `WEB_MCP_TEST_PUBLIC_IP` (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public;
+`WEB_MCP_TEST_ENGINES` (the same builds, `google=http://127.0.0.3:8080,…`) moves a listed engine's result URL to that
+scheme, host and port, keeping its path and query, so `/sorry` and `/goto` stay real;
 `WEB_MCP_FALLBACK_MS`, `WEB_MCP_PAPERS_MS` and `WEB_MCP_LOOKUP_MS` (read in every build, release included) shorten the
 fetch fallback's, each paper source's and each lookup source's deadline.
+
+The real harness, `Mcp::start_real` in `tests/common/mod.rs`, starts web-mcp on the real agent-browser
+(`real_agent_browser()` in browser-core: `WEB_MCP_AGENT_BROWSER`, else the installer's copy, else the test panics) and
+Chrome for Testing, and serves each named engine's capture from `tests/fixtures/engines/` (their dates, queries and
+scrubs are in its `README.md`) on its own server on `127.0.0.3`, at the engine's path for any query, under a CSP that
+runs none of the capture's scripts and loads nothing from the engine's hosts. As it serves a capture, every absolute
+`href` points at a stand-in page on `127.0.0.2` (a Bing `ck/a` wrapper by the address it wraps), and Google's `/goto`
+links redirect to one, so a search fetches no real result. One such test runs at a time; dropping its `Mcp` closes web-mcp's stdin, waits up to 5 s, then
+kills web-mcp and every process whose command line holds its temp folder, and removes that folder. The parsers still
+see the loopback host, so a host check (Google's consent host) isn't covered. These tests are skipped in the Nix
+package checks (`checkFlags` in `flake.nix`) and run in crates.yml's rust job, which downloads the pinned agent-browser
+and caches Chrome for Testing; `scripts/test.mjs` reports web-mcp, browser-core and http-runner as NOT RUN when it
+finds no agent-browser.
 
 Env knobs: `WEB_MCP_CHROME` picks the browser binary; `WEB_MCP_SEARCH_DIR` picks where profile slots live (no temp
 fallback).

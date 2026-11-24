@@ -118,14 +118,34 @@ impl Engine {
 
     /// The English result page for `query`, narrowed to `since` where the engine can.
     pub fn url(self, query: &str, since: Option<Since>) -> Url {
-        match self {
+        let u = match self {
             Self::Google => google::url(query, since),
             Self::Bing => bing::url(query, since),
             Self::DuckDuckGo => duckduckgo::url(query, since),
             Self::Brave => brave::url(query, since),
             Self::Scholar => scholar::url(query, since),
             Self::SemanticScholar => semanticscholar::url(query),
-        }
+        };
+        // Tests serve captured pages from loopback (`google=http://127.0.0.3:8080,…`); only debug builds or the
+        // `test-hooks` feature read this, a normal release never does. The path stays, so `/sorry` and `/goto` do.
+        #[cfg(any(debug_assertions, feature = "test-hooks"))]
+        let u = {
+            let mut u = u;
+            let listed = std::env::var("WEB_MCP_TEST_ENGINES").ok().and_then(|l| {
+                l.split(',').find_map(|kv| {
+                    let origin = kv.trim().strip_prefix(self.name())?.strip_prefix('=')?;
+                    Url::parse(origin).ok()
+                })
+            });
+            if let Some(origin) = listed {
+                // http and https are both special schemes with a host, so none of these fails.
+                let _ = u.set_scheme(origin.scheme());
+                let _ = u.set_host(origin.host_str());
+                let _ = u.set_port(origin.port());
+            }
+            u
+        };
+        u
     }
 
     /// The selector of the result page's search box, which a follow-up search types into; `None`: always load the

@@ -8,13 +8,17 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
 /// The address the tests treat as a public host (see `WEB_MCP_TEST_PUBLIC_IP`).
 pub const PUBLIC: &str = "127.0.0.2";
+/// Where `start_real` serves the engines' captured pages, also a public host to the server.
+const ENGINE_HOST: &str = "127.0.0.3";
+/// A capture's scripts never run and nothing loads from an engine's own hosts.
+const ENGINE_CSP: &str = "default-src 'self'; script-src 'none'";
 
 #[derive(Clone)]
 pub struct Resp {
@@ -53,7 +57,8 @@ impl Resp {
 
 #[derive(Default)]
 struct State {
-    /// Scripted responses per path (with query); the front is served and popped until one is left.
+    /// Scripted responses per path (with query, else without it for any query); the front is served and popped until
+    /// one is left.
     routes: HashMap<String, Vec<Resp>>,
     hits: HashMap<String, usize>,
 }
@@ -118,7 +123,13 @@ fn serve(conn: TcpStream, state: &Mutex<State>) {
     let resp = {
         let mut st = state.lock().unwrap();
         *st.hits.entry(path.clone()).or_default() += 1;
-        match st.routes.get_mut(&path) {
+        let bare = path.split('?').next().unwrap_or_default();
+        let key = if st.routes.contains_key(&path) {
+            path.as_str()
+        } else {
+            bare
+        };
+        match st.routes.get_mut(key) {
             Some(v) if v.len() > 1 => Some(v.remove(0)),
             Some(v) => v.first().cloned(),
             None => None,
@@ -199,6 +210,137 @@ pub struct Mcp {
     stdin: Option<ChildStdin>,
     out: BufReader<ChildStdout>,
     next_id: u64,
+    /// What `start_real` adds.
+    real: Option<Real>,
+}
+
+/// One Chrome at a time: a test run must not open one per thread.
+static CHROME: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
+
+/// The permit to start Chrome, held until dropped: a `MutexGuard` would make `Mcp` stay on its thread.
+struct Permit;
+
+impl Permit {
+    fn take() -> Self {
+        let mut busy = CHROME.0.lock().unwrap_or_else(PoisonError::into_inner);
+        while *busy {
+            busy = CHROME.1.wait(busy).unwrap_or_else(PoisonError::into_inner);
+        }
+        *busy = true;
+        Self
+    }
+}
+
+impl Drop for Permit {
+    fn drop(&mut self) {
+        *CHROME.0.lock().unwrap_or_else(PoisonError::into_inner) = false;
+        CHROME.1.notify_one();
+    }
+}
+
+/// A `start_real` server's own parts.
+struct Real {
+    /// Holds the project and the search folder, so Chrome's profile too; removed on drop.
+    root: PathBuf,
+    /// Where the captures' result links lead instead: each answers a stand-in page.
+    results: Fixture,
+    /// Each absolute link's target (normalised, as a parser reads it) to its stand-in on `results`.
+    links: HashMap<String, String>,
+    _permit: Permit,
+}
+
+/// What every stand-in for a result answers.
+const STAND_IN: &str = "<!doctype html><title>Stand-in</title><p>A captured result's stand-in.</p>";
+
+/// `html` with each absolute `href` pointed at a stand-in on `results` (`/r/<n>` for the n-th distinct target, kept in
+/// `links`), so neither web-mcp nor Chrome reaches a result's real host.
+fn localise(html: &str, results: &Fixture, links: &mut HashMap<String, String>) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(at) = rest.find("href=\"http") {
+        let (head, tail) = rest.split_at(at + "href=\"".len());
+        let end = tail.find('"').unwrap();
+        out.push_str(head);
+        match link_target(&tail[..end].replace("&amp;", "&")) {
+            Some(target) => {
+                let n = links.len();
+                out.push_str(links.entry(target).or_insert_with(|| {
+                    let path = format!("/r/{n}");
+                    results.route(&path, vec![Resp::html(STAND_IN)]);
+                    results.url(&path)
+                }));
+            }
+            None => out.push_str(&tail[..end]),
+        }
+        rest = &tail[end..];
+    }
+    out + rest
+}
+
+/// The address an absolute http(s) link leads to as the parsers read it: a Bing `ck/a` wrapper's is the one it
+/// wraps (as `bing::unwrap_redirect` decodes it).
+fn link_target(href: &str) -> Option<String> {
+    use base64::Engine as _;
+    let url = url::Url::parse(href)
+        .ok()
+        .filter(|u| matches!(u.scheme(), "http" | "https"))?;
+    let bing = url
+        .host_str()
+        .is_some_and(|h| h == "bing.com" || h.ends_with(".bing.com"));
+    let wrapped = (bing && url.path() == "/ck/a")
+        .then(|| url.query_pairs().find(|(k, _)| k == "u"))
+        .flatten()
+        .and_then(|(_, v)| {
+            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(v.strip_prefix("a1")?)
+                .ok()
+        })
+        .and_then(|b| url::Url::parse(&String::from_utf8(b).ok()?).ok());
+    Some(wrapped.unwrap_or(url).to_string())
+}
+
+/// Each engine's result path, as `Engine::url` builds it.
+fn engine_path(engine: &str) -> &'static str {
+    match engine {
+        "duckduckgo" => "/",
+        "scholar" => "/scholar",
+        _ => "/search",
+    }
+}
+
+/// The processes whose command line holds `dir`.
+pub fn processes_holding(dir: &Path) -> Vec<u32> {
+    let dir = dir.to_str().unwrap();
+    #[cfg(windows)]
+    {
+        // Not this PowerShell, whose own command line holds it too.
+        let script = format!(
+            "Get-CimInstance Win32_Process | Where-Object {{ $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('{}') }} | ForEach-Object {{ $_.ProcessId }}",
+            dir.replace('\'', "''")
+        );
+        let out = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout)
+            .split_whitespace()
+            .filter_map(|p| p.parse().ok())
+            .collect()
+    }
+    #[cfg(not(windows))]
+    {
+        std::fs::read_dir("/proc")
+            .unwrap()
+            .flatten()
+            .filter_map(|e| {
+                let pid = e.file_name().to_str()?.parse().ok()?;
+                let cmdline = std::fs::read(e.path().join("cmdline")).ok()?;
+                String::from_utf8_lossy(&cmdline)
+                    .contains(dir)
+                    .then_some(pid)
+            })
+            .collect()
+    }
 }
 
 impl Mcp {
@@ -208,8 +350,8 @@ impl Mcp {
 
     /// In `project` (so a second server there sees the first one's `.web`), with extra environment.
     /// Unless `envs` says otherwise, agent-browser is the fake, the browser a dummy file, and the search
-    /// folder a fresh one; whichever it is gets the cookie extension already unpacked: no test starts a browser or
-    /// downloads.
+    /// folder a fresh one; whichever it is gets a minimal extension in place of the cookie extension, so no test
+    /// downloads it.
     pub fn start_with(project: PathBuf, envs: &[(&str, String)]) -> Self {
         let search = envs
             .iter()
@@ -217,7 +359,11 @@ impl Mcp {
             .map_or_else(tempdir, |(_, v)| PathBuf::from(v));
         let ext = search.join("extensions/idcac-8f70ab94");
         std::fs::create_dir_all(&ext).unwrap();
-        std::fs::write(ext.join("manifest.json"), "{}").unwrap();
+        std::fs::write(
+            ext.join("manifest.json"),
+            r#"{"manifest_version": 3, "name": "test", "version": "1"}"#,
+        )
+        .unwrap();
         std::fs::write(search.join("chrome"), "").unwrap();
         let state = envs
             .iter()
@@ -245,9 +391,9 @@ impl Mcp {
                 "WEB_MCP_AGENT_BROWSER",
                 env!("CARGO_BIN_EXE_fake-agent-browser"),
             )
+            .env("WEB_MCP_TEST_PUBLIC_IP", PUBLIC)
             .envs(envs.iter().map(|(k, v)| (k, v)))
             .env("CLAUDE_PROJECT_DIR", &project)
-            .env("WEB_MCP_TEST_PUBLIC_IP", PUBLIC)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped());
         let mut child = cmd.spawn().unwrap();
@@ -261,6 +407,7 @@ impl Mcp {
             stdin: Some(stdin),
             out,
             next_id: 1,
+            real: None,
         };
         m.request(
             "initialize",
@@ -269,6 +416,82 @@ impl Mcp {
         );
         m.send(&json!({"jsonrpc":"2.0","method":"notifications/initialized"}));
         m
+    }
+
+    /// On the real agent-browser and Chrome for Testing (an empty `WEB_MCP_CHROME` is unset), each of `engines`
+    /// answered from `tests/fixtures/engines/<engine>.html` by its own server on `127.0.0.3` at the engine's path,
+    /// any query.
+    pub fn start_real(engines: &[&str]) -> Self {
+        let permit = Permit::take();
+        let root = tempdir();
+        let results = Fixture::start(PUBLIC);
+        let mut links = HashMap::new();
+        let origins: Vec<String> = engines
+            .iter()
+            .map(|e| {
+                let fx = Fixture::start(ENGINE_HOST);
+                let html =
+                    std::fs::read_to_string(fixtures().join(format!("engines/{e}.html"))).unwrap();
+                // Google's result links are its own opaque `/goto?url=<token>[&amp;…]` redirects: each gets a target.
+                for (at, _) in html.match_indices("\"/goto?url=") {
+                    let link = &html[at + 1..];
+                    let link = link[..link.find('"').unwrap()].replace("&amp;", "&");
+                    let token = link["/goto?url=".len()..].split('&').next().unwrap();
+                    let path = format!("/{token}");
+                    results.route(&path, vec![Resp::html(STAND_IN)]);
+                    fx.route(&link, vec![Resp::redirect(&results.url(&path))]);
+                }
+                let html = localise(&html, &results, &mut links);
+                fx.route(
+                    engine_path(e),
+                    vec![Resp::html(html).header("Content-Security-Policy", ENGINE_CSP)],
+                );
+                format!("{e}={}", fx.url(""))
+            })
+            .collect();
+        let agent_browser = browser_core::browser::real_agent_browser();
+        let mut m = Self::start_with(
+            root.join("project"),
+            &[
+                (
+                    "WEB_MCP_SEARCH_DIR",
+                    root.join("search").display().to_string(),
+                ),
+                ("WEB_MCP_CHROME", String::new()),
+                // Unused by the real agent-browser; inside the root, so it goes with it.
+                ("FAKE_AB_STATE", root.join("state").display().to_string()),
+                ("WEB_MCP_AGENT_BROWSER", agent_browser.display().to_string()),
+                ("WEB_MCP_TEST_PUBLIC_IP", format!("{PUBLIC},{ENGINE_HOST}")),
+                ("WEB_MCP_TEST_ENGINES", origins.join(",")),
+            ],
+        );
+        m.real = Some(Real {
+            root,
+            results,
+            links,
+            _permit: permit,
+        });
+        m
+    }
+
+    /// Where a captured result link leads under `start_real`: a Google `/goto?url=<token>` link redirects to its
+    /// stand-in, an absolute link is served as one; any other URL stays.
+    pub fn stand_in(&self, url: &url::Url) -> String {
+        let Some(real) = &self.real else {
+            return url.to_string();
+        };
+        let token = url
+            .query_pairs()
+            .find(|(k, _)| k == "url")
+            .filter(|_| url.path() == "/goto");
+        match token {
+            Some((_, t)) => real.results.url(&format!("/{t}")),
+            None => real
+                .links
+                .get(url.as_str())
+                .cloned()
+                .unwrap_or_else(|| url.to_string()),
+        }
     }
 
     pub fn send(&mut self, m: &Value) {
@@ -357,6 +580,32 @@ impl Mcp {
 
 impl Drop for Mcp {
     fn drop(&mut self) {
+        if let Some(real) = &self.real {
+            // web-mcp closes its browser only when its stdin closes.
+            self.stdin = None;
+            let until = Instant::now() + Duration::from_secs(5);
+            while matches!(self.child.try_wait(), Ok(None)) && Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+            for pid in processes_holding(&real.root) {
+                let pid = pid.to_string();
+                let _ = if cfg!(windows) {
+                    Command::new("taskkill").args(["/F", "/PID", &pid]).output()
+                } else {
+                    Command::new("kill").args(["-9", &pid]).output()
+                };
+            }
+            // Windows frees a killed process's files a moment later.
+            let until = Instant::now() + Duration::from_secs(5);
+            while std::fs::remove_dir_all(&real.root).is_err()
+                && real.root.exists()
+                && Instant::now() < until
+            {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        }
         let _ = self.child.kill();
         let _ = self.child.wait();
     }

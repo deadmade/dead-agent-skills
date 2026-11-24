@@ -55,13 +55,45 @@ jobs:
           $selection = @($packages | ForEach-Object { '-p'; $_ })
           cargo clippy @selection --all-targets --locked -- -D warnings
 
-      # The rust suite builds the fake first: unit tests reach it by path, not CARGO_BIN_EXE.
+      # The tests that drive a real browser: the pinned, checksum-checked agent-browser, which the rust suite passes to
+      # cargo through WEB_MCP_AGENT_BROWSER.
+      - name: agent-browser
+        id: agent-browser
+        run: |
+          echo "version=$(node -p "require('./tools/installer/assets/tools.json').tools['agent-browser'].version")" >> "$GITHUB_OUTPUT"
+          node --input-type=module -e "
+            import { appendFileSync } from 'node:fs';
+            import { join } from 'node:path';
+            import { resolveTool } from './tools/installer/core/tools.ts';
+            import { downloadBin } from './tools/installer/system/net.ts';
+            const bin = join(process.env.RUNNER_TEMP, 'agent-browser' + (process.platform === 'win32' ? '.exe' : ''));
+            await downloadBin('agent-browser', resolveTool('agent-browser', process.platform, process.arch, '0.0.0'), bin);
+            appendFileSync(process.env.GITHUB_ENV, 'WEB_MCP_AGENT_BROWSER=' + bin + '\n');
+            process.exit(0);
+          "
+
+      # Chrome for Testing, whichever version agent-browser installs (ADR 0017's one unpinned download).
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.agent-browser/browsers
+          key: agent-browser-browsers-${{ runner.os }}-${{ steps.agent-browser.outputs.version }}
+
+      # Fetches only what the cache lacks.
+      - name: Chrome for Testing
+        run: '"$WEB_MCP_AGENT_BROWSER" install'
+
+      # The rust suite builds the fake first: unit tests reach it by path, not CARGO_BIN_EXE. On Linux the headed Chrome
+      # gets a virtual display.
       - name: Rust tests
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           $packages = @($env:PACKAGES | ConvertFrom-Json) -join ','
-          node scripts/test.mjs --strict rust --packages $packages --each-package
+          if ($IsLinux) {
+            xvfb-run -a node scripts/test.mjs --strict rust --packages $packages --each-package
+          } else {
+            node scripts/test.mjs --strict rust --packages $packages --each-package
+          }
 
   # Validate each independently installed Linux package.
   nix:

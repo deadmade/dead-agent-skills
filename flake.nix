@@ -120,6 +120,16 @@
         nativeCheckInputs = [pkgs.cacert];
         # Debug checks: the fetch tests' WEB_MCP_TEST_PUBLIC_IP hook exists only in debug builds or the `test-hooks` feature.
         checkType = "debug";
+        # The sandbox has no agent-browser, Chrome or display: the tests that start a browser run in crates.yml's rust
+        # job instead (docs/adr/0017-tests-use-the-real-thing.md).
+        checkFlags = [
+          "--skip"
+          "search_through_real_chrome_reads_captured_google"
+          "--skip"
+          "real_chrome_rows_match_the_parser"
+          "--skip"
+          "a_dropped_server_leaves_no_chrome"
+        ];
         meta = {
           inherit (webMcp) description;
           mainProgram = "web-mcp";

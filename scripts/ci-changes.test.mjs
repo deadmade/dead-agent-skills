@@ -95,6 +95,16 @@ test('installer changes skip Rust and scanning; skill changes scan', () => {
   assert.equal(selectChecks(['.github/skill-scanner.yaml']).skills, true);
 });
 
+test('the installer tools pin also selects the crates whose tests run the pinned agent-browser', () => {
+  assert.deepEqual(selectChecks(['tools/installer/assets/tools.json']), {
+    node: true,
+    skills: false,
+    rust: true,
+    binaries: ['web-mcp', 'http-runner'],
+    packages: ['web-mcp', 'http-runner', 'browser-core'],
+  });
+});
+
 test('docs skip expensive checks, but root readmes and crate manifests get consistency checks', () => {
   assert.equal(selectChecks(['docs/adr/example.md']).rust, false);
   assert.equal(selectChecks(['docs/adr/example.md']).node, false);

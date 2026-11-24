@@ -24,6 +24,8 @@ export function selectChecks(paths, all = false) {
   if (all) everything();
   for (const path of paths) {
     if (isTestName(path)) node = true;
+    // Their tests run the agent-browser this file pins.
+    if (path === 'tools/installer/assets/tools.json') ['web-mcp', 'http-runner'].forEach((c) => selected.add(c));
     const crate =
       crates.find((c) => roots[c].some((root) => path.startsWith(root))) ??
       Object.values(libraries).find((l) => path.startsWith(l.root))?.binary;

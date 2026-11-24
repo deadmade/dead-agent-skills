@@ -22,11 +22,12 @@ import { which } from '../tools/installer/system/proc.ts';
 const REAL = fileURLToPath(new URL('..', import.meta.url));
 const WIN = process.platform === 'win32';
 const TOML = 'excludes = [\n  "plugins/vendored/**",\n]\n';
-// Each fake logs `<cwd> :: <args> :: <UV_PROJECT_ENVIRONMENT> <PYTHONDONTWRITEBYTECODE>` and fails when `fail` is in its cwd.
+// Each fake logs `<cwd> :: <args> :: <UV_PROJECT_ENVIRONMENT> <PYTHONDONTWRITEBYTECODE> :: <WEB_MCP_AGENT_BROWSER>` and
+// fails when `fail` is in its cwd.
 const SH =
-  '#!/bin/sh\necho "$(pwd) :: $* :: $UV_PROJECT_ENVIRONMENT $PYTHONDONTWRITEBYTECODE" >> "$FAKE_LOG"\n[ -f fail ] && exit 1\nexit 0\n';
+  '#!/bin/sh\necho "$(pwd) :: $* :: $UV_PROJECT_ENVIRONMENT $PYTHONDONTWRITEBYTECODE :: $WEB_MCP_AGENT_BROWSER" >> "$FAKE_LOG"\n[ -f fail ] && exit 1\nexit 0\n';
 const CMD =
-  '@echo off\r\n>> "%FAKE_LOG%" echo %cd% :: %* :: %UV_PROJECT_ENVIRONMENT% %PYTHONDONTWRITEBYTECODE%\r\nif exist fail exit /b 1\r\nexit /b 0\r\n';
+  '@echo off\r\n>> "%FAKE_LOG%" echo %cd% :: %* :: %UV_PROJECT_ENVIRONMENT% %PYTHONDONTWRITEBYTECODE% :: %WEB_MCP_AGENT_BROWSER%\r\nif exist fail exit /b 1\r\nexit /b 0\r\n';
 // The fake claude logs `<cwd> :: <args> :: <its hooks/ and tests/ test files>` and fails when `fail` is in its cwd.
 // The cmd loop variable is %%x: cmd would also expand a %%f inside %%files%%.
 const CLAUDE_SH =
@@ -42,7 +43,8 @@ appendFileSync(process.env.FAKE_LOG, 'build :: ' + process.argv.slice(2).join(' 
 `;
 
 // A checkout with a space in its path: the door itself, the installer modules proc.ts loads, stubs for what it starts,
-// and fake tools in their own folder, which are the only thing on the child's PATH.
+// and fake tools in their own folder, which are the only thing on the child's PATH. No agent-browser, unless a run
+// sets WEB_MCP_AGENT_BROWSER or CLAUDE_CONFIG_DIR.
 function door(t, { modules = true, tools = ['uv', 'cargo'] } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'door root '));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -77,6 +79,8 @@ function door(t, { modules = true, tools = ['uv', 'cargo'] } = {}) {
     const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== 'PATH'));
     delete env.MSYSTEM;
     delete env.UV_PROJECT_ENVIRONMENT;
+    delete env.WEB_MCP_AGENT_BROWSER;
+    env.CLAUDE_CONFIG_DIR = join(root, 'claude config');
     // Set by node --test, it makes a nested node --test skip its files.
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [script, ...args], {
@@ -88,7 +92,10 @@ function door(t, { modules = true, tools = ['uv', 'cargo'] } = {}) {
     const log = readFileSync(logFile, 'utf8').replaceAll('"', '').split(/\r?\n/).filter(Boolean);
     return { status: r.status, out: r.stdout, err: r.stderr, log };
   };
-  return { root, fake, put, run };
+  // A file standing in for agent-browser.
+  const agentBrowser = join(root, 'agent-browser');
+  writeFileSync(agentBrowser, '');
+  return { root, fake, put, run, agentBrowser };
 }
 
 test('a failing suite does not stop the next, and fails the run', (t) => {
@@ -151,7 +158,7 @@ test('under Git Bash the rust suite refuses to run cargo', (t) => {
 
 test('the rust suite builds the fake, tests the packages together, then each one', (t) => {
   const d = door(t);
-  const cargo = (args) => d.run(args).log.map((l) => l.split(' :: ')[1]);
+  const cargo = (args) => d.run(args, { WEB_MCP_AGENT_BROWSER: d.agentBrowser }).log.map((l) => l.split(' :: ')[1]);
   const build = 'build --locked -p web-mcp --bin fake-agent-browser';
   const test = 'test --locked --no-fail-fast';
   assert.deepEqual(cargo(['rust', '--packages', 'web-mcp,ado-mcp', '--each-package']), [
@@ -164,9 +171,41 @@ test('the rust suite builds the fake, tests the packages together, then each one
   assert.deepEqual(cargo(['rust']), [build, `${test} --workspace`]);
   // Every command runs, and one failing fails the suite.
   writeFileSync(join(d.root, 'fail'), '');
-  const f = d.run(['rust', '--packages', 'web-mcp,ado-mcp', '--each-package']);
+  const f = d.run(['rust', '--packages', 'web-mcp,ado-mcp', '--each-package'], {
+    WEB_MCP_AGENT_BROWSER: d.agentBrowser,
+  });
   assert.equal(f.status, 1);
   assert.equal(f.log.length, 4);
+});
+
+test('cargo gets the agent-browser it found, the installer copy when nothing is set', (t) => {
+  const d = door(t);
+  const config = join(d.root, 'claude config');
+  const copy = join(config, 'bin', WIN ? 'agent-browser.exe' : 'agent-browser');
+  mkdirSync(dirname(copy), { recursive: true });
+  writeFileSync(copy, '');
+  const passed = (extra) => d.run(['rust', '--packages', 'ado-mcp'], extra).log.map((l) => l.split(' :: ')[3]);
+  assert.deepEqual(passed({}), [copy]);
+  assert.deepEqual(passed({ WEB_MCP_AGENT_BROWSER: d.agentBrowser }), [d.agentBrowser]);
+});
+
+test('without agent-browser only the packages that drive it are NOT RUN', (t) => {
+  const d = door(t);
+  const run = (args) => {
+    const r = d.run(args);
+    return { status: r.status, out: r.out, cargo: r.log.map((l) => l.split(' :: ')[1]) };
+  };
+  const test = 'test --locked --no-fail-fast';
+  const all = run(['rust']);
+  assert.deepEqual(all.cargo, [`${test} --workspace --exclude web-mcp --exclude browser-core --exclude http-runner`]);
+  assert.match(all.out, /^rust +NOT RUN +web-mcp, browser-core, http-runner: agent-browser not found$/m);
+  assert.equal(all.status, 0);
+  const some = run(['rust', '--packages', 'web-mcp,ado-mcp,browser-core', '--each-package']);
+  assert.deepEqual(some.cargo, [`${test} -p ado-mcp`]);
+  assert.match(some.out, /^rust +NOT RUN +web-mcp, browser-core: agent-browser not found$/m);
+  assert.equal(run(['--strict', 'rust', '--packages', 'http-runner']).status, 1);
+  // A path that names no file counts as missing.
+  assert.deepEqual(d.run(['rust', '--packages', 'web-mcp'], { WEB_MCP_AGENT_BROWSER: join(d.root, 'none') }).log, []);
 });
 
 test('the python suite runs in the server folder with its venv outside the tree', (t) => {
@@ -319,7 +358,8 @@ test('usage errors exit 2 and run nothing', (t) => {
 });
 
 test('--list prints each command and runs nothing', (t) => {
-  const r = door(t).run(['--list', 'node', 'rust']);
+  const d = door(t);
+  const r = d.run(['--list', 'node', 'rust'], { WEB_MCP_AGENT_BROWSER: d.agentBrowser });
   assert.equal(r.status, 0);
   assert.match(r.out, /^node: .*--test-timeout=300000 /m);
   assert.doesNotMatch(r.out, /^node: .*--test-coverage-lines/m);

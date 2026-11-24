@@ -1136,3 +1136,100 @@ fn bad_since_is_rejected() {
     let t = text(&r["result"]);
     assert!(t.contains("fortnight") && t.contains("`day`"), "{t}");
 }
+
+/// The engines' parsers, compiled in here to read a capture on its real URL; their own tests run here a second time.
+#[path = "../src/engines/mod.rs"]
+#[allow(dead_code)]
+mod engines;
+
+/// The query each `engines/<engine>.html` was captured for (`tests/fixtures/engines/README.md`).
+fn captured_query(engine: &str) -> &'static str {
+    match engine {
+        "google" => "Tokio 1.x vs smol",
+        _ => "tokio select cancellation safety",
+    }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn search_through_real_chrome_reads_captured_google() {
+    let mut mcp = Mcp::start_real(&["google"]);
+    let r = search(
+        &mut mcp,
+        json!({"query": captured_query("google"), "engines": "google", "max_passages": 20}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        first_line(t).starts_with("Source: google (searched "),
+        "{t}"
+    );
+    assert!(t.contains("smol vs tokio vs async-std; : r/rust"), "{t}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn real_chrome_rows_match_the_parser() {
+    use engines::{Engine, Parsed};
+    for e in [
+        Engine::Google,
+        Engine::Bing,
+        Engine::DuckDuckGo,
+        Engine::Brave,
+    ] {
+        let name = e.name();
+        let query = captured_query(name);
+        let html = std::fs::read_to_string(format!(
+            "{}/tests/fixtures/engines/{name}.html",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        let Parsed::Results(want) = e.parse(&html, &e.url(query, None)) else {
+            panic!("{name}: the capture parses as no rows");
+        };
+        let mut mcp = Mcp::start_real(&[name]);
+        let r = search(&mut mcp, json!({"query": query, "engines": name}));
+        assert!(!is_error(&r), "{name}: {r}");
+        let row =
+            |url: String, title: &str, snippet: &str| (url, title.to_owned(), snippet.to_owned());
+        let got: Vec<_> = only_record(&mcp)["engines"][name]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| {
+                let get = |k: &str| f[k].as_str().unwrap();
+                row(get("url").to_owned(), get("title"), get("snippet"))
+            })
+            .collect();
+        // The served capture's result links lead to the harness's stand-ins, so no search leaves this machine.
+        let want: Vec<_> = want
+            .iter()
+            .map(|f| row(mcp.stand_in(&f.url), &f.title, &f.snippet))
+            .collect();
+        assert_eq!(got, want, "{name}");
+    }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn a_dropped_server_leaves_no_chrome() {
+    let mut mcp = Mcp::start_real(&["bing"]);
+    let r = search(
+        &mut mcp,
+        json!({"query": captured_query("bing"), "engines": "bing"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let root = mcp.search.parent().unwrap().to_owned();
+    assert!(
+        !common::processes_holding(&root).is_empty(),
+        "no Chrome holds {}",
+        root.display()
+    );
+    drop(mcp);
+    let until = Instant::now() + Duration::from_secs(5);
+    while !common::processes_holding(&root).is_empty() && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    assert_eq!(common::processes_holding(&root), Vec::<u32>::new());
+    assert!(!root.exists(), "{} is left", root.display());
+}

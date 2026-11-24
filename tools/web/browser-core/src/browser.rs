@@ -861,6 +861,34 @@ pub fn fake_agent_browser() -> PathBuf {
         .expect("build the fake first: cargo build --locked -p web-mcp --bin fake-agent-browser")
 }
 
+/// The real agent-browser for tests: `WEB_MCP_AGENT_BROWSER` if set, else the installer's copy in
+/// `<CLAUDE_CONFIG_DIR or ~/.claude>/bin`.
+///
+/// # Panics
+///
+/// When that file doesn't exist.
+#[cfg(any(test, feature = "test-support"))]
+#[must_use]
+pub fn real_agent_browser() -> PathBuf {
+    let var = |k: &str| {
+        std::env::var_os(k)
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+    };
+    var("WEB_MCP_AGENT_BROWSER")
+        .or_else(|| {
+            let home = var(if cfg!(windows) { "USERPROFILE" } else { "HOME" });
+            let config = var("CLAUDE_CONFIG_DIR").or_else(|| Some(home?.join(".claude")))?;
+            Some(
+                config
+                    .join("bin")
+                    .join(format!("agent-browser{}", std::env::consts::EXE_SUFFIX)),
+            )
+        })
+        .filter(|p| p.is_file())
+        .expect("agent-browser not found: run the installer or set WEB_MCP_AGENT_BROWSER")
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
