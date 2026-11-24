@@ -308,9 +308,11 @@ fn engine_path(engine: &str) -> &'static str {
     }
 }
 
-/// The processes whose command line holds `dir`.
+/// The processes whose command line holds a path inside `dir`. The separator keeps root `…-5` from matching a
+/// concurrent test's `…-50`; Chrome's and agent-browser's arguments carry it on both OSes.
 pub fn processes_holding(dir: &Path) -> Vec<u32> {
-    let dir = dir.to_str().unwrap();
+    let dir = format!("{}{}", dir.to_str().unwrap(), std::path::MAIN_SEPARATOR);
+    let dir = dir.as_str();
     #[cfg(windows)]
     {
         // Not this PowerShell, whose own command line holds it too.
