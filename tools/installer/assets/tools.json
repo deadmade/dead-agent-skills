@@ -54,10 +54,10 @@
         }
       }
     },
-    "graphify": {
+    "serena": {
       "source": "pypi",
-      "package": "graphifyy",
-      "extras": "sql,pdf,office,watch,leiden"
+      "package": "serena-agent",
+      "python": "3.13"
     }
   }
 }

@@ -1,7 +1,6 @@
 // The binaries the installer can only ask the user to install, and the checksum and version helpers its downloads use.
 import { createHash } from 'node:crypto';
 import { BUNDLE } from './plugins.ts';
-import { pypiSpec } from './tools.ts';
 
 // [binary, needed for (plugin name), NixOS command, Windows command]
 const BINARIES = [
@@ -17,8 +16,6 @@ const BINARIES = [
   ['nixd', 'nix-lsp', 'nix: nixd', 'not available on Windows, deselect nix-lsp'],
   ['jq', BUNDLE, 'nix: jq', 'winget install -e --id jqlang.jq'],
   ['python3', BUNDLE, 'nix: python3', 'winget install -e --id Python.Python.3.13'],
-  ['uv', 'graphify', 'nix: uv', 'winget install -e --id astral-sh.uv'],
-  ['graphify', 'graphify', `uv tool install "${pypiSpec('graphify')}"`, `uv tool install "${pypiSpec('graphify')}"`],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
 ];
 

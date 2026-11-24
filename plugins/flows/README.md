@@ -7,7 +7,7 @@ Claude proposes and recommends; you decide.
 
 | Command                                          | Job                                                             | Runs                                                                                                                                                                                                                                                                                                                                                                                                                                         | Ends in                                           |
 | ------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `/understand <topic>`                            | learn a codebase, subsystem or concept                          | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                                                                                                                                                                                                             | terms in GLOSSARY.md                              |
+| `/understand <topic>`                            | learn a codebase, subsystem or concept                          | serena, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                                                                                                                                                                                                               | terms in GLOSSARY.md                              |
 | `/build-feature <what>`                          | a new feature with a design                                     | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                                                                                                                                                                                                                                                                                                            | `/review-code`, `/learn`                          |
 | `/research-feature <question>`                   | research a design question before building                      | frame, papers and engineering sources (web-mcp, paper-lookup), source check, a claim vote on what the options rest on, `grilling` on the options; no build, no benchmark                                                                                                                                                                                                                                                                     | a decision report, then `/build-feature`          |
 | `/evaluate <url or name> [purpose]`              | is this tool useful here?                                       | identifies the tool, reads the project, prior art, source check; reads only, never runs the tool                                                                                                                                                                                                                                                                                                                                             | one page: adopt, try or skip                      |
@@ -36,19 +36,20 @@ build-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: codebase-design, domain-modeling, grilling, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
 ├ pstack-picks: architect, arena, blast-radius, how, interrogate, principle-boundary-discipline, principle-redesign-from-first-principles, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: brainstorming, executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees, writing-plans
 └ web-mcp: fetch, search
 
 evaluate
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ graphify: graphify
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: how, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 └ web-mcp: fetch, search
 
 fix
@@ -63,9 +64,9 @@ implement
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees
 └ web-mcp: fetch
 
@@ -81,10 +82,10 @@ refactor
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: codebase-design, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
 ├ pstack-picks: blast-radius, how, interrogate, principle-boundary-discipline, principle-redesign-from-first-principles, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees, writing-plans
 └ web-mcp: fetch
 
@@ -92,10 +93,10 @@ research-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: grilling, setup-matt-pocock-skills
 ├ paper-lookup: paper-lookup
 ├ pstack-picks: how, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 └ web-mcp: fetch, search
 
 review-code
@@ -115,9 +116,10 @@ tidy
 understand
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ graphify: graphify
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills, teach
 ├ pstack-picks: how, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 └ web-mcp: fetch
 
 upgrade
@@ -125,9 +127,9 @@ upgrade
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ dead-skills: context7
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, writing-plans
 └ web-mcp: fetch
 ```

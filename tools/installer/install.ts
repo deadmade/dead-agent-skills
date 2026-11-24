@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { SELF_CONFIGURED } from './core/config.ts';
 import { collectConfig } from './steps/config.ts';
 import { missingBinaries } from './core/binaries.ts';
+import { toolPath } from './core/tools.ts';
 import { HINTS, TOGGLES, categorize, unavailable } from './core/options.ts';
 import {
   type Marketplace,
@@ -41,6 +42,7 @@ import {
 } from './core/settings.ts';
 import {
   ask,
+  BIN_DIR,
   CONFIG,
   FLAGS,
   PKG,
@@ -55,7 +57,14 @@ import {
   tryJson,
 } from './context.ts';
 import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
-import { HEADROOM_TRIM, installGraphify, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
+import {
+  HEADROOM_TRIM,
+  installSerena,
+  installUv,
+  prepareTrimServer,
+  stopTrimServer,
+  uninstallGraphify,
+} from './steps/uv.ts';
 import { HTTP_RUNNER, MCP_AZURE, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
@@ -299,12 +308,29 @@ const webBuiltinsOff = webBuiltinsDecision({
   installed: has(WEB_MCP),
   healthy: browser.works,
 });
-const withGraphify = selected.some((id) => nameOf(id) === 'graphify');
-if (selected.includes(HEADROOM_TRIM) || withGraphify) {
-  const uv = await installUv();
+const withSerena = selected.some((id) => nameOf(id) === 'serena');
+const graphifyRetired = retired.includes(`graphify@${MARKETPLACE}`);
+let uv: string | undefined;
+if (selected.includes(HEADROOM_TRIM) || withSerena) {
+  uv = await installUv();
   if (uv && selected.includes(HEADROOM_TRIM)) await prepareTrimServer(uv);
-  if (uv && withGraphify) installGraphify(uv);
+  const serenaPath = uv && withSerena ? installSerena(uv) : undefined;
+  if (serenaPath) {
+    const r = await claude(
+      JSON.stringify({ serenaPath }),
+      'plugin',
+      'configure',
+      `serena@${MARKETPLACE}`,
+      '--values-stdin',
+    );
+    if (r.ok) done.push(`serena: serenaPath is ${serenaPath}`);
+    else
+      failures.push(
+        `serena: could not set serenaPath (${r.err}); set it to ${serenaPath} with /plugin configure serena`,
+      );
+  }
 }
+if (graphifyRetired) uninstallGraphify([uv, toolPath(BIN_DIR, 'uv', process.platform)]);
 
 const toggles = {
   statusLine: on('ccstatusline'),

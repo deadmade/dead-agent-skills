@@ -2,24 +2,29 @@ import type { EmitContext } from '../targets/target.ts';
 
 // The plugins the Codex installer configures from their definition. web-mcp's variables are Claude-only, and
 // Atlassian has no plugin.json, so neither is here.
-export const MCP_SETTINGS = ['dead-skills', 'mcp-github', 'mcp-azure'];
+export const MCP_SETTINGS = ['dead-skills', 'mcp-github', 'mcp-azure', 'serena'];
 
-// A plugin's first MCP server: its url and the names of its environment variables, read from plugin.json.
-export function mcpSettings(context: EmitContext): { url?: string; envVars: string[] } {
+// A plugin's first MCP server: its url, args and the names of its environment variables, read from plugin.json.
+export function mcpSettings(context: EmitContext): { url?: string; args?: string[]; envVars: string[] } {
   const server = Object.values(context.plugin.manifest?.mcpServers ?? {})[0];
-  return { ...(server?.url ? { url: server.url } : {}), envVars: Object.keys(server?.env ?? {}) };
+  return {
+    ...(server?.url ? { url: server.url } : {}),
+    ...(server?.args ? { args: server.args } : {}),
+    envVars: Object.keys(server?.env ?? {}),
+  };
 }
 
 // Codex install prose. It is generated into the Codex distribution only; plugins/ never carries it.
 export function integrationSetup(context: EmitContext) {
   const { name } = context.plugin;
-  const { url, envVars } = mcpSettings(context);
+  const { url, args = [], envVars } = mcpSettings(context);
   const commands: Record<string, string> = {
     'web-mcp': 'codex mcp add dead-agent-skills-web-mcp -- web-mcp',
     'mcp-github': `codex mcp add dead-agent-skills-mcp-github --url ${url} --bearer-token-env-var GITHUB_PERSONAL_ACCESS_TOKEN`,
     'mcp-azure': 'codex mcp add dead-agent-skills-mcp-azure -- ado-mcp',
     'http-runner': 'codex mcp add dead-agent-skills-http-runner -- http-runner',
     atlassian: 'codex mcp add dead-agent-skills-atlassian --url https://mcp.atlassian.com/v1/mcp',
+    serena: `codex mcp add dead-agent-skills-serena -- serena ${args.join(' ')}`,
   };
   let setup = `Use the native Codex CLI to configure this integration; no project installer is required.\n\n\`\`\`sh\n${commands[name]}\n\`\`\`\n\nNever paste credentials into chat or package files. Preserve an existing server with this name and ask before replacing it.`;
   if (name === 'web-mcp')
@@ -31,6 +36,9 @@ export function integrationSetup(context: EmitContext) {
     setup += `\n\nPut the ado-mcp release binary on PATH (or use its absolute path in the command). Set ADO_ORG_URL (the Azure DevOps Server collection URL) and ADO_PAT in the environment that starts Codex. In the native server table [mcp_servers.dead-agent-skills-mcp-azure], add env_vars = [${envVars.map((v) => `"${v}"`).join(', ')}]. ADO_PROJECT_DIR optionally overrides the repository used for project detection. Preserve all unrelated configuration; ask for missing non-secret preferences. Release binaries: https://github.com/${context.repository}/releases .`;
   if (name === 'http-runner')
     setup += `\n\nPut the http-runner release binary on PATH (or use its absolute path in the command). The user types each host's login on a page the server opens in their browser, so no credential goes in the environment, the command or the chat. The typed values live in logins.json in the per-user data folder or HTTP_RUNNER_DIR, a host is forgotten by deleting its entry there, and http-replies/ should be reviewed before it is committed. Release binaries: https://github.com/${context.repository}/releases .`;
+  if (name === 'serena')
+    setup +=
+      '\n\nInstall the serena CLI with uv (uv tool install -p 3.13 serena-agent), or use its absolute path in the command. Its first start in a repository downloads language servers, so in the native server table [mcp_servers.dead-agent-skills-serena] add startup_timeout_sec = 15. Serena writes .serena/project.yml into each repository it activates.';
   if (name === 'atlassian')
     setup +=
       '\n\nComplete OAuth with codex mcp login dead-agent-skills-atlassian. Authentication is a separate user action.';
@@ -40,12 +48,12 @@ export function integrationSetup(context: EmitContext) {
 export function packageReadme(context: EmitContext) {
   const { name, dependencies } = context.plugin;
   if (name === 'flows')
-    return `# Codex flows\n\nInstall directly from this marketplace:\n\n\`\`\`sh\ncodex plugin add flows@dead-agent-skills\n${dependencies.map((dependency) => `codex plugin add ${dependency}@dead-agent-skills`).join('\n')}\n\`\`\`\n\nCodex does not install Claude dependency declarations. Companion integrations are optional at runtime: each conductor names its fallback for a missing one. Run the web-mcp setup skill to configure its server. Packs, reviewer briefs and graphify resources are bundled. No installer or build is required.\n`;
+    return `# Codex flows\n\nInstall directly from this marketplace:\n\n\`\`\`sh\ncodex plugin add flows@dead-agent-skills\n${dependencies.map((dependency) => `codex plugin add ${dependency}@dead-agent-skills`).join('\n')}\n\`\`\`\n\nCodex does not install Claude dependency declarations. Companion integrations are optional at runtime: each conductor names its fallback for a missing one. Run the web-mcp and serena setup skills to configure their servers. Packs and reviewer briefs are bundled. No installer or build is required.\n`;
   if (name === 'dead-skills')
     return `# Shared coding rules, Night City and Context7\n\nRun the setup-night-city skill to copy the packaged native theme safely and select it with /theme. No installer is required.\n\nThe trusted startup hook supplies shared coding rules. Review and trust hooks in Codex, then verify a fresh session before removing any installer-managed global rules block. Existing user instructions are preserved. The project-rules skill also carries the conventions. Context7 can be configured without an installer:\n\n\`\`\`sh\ncodex mcp add dead-agent-skills-dead-skills --url ${mcpSettings(context).url}\n\`\`\`\n`;
   return `# ${name}\n\n${integrationSetup(context)}\n\nThe setup skill guides native MCP registration and authentication. Installing this setup plugin alone does not register a global MCP server.\n`;
 }
-export const INTEGRATIONS = ['web-mcp', 'mcp-github', 'mcp-azure', 'http-runner', 'atlassian'];
+export const INTEGRATIONS = ['web-mcp', 'mcp-github', 'mcp-azure', 'http-runner', 'atlassian', 'serena'];
 export const READMES = ['flows', 'dead-skills', ...INTEGRATIONS];
 export const setupSkill = (context: EmitContext) =>
   `---\nname: setup-${context.plugin.name}\ndescription: Set up the ${context.plugin.name} integration installed by dead-agent-skills.\n---\n\n${integrationSetup(context)}\n`;

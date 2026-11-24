@@ -27,7 +27,6 @@ const FIELDS = [
   'extensions',
   'themes',
   'instructions',
-  'embeds',
 ];
 const targets = (v: unknown, where: string) => strings(v, where).map((t) => oneOf(t, TARGET_IDS, where));
 
@@ -153,7 +152,6 @@ export function parseManifest(value: unknown, name: string): Manifest {
       return { name: string(o.name, `${w}.name`), palette: relativePath(o.palette, `${w}.palette`) };
     }),
     ...(m.instructions ? { instructions: relativePath(m.instructions, `${where}.instructions`) } : {}),
-    embeds: m.embeds === undefined ? [] : strings(m.embeds, `${where}.embeds`),
   };
 }
 

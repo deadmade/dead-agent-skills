@@ -6,7 +6,7 @@ Say which plugin provides it, then use the fallback. Only the rows for plugins t
 | ---------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | flows                  | a pack file (`<packs>/…`)                | none: flows is broken, reinstall it                                                                 |
 | web-mcp                | `search`, `fetch`, papers                | paper-lookup for papers, the host's own web search and fetch for the rest, marked weaker provenance |
-| graphify               | a knowledge graph                        | {{explore}}                                                                                         |
+| serena                 | symbol lookup                            | {{explore}}                                                                                         |
 | dead-skills (context7) | library docs                             | the library's docs via {{web-fetch}}                                                                |
 | dead-skills            | a desktop ping                           | nothing                                                                                             |
 | host security skill    | security review                          | review the diff for exploitable vulnerabilities using the host adapter                              |
