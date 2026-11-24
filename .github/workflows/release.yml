@@ -151,7 +151,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" dist/* --title "$TAG" --generate-notes \
+          # The notes start at the release before this one. Patch tags sit off main, and without a start tag GitHub's
+          # notes started at v0.6.0, the last tag on main. Releases, not tags: a tag a failed run left keeps its PRs.
+          previous=$({ gh release list --exclude-drafts --limit 100 --json tagName -q '.[].tagName'; echo "$TAG"; } | sort -V | awk -v t="$TAG" '$0 == t { print p; exit } { p = $0 }')
+          gh release create "$TAG" dist/* --title "$TAG" --generate-notes --notes-start-tag "$previous" \
             --notes "Install or update with \`npx --allow-remote=root https://github.com/${{ github.repository }}/releases/download/$TAG/installer.tgz\`, which points the marketplace at the release branch (Claude Code then updates the plugins on its own) and installs this release's binaries, or with \`/plugin update\` if you added the marketplace by hand from its release branch (\`${{ github.repository }}@release\`).
 
           installer.tgz: the installer, built to JS.

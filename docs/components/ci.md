@@ -30,4 +30,6 @@ back): the tag plus one `Distribution vX.Y.Z` commit holding the native distribu
 Tags carry sources only. The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so
 Claude Code's marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer
 (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed plugins of
-ours that the manifest no longer lists.
+ours that the manifest no longer lists. The release notes start at the release before this one (`--notes-start-tag`,
+from `gh release list`): patch tags sit off main, and without a start tag GitHub's notes started at v0.6.0, the last
+tag on main, and listed everything since.
