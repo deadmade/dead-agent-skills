@@ -116,9 +116,15 @@ Read `docs/components/ci.md` for how a release is built and published.
 - In a fresh clone, run `npm ci` before committing, because check-repo and the compiler, which the pre-commit hook runs, import `smol-toml`.
 - `npm test` is the one list of what runs (`package.json`'s `test` script; `claude plugin validate`, inside
   `check-repo.mjs`, is skipped when `claude` isn't on PATH). The installer tests run with a line-coverage floor
-  (`--test-coverage-lines` in that script; raise it, never lower it), and `tools/installer/modules.test.ts`
+  (`--test-coverage-lines` on the `real` suite; raise it, never lower it), and `tools/installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
+- Tests use the real thing (ADR 0017): the real process, CLI, browser and files, never a fake that makes up answers. Only
+  what CI cannot reach is answered from captures by a replay server, and a fake stays only with a `// fake: <why>` beside it.
+  Node tests find a real tool through `realTool` in `scripts/test.mjs`, Rust tests through `real_agent_browser`; a missing
+  tool skips the test, or fails it under `DEAD_SKILLS_STRICT=1`, which `scripts/test.mjs --strict` (CI) sets. The slow
+  real Node tests are `*.real.test.{mjs,ts}` and run only in the `real` suite: `npm test` and CI run it, the pre-commit
+  hook and the release jobs run `repo node`.
 - Run `npm ci` once, then `npm run typecheck`, which is also one list: `tsc --noEmit` over `tools/installer/` (sources and tests,
   strict), then the harness-compiler's and upstream-sync's own `typecheck`.
 - Rust, from the root: `cargo build --locked -p web-mcp --bin fake-agent-browser`, then

@@ -10,7 +10,8 @@ import { startSync, which } from '../tools/installer/system/proc.ts';
 // The extensions are named because, given no paths, `node --test` also runs .test.cjs, the stale .test.js that
 // prepack's tsc writes, and target/.
 const GLOBS = {
-  node: ['{scripts,tools}/**/*.test.{ts,mjs}', 'plugins/**/*.test.mjs'],
+  node: ['{scripts,tools}/**/*.test.{ts,mjs}', 'plugins/**/*.test.mjs'], // not *.real.test.*, which only `real` runs
+  real: ['plugins/**/*.real.test.mjs', 'tools/**/*.real.test.ts'],
   mods: ['plugins/**/*.test.{ts,tsx}'],
   python: ['plugins/opt-in/headroom-trim/server/tests/test*.py'],
 };
@@ -27,12 +28,18 @@ function vendoredPath(root) {
 // Sorted repo-relative `/` paths. `**` does not skip node_modules, so exclude lists them.
 export function suiteFiles(root) {
   const vendored = vendoredPath(root);
-  const files = (globs) =>
+  const files = (globs, keep = () => true) =>
     globSync(globs, { cwd: root, exclude: ['**/node_modules/**', '**/target/**'] })
       .map((p) => p.replaceAll('\\', '/'))
-      .filter((p) => !vendored(p))
+      .filter((p) => !vendored(p) && keep(p))
       .sort();
-  return { node: files(GLOBS.node), mods: files(GLOBS.mods), python: files(GLOBS.python) };
+  const notReal = (p) => !/\.real\.test\./.test(posix.basename(p));
+  return {
+    node: files(GLOBS.node, notReal),
+    real: files(GLOBS.real),
+    mods: files(GLOBS.mods),
+    python: files(GLOBS.python),
+  };
 }
 
 export const isTestName = (path) => /\.test\.|^test_.*\.py$|_test\.py$/.test(posix.basename(path));
@@ -52,9 +59,18 @@ const NODE_FLAGS = [
   '--experimental-test-coverage',
   '--test-coverage-include=tools/installer/**',
   '--test-coverage-exclude=tools/installer/**/*.test.ts',
-  '--test-coverage-lines=84',
 ];
+const COVERAGE_FLOOR = '--test-coverage-lines=84';
 const TREES = { file: process.execPath, args: ['tools/harness-compiler/src/cli.ts', 'build'] };
+
+// A real tool for a test: the first existing candidate, else the one on PATH, else a failure under strict (the door's
+// --strict sets DEAD_SKILLS_STRICT) and a skip otherwise.
+export function realTool(t, name, { candidates = [], strict = process.env.DEAD_SKILLS_STRICT === '1' } = {}) {
+  const found = candidates.find((c) => existsSync(c)) ?? which(name);
+  if (found) return found;
+  if (strict) throw new Error(`${name} not found`);
+  t.skip(`${name} not found`);
+}
 
 // Each suite gives { commands, fail } (fail: why it cannot start) or { notRun } (why it is skipped).
 // A command is { file, args, cwd (relative to the root), env }, or { list, run } when it is more than one program start:
@@ -69,6 +85,15 @@ const SUITES = {
     return {
       commands: [{ file: process.execPath, args: [...NODE_FLAGS, ...files] }],
       fail: modules ?? (files.length ? undefined : 'node: no test files'),
+    };
+  },
+  // The real tests, and the installer's tests, which hold the coverage floor.
+  real: ({ root, modules }) => {
+    const { node, real } = suiteFiles(root);
+    const files = [...real, ...node.filter((p) => p.startsWith('tools/installer/'))];
+    return {
+      commands: [{ file: process.execPath, args: [...NODE_FLAGS, COVERAGE_FLOOR, ...files] }],
+      fail: modules ?? (files.length ? undefined : 'real: no test files'),
     };
   },
   mods: ({ root, modules }) => {
@@ -166,7 +191,7 @@ const SUITES = {
 };
 
 const USAGE =
-  'usage: node scripts/test.mjs [--strict] [--list] [--packages a,b] [--each-package] [repo|node|mods|python|rust ...]';
+  'usage: node scripts/test.mjs [--strict] [--list] [--packages a,b] [--each-package] [repo|node|real|mods|python|rust ...]';
 
 function usage(message) {
   console.error(`${message}\n${USAGE}`);
@@ -200,11 +225,12 @@ function parse(argv) {
 // The exit code: 1 when a suite failed, or was NOT RUN under --strict.
 function main(argv) {
   const { suites, strict, list, packages, each } = parse(argv);
+  if (strict) process.env.DEAD_SKILLS_STRICT = '1';
   const root = fileURLToPath(new URL('..', import.meta.url));
   const modules = existsSync(join(root, 'node_modules')) ? undefined : 'node_modules missing: run npm ci';
   const plan = (suite) => SUITES[suite]({ root, modules, packages, each, strict });
   // When repo is selected, check-repo builds the generated trees itself.
-  const needsTrees = (suite) => (suite === 'node' || suite === 'mods') && !suites.includes('repo');
+  const needsTrees = (suite) => (suite === 'node' || suite === 'real' || suite === 'mods') && !suites.includes('repo');
 
   if (list) {
     let treesListed = false;

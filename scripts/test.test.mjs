@@ -16,7 +16,8 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { layoutProblems, suiteFiles } from './test.mjs';
+import { layoutProblems, realTool, suiteFiles } from './test.mjs';
+import { which } from '../tools/installer/system/proc.ts';
 
 const REAL = fileURLToPath(new URL('..', import.meta.url));
 const WIN = process.platform === 'win32';
@@ -238,6 +239,47 @@ test('without repo, the door builds the native trees before mods', (t) => {
   assert.match(r.log[0], /^check-repo ::/);
 });
 
+test('without repo, the real suite builds the native trees first', (t) => {
+  const d = door(t);
+  d.put('plugins/x/a.real.test.mjs', '');
+  assert.deepEqual(d.run(['real']).log, ['build :: build']);
+  const r = d.run(['repo', 'real']);
+  assert.equal(r.log.length, 1);
+  assert.match(r.log[0], /^check-repo ::/);
+});
+
+test('the real suite holds the real tests and the coverage floor', (t) => {
+  const d = door(t);
+  d.put('plugins/x/a.real.test.mjs', '');
+  d.put('plugins/x/b.test.mjs', '');
+  const files = suiteFiles(d.root);
+  assert.deepEqual(files.real, ['plugins/x/a.real.test.mjs']);
+  assert.deepEqual(files.node, ['plugins/x/b.test.mjs']);
+  const r = d.run(['--list', 'node', 'real']);
+  const real = r.out.split('\n').find((l) => l.startsWith('real: '));
+  assert.ok(real.includes('--test-coverage-lines=84') && real.includes('plugins/x/a.real.test.mjs'));
+  assert.doesNotMatch(r.out, /^node: .*--test-coverage-lines/m);
+  assert.doesNotMatch(r.out, /^node: .*a[.]real[.]test/m);
+});
+
+test('realTool returns the path of a tool on PATH', (t) => {
+  assert.equal(realTool(t, 'node'), which('node'));
+});
+
+test('realTool prefers an existing candidate', (t) => {
+  assert.equal(realTool(t, 'nope', { candidates: [process.execPath] }), process.execPath);
+});
+
+test('realTool skips a missing tool without strict', () => {
+  const skipped = [];
+  assert.equal(realTool({ skip: (m) => skipped.push(m) }, 'no-such-tool-xyz', { strict: false }), undefined);
+  assert.match(skipped.join(), /no-such-tool-xyz/);
+});
+
+test('realTool throws for a missing tool under strict', (t) => {
+  assert.throws(() => realTool(t, 'no-such-tool-xyz', { strict: true }), /no-such-tool-xyz not found/);
+});
+
 test('usage errors exit 2 and run nothing', (t) => {
   const d = door(t);
   for (const args of [['lint'], ['--each-package'], ['--packages']]) {
@@ -250,7 +292,8 @@ test('usage errors exit 2 and run nothing', (t) => {
 test('--list prints each command and runs nothing', (t) => {
   const r = door(t).run(['--list', 'node', 'rust']);
   assert.equal(r.status, 0);
-  assert.match(r.out, /^node: .*--test-timeout=300000 .*--test-coverage-lines=84/m);
+  assert.match(r.out, /^node: .*--test-timeout=300000 /m);
+  assert.doesNotMatch(r.out, /^node: .*--test-coverage-lines/m);
   assert.match(r.out, /^node: .* tools\/harness-compiler\/src\/cli\.ts build$/m);
   assert.match(r.out, /^rust: .*cargo(\.cmd)? build --locked -p web-mcp --bin fake-agent-browser$/m);
   assert.match(r.out, /^rust: .*cargo(\.cmd)? test --locked --no-fail-fast --workspace$/m);
@@ -278,6 +321,7 @@ test("suiteFiles picks each suite's files and skips vendored ones", (t) => {
   }
   const expected = {
     node: ['plugins/p/hooks/c.test.mjs', 'scripts/a.test.mjs', 'tools/x/b.test.ts'],
+    real: [],
     mods: ['plugins/p/hooks/d.test.ts'],
     python: ['plugins/opt-in/headroom-trim/server/tests/test_x.py'],
   };

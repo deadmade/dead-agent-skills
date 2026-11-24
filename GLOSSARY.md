@@ -303,3 +303,22 @@ _Avoid_: allowed host, sandbox URL
 **Typed value**:
 Something the user entered on the login page, kept for one confirmed host and masked wherever it appears.
 _Avoid_: env var, credential (a typed value can be a plain user name)
+
+## Testing
+
+**Real test**:
+A test that runs the real process, CLI, browser or files it checks, as a user's machine would.
+_Avoid_: integration test (ambiguous here), live test, end-to-end test
+
+**Capture**:
+One real answer from a remote system the tests cannot reach, kept with its credentials and identities masked.
+_Avoid_: recording, cassette, fixture (alone), sample
+
+**Replay server**:
+A local server that answers the tests with captures.
+_Avoid_: mock server, stub server
+
+**Fake**:
+A stand-in program or object that makes up answers instead of running the real thing; kept only where nothing real
+can produce the behaviour.
+_Avoid_: mock, stub, double

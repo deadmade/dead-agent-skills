@@ -56,7 +56,7 @@ jobs:
         if: needs.changes.outputs.node == 'true'
         env:
           UV_PROJECT_ENVIRONMENT: ${{ runner.temp }}/trim-venv
-        run: node scripts/test.mjs --strict repo node mods python
+        run: node scripts/test.mjs --strict repo node mods python real
 
       - name: Installer and upstream-sync typecheck
         if: needs.changes.outputs.node == 'true'

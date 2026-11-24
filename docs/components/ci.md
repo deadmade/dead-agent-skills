@@ -11,6 +11,11 @@ select all checks; docs/ changes select none. Manual runs select everything. `cr
 binaries on PRs, but release calls always build the complete matrix because each version ships all binaries. Keep
 routing and its tests current when adding consumers.
 
+`scripts/test.mjs` is the one list of Node suites. `test.yml` runs `--strict repo node mods python real`; the pre-commit
+hook (`repo-node` in `flake.nix`) and the release jobs (`release.yml`, `scripts/release.mjs`) run `repo node` only. The
+`real` suite holds the slow `*.real.test.{mjs,ts}` tests (which `node` leaves out) and the installer's tests under the
+84 % line-coverage floor. `--strict` also sets `DEAD_SKILLS_STRICT`, which makes a test fail, not skip, when its real tool is missing.
+
 The repo's rulesets live in its GitHub settings (Settings → Rules), not in the repo: main takes squash or rebase PRs
 once `test.yml`'s three jobs pass (admins bypass it, which `npm run release` pushed to main needs), and only admins move
 or delete a `v*` tag. Creating one stays open, since `release.yml` tags each merge with the workflow's token, but
