@@ -1,12 +1,24 @@
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, symlinkSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { applyCodex, type CodexIO } from './codex.ts';
 import { buildTree } from '../../harness-compiler/src/emit/build.ts';
 import { VERSION, failures } from '../context.ts';
+
+// What install.real.test.ts can't reach in one fresh install: reruns, upgrades, foreign or lost entries, failures,
+// darwin and the legacy rules block.
 
 function fixture() {
   const temp = mkdtempSync(join(tmpdir(), 'codex-installer-'));
@@ -22,12 +34,14 @@ function fixture() {
     home,
     source,
     which: (name) => `/tools/${name}`,
+    // fake: Codex's state between runs (a rerun, an older release, a foreign or failing entry), which one fresh real
+    // install can't produce; install.real.test.ts runs the real codex.
     command: (...args) => {
       calls.push(args);
       if (args[0] === 'plugin' && args[1] === 'list')
         return JSON.stringify({ installed: installed.map((name) => ({ pluginId: `${name}@dead-agent-skills` })) });
       if (args[0] === 'mcp' && args[1] === 'add' && args[2] === 'dead-agent-skills-mcp-azure')
-        writeFileSync(join(home, 'config.toml'), '[mcp_servers.dead-agent-skills-mcp-azure]\ncommand = "node"\n');
+        appendFileSync(join(home, 'config.toml'), '[mcp_servers.dead-agent-skills-mcp-azure]\ncommand = "node"\n');
       if (args[0] === 'mcp' && args[1] === 'list') return JSON.stringify(mcps.map((name) => ({ name })));
       if (args[0] === 'plugin' && args[1] === 'add') installed.push(args[2].split('@')[0]);
       if (args[0] === 'plugin' && args[1] === 'remove')
@@ -37,7 +51,6 @@ function fixture() {
     screen: async (state: any) =>
       ({ ...state, chosen: Object.fromEntries(selected.map((n) => [n, true])), result: 'apply' }) as any,
     ask: async () => true,
-    browser: async () => ({ path: '/tools/agent-browser', works: false }),
   };
   return {
     temp,
@@ -74,68 +87,25 @@ test('Codex installs, repeats, updates and removes only selected managed compone
     f.close();
   }
 });
-test('Codex configures MCP using native CLI and emits environment-based authentication handoffs', async () => {
+test('Codex writes the GitHub and Atlassian url servers, and removes a deselected server on a rerun', async () => {
   const f = fixture();
   try {
-    f.select(['flows', 'mcp-github', 'mcp-azure', 'http-runner', 'atlassian']);
+    f.select(['mcp-github', 'atlassian']);
     await applyCodex(f.io);
-    assert.ok(f.state().selected.includes('graphify'));
-    assert.ok(f.calls.some((c) => c.includes('--bearer-token-env-var')));
-    assert.ok(f.calls.some((c) => c.includes('/tools/web-mcp')));
-    assert.ok(f.calls.some((c) => c.includes('/tools/ado-mcp')));
-    assert.ok(f.calls.some((c) => c.includes('/tools/http-runner')));
+    const config = readFileSync(join(f.home, 'config.toml'), 'utf8');
     assert.match(
-      readFileSync(join(f.home, 'config.toml'), 'utf8'),
-      /env_vars = \["ADO_ORG_URL","ADO_PAT","ADO_PROJECT_DIR"\]/,
+      config,
+      /^\[mcp_servers\.dead-agent-skills-mcp-github\]\nurl = "https:\/\/api\.githubcopilot\.com\/mcp"\nbearer_token_env_var = "GITHUB_PERSONAL_ACCESS_TOKEN"$/m,
     );
+    assert.match(
+      config,
+      /^\[mcp_servers\.dead-agent-skills-atlassian\]\nurl = "https:\/\/mcp\.atlassian\.com\/v1\/mcp"$/m,
+    );
+    assert.ok(!f.calls.some((c) => c[0] === 'mcp' && c[1] === 'add'));
+    assert.deepEqual(f.state().mcp, ['dead-skills', 'mcp-github', 'atlassian']);
     f.select([]);
     await applyCodex(f.io);
-    assert.ok(f.calls.some((c) => c[0] === 'mcp' && c[1] === 'remove' && c[2] === 'dead-agent-skills-web-mcp'));
-  } finally {
-    f.close();
-  }
-});
-test('Codex MCP settings come from each plugin definition, and the installer reads the generated file', async () => {
-  const f = fixture();
-  try {
-    const file = (name: string) => join(f.source, '.agents/plugins', name, 'codex-mcp.json');
-    const read = (name: string) => JSON.parse(readFileSync(file(name), 'utf8'));
-    assert.deepEqual(read('mcp-azure'), { envVars: ['ADO_ORG_URL', 'ADO_PAT', 'ADO_PROJECT_DIR'] });
-    assert.deepEqual(read('mcp-github'), { url: 'https://api.githubcopilot.com/mcp', envVars: [] });
-    assert.deepEqual(read('dead-skills'), { url: 'https://mcp.context7.com/mcp', envVars: [] });
-    assert.equal(existsSync(file('web-mcp')), false);
-    writeFileSync(file('mcp-github'), JSON.stringify({ url: 'https://github.invalid/mcp', envVars: [] }));
-    writeFileSync(file('dead-skills'), JSON.stringify({ url: 'https://context7.invalid/mcp', envVars: [] }));
-    writeFileSync(file('mcp-azure'), JSON.stringify({ envVars: ['ADO_ONLY'] }));
-    f.select(['mcp-github', 'mcp-azure']);
-    await applyCodex(f.io);
-    const add = (name: string) => f.calls.find((c) => c[0] === 'mcp' && c[1] === 'add' && c[2] === name)!;
-    assert.ok(add('dead-agent-skills-mcp-github').includes('https://github.invalid/mcp'));
-    assert.ok(add('dead-agent-skills-dead-skills').includes('https://context7.invalid/mcp'));
-    assert.match(readFileSync(join(f.home, 'config.toml'), 'utf8'), /env_vars = \["ADO_ONLY"\]/);
-  } finally {
-    f.close();
-  }
-});
-
-test('Codex downloads the ado-mcp release when it is absent from PATH', async () => {
-  const f = fixture();
-  try {
-    f.select(['mcp-azure']);
-    f.io.which = (name) => (name === 'ado-mcp' ? undefined : `/tools/${name}`);
-    const downloads: string[] = [];
-    f.io.download = async (name, _asset, destination) => {
-      downloads.push(name);
-      mkdirSync(join(destination, '..'), { recursive: true });
-      writeFileSync(destination, 'binary fixture');
-    };
-    await applyCodex(f.io);
-    assert.deepEqual(downloads, ['ado-mcp']);
-    const add = f.calls.find((c) => c[0] === 'mcp' && c[1] === 'add' && c[2] === 'dead-agent-skills-mcp-azure')!;
-    assert.equal(add[3], '--');
-    assert.ok(add[4].startsWith(join(f.home, 'dead-agent-skills/bin', VERSION)));
-    assert.match(add[4], /ado-mcp(?:\.exe)?$/);
-    assert.ok(!add.some((arg) => arg.includes('npx')));
+    assert.ok(f.calls.some((c) => c[0] === 'mcp' && c[1] === 'remove' && c[2] === 'dead-agent-skills-mcp-github'));
   } finally {
     f.close();
   }
@@ -145,13 +115,11 @@ test('Codex keeps a PATH agent-browser on a platform with no pinned build', asyn
   const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
   const arch = Object.getOwnPropertyDescriptor(process, 'arch')!;
   try {
+    // fake: Windows and Linux runners can't be darwin.
     Object.defineProperty(process, 'platform', { ...platform, value: 'darwin' });
     Object.defineProperty(process, 'arch', { ...arch, value: 'arm64' });
     f.select(['flows']);
     f.io.which = (name) => `/path/${name}`;
-    f.io.browser = async () => {
-      throw new Error('the installer must not fetch agent-browser here');
-    };
     const before = failures.length;
     await applyCodex(f.io);
     const add = f.calls.find((c) => c[0] === 'mcp' && c[1] === 'add' && c[2] === 'dead-agent-skills-web-mcp')!;
@@ -183,7 +151,7 @@ test('Codex recovers an existing default Context7 connection and can rerun', asy
         : command(...args);
     await applyCodex(f.io);
     assert.deepEqual(f.state().mcp, ['dead-skills']);
-    assert.ok(!f.calls.some((c) => c[0] === 'mcp' && c[1] === 'add'));
+    assert.ok(!existsSync(join(f.home, 'config.toml')));
     await applyCodex(f.io);
     assert.deepEqual(f.state().mcp, ['dead-skills']);
     assert.equal(f.state().version, VERSION);
@@ -193,6 +161,7 @@ test('Codex recovers an existing default Context7 connection and can rerun', asy
 });
 test('missing Codex and cancellation do not install anything', async () => {
   const count = failures.length;
+  // fake: a machine with codex on PATH can't also lack it.
   await applyCodex({ which: () => undefined });
   assert.equal(failures.length, count + 1);
   failures.splice(count);
@@ -219,47 +188,6 @@ test('interrupted upgrade keeps the previous version so it can be retried', asyn
     };
     await assert.rejects(applyCodex(f.io), /simulated failure/);
     assert.equal(f.state().version, '0.0.1');
-  } finally {
-    f.close();
-  }
-});
-
-test('Codex offers shared catalog choices and installs the flows dependency closure', async () => {
-  const f = fixture();
-  try {
-    f.select(['flows']);
-    const choose = f.io.screen!;
-    f.io.screen = async (state, controls) => {
-      const choices = (state as unknown as { chosen: Record<string, boolean> }).chosen;
-      // These are the actual installer choices before the test user selects flows.
-      assert.deepEqual(Object.keys(choices).sort(), [
-        'atlassian',
-        'csharp-skills',
-        'flows',
-        'graphify',
-        'hallmark',
-        'http-runner',
-        'mcp-azure',
-        'mcp-github',
-        'postgres',
-        'rust-skills',
-        'shop',
-        'web-mcp',
-      ]);
-      for (const native of ['nix-lsp']) assert.equal(Object.hasOwn(choices, native), false);
-      // The default component is automatic rather than an opt-out choice.
-      assert.equal(Object.hasOwn(choices, 'dead-skills'), false);
-      return choose(state, controls);
-    };
-    await applyCodex(f.io);
-    const additions = f.calls.filter((call) => call[0] === 'plugin' && call[1] === 'add').map((call) => call[2]);
-    assert.deepEqual(additions, [
-      'dead-skills@dead-agent-skills',
-      'flows@dead-agent-skills',
-      'graphify@dead-agent-skills',
-      'web-mcp@dead-agent-skills',
-    ]);
-    assert.deepEqual(f.state().selected, ['dead-skills', 'flows', 'graphify', 'web-mcp']);
   } finally {
     f.close();
   }
@@ -337,20 +265,6 @@ for (const change of [
       f.close();
     }
   });
-test('fresh setup leaves global instructions absent and installs packaged theme', async () => {
-  const f = fixture();
-  try {
-    await applyCodex(f.io);
-    assert.equal(existsSync(join(f.home, 'AGENTS.md')), false);
-    assert.equal(
-      readFileSync(join(f.home, 'themes/night-city.tmTheme'), 'utf8'),
-      readFileSync(join(f.source, '.agents/plugins/dead-skills/themes/night-city.tmTheme'), 'utf8'),
-    );
-  } finally {
-    f.close();
-  }
-});
-
 test('existing instructions and foreign configuration survive reruns', async () => {
   const f = fixture();
   try {
@@ -360,7 +274,7 @@ test('existing instructions and foreign configuration survive reruns', async () 
     f.mcp(['foreign']);
     await applyCodex(f.io);
     await applyCodex(f.io);
-    assert.equal(readFileSync(join(f.home, 'config.toml'), 'utf8'), config);
+    assert.ok(readFileSync(join(f.home, 'config.toml'), 'utf8').startsWith(config));
     assert.equal(readFileSync(join(f.home, 'AGENTS.md'), 'utf8'), 'personal rules');
     assert.equal(
       f.calls.some((c) => c[0] === 'mcp' && c[1] === 'remove' && c[2] === 'foreign'),
@@ -387,6 +301,7 @@ async function offered(f: ReturnType<typeof fixture>, platform: string, arch: st
     }
     return { ...(state as any), result: 'apply' };
   };
+  // fake: Windows and Linux runners can't be darwin.
   const real = Object.getOwnPropertyDescriptors(process);
   Object.defineProperty(process, 'platform', { value: platform, configurable: true });
   Object.defineProperty(process, 'arch', { value: arch, configurable: true });
@@ -406,16 +321,6 @@ test('Codex hides every web-mcp-dependent plugin when web-mcp has no build for t
     assert.ok(keys.includes('hallmark'));
     for (const hidden of ['web-mcp', 'flows', 'shop']) assert.ok(!keys.includes(hidden), `${hidden} was offered`);
     assert.ok(!f.calls.some((c) => c[0] === 'plugin' && c[1] === 'add' && /^(shop|web-mcp|flows)@/.test(c[2])));
-  } finally {
-    f.close();
-  }
-});
-
-test('Codex offers shop when web-mcp has a build for the platform', async () => {
-  const f = fixture();
-  try {
-    const keys = await offered(f, 'linux', 'x64', false);
-    for (const shown of ['web-mcp', 'flows', 'shop']) assert.ok(keys.includes(shown), `${shown} was not offered`);
   } finally {
     f.close();
   }

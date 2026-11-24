@@ -13,14 +13,7 @@ import { PKG, must, tryJson, failures } from '../context.ts';
 import { join } from 'node:path';
 import { claude } from '../system/proc.ts';
 import { line, log, secret } from '../ui/ui.ts';
-const defaults = { claude, line, secret, log };
-export async function collectConfig(
-  wantedIds: string[],
-  installedIds: string[],
-  manifest: Marketplace,
-  services = defaults,
-) {
-  const { claude, line, secret, log } = services;
+export async function collectConfig(wantedIds: string[], installedIds: string[], manifest: Marketplace) {
   const selfConfigured = (id: string) => SELF_CONFIGURED.includes(nameOf(id));
   const selfValues: Record<string, Record<string, string>> = {};
   const selfHandoff: string[] = [];

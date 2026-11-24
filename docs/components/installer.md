@@ -30,6 +30,12 @@ refuses tarball URLs without the flag). npx caches by URL and keeps running the 
 (`--prefer-online` too), so each run reads the tag `latest/` redirects to and, when it is newer, hands over to that
 release's versioned URL (`newerInstaller`).
 
+Codex owns its plugin cache and configuration: `steps/codex.ts` installs plugins and stdio MCP servers through
+`codex plugin` and `codex mcp add`. It writes the url MCP servers (Context7, GitHub, Atlassian) into `config.toml`
+itself (`mcpUrlServer` in `core/codex.ts`, idempotent, other tables kept), because `codex mcp add --url` starts an OAuth
+sign-in that fails the add after 5 minutes without a browser (Codex CLI 0.172.0); signing in stays `codex mcp login`.
+Its only other direct edit is the Azure `env_vars` allowlist.
+
 ## Test seam: the answers file
 
 `DEAD_SKILLS_TEST_ANSWERS` names a JSON file that lets the installer run unattended; only tests set it, a user never
@@ -39,3 +45,10 @@ the message starts with; an unanswered prompt throws `no answer for prompt: …`
 local folder added in place of the github `release` branch, pinned as `{source: 'directory', path}`, which also skips
 adding the official marketplace) and `releases` (the release download URL, a constant read at load; it also skips the
 self-update check). With the file present the TTY guard passes. The steps read none of this.
+
+`install.real.test.ts` is the end-to-end test through it: the whole installer for Claude Code and Codex into temporary
+homes, with the real `claude` and `codex` CLIs, a copy of the built marketplace (headroom-trim on a free port) and this
+checkout's debug builds of web-mcp, http-runner and ado-mcp served as a local release. It runs in the `real` suite under
+the 84 % coverage floor, which reports it NOT RUN without claude, codex or `cargo build --locked -p web-mcp -p
+http-runner -p ado-mcp`. The step tests left keep only what one fresh install can't reach (reruns, upgrades, foreign
+entries, failures, darwin, the legacy rules block), each fake marked `// fake:`.

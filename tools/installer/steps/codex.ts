@@ -1,4 +1,5 @@
-// Codex owns its plugin cache and configuration; the only direct TOML edit adds the Azure environment allowlist.
+// Codex owns its plugin cache and configuration. The installer edits config.toml directly only for the url MCP servers
+// (`codex mcp add --url` starts an OAuth sign-in that fails the add without a browser) and the Azure environment allowlist.
 import { createHash } from 'node:crypto';
 import { rulesMigration } from '../core/rules-migration.ts';
 import { installCodexTheme, readRulesReceipt } from '../system/harness-setup.ts';
@@ -16,6 +17,7 @@ import {
   installedCodex,
   mcpName,
   mcpEnvironment,
+  mcpUrlServer,
 } from '../core/codex.ts';
 import { resolveTool } from '../core/tools.ts';
 import { categorize } from '../core/options.ts';
@@ -32,11 +34,8 @@ export interface CodexIO {
   source?: string;
   command?: (...args: string[]) => string;
   screen?: typeof screen;
-  confirm?: typeof confirm;
   ask?: typeof ask;
   which?: typeof which;
-  download?: typeof downloadBin;
-  browser?: typeof installAgentBrowser;
 }
 
 // The url and environment variable names a plugin's Codex package states, generated from its plugin.json.
@@ -133,10 +132,7 @@ export async function applyCodex(io: CodexIO = {}) {
     if (state.result === 'apply') break;
     if (
       state.result === 'ask-quit' &&
-      (await (io.confirm ?? confirm)(
-        `Quit Codex without applying ${changeList(state, data).count} changes?`,
-        false,
-      )) === false
+      (await confirm(`Quit Codex without applying ${changeList(state, data).count} changes?`, false)) === false
     ) {
       state = { ...state, result: undefined };
       continue;
@@ -165,7 +161,17 @@ export async function applyCodex(io: CodexIO = {}) {
   const mcp = [...(previous?.mcp ?? [])];
   const existingMcp = JSON.parse(run('mcp', 'list', '--json'));
   if (!Array.isArray(existingMcp)) throw new Error('Unrecognized codex mcp list JSON');
-  const configure = (component: string, args: string[]) => {
+  // Its own symlink and managed-elsewhere check, for each direct edit. what: what to add by hand there.
+  const config = join(home, 'config.toml');
+  const editConfig = (what: string, change: (raw: string) => string) => {
+    if (existsSync(config) && lstatSync(config).isSymbolicLink())
+      throw new Error(`Codex config.toml is a symlink; add ${what} where it is managed`);
+    const raw = existsSync(config) ? readFileSync(config, 'utf8') : '';
+    const next = change(raw);
+    if (next !== raw) writeAtomic(config, next);
+  };
+  // server: the stdio command line `codex mcp add` takes, or a url server, which is written directly.
+  const configure = (component: string, server: string[] | { url: string; bearerTokenEnvVar?: string }) => {
     const name = mcpName(component);
     const existing = existingMcp.find((s: any) => s.name === name);
     if (existing && !mcp.includes(component)) {
@@ -176,7 +182,8 @@ export async function applyCodex(io: CodexIO = {}) {
       }
       throw new Error(`MCP name ${name} already exists outside this install; left unchanged`);
     }
-    run('mcp', 'add', name, ...args);
+    if (Array.isArray(server)) run('mcp', 'add', name, ...server);
+    else editConfig(`the ${name} server`, (raw) => mcpUrlServer(raw, name, server.url, server.bearerTokenEnvVar));
     if (!mcp.includes(component)) mcp.push(component);
     save();
   };
@@ -208,18 +215,18 @@ export async function applyCodex(io: CodexIO = {}) {
     // Do not mark the release current until every requested operation succeeds.
     save();
   }
-  configure('dead-skills', ['--url', context7]);
+  configure('dead-skills', { url: context7 });
   if (plan.wanted.includes('web-mcp')) {
     let binary = find('web-mcp');
     if (!binary) {
       const asset = resolveTool('web-mcp', process.platform, process.arch, VERSION);
       if (!asset) throw new Error('No web-mcp release for this platform');
       binary = join(base, 'bin', VERSION, asset.exe);
-      if (!existsSync(binary)) await (io.download ?? downloadBin)('web-mcp', asset, binary);
+      if (!existsSync(binary)) await downloadBin('web-mcp', asset, binary);
     }
     // With no pinned agent-browser build here, keep the one on PATH, as web-mcp itself falls back to it.
     const browser = resolveTool('agent-browser', process.platform, process.arch, VERSION)
-      ? await (io.browser ?? installAgentBrowser)(join(base, 'bin'))
+      ? await installAgentBrowser(join(base, 'bin'))
       : { path: find('agent-browser'), works: !!find('agent-browser') };
     configure('web-mcp', [...(browser.path ? ['--env', `WEB_MCP_AGENT_BROWSER=${browser.path}`] : []), '--', binary]);
     if (!browser.works)
@@ -233,21 +240,16 @@ export async function applyCodex(io: CodexIO = {}) {
       const asset = resolveTool('http-runner', process.platform, process.arch, VERSION);
       if (!asset) throw new Error('No http-runner release for this platform');
       binary = join(base, 'bin', VERSION, asset.exe);
-      if (!existsSync(binary)) await (io.download ?? downloadBin)('http-runner', asset, binary);
+      if (!existsSync(binary)) await downloadBin('http-runner', asset, binary);
     }
     configure('http-runner', ['--', binary]);
   }
   if (plan.wanted.includes('mcp-github')) {
-    configure('mcp-github', [
-      '--url',
-      settings('mcp-github').url!,
-      '--bearer-token-env-var',
-      'GITHUB_PERSONAL_ACCESS_TOKEN',
-    ]);
+    configure('mcp-github', { url: settings('mcp-github').url!, bearerTokenEnvVar: 'GITHUB_PERSONAL_ACCESS_TOKEN' });
     note('Codex GitHub authentication', ['Set GITHUB_PERSONAL_ACCESS_TOKEN in the environment that starts Codex.']);
   }
   if (plan.wanted.includes('atlassian')) {
-    configure('atlassian', ['--url', 'https://mcp.atlassian.com/v1/mcp']);
+    configure('atlassian', { url: 'https://mcp.atlassian.com/v1/mcp' });
     note('Codex Atlassian authentication', [`Run codex mcp login ${mcpName('atlassian')} to sign in.`]);
   }
   if (plan.wanted.includes('mcp-azure')) {
@@ -256,16 +258,11 @@ export async function applyCodex(io: CodexIO = {}) {
       const asset = resolveTool('ado-mcp', process.platform, process.arch, VERSION);
       if (!asset) throw new Error('No ado-mcp release for this platform');
       binary = join(base, 'bin', VERSION, asset.exe);
-      if (!existsSync(binary)) await (io.download ?? downloadBin)('ado-mcp', asset, binary);
+      if (!existsSync(binary)) await downloadBin('ado-mcp', asset, binary);
     }
     configure('mcp-azure', ['--', binary]);
-    const config = join(home, 'config.toml');
-    if (lstatSync(config).isSymbolicLink())
-      throw new Error('Codex config.toml is a symlink; add Azure env_vars where it is managed');
-    const raw = readFileSync(config, 'utf8');
     const { envVars } = settings('mcp-azure');
-    const next = mcpEnvironment(raw, mcpName('mcp-azure'), envVars);
-    if (next !== raw) writeAtomic(config, next);
+    editConfig('Azure env_vars', (raw) => mcpEnvironment(raw, mcpName('mcp-azure'), envVars));
     note('Codex Azure authentication', [
       `Set ${envVars.join(', ')} in the environment that starts Codex; the setup-mcp-azure skill says which are optional.`,
     ]);

@@ -65,6 +65,27 @@ export function managedRules(raw: string, rules: string): string {
     : raw.slice(0, a) + block + raw.slice(b + end.length);
 }
 
+// A url server's table, written here because `codex mcp add --url` starts an OAuth sign-in that fails the add after
+// 5 minutes without a browser (measured on Codex CLI 0.172.0). Replaces this server's earlier table and its subtables;
+// every other table is kept.
+export function mcpUrlServer(raw: string, name: string, url: string, bearerTokenEnvVar?: string): string {
+  if (!/^[a-z0-9-]+$/.test(name)) throw new Error('Unsafe MCP name');
+  const header = `[mcp_servers.${name}]`;
+  const body = [`url = ${JSON.stringify(url)}`];
+  if (bearerTokenEnvVar) body.push(`bearer_token_env_var = ${JSON.stringify(bearerTokenEnvVar)}`);
+  const lines = raw.split('\n');
+  const index = lines.findIndex((line) => [header, `[mcp_servers."${name}"]`].includes(line.trim()));
+  if (index < 0)
+    return `${raw}${raw && !raw.endsWith('\n') ? '\n' : ''}${raw ? '\n' : ''}${[header, ...body].join('\n')}\n`;
+  const end = lines.findIndex(
+    (line, i) => i > index && /^\s*\[/.test(line) && !line.trim().startsWith(`[mcp_servers.${name}.`),
+  );
+  const section = lines.slice(index + 1, end < 0 ? undefined : end).filter((line) => line.trim());
+  if (section.map((line) => line.trim()).join('\n') === body.join('\n')) return raw;
+  const rest = end < 0 ? [] : ['', ...lines.slice(end)];
+  return [...lines.slice(0, index), header, ...body, ...rest].join('\n') + (end < 0 ? '\n' : '');
+}
+
 // The native CLI does not expose env_vars. Insert only this allowlist into the table it just created.
 export function mcpEnvironment(raw: string, name: string, variables: string[]): string {
   if (!/^[a-z0-9-]+$/.test(name)) throw new Error('Unsafe MCP name');

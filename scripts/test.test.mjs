@@ -77,6 +77,8 @@ function door(t, { modules = true, tools = ['uv', 'cargo'] } = {}) {
     const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== 'PATH'));
     delete env.MSYSTEM;
     delete env.UV_PROJECT_ENVIRONMENT;
+    // Set by node --test, it makes a nested node --test skip its files.
+    delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [script, ...args], {
       cwd: join(root, 'scripts'),
       env: { ...env, PATH: bin, FAKE_LOG: logFile, ...extra },
@@ -248,18 +250,45 @@ test('without repo, the real suite builds the native trees first', (t) => {
   assert.match(r.log[0], /^check-repo ::/);
 });
 
-test('the real suite holds the real tests and the coverage floor', (t) => {
-  const d = door(t);
+test('the real suite runs the gating real tests, then the installer tests under the coverage floor', (t) => {
+  const d = door(t, { tools: ['claude', 'codex'] });
   d.put('plugins/x/a.real.test.mjs', '');
   d.put('plugins/x/b.test.mjs', '');
+  d.put('tools/installer/c.test.ts', '');
+  d.put('tools/installer/d.real.test.ts', '');
+  for (const name of ['web-mcp', 'http-runner', 'ado-mcp']) d.put(`target/debug/${WIN ? `${name}.exe` : name}`, '');
   const files = suiteFiles(d.root);
-  assert.deepEqual(files.real, ['plugins/x/a.real.test.mjs']);
-  assert.deepEqual(files.node, ['plugins/x/b.test.mjs']);
+  assert.deepEqual(files.real, ['plugins/x/a.real.test.mjs', 'tools/installer/d.real.test.ts']);
+  assert.deepEqual(files.node, ['plugins/x/b.test.mjs', 'tools/installer/c.test.ts']);
   const r = d.run(['--list', 'node', 'real']);
-  const real = r.out.split('\n').find((l) => l.startsWith('real: '));
-  assert.ok(real.includes('--test-coverage-lines=84') && real.includes('plugins/x/a.real.test.mjs'));
+  const [own, installer] = r.out.split('\n').filter((l) => l.startsWith('real: ') && !l.endsWith(' build'));
+  assert.ok(own.endsWith(' plugins/x/a.real.test.mjs') && !own.includes('--test-coverage-lines'));
+  assert.ok(installer.includes('--test-coverage-lines=84'));
+  assert.ok(installer.endsWith(' tools/installer/d.real.test.ts tools/installer/c.test.ts'));
   assert.doesNotMatch(r.out, /^node: .*--test-coverage-lines/m);
   assert.doesNotMatch(r.out, /^node: .*a[.]real[.]test/m);
+});
+
+test('without codex or a debug build the installer tests are NOT RUN, after the gating real tests ran', (t) => {
+  const d = door(t, { tools: ['claude'] });
+  d.put(
+    'plugins/x/a.real.test.mjs',
+    "import { appendFileSync } from 'node:fs';\nappendFileSync(process.env.FAKE_LOG, 'a ran\\n');\n",
+  );
+  d.put('tools/installer/c.test.ts', '');
+  const listed = d.run(['--list', 'real']).out;
+  assert.match(listed, /^real: .* plugins\/x\/a\.real\.test\.mjs$/m);
+  assert.match(listed, /^real: NOT RUN installer tests: codex not found$/m);
+  const r = d.run(['real']);
+  assert.equal(r.status, 0);
+  assert.ok(r.log.includes('a ran'));
+  assert.match(r.out, /^real +NOT RUN +installer tests: codex not found$/m);
+  assert.equal(d.run(['--strict', 'real']).status, 1);
+  d.fake('codex');
+  assert.match(
+    d.run(['--list', 'real']).out,
+    /^real: NOT RUN installer tests: web-mcp not found: run cargo build --locked -p web-mcp -p http-runner -p ado-mcp$/m,
+  );
 });
 
 test('realTool returns the path of a tool on PATH', (t) => {

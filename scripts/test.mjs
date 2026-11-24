@@ -63,10 +63,22 @@ const NODE_FLAGS = [
 const COVERAGE_FLOOR = '--test-coverage-lines=84';
 const TREES = { file: process.execPath, args: ['tools/harness-compiler/src/cli.ts', 'build'] };
 
+const findTool = (name, candidates = []) => candidates.find((c) => existsSync(c)) ?? which(name);
+
+// What the installer's end-to-end test needs, and why it is missing: claude, codex and this checkout's debug builds.
+const BUILD = 'run cargo build --locked -p web-mcp -p http-runner -p ado-mcp';
+function installerToolMissing(root) {
+  for (const name of ['claude', 'codex']) if (!findTool(name)) return `${name} not found`;
+  for (const name of ['web-mcp', 'http-runner', 'ado-mcp']) {
+    const exe = process.platform === 'win32' ? `${name}.exe` : name;
+    if (!findTool(name, [join(root, 'target', 'debug', exe)])) return `${name} not found: ${BUILD}`;
+  }
+}
+
 // A real tool for a test: the first existing candidate, else the one on PATH, else a failure under strict (the door's
 // --strict sets DEAD_SKILLS_STRICT) and a skip otherwise.
 export function realTool(t, name, { candidates = [], strict = process.env.DEAD_SKILLS_STRICT === '1' } = {}) {
-  const found = candidates.find((c) => existsSync(c)) ?? which(name);
+  const found = findTool(name, candidates);
   if (found) return found;
   if (strict) throw new Error(`${name} not found`);
   t.skip(`${name} not found`);
@@ -74,7 +86,7 @@ export function realTool(t, name, { candidates = [], strict = process.env.DEAD_S
 
 // Each suite gives { commands, fail } (fail: why it cannot start) or { notRun } (why it is skipped).
 // A command is { file, args, cwd (relative to the root), env }, or { list, run } when it is more than one program start:
-// `list` is what --list prints and `run` returns the status of what it ran.
+// `list` is what --list prints and `run` returns the status of what it ran, or { notRun } when it is skipped.
 const SUITES = {
   repo: ({ modules, strict }) => ({
     commands: [{ file: process.execPath, args: ['scripts/check-repo.mjs', ...(strict ? ['--strict'] : [])] }],
@@ -87,13 +99,22 @@ const SUITES = {
       fail: modules ?? (files.length ? undefined : 'node: no test files'),
     };
   },
-  // The real tests, and the installer's tests, which hold the coverage floor.
+  // The real tests that gate themselves, then the installer's tests with its end-to-end run, which hold the coverage
+  // floor: without claude, codex or a debug build the floor would fail for a skipped run, so they are NOT RUN instead.
   real: ({ root, modules }) => {
     const { node, real } = suiteFiles(root);
-    const files = [...real, ...node.filter((p) => p.startsWith('tools/installer/'))];
+    const installer = (p) => p.startsWith('tools/installer/');
+    const own = real.filter((p) => !installer(p));
+    const files = [...real.filter(installer), ...node.filter(installer)];
+    const missing = installerToolMissing(root);
     return {
-      commands: [{ file: process.execPath, args: [...NODE_FLAGS, COVERAGE_FLOOR, ...files] }],
-      fail: modules ?? (files.length ? undefined : 'real: no test files'),
+      commands: [
+        ...(own.length ? [{ file: process.execPath, args: [...NODE_FLAGS, ...own] }] : []),
+        missing
+          ? { notRun: `installer tests: ${missing}` }
+          : { file: process.execPath, args: [...NODE_FLAGS, COVERAGE_FLOOR, ...files] },
+      ],
+      fail: modules ?? (own.length || files.length ? undefined : 'real: no test files'),
     };
   },
   mods: ({ root, modules }) => {
@@ -245,14 +266,18 @@ function main(argv) {
         commands.unshift(TREES);
       }
       for (const c of commands)
-        console.log(`${suite}: ${c.list ?? `${[c.file, ...c.args].join(' ')}${c.cwd ? ` (in ${c.cwd})` : ''}`}`);
+        console.log(
+          `${suite}: ${c.notRun ? `NOT RUN ${c.notRun}` : (c.list ?? `${[c.file, ...c.args].join(' ')}${c.cwd ? ` (in ${c.cwd})` : ''}`)}`,
+        );
     }
     return 0;
   }
 
   const run = (c) =>
-    c.run?.() ??
-    startSync(c.file, c.args, { cwd: join(root, c.cwd ?? ''), env: c.env ?? process.env, stdio: 'inherit' });
+    c.notRun
+      ? c
+      : (c.run?.() ??
+        startSync(c.file, c.args, { cwd: join(root, c.cwd ?? ''), env: c.env ?? process.env, stdio: 'inherit' }));
   let treesBuilt; // undefined until a suite needs the build
   // Returns [status, reason]; a missing reason means the suite ran, so the summary shows its time.
   const execute = (suite) => {
@@ -262,14 +287,17 @@ function main(argv) {
     if (needsTrees(suite) && !(treesBuilt ??= run(TREES).status === 0)) return ['failed', 'native build failed'];
     let status = 'passed';
     let reason;
+    let skipped;
     // Every command runs, even after one fails.
     for (const r of commands.map(run)) {
-      if (r.status === 0) continue;
+      if (r.notRun) skipped ??= r.notRun;
+      if (r.notRun || r.status === 0) continue;
       status = 'failed';
       // A killed child or one that cannot start has no exit status.
       if (r.status === null) reason ??= r.error?.message ?? `killed by ${r.signal}`;
     }
-    return [status, reason];
+    // A suite that passed what it ran but skipped a command is NOT RUN, which fails under --strict.
+    return status === 'passed' && skipped ? ['NOT RUN', skipped] : [status, reason];
   };
 
   const results = [];
