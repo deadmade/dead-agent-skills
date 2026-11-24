@@ -142,6 +142,14 @@ test('startArgs builds uv run --locked with an absolute script, the identity and
   assert.deepEqual(r.env, { UV_PROJECT_ENVIRONMENT: join('/d', 'venv'), PYTHONDONTWRITEBYTECODE: '1' });
 });
 
+test('startArgs runs pythonw on Windows, so the detached server opens no console', () => {
+  const program = (platform) =>
+    startArgs({ uv: 'u', serverDir: 's', port: 1, data: 'd', identity: 'h', version: 'v', platform }).args[4];
+  assert.equal(program('win32'), 'pythonw');
+  assert.equal(program('linux'), 'python');
+  assert.equal(program('darwin'), 'python');
+});
+
 test('openServerLog appends, and starts over once the log passes the limit', () => {
   const data = mkdtempSync(join(tmpdir(), 'ht-log-'));
   const file = join(data, 'server.log');
@@ -222,7 +230,8 @@ test('main spawns detached and hidden into server.log, logs the start, and unref
   const { o, child, cmd, args } = spawned[0];
   const uv = join('/cfg', 'bin', process.platform === 'win32' ? 'uv.exe' : 'uv');
   assert.equal(cmd, uv);
-  assert.equal(o.detached, process.platform !== 'win32');
+  assert.equal(o.detached, true);
+  assert.equal(args[4], process.platform === 'win32' ? 'pythonw' : 'python');
   assert.equal(o.windowsHide, true);
   assert.equal(o.cwd, data);
   assert.equal(o.stdio[0], 'ignore');

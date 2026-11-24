@@ -9,7 +9,8 @@
 folders); `PYTHONDONTWRITEBYTECODE=1` keeps `__pycache__` out of the install folder.
 
 A SessionStart launcher (`hooks/launcher.mjs`) finds uv (`<CONFIG>/bin`, then an absolute PATH entry; never a bare
-name), starts `uv run --locked` (detached except on Windows) with cwd = the data dir, output to `server.log`, and
+name), starts `uv run --locked` detached (on Windows too: Node kills an attached child when the launcher exits; there
+the server runs through `pythonw`, which opens no console window) with cwd = the data dir, output to `server.log`, and
 without the session's `UV_*`, `PYTHON*` and `VIRTUAL_ENV` (the installer drops them too, `trimServerEnv`), and returns
 within about 300 ms, or about 1.3 s when it replaces a server.
 
