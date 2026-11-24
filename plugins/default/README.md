@@ -29,8 +29,8 @@ Claude-only additions beyond the theme:
   the empty space matches (OSC 11, reset when Claude exits or you pick another theme). Linux; Windows
   Terminal untested. If Claude is killed, the color stays until you run `printf '\033]111\007'`.
 - Night City spinner words and turn-end verbs ("Jacked out for 3s").
-- Short status-line reactions: `▚▞ FLATLINE ▞▚` once per turn on a failing tool, `◢◤ JACKED OUT ◢◤` when a main turn
-  ends.
+- A short status-line reaction, `◢◤ JACKED OUT ◢◤`, when a main turn ends. Nothing reacts to tool calls: Claude Code
+  won't start Code Mode while a mod hooks them.
 - A Night City ccstatusline config: Powerline segments with slanted edges in the theme's colours, icons, context as tokens
   and percent, the cost in eddies (`€$1.23`) and a ナイトシティ sign fading pink to teal. It needs a Nerd Font in the terminal. The installer writes it with the ccstatusline toggle
   and replaces the stock config earlier versions wrote.

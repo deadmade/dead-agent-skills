@@ -59,11 +59,14 @@ export function findUv({ config, path, platform, isFile }) {
   return candidates.find((c) => isFile(c));
 }
 
-export function startArgs({ uv, serverDir, port, data, identity, version }) {
+// Windows runs the server through pythonw: the launcher starts uv detached, without a console, and python.exe would
+// open a visible one of its own.
+export function startArgs({ uv, serverDir, port, data, identity, version, platform }) {
+  const python = platform === 'win32' ? 'pythonw' : 'python';
   return {
     cmd: uv,
     args: [
-      'run', '--locked', '--project', serverDir, 'python', join(serverDir, 'server.py'),
+      'run', '--locked', '--project', serverDir, python, join(serverDir, 'server.py'),
       '--port', String(port), '--data', data, '--lock-hash', identity, '--version', version,
     ],
     env: { UV_PROJECT_ENVIRONMENT: join(data, 'venv'), PYTHONDONTWRITEBYTECODE: '1' },
@@ -132,7 +135,7 @@ export async function main({ argv, env, fetch, spawn, isFile }) {
     const config = env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
     const uv = findUv({ config, path: env.PATH ?? env.Path, platform: process.platform, isFile });
     if (!uv) return log('uv not found: run the dead-claude-skills installer, which downloads it');
-    const s = startArgs({ uv, serverDir, port, data, identity, version });
+    const s = startArgs({ uv, serverDir, port, data, identity, version, platform: process.platform });
     mkdirSync(data, { recursive: true });
     const out = openServerLog(data);
     let child;
@@ -140,9 +143,8 @@ export async function main({ argv, env, fetch, spawn, isFile }) {
       child = spawn(s.cmd, s.args, {
         cwd: data,
         env: serverEnv(env, s.env),
-        // Windows: detached starts uv with no console, so the python.exe it runs opens a visible one. Not detached, uv gets
-        // a hidden console (CREATE_NO_WINDOW) that python inherits, and Windows children outlive their parent anyway.
-        detached: process.platform !== 'win32',
+        // Detached on Windows too: Node puts every attached child into a job object that kills it when the launcher exits.
+        detached: true,
         windowsHide: true,
         stdio: ['ignore', out, out],
       });

@@ -823,7 +823,7 @@ pub(crate) mod tests {
             }
         ));
         std::fs::create_dir_all(&project).unwrap();
-        let archive = crate::archive::Archive::open(&project, &jiff::Zoned::now()).unwrap();
+        let archive = crate::archive::Archive::open(&project, &jiff::ZonedDateTime::now()).unwrap();
         Arc::new(Ctx {
             archive,
             cfg: crate::config::Config {

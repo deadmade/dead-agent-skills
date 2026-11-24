@@ -41,10 +41,11 @@ test('auto-compact window defaults to 350k and keeps a number the user set', () 
   assert.equal(resetSettings({ autoCompactWindow: 500000 }, {}).autoCompactWindow, 350000);
 });
 
-test('output style defaults to concise and keeps one the user chose', () => {
-  assert.equal(mergeSettings({}, {}).outputStyle, 'concise');
+test('output style defaults to the built-in Concise, moves the old shipped one and keeps one the user chose', () => {
+  assert.equal(mergeSettings({}, {}).outputStyle, 'Concise');
+  assert.equal(mergeSettings({ outputStyle: 'concise' }, {}).outputStyle, 'Concise');
   assert.equal(mergeSettings({ outputStyle: 'Explanatory' }, {}).outputStyle, 'Explanatory');
-  assert.equal(resetSettings({ outputStyle: 'Explanatory' }, {}).outputStyle, 'concise');
+  assert.equal(resetSettings({ outputStyle: 'Explanatory' }, {}).outputStyle, 'Concise');
 });
 
 test('merge is idempotent', () => {
@@ -200,11 +201,18 @@ test('Night City settings are always on, next to other env, and leave the theme 
   const out = mergeSettings({ env: { FOO: 'x' }, theme: 'dark' }, {});
   assert.deepEqual(out.env, {
     CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: '8',
+    CLAUDE_CODE_EXPERIMENTAL_CODE_MODE: '1',
     FOO: 'x',
     CLAUDE_CODE_TMUX_TRUECOLOR: '1',
   });
   assert.equal(out.syntaxHighlightingDisabled, true);
   assert.equal(out.theme, 'dark');
+});
+
+test('Code Mode defaults to on and keeps a value the user set', () => {
+  assert.equal(mergeSettings({}, {}).env?.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, '1');
+  const off = mergeSettings({ env: { CLAUDE_CODE_EXPERIMENTAL_CODE_MODE: '0' } }, {});
+  assert.equal(off.env?.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, '0');
 });
 
 test('workflow concurrency defaults to 8, keeps a number the user set, and no subagent model is ever written', () => {

@@ -451,7 +451,7 @@ async fn ask(ctx: &Ctx, source: &'static str, url: Url, parse: Parse) -> Answer 
 fn since_date(s: Since) -> jiff::civil::Date {
     use jiff::ToSpan;
     let today = jiff::Timestamp::now()
-        .to_zoned(jiff::tz::TimeZone::UTC)
+        .to_zoned_datetime(jiff::tz::TimeZone::UTC)
         .date();
     today.saturating_sub(match s {
         Since::Day => 1.day(),

@@ -35,7 +35,6 @@ Installing flows installs every plugin below except `claude-code`, which names t
 build-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
 ├ mattpocock-picks: codebase-design, domain-modeling, grilling, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
@@ -47,7 +46,7 @@ build-feature
 evaluate
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: how, why
 ├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
@@ -56,7 +55,6 @@ evaluate
 fix
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
 ├ pstack-picks: blast-radius, how, interrogate, why
 ├ superpowers: finishing-a-development-branch, systematic-debugging, test-driven-development, using-git-worktrees
@@ -65,7 +63,6 @@ fix
 implement
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why
@@ -76,7 +73,6 @@ implement
 learn
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills
 ├ pstack-picks: recall
 ├ superpowers: writing-skills
@@ -85,7 +81,6 @@ learn
 refactor
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
 ├ mattpocock-picks: codebase-design, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
@@ -97,7 +92,6 @@ refactor
 research-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
 ├ mattpocock-picks: grilling, setup-matt-pocock-skills
 ├ paper-lookup: paper-lookup
@@ -108,7 +102,6 @@ research-feature
 review-code
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
 ├ mattpocock-picks: grilling, improve-codebase-architecture
 ├ ponytail: ponytail-audit, ponytail-review
@@ -123,7 +116,7 @@ tidy
 understand
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills, teach
 ├ pstack-picks: how, why
 ├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
@@ -132,7 +125,6 @@ understand
 upgrade
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ dead-skills: context7
 ├ flows: diagrams
 ├ mattpocock-picks: setup-matt-pocock-skills
