@@ -10,7 +10,7 @@ below: our copy in `~/.claude/bin` runs. The installer downloads it when it is m
 own binaries, the installer's version) and keeps it when it is equal or newer. A copy elsewhere on PATH is ignored.
 Plugin settings (`binPath`, `agentBrowserPath`) always point at our copy. The rule lives in one function, driven by the
 tool manifest (`tools/installer/assets/tools.json`). graphify is a uv tool, not a download: it stays unpinned and is
-always installed with `--upgrade`.
+always installed with `--upgrade`. graphify was replaced by serena (ADR 0016), installed the same way.
 
 ## Considered options
 

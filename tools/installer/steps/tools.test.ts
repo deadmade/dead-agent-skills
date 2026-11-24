@@ -45,9 +45,9 @@ test('a github tool older than the pin is upgraded', async () => {
 
 test('a declined prompt: no download, undefined, one failure line ending in io.off', async () => {
   const t = io(undefined, false);
-  assert.equal(await ensureTool('uv', { ...t.fake, off: 'graphify stays as it is' }), undefined);
+  assert.equal(await ensureTool('uv', { ...t.fake, off: 'serena stays as it is' }), undefined);
   assert.deepEqual(t.downloaded, []);
-  assert.deepEqual(failures, ['uv: install skipped by you; graphify stays as it is']);
+  assert.deepEqual(failures, ['uv: install skipped by you; serena stays as it is']);
 });
 
 test('ours at or above the pin: no prompt, no download, changed false', async () => {

@@ -14,6 +14,6 @@ tools/installer/**/*.js
 # release branch by release.yml.
 /.claude-plugin/
 /.agents/plugins/
-# graphify's generated analysis output, and the old Rust build folder.
-/graphify-out/
+# serena's per-repository project files, and the old Rust build folder.
+/.serena/
 /crates/

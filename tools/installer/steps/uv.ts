@@ -2,6 +2,7 @@
 // kept at the version pinned in tools/installer/assets/tools.json. Then the server's environment and tiktoken's
 // vocabulary are built into the plugin's data folder, so the first session starts at once. Asks before a download; every
 // failure is a summary line.
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   pluginDataDir,
@@ -12,14 +13,15 @@ import {
 } from '../core/plugins.ts';
 import { MARKETPLACE } from '../core/release.ts';
 import { CONFIG, done, failures, tryJson } from '../context.ts';
-import { TOOLS, pypiSpec } from '../core/tools.ts';
+import { TOOLS, pypiSpec, toolPath } from '../core/tools.ts';
 import { stopLocalServer } from '../system/net.ts';
 import { errCode, startSync } from '../system/proc.ts';
 import { log } from '../ui/ui.ts';
 import { ensureTool } from './tools.ts';
 
 export const HEADROOM_TRIM = `headroom-trim@${MARKETPLACE}`;
-const OFF = 'headroom-trim and graphify stay as they are: the installer could not set up its own uv copy';
+const OFF =
+  "headroom-trim and serena stay as they are and graphify's CLI stays installed: the installer could not set up its own uv copy";
 
 // The uv path in use, or undefined (a summary line says why).
 export const installUv = async () => (await ensureTool('uv', { off: OFF }))?.path;
@@ -63,18 +65,42 @@ export async function prepareTrimServer(uv: string): Promise<void> {
     );
 }
 
-// graphify's CLI, with its optional parsers, as a uv tool run by the installer's uv. Always upgraded, so a rerun picks up
-// a new graphifyy; a failure is a summary line.
-export function installGraphify(uv: string): void {
-  log('info', 'Installing graphify (uv tool install)');
-  const r = startSync(uv, ['tool', 'install', '--upgrade', pypiSpec('graphify')], { stdio: 'inherit' });
+// serena as a uv tool run by the installer's uv. Always upgraded, so a rerun picks up a new serena-agent. Returns the
+// path of uv's serena, or undefined (a summary line says why).
+export function installSerena(uv: string): string | undefined {
+  const tool = TOOLS.tools.serena;
+  const python = tool?.source === 'pypi' && tool.python ? ['-p', tool.python] : [];
+  log('info', 'Installing serena (uv tool install)');
+  const r = startSync(uv, ['tool', 'install', '--upgrade', ...python, pypiSpec('serena')], { stdio: 'inherit' });
   if (r.status !== 0) {
     failures.push(
-      `graphify: uv tool install failed (${errCode(r.error) ?? `exit ${r.status}`}); run it yourself: uv tool install "${pypiSpec('graphify')}"`,
+      `serena: uv tool install failed (${errCode(r.error) ?? `exit ${r.status}`}); close Claude Code and Codex sessions that run serena, then rerun the installer, or run: uv tool install ${python.join(' ')} ${pypiSpec('serena')}`,
     );
+    return undefined;
+  }
+  const dir = startSync(uv, ['tool', 'dir', '--bin']);
+  const path = dir.status === 0 ? toolPath(dir.stdout.trim(), 'serena', process.platform) : undefined;
+  if (path && existsSync(path)) return path;
+  failures.push(
+    `serena: installed, but uv's tool folder has no serena command (${path ?? `uv tool dir --bin: exit ${dir.status}`})`,
+  );
+  return undefined;
+}
+
+// graphify's CLI (graphifyy), which earlier releases installed with uv; removed with the first of `uvs` that exists
+// (never a uv downloaded just for this) when that uv lists it.
+export function uninstallGraphify(uvs: (string | undefined)[]): void {
+  const uv = uvs.find((p) => p && existsSync(p));
+  if (!uv) {
+    done.push('graphify: retired; if its CLI is installed, remove it with: uv tool uninstall graphifyy');
     return;
   }
-  done.push(
-    `graphify: installed with the ${(TOOLS.tools.graphify as { extras: string }).extras.replaceAll(',', ', ')} extras`,
-  );
+  const list = startSync(uv, ['tool', 'list']);
+  if (list.status !== 0 || !list.stdout.split(/\r?\n/).some((line) => line.startsWith('graphifyy '))) return;
+  const r = startSync(uv, ['tool', 'uninstall', 'graphifyy'], { stdio: 'inherit' });
+  if (r.status === 0) done.push('graphify: its CLI (graphifyy) uninstalled');
+  else
+    failures.push(
+      `graphify: uv tool uninstall failed (${errCode(r.error) ?? `exit ${r.status}`}); run it yourself: uv tool uninstall graphifyy`,
+    );
 }

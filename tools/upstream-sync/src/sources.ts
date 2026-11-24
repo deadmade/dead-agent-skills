@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import type { Source } from './types.ts';
 import { run as agent_review } from './adapters/agent-review.ts';
 import { run as csharp } from './adapters/csharp.ts';
-import { run as graphify } from './adapters/graphify.ts';
 import { run as hallmark } from './adapters/hallmark.ts';
 import { run as mattpocock } from './adapters/mattpocock.ts';
 import { run as paper_lookup } from './adapters/paper-lookup.ts';
@@ -126,20 +125,6 @@ export function sources(ROOT: string): Source[] {
         report +
         '```\n' +
         CC,
-    },
-    {
-      name: 'graphify',
-      adapter: graphify,
-      paths: ['plugins/shared/graphify'],
-      check: () => {
-        const d = 'plugins/shared/graphify';
-        json(`${d}/plugin.json`, `${d}/hooks/hooks.json`);
-        exists(`${d}/skills/graphify/SKILL.md`);
-        const refs = readdirSync(join(ROOT, d, 'skills/graphify/references')).filter((f) => f.endsWith('.md'));
-        count('graphify references', refs.length, 8);
-        return { sha: upstream(`${d}/UPSTREAM`) };
-      },
-      ...commitPr('graphify', 'the graphify Claude Code skill', 'Graphify-Labs/graphify'),
     },
     {
       name: 'hallmark',

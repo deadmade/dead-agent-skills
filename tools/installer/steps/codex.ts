@@ -1,4 +1,5 @@
-// Codex owns its plugin cache and configuration; the only direct TOML edit adds the Azure environment allowlist.
+// Codex owns its plugin cache and configuration; the only direct TOML edits add the Azure environment allowlist and
+// serena's start timeout.
 import { createHash } from 'node:crypto';
 import { rulesMigration } from '../core/rules-migration.ts';
 import { installCodexTheme, readRulesReceipt } from '../system/harness-setup.ts';
@@ -16,16 +17,19 @@ import {
   installedCodex,
   mcpName,
   mcpEnvironment,
+  mcpTableLine,
 } from '../core/codex.ts';
-import { resolveTool } from '../core/tools.ts';
+import { resolveTool, toolPath } from '../core/tools.ts';
 import { categorize } from '../core/options.ts';
-import { PKG, VERSION, ask, done, failures, tryJson } from '../context.ts';
+import { BIN_DIR, PKG, VERSION, ask, done, failures, tryJson } from '../context.ts';
 import { writeAtomic } from '../system/files.ts';
 import { downloadBin } from '../system/net.ts';
 import { startSync, which } from '../system/proc.ts';
 import { confirm, note, screen } from '../ui/ui.ts';
 import { type Data, changeList, initial, move, render } from '../ui/view.ts';
 import { installAgentBrowser } from './agent-browser.ts';
+import { ensureTool } from './tools.ts';
+import { installSerena, uninstallGraphify } from './uv.ts';
 
 export interface CodexIO {
   home?: string;
@@ -37,10 +41,14 @@ export interface CodexIO {
   which?: typeof which;
   download?: typeof downloadBin;
   browser?: typeof installAgentBrowser;
+  // uv's serena path, or undefined when the install failed.
+  serena?: () => Promise<string | undefined>;
+  // Removes graphify's CLI after the run retired the graphify plugin.
+  cleanup?: () => Promise<void>;
 }
 
-// The url and environment variable names a plugin's Codex package states, generated from its plugin.json.
-function readCodexMcp(catalog: string, name: string): { url?: string; envVars: string[] } {
+// The url, args and environment variable names a plugin's Codex package states, generated from its plugin.json.
+function readCodexMcp(catalog: string, name: string): { url?: string; args?: string[]; envVars: string[] } {
   return JSON.parse(readFileSync(join(catalog, '.agents/plugins', name, 'codex-mcp.json'), 'utf8'));
 }
 
@@ -105,9 +113,12 @@ export async function applyCodex(io: CodexIO = {}) {
     ),
     describe: (key) => ({
       label: key,
-      detail: MCP_COMPONENTS.includes(key)
-        ? 'MCP integration (authentication may need setup)'
-        : 'Portable skills and resources',
+      detail:
+        key === 'serena'
+          ? 'MCP server (the installer installs it with uv)'
+          : MCP_COMPONENTS.includes(key)
+            ? 'MCP integration (authentication may need setup)'
+            : 'Portable skills and resources',
     }),
     updates:
       previous?.version !== VERSION
@@ -191,7 +202,16 @@ export async function applyCodex(io: CodexIO = {}) {
       ) + '\n',
     );
   for (const name of plan.remove) {
-    run('plugin', 'remove', `${name}@${CODEX_MARKETPLACE}`, '--json');
+    try {
+      run('plugin', 'remove', `${name}@${CODEX_MARKETPLACE}`, '--json');
+    } catch (error) {
+      // The new marketplace no longer lists a retired plugin; its removal must not block the rest of the step.
+      if (!plan.retired.includes(name)) throw error;
+      failures.push(
+        `Codex: could not remove ${name} (${(error as Error).message}); run: codex plugin remove ${name}@${CODEX_MARKETPLACE}`,
+      );
+      continue;
+    }
     applied.delete(name);
     save();
   }
@@ -270,6 +290,33 @@ export async function applyCodex(io: CodexIO = {}) {
       `Set ${envVars.join(', ')} in the environment that starts Codex; the setup-mcp-azure skill says which are optional.`,
     ]);
   }
+  if (plan.wanted.includes('serena')) {
+    const path = await (
+      io.serena ??
+      (async () => {
+        const uv = await ensureTool('uv', { binDir: join(base, 'bin'), off: 'serena is not added to Codex' });
+        return uv && installSerena(uv.path);
+      })
+    )();
+    if (path) {
+      configure('serena', ['--', path, ...(settings('serena').args ?? [])]);
+      const config = join(home, 'config.toml');
+      if (lstatSync(config).isSymbolicLink())
+        throw new Error("Codex config.toml is a symlink; add serena's startup_timeout_sec where it is managed");
+      const raw = readFileSync(config, 'utf8');
+      const next = mcpTableLine(raw, mcpName('serena'), 'startup_timeout_sec = 15');
+      if (next !== raw) writeAtomic(config, next);
+    }
+  }
+  if (plan.retired.includes('graphify'))
+    await (
+      io.cleanup ??
+      (async () =>
+        uninstallGraphify([
+          toolPath(join(base, 'bin'), 'uv', process.platform),
+          toolPath(BIN_DIR, 'uv', process.platform),
+        ]))
+    )();
   const packaged = join(catalog, '.agents/plugins/dead-skills');
   const theme = installCodexTheme(home, join(packaged, 'themes/night-city.tmTheme'));
   note('Codex Night City', [

@@ -9,7 +9,6 @@ excludes = [
   "plugins/opt-in/hallmark/**",
   "plugins/flows/packs/**",
   "plugins/flows/agents/**",
-  "plugins/shared/graphify/**",
   "plugins/opt-in/implementation/*-skills/library/**",
   "plugins/opt-in/implementation/*-skills/skills/**",
   "plugins/opt-in/implementation/*-skills/LICENSE",

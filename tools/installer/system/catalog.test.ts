@@ -54,7 +54,7 @@ test('packed compiled installer loads catalog and selects without authored plugi
     ]);
     assert.equal(run.status, 0, run.stderr);
     assert.ok(run.stdout.trim(), JSON.stringify(run));
-    assert.deepEqual(JSON.parse(run.stdout), ['dead-skills', 'flows', 'graphify', 'web-mcp']);
+    assert.deepEqual(JSON.parse(run.stdout), ['dead-skills', 'flows', 'serena', 'web-mcp']);
     const files = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).files;
     assert.ok(files.includes('plugins/catalog.json'));
   } finally {

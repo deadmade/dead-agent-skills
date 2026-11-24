@@ -13,6 +13,5 @@
       "name": "claude-security",
       "marketplace": "claude-plugins-official"
     }
-  ],
-  "embeds": ["graphify"]
+  ]
 }

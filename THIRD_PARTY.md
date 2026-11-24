@@ -99,15 +99,6 @@ Modified by `tools/upstream-sync/src/adapters/simple.ts`: a `paths:` block (`**/
 `**/*.prisma`, `**/alembic/**`) is added to each SKILL.md's frontmatter. Synced weekly via GitHub Actions
 (`sync.yml`).
 
-## graphify
-
-`plugins/shared/graphify/skills/graphify/` vendors the Claude Code skill (`graphify/skill.md`) and its `references/`
-from [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify) (Apache License 2.0, Copyright 2026
-Safi Shamsi and the Graphify contributors; `LICENSE`, `LICENSE-MIT` and `NOTICE` in `plugins/shared/graphify/`),
-unmodified. `plugins/shared/graphify/hooks/hooks.json` reproduces the hooks upstream's installer writes and calls the
-separately installed `graphifyy` CLI. Synced by `tools/upstream-sync/src/adapters/graphify.ts` (weekly via GitHub Actions); the
-synced upstream commit is in `plugins/shared/graphify/UPSTREAM`.
-
 ## review-code
 
 flows' `/review-code` (`plugins/flows/skills/review-code/`) vendors one agent from
@@ -166,6 +157,5 @@ review-code and build-feature are adapted from its method.
 ## Re-listed plugins
 
 The marketplace entry for Atlassian only points at its upstream repository; no code is vendored here. Anthropic's
-plugins (claude-code-setup, claude-md-management, security-guidance,
-claude-security, skill-creator and the LSPs) aren't listed here at all: they install from Anthropic's
+plugins (claude-md-management, claude-security, skill-creator and the LSPs) aren't listed here at all: they install from Anthropic's
 `claude-plugins-official` marketplace. Each is covered by its own upstream license.

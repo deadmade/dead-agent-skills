@@ -39,9 +39,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   REST Client `.http` files and returns real replies with their secrets masked. Read `docs/components/http-runner.md`
   before changing it.
 - `plugins/opt-in/mcp/mcp-github/`: an MCP server config only.
-- `plugins/shared/graphify/`: vendored knowledge-graph skill and `tool.starting` hooks that nudge towards `graphify-out/`, on both
-  harnesses. flows pulls it in (on Codex flows also embeds its skills); the installer's Tools page offers it and runs
-  `uv tool install` for its CLI.
+- `plugins/shared/serena/`: Serena's MCP server (symbol lookup over language servers) in its `ide` context, without
+  memories, onboarding or an opened dashboard, on both harnesses; it writes `.serena/` into each repository it
+  activates. flows pulls it in and its grounding step uses it. The installer installs `serena-agent` with its own uv on
+  either host and points `serenaPath` (Codex: the `codex mcp add` command) at that copy (ADR 0016).
 - `plugins/shared/agent-review/`: vendored skill that checks agent work at three levels, Claude Code only. The dead-skills
   bundle pulls it in.
 - `plugins/opt-in/hallmark/`: vendored frontend-design skill, on both harnesses. Nothing pulls it in.
@@ -81,7 +82,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 `treefmt.toml`'s `excludes` lists every vendored path (`docs/vendor-a-pack.md` is the checklist for adding one).
 `tools/upstream-sync/src/adapters/*.ts` and `sources.ts` copy these paths from upstream (the weekly `sync.yml` opens the PRs),
 and every sync overwrites them. To change one, change its sync script's transform, not the vendored files. A sync skips
-these hand-written exceptions: `plugin.json` for csharp-skills, rust-skills, postgres, hallmark, graphify and agent-review, and the
+these hand-written exceptions: `plugin.json` for csharp-skills, rust-skills, postgres, hallmark and agent-review, and the
 `*-skills` plugins' `evals/`. ponytail and superpowers vendor no manifest at all (a pack is a plain resource folder; the compiler never
 loads one as a plugin). `tob-picks` is CC BY-SA 4.0; THIRD_PARTY.md has every pack's actual license.
 When what's vendored or its license changes, update THIRD_PARTY.md.
@@ -145,6 +146,12 @@ Read `docs/components/ci.md` for how a release is built and published.
   changed (never a folder: it reformats files you didn't touch), then `npm run build:harnesses`, then stage.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt, taplo for TOML).
   Formatter options live in `treefmt.toml`; flow steps use `#:schema ./step.schema.json` for editor validation.
+  Without the nix shell (no `treefmt` on PATH, as on Windows), run
+  `npx -y prettier@3 --write --no-config --print-width 120 --single-quote <files>` on the files you changed: treefmt's
+  prettier settings; TOML then goes unformatted.
+- Run `npm run build:harnesses` (and `npm test`, which builds) in one process at a time: two at once, subagents
+  included, fail on Windows with `EPERM` renaming `.native-build-*` and can leave `.claude-plugin/` missing until a
+  rebuild.
 - `npm run scan-skills` (needs `pipx`) runs Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`
   and the composed flows conductors in `.claude-plugin/flows/skills/`; it fails on a high or critical finding. A
   finding judged benign gets a scoped suppression with its reason in `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR except the `uv` and `agent-browser` pin bumps (`scan: false` in `sources.ts`).
@@ -156,7 +163,7 @@ Read `docs/components/ci.md` before changing a workflow, renaming a `test.yml` j
 
 `plugins/` is agent-neutral: no `.claude-plugin`, `.codex-plugin`, `.mcp.json`, native hook files, install instructions
 or harness paths. Each local plugin has a neutral `plugin.json` (description, author, dependencies, `config`, `mcpServers`,
-`lsp`, `themes`, `extensions`, `instructions`, `embeds`, `hooks`) and, if it has hooks, a neutral `hooks/hooks.json` (events such as `session.started`,
+`lsp`, `themes`, `extensions`, `instructions`, `hooks`) and, if it has hooks, a neutral `hooks/hooks.json` (events such as `session.started`,
 `tool.completed`; tools such as `file.write`). `plugins/catalog.json` lists the plugins, their source, resources,
 dependencies and targets. UI mods (TypeScript against Claude's UI engine) stay in their plugin and are declared in `plugin.json` as an
 `extensions` entry; a harness that cannot run them gets a build warning and the mod is left out of its package.
