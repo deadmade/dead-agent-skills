@@ -2,7 +2,7 @@
 // call, not once, because tests set and unset the variable within one process.
 import { readFileSync } from 'node:fs';
 
-export type Answers = {
+type Answers = {
   chosen: Record<string, boolean>;
   prompts: Record<string, boolean | string>;
   marketplace?: string;

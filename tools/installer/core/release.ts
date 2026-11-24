@@ -13,8 +13,10 @@ export const REPO = JSON.parse(readFileSync(new URL('../../../package.json', imp
 export const RELEASE_BRANCH = 'release';
 // The test seam's local marketplace folder replaces the github branch and skips the official add (an unpinned network clone).
 export const marketplaceArg = () => testAnswers()?.marketplace ?? `${REPO}@${RELEASE_BRANCH}`;
-export const marketplaceSource = (local = testAnswers()?.marketplace) =>
-  local ? { source: 'directory', path: local } : { source: 'github', repo: REPO, ref: RELEASE_BRANCH };
+export const marketplaceSource = () => {
+  const local = testAnswers()?.marketplace;
+  return local ? { source: 'directory', path: local } : { source: 'github', repo: REPO, ref: RELEASE_BRANCH };
+};
 export const addsOfficialMarketplace = () => !testAnswers()?.marketplace;
 
 // Claude Code refuses to add a marketplace whose source differs from its extraKnownMarketplaces entry, so the entry
