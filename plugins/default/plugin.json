@@ -14,14 +14,6 @@
       "marketplace": "claude-plugins-official"
     },
     {
-      "name": "security-guidance",
-      "marketplace": "claude-plugins-official"
-    },
-    {
-      "name": "claude-security",
-      "marketplace": "claude-plugins-official"
-    },
-    {
       "name": "agent-review",
       "targets": ["claude-code"]
     }

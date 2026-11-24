@@ -60,8 +60,9 @@ test('opt-ins from the real manifests', () => {
 
 test('bundle ids resolve bare names to our marketplace; flows carries the packs, so the bundle has none', () => {
   const ids = bundleIds(bundle);
-  assert.ok(ids.includes(`dead-skills@${M}`) && ids.includes(`claude-security@${O}`));
-  for (const gone of [`superpowers@${M}`, `ponytail@${M}`, `code-review@${O}`]) assert.ok(!ids.includes(gone), gone);
+  assert.ok(ids.includes(`dead-skills@${M}`) && ids.includes(`claude-md-management@${O}`));
+  const gone = [`superpowers@${M}`, `ponytail@${M}`, `code-review@${O}`, `security-guidance@${O}`, `claude-security@${O}`];
+  for (const id of gone) assert.ok(!ids.includes(id), id);
 });
 
 test('token plugins', () => {

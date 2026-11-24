@@ -1,7 +1,7 @@
 # Hardening pass (`all`)
 
-What makes the code fragile? Moved from the former harden conductor; the security lens and the full-scan pass
-(`claude-security`) cover the general security sweep.
+What makes the code fragile? Moved from the former harden conductor; the security lens covers the general security
+sweep.
 
 ## Passes
 

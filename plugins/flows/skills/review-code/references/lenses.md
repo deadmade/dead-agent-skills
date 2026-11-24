@@ -49,8 +49,7 @@ finding too.
 instruction-file review, leading with statements the diff made untrue. Prose findings only for docs the diff changed.
 
 **security.** One agent following the adapter's security review, with the diff from Phase 1 in place of a branch diff
-a skill builds itself. Where the adapter offers more than one, this lens takes the one-agent review; a many-agent
-pipeline (`claude-security`) runs only as the `all` pass full scan.
+a skill builds itself.
 
 **risk.** pstack `blast-radius` over the change (callers, data, wire formats, configs), plus:
 
@@ -72,9 +71,8 @@ style taste, no praise, no summary. "No findings" is a valid answer.
 `all` runs the lenses on every tracked file (vendored skipped, as Phase 1 says), then the main session offers these
 passes, each with a recommendation and its cost in agents, and runs only those the user says yes to:
 
-| Pass        | Follows                                                                                          |
-| ----------- | ------------------------------------------------------------------------------------------------ |
-| tests, deep | [tests-all.md](tests-all.md): mutation testing, property candidates, untested requirements       |
-| hardening   | [harden-all.md](harden-all.md): security domains, sharp edges, bloat, architecture               |
-| full scan   | `claude-security:claude-security` where the host has it, a scoped scan (its own pipeline, panel) |
-| every claim | [docs.md](docs.md) **Every claim**                                                               |
+| Pass        | Follows                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| tests, deep | [tests-all.md](tests-all.md): mutation testing, property candidates, untested requirements |
+| hardening   | [harden-all.md](harden-all.md): security domains, sharp edges, bloat, architecture         |
+| every claim | [docs.md](docs.md) **Every claim**                                                         |

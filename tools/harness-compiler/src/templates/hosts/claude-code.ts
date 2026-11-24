@@ -26,7 +26,6 @@ export const TOKENS: HostTokens = {
     uses: {
       'claude-code': ['code-review', 'security-review'],
       'claude-md-management@claude-plugins-official': ['claude-md-improver'],
-      'claude-security@claude-plugins-official': ['claude-security'],
     },
   },
 };

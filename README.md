@@ -51,8 +51,8 @@ registration and safe migration from existing managed global rules. It accepts `
 comma. Codex installer state lives under `$CODEX_HOME/dead-agent-skills` (default `~/.codex/dead-agent-skills`).
 The old executable name remains an alias.
 
-For Claude Code, the default bundle, **[dead-skills](plugins/default/README.md)**, pulls in claude-code-setup, claude-md-management, security-guidance and
-claude-security and agent-review, and itself carries Context7, Night City (a
+For Claude Code, the default bundle, **[dead-skills](plugins/default/README.md)**, pulls in claude-code-setup, claude-md-management and
+agent-review, and itself carries Context7, Night City (a
 toned-down synthwave theme that everything else here is painted in), desktop notifications when a turn ends or Claude
 waits for you, and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, [Azure DevOps Server](plugins/opt-in/mcp/mcp-azure/README.md), http-runner, which runs `.http` files against an API and saves each real reply with its secrets masked, Atlassian on Codex), skill packs
