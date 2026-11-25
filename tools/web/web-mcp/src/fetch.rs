@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use futures::future::{BoxFuture, FutureExt as _, Shared};
-use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, RETRY_AFTER};
+use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, HeaderMap, HeaderValue, RETRY_AFTER};
 use rmcp::model::{CallToolResult, ContentBlock};
 use url::{Host, Url};
 
@@ -22,6 +22,8 @@ use crate::limits::HostPermit;
 
 pub const MAX_BODY: usize = 20 * 1024 * 1024;
 const ACCEPT_VALUE: &str = "text/markdown, text/html;q=0.9, */*;q=0.8";
+/// The browser's `--lang=en-US`, so the plain request asks for what the browser would.
+const ACCEPT_LANGUAGE_VALUE: &str = "en-US,en;q=0.9";
 // shortcut: pages with more content images than this archive only the first ones; raise if that bites.
 const MAX_IMAGES: usize = 24;
 const SHOWN_IMAGES: usize = 6;
@@ -102,6 +104,10 @@ fn net(e: impl fmt::Display) -> FetchError {
 pub fn client(public_only: bool) -> reqwest::Result<reqwest::Client> {
     let b = reqwest::Client::builder()
         .user_agent(concat!("web-mcp/", env!("CARGO_PKG_VERSION")))
+        .default_headers(HeaderMap::from_iter([(
+            ACCEPT_LANGUAGE,
+            HeaderValue::from_static(ACCEPT_LANGUAGE_VALUE),
+        )]))
         .redirect(reqwest::redirect::Policy::none());
     if public_only {
         b.dns_resolver(Arc::new(PublicOnly))
@@ -189,7 +195,14 @@ pub async fn get(
             // The guard's removal waits for this lock, so it can't run before the insert below.
             let task = tokio::spawn(async move {
                 let guard = guard;
-                run(&guard.0, &guard.1.0, deadline, opts).await
+                let (ctx, url) = (&guard.0, &guard.1.0);
+                match run(ctx, url, deadline, opts).await {
+                    // Only `download` answers a status.
+                    Err(FetchError::Status(s @ (403 | 503))) if wants_retry(opts) => {
+                        blocked_in_browser(ctx, url, s).await
+                    }
+                    r => r,
+                }
             });
             let f = async move { task.await.unwrap_or_else(|e| Err(net(e))) }
                 .boxed()
@@ -325,7 +338,8 @@ async fn run(
                 };
                 // A private page that this fetch may not reach was refused in `download` already.
                 if wants_fallback(opts, &page) {
-                    match browser_page(ctx, &final_url, opts.allow_private).await {
+                    let why = "(This page looks empty without JavaScript, and the browser fallback";
+                    match browser_page(ctx, &final_url, opts.allow_private, why).await {
                         Ok(html) => {
                             let h = html.clone();
                             page = blocking(Box::new(move || extract_html(&h, &base))).await?;
@@ -386,11 +400,68 @@ fn wants_fallback(opts: GetOpts, page: &Page) -> bool {
     opts.browser_fallback && opts.allow_private && near_empty(page)
 }
 
+/// The user's own `fetch` calls only, as for `wants_fallback`.
+fn wants_retry(opts: GetOpts) -> bool {
+    opts.browser_fallback && opts.allow_private
+}
+
+/// A public site's 403 or 503 to the plain request (often a bot check), loaded once in the browser tab after
+/// the host's request slot. A failed or near-empty rendering keeps the status, with the browser's reason; a
+/// private or loopback host's status is its real answer and stays as it is.
+async fn blocked_in_browser(ctx: &Ctx, url: &Url, status: u16) -> Result<Fetched, FetchError> {
+    if private_landing(url).await {
+        return Err(FetchError::Status(status));
+    }
+    let failed = |why: String| FetchError::Network(format!("HTTP {status}; {why}"));
+    let why = format!("(The plain request got HTTP {status}, and the browser");
+    let html = {
+        let _slot = ctx.limits.acquire(url).await;
+        browser_page(ctx, url, false, &why).await.map_err(failed)?
+    };
+    let page = {
+        let (h, base) = (html.clone(), url.clone());
+        tokio::task::spawn_blocking(move || extract_html(&h, &base))
+            .await
+            .map_err(net)?
+    };
+    if near_empty(&page) {
+        return Err(failed(format!("{why}'s rendering looks empty too.)")));
+    }
+    let item = Item::Page {
+        url: url.clone(),
+        final_url: url.clone(),
+        raw: html.clone().into_bytes(),
+        raw_ext: "html",
+        rendered: Some(html),
+        markdown: page.markdown.clone(),
+        images: Vec::new(),
+        cache: false,
+    };
+    let archived = ctx
+        .archive
+        .put(item)
+        .await
+        .map_err(|e| net(format!("could not archive the page: {e}")))?;
+    Ok(Fetched {
+        final_url: url.clone(),
+        private: false,
+        archived,
+        page,
+        note: Some(format!(
+            "(The plain request got HTTP {status}; this is the browser's rendering.)"
+        )),
+    })
+}
+
 /// The page rendered by agent-browser. The browser follows redirects on its own, so where it ended
 /// is checked like a fetch hop: a landing on a private address is dropped unless `allow_private`.
-/// The `Err` is a note for the reader.
-async fn browser_page(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<String, String> {
-    let why = "(This page looks empty without JavaScript, and the browser fallback";
+/// The `Err` is a note for the reader, opened by `why` (the reason the browser was asked).
+async fn browser_page(
+    ctx: &Ctx,
+    url: &Url,
+    allow_private: bool,
+    why: &str,
+) -> Result<String, String> {
     let (html, landed) = ctx
         .browser
         .rendered_html(url)
@@ -398,7 +469,7 @@ async fn browser_page(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<Strin
         .map_err(|e| format!("{why} failed: {e})"))?;
     if !allow_private && private_landing(&landed).await {
         return Err(format!(
-            "(This page looks empty without JavaScript; the browser ended on {landed}, a private-network address this fetch may not reach, so its content was dropped.)"
+            "{why} ended on {landed}, a private-network address this fetch may not reach, so its content was dropped.)"
         ));
     }
     Ok(html)
@@ -962,9 +1033,9 @@ pub(crate) mod tests {
         let fake = browser_core::browser::fake_agent_browser();
         let ctx = test_ctx_with(&fake.to_string_lossy());
         let url = Url::parse("http://example.com/redirect-private").unwrap();
-        let dropped = browser_page(&ctx, &url, false).await.unwrap_err();
+        let dropped = browser_page(&ctx, &url, false, "(Why").await.unwrap_err();
         assert!(dropped.contains("http://127.0.0.1/admin"), "{dropped}");
-        let own = browser_page(&ctx, &url, true).await.unwrap();
+        let own = browser_page(&ctx, &url, true, "(Why").await.unwrap();
         assert!(own.contains("Rendered page for"), "{own}");
     }
 

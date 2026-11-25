@@ -500,3 +500,156 @@ fn direct_fetch_of_localhost_still_works() {
     assert_eq!(fx.hits("/img/1.jpg"), 1);
     assert_eq!(images(&r), 1);
 }
+
+#[test]
+fn sends_accept_language() {
+    use std::io::{BufRead as _, BufReader, Write as _};
+    let listener = std::net::TcpListener::bind((PUBLIC, 0)).unwrap();
+    let url = format!("http://{}/notes", listener.local_addr().unwrap());
+    let head = std::thread::spawn(move || {
+        let (conn, _) = listener.accept().unwrap();
+        let mut reader = BufReader::new(conn.try_clone().unwrap());
+        let mut head = String::new();
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                break;
+            }
+            head.push_str(&line.to_ascii_lowercase());
+        }
+        let body = "# Notes";
+        let mut out = conn;
+        let _ = write!(
+            out,
+            "HTTP/1.1 200 OK\r\nContent-Type: text/markdown\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        head
+    });
+    let mut mcp = Mcp::start();
+    let r = fetch(&mut mcp, &url);
+    assert!(!is_error(&r), "{r}");
+    let head = head.join().unwrap();
+    assert!(
+        head.contains("\r\naccept-language: en-us,en;q=0.9\r\n"),
+        "{head}"
+    );
+    assert!(head.contains("\r\nuser-agent: web-mcp/"), "{head}");
+}
+
+/// A server started with the fake agent-browser logging to the returned file; `pages` go in `$FAKE_AB_PAGES`.
+fn with_browser(pages: &[(&str, &str)]) -> (Mcp, std::path::PathBuf) {
+    let dir = common::tempdir();
+    for (name, html) in pages {
+        std::fs::write(dir.join(name), html).unwrap();
+    }
+    let log = common::tempdir().join("calls.jsonl");
+    let mcp = Mcp::start_with(
+        common::tempdir(),
+        &[
+            ("FAKE_AB_PAGES", dir.display().to_string()),
+            ("FAKE_AB_LOG", log.display().to_string()),
+        ],
+    );
+    (mcp, log)
+}
+
+/// Whether the fake was asked to `open` a URL containing `url`.
+fn opened(log: &std::path::Path, url: &str) -> bool {
+    common::logged(log).iter().any(|c| {
+        let stdin = c["stdin"].as_str().unwrap_or_default();
+        let argv = common::argv(c);
+        (stdin.contains("\"open\"") && stdin.contains(url))
+            || argv
+                .windows(2)
+                .any(|w| w[0] == "open" && w[1].contains(url))
+    })
+}
+
+fn blocked(fx: &Fixture, path: &str, status: u16) {
+    fx.route(
+        path,
+        vec![Resp::new(
+            status,
+            "text/html",
+            "<html><body>Access denied</body></html>",
+        )],
+    );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn blocked_public_page_is_loaded_in_the_browser() {
+    let fx = Fixture::start(PUBLIC);
+    blocked(&fx, "/guarded", 403);
+    let (mut mcp, log) = with_browser(&[]);
+    let url = fx.url("/guarded");
+    let r = fetch(&mut mcp, &url);
+    assert!(!is_error(&r), "{r}");
+    assert!(opened(&log, &url), "{r}");
+    let t = text(&r);
+    assert!(t.contains(", archived at .web/"), "{t}");
+    let (inside, after) = guarded(t);
+    assert!(inside.contains("Rendered page for"), "{t}");
+    assert_eq!(
+        after,
+        "\n\n(The plain request got HTTP 403; this is the browser's rendering.)"
+    );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn blocked_page_landing_private_names_the_status() {
+    let fx = Fixture::start(PUBLIC);
+    blocked(&fx, "/redirect-private", 403);
+    let (mut mcp, _log) = with_browser(&[]);
+    let r = fetch(&mut mcp, &fx.url("/redirect-private"));
+    assert!(is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("HTTP 403"), "{t}");
+    assert!(t.contains("127.0.0.1/admin"), "{t}");
+    assert!(!t.contains("looks empty"), "{t}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn blocked_public_page_rendering_empty_keeps_the_error() {
+    let fx = Fixture::start(PUBLIC);
+    blocked(&fx, "/shell", 503);
+    let (mut mcp, _log) = with_browser(&[(
+        "shell.html",
+        "<html><body><p>Checking your browser</p></body></html>",
+    )]);
+    let r = fetch(&mut mcp, &fx.url("/shell"));
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("HTTP 503"), "{r}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn rate_limited_page_is_not_retried_in_the_browser() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        "/busy",
+        vec![Resp::new(429, "text/plain", "slow down").header("Retry-After", "1")],
+    );
+    let (mut mcp, log) = with_browser(&[]);
+    let url = fx.url("/busy");
+    let r = fetch(&mut mcp, &url);
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("HTTP 429"), "{r}");
+    assert_eq!(fx.hits("/busy"), 2);
+    assert!(!opened(&log, &url), "{r}");
+}
+
+#[test]
+fn blocked_private_page_is_not_retried() {
+    let fx = Fixture::start("127.0.0.1");
+    blocked(&fx, "/guarded", 403);
+    let (mut mcp, log) = with_browser(&[]);
+    let url = fx.url("/guarded");
+    let r = fetch(&mut mcp, &url);
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("HTTP 403"), "{r}");
+    assert!(!opened(&log, &url), "{r}");
+}
