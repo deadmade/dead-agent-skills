@@ -267,6 +267,33 @@ async fn call(
     Ok(v.get("data").cloned().unwrap_or(v))
 }
 
+/// `tab close` while `session`'s generation is current (`cdp`), then `close` without `--cdp`, which also works
+/// after its Chrome died. A tab already gone counts as closed.
+async fn end(
+    bin: &Path,
+    session: &str,
+    config: &Path,
+    cdp: Option<&str>,
+) -> Result<Value, BrowserError> {
+    let tab = match cdp {
+        Some(cdp) => {
+            let tab_close = ["tab".to_owned(), "close".to_owned()];
+            let via = Via::Tab { config, cdp };
+            call(bin, session, &tab_close, None, false, via).await
+        }
+        None => Ok(Value::Null),
+    };
+    let tab = match tab {
+        Err(BrowserError::TabGone(_)) => Ok(Value::Null),
+        // shortcut: this text is assumed, not seen; the owner's blank tabs keep it from happening.
+        Err(BrowserError::Failed(m)) if m.contains("Cannot close the last tab") => Ok(Value::Null),
+        t => t,
+    };
+    let close = ["close".to_owned()];
+    let closed = call(bin, session, &close, None, false, Via::Detached(config)).await;
+    tab.and(closed)
+}
+
 impl Browser {
     /// `name` as configured: found on PATH, or kept as given so that running it reports `Missing`.
     #[must_use]
@@ -428,38 +455,12 @@ impl Browser {
             return Ok(json!({"closed": false}));
         }
         let config = self.window.attach_config().map_err(BrowserError::Failed)?;
-        self.end(&session, &config, Some(&live.url)).await
-    }
-
-    /// `tab close` while `session`'s generation is current (`cdp`), then `close` without `--cdp`, which also works
-    /// after its Chrome died. A tab already gone counts as closed.
-    async fn end(
-        &self,
-        session: &str,
-        config: &Path,
-        cdp: Option<&str>,
-    ) -> Result<Value, BrowserError> {
-        let tab = match cdp {
-            Some(cdp) => {
-                let tab_close = ["tab".to_owned(), "close".to_owned()];
-                let via = Via::Tab { config, cdp };
-                self.run_with(session, &tab_close, None, false, via).await
-            }
-            None => Ok(Value::Null),
-        };
-        let tab = match tab {
-            Err(BrowserError::TabGone(_)) => Ok(Value::Null),
-            // shortcut: this text is assumed, not seen; the owner's blank tabs keep it from happening.
-            Err(BrowserError::Failed(m)) if m.contains("Cannot close the last tab") => {
-                Ok(Value::Null)
-            }
-            t => t,
-        };
-        let close = ["close".to_owned()];
-        let closed = self
-            .run_with(session, &close, None, false, Via::Detached(config))
-            .await;
-        tab.and(closed)
+        // Its own task: a caller that stops waiting (`render`'s 5 s) doesn't stop it, so a tab whose page is still
+        // loading (its `tab close` waits behind the load, measured) still gets its session closed afterwards.
+        let bin = self.bin.clone();
+        tokio::spawn(async move { end(&bin, &session, &config, Some(&live.url)).await })
+            .await
+            .map_err(|e| BrowserError::Failed(e.to_string()))?
     }
 
     /// Closes every session still open, in parallel, best effort, each within 5 s; then the owner, which closes
@@ -473,7 +474,7 @@ impl Browser {
         if let (Some(live), Ok(config)) = (&live, self.window.attach_config()) {
             futures::future::join_all(ran.iter().map(|(s, g)| {
                 let cdp = (*g == live.r#gen).then_some(live.url.as_str());
-                tokio::time::timeout(CLOSE_TIMEOUT, self.end(s, &config, cdp))
+                tokio::time::timeout(CLOSE_TIMEOUT, end(&self.bin, s, &config, cdp))
             }))
             .await;
         }
