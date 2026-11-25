@@ -33,7 +33,8 @@ What web-mcp uses, and nothing else:
   window yet, each within 2 s. agent-browser 0.43.0 holds a session's first call while another tab's page is still
   loading (measured: 4 s headless, 10 s and more in the window), so a hanging page would cost tabs bound after it
   their deadline. It holds the window's lock throughout, so a second caller waits and then finds the keys run; a tab
-  that doesn't bind is left to its first call. A fetch's or `rows`' tab binds on its own first call and can still
+  that doesn't bind is left to its first call, and the next `bind` tries it again unless another call ran it in
+  between. A fetch's or `rows`' tab binds on its own first call and can still
   wait behind a hanging page.
 - `window::{Window, tie_to_process}`. `Window::new` takes the `Profiles` (or the error that made them). `tie_to_process`
   does nothing off Windows.

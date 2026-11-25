@@ -2,7 +2,7 @@
 //! a tab of web-mcp's one browser window (`window.rs`), attached with `--cdp <url> --pin-tab`. Before a `click` or
 //! `press` the tab is raised: `tab list` names it and one HTTP GET to the window's debug port activates it (`raise`).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -81,6 +81,8 @@ pub struct Browser {
     /// The attached sessions this process has run and not closed, with their generation. Only these are ever
     /// closed: a `close` on a session without a daemon starts one and leaks a tab (web-mcp-one-window/findings.md).
     ran: Mutex<BTreeMap<String, u32>>,
+    /// The sessions `bind` put in `ran` and no other call has run since; taken under `ran`'s lock.
+    binding: Mutex<BTreeSet<String>>,
     /// The owner's config, from its first call; shutdown closes the owner under it.
     owner_config: Mutex<Option<PathBuf>>,
     /// Held from raising a tab until its input is sent: only the front tab takes input, so another session raising
@@ -303,6 +305,7 @@ impl Browser {
             window,
             live: Mutex::default(),
             ran: Mutex::default(),
+            binding: Mutex::default(),
             owner_config: Mutex::default(),
             front: tokio::sync::Mutex::default(),
             http: std::sync::OnceLock::new(),
@@ -333,8 +336,10 @@ impl Browser {
     /// Binds each of `keys`' tabs that no call has run in this window yet, all at once, each within `BIND_TIMEOUT`,
     /// after `warm` and before any of them navigates: a session's first call waits on another tab's pending page
     /// load in agent-browser 0.43.0 (measured: 4 s headless, 10 s and more in the window). A tab that doesn't bind is
-    /// left to its first call, as before. The window's lock, held throughout, keeps a second caller from running any
-    /// of these keys before their binds end: it waits, then finds them run.
+    /// left to its first call, as before, and forgotten again unless another call ran it meanwhile, so the next `bind`
+    /// tries it again; while it binds it stays in `ran`, so `close_all` still ends a daemon it may have started. The
+    /// window's lock, held throughout, keeps a second caller from running any of these keys before their binds end:
+    /// it waits, then finds them run.
     ///
     /// # Panics
     /// When another thread panicked holding the window or session lock.
@@ -346,9 +351,13 @@ impl Browser {
         };
         let fresh: Vec<String> = {
             let mut ran = self.ran.lock().expect("sessions");
+            let mut binding = self.binding.lock().expect("binds");
             keys.iter()
                 .map(|k| name(k, live.r#gen))
                 .filter(|s| ran.insert(s.clone(), live.r#gen).is_none())
+                .inspect(|s| {
+                    binding.insert(s.clone());
+                })
                 .collect()
         };
         let via = Via::Tab {
@@ -356,12 +365,18 @@ impl Browser {
             cdp: &live.url,
         };
         let get_url = ["get".to_owned(), "url".to_owned()];
-        futures::future::join_all(
-            fresh
-                .iter()
-                .map(|s| tokio::time::timeout(BIND_TIMEOUT, self.run_with(s, &get_url, None, via))),
-        )
-        .await;
+        let bound =
+            futures::future::join_all(fresh.iter().map(|s| {
+                tokio::time::timeout(BIND_TIMEOUT, self.run_with(s, &get_url, None, via))
+            }))
+            .await;
+        let mut ran = self.ran.lock().expect("sessions");
+        let mut binding = self.binding.lock().expect("binds");
+        for (s, b) in fresh.iter().zip(bound) {
+            if binding.remove(s) && !matches!(b, Ok(Ok(_))) {
+                ran.remove(s);
+            }
+        }
     }
 
     /// The window: the one last seen unless `fresh` (or none was), else the owner's answer now. A newer generation
@@ -417,7 +432,9 @@ impl Browser {
     /// Notes `key`'s session in generation `g` as run, and returns it.
     fn track(&self, key: &str, g: u32) -> String {
         let s = name(key, g);
-        self.ran.lock().expect("sessions").insert(s.clone(), g);
+        let mut ran = self.ran.lock().expect("sessions");
+        ran.insert(s.clone(), g);
+        self.binding.lock().expect("binds").remove(&s);
         s
     }
 
@@ -1309,6 +1326,28 @@ mod tests {
             (Duration::from_millis(500)..=Duration::from_millis(550)).contains(&waited),
             "{waited:?}"
         );
+    }
+
+    /// A tab whose bind failed is bound again by the next `bind`; one that bound is not.
+    // fake: the real agent-browser fails a bind only by chance (a page loading in another tab), not on demand.
+    #[tokio::test]
+    async fn bind_tries_a_failed_tab_again() {
+        let (dir, b) = fake("bind");
+        b.warm().await.unwrap();
+        let (bing, brave) = (name("search-bing", 1), name("search-brave", 1));
+        let gone = dir.join(format!("{bing}.gone"));
+        std::fs::write(&gone, "").unwrap();
+        let keys = ["search-bing".to_owned(), "search-brave".to_owned()];
+        b.bind(&keys).await;
+        std::fs::remove_file(&gone).unwrap();
+        b.bind(&keys).await;
+        let binds = |s: &str| {
+            calls(&dir)
+                .iter()
+                .filter(|c| args(c).contains(&s) && args(c).ends_with(&["get", "url"]))
+                .count()
+        };
+        assert_eq!((binds(&bing), binds(&brave)), (2, 1));
     }
 
     #[tokio::test]
