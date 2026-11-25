@@ -12,7 +12,7 @@ pub(super) const READY: &str = r"!!(
     /did not match any articles/.test((document.querySelector('#gs_res_ccl_top') || {}).innerText || '') ||
     location.pathname.startsWith('/sorry') ||
     document.querySelector('#gs_captcha_ccl, #captcha-form, #recaptcha'))
-);";
+)";
 
 pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     let mut u = Url::parse_with_params(

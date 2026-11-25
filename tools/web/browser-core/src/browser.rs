@@ -100,6 +100,7 @@ pub struct Browser {
 /// A search's page load, in an engine's tab.
 pub struct SearchRun<'a> {
     /// The `wait --fn` expression that is true once the page shows results, no results or a block.
+    /// It must not end in `;`: agent-browser 0.43.0 never finishes such a wait, so it would run out its whole timeout.
     pub ready_js: &'a str,
 }
 
@@ -972,7 +973,7 @@ mod tests {
         assert_eq!(cwd.canonicalize().unwrap(), dir.canonicalize().unwrap());
     }
 
-    const READY_JS: &str = "!!(document.querySelector('#r'));";
+    const READY_JS: &str = "!!(document.querySelector('#r'))";
     const CDP: &str = "ws://127.0.0.1:9222/devtools/browser/1";
 
     #[test]

@@ -15,7 +15,7 @@ pub(super) const READY: &str = r#"!!(
     ) ||
     document.querySelector('#captcha-container, #challenge-container') ||
     document.title === 'Human Verification')
-);"#;
+)"#;
 
 pub(super) fn url(query: &str) -> Url {
     Url::parse_with_params(

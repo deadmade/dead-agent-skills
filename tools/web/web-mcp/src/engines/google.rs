@@ -17,7 +17,7 @@ pub(super) const READY: &str = r#"!!(
     ) ||
     location.pathname.startsWith('/sorry') ||
     document.querySelector('#captcha-form, form[action="index"] #recaptcha'))
-);"#;
+)"#;
 
 pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     let mut u = Url::parse_with_params(

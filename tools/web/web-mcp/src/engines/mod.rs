@@ -105,6 +105,7 @@ impl Engine {
     }
 
     /// The `agent-browser wait --fn` expression that is true once the page shows results, no results or a block.
+    /// It must not end in `;`: agent-browser 0.43.0 never finishes such a wait, so it would run out its whole timeout.
     pub fn ready_js(self) -> &'static str {
         match self {
             Self::Google => google::READY,
@@ -284,7 +285,7 @@ mod tests {
 
     #[test]
     fn urls_keep_site_and_quotes() {
-        let q = "\"select!\" site:docs.rs ü";
+        let q = "\"select!\" site:docs.rs Ã¼";
         for e in Engine::ALL {
             assert_eq!(
                 param(&e.url(q, None), "q").as_deref(),
@@ -374,8 +375,12 @@ mod tests {
 
     #[test]
     fn every_engine_waits_on_an_expression() {
+        // agent-browser 0.43.0 never finishes a `wait --fn` whose expression ends in `;` (measured: `!!(true)`
+        // returned in 256 ms, `!!(true);` ran out its timeout), so a trailing `;` waits out the whole budget.
         for e in Engine::ALL {
-            assert!(e.ready_js().starts_with("!!(") && e.ready_js().ends_with(");"));
+            let js = e.ready_js();
+            assert!(js.starts_with("!!(") && js.ends_with(')'), "{e:?}");
+            assert!(!js.trim().ends_with(';'), "{e:?}");
         }
     }
 
