@@ -12,7 +12,7 @@ pub(super) const READY: &str = r#"!!(
     document.querySelector('#b_results > li.b_no') ||
     location.pathname.startsWith('/challenge') ||
     document.querySelector('#b_captcha, iframe[src*="captcha"], iframe[src*="challenges.cloudflare.com"]'))
-);"#;
+)"#;
 
 pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     let mut u = Url::parse_with_params(

@@ -13,7 +13,7 @@ pub(super) const READY: &str = r#"!!(
       (document.querySelector('#results, main') || {}).innerText || '',
     ) ||
     document.querySelector('#captcha, form[action*="captcha"]'))
-);"#;
+)"#;
 
 pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     let mut u = Url::parse_with_params(

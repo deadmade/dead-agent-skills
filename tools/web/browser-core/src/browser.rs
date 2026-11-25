@@ -997,7 +997,7 @@ mod tests {
         assert_eq!(cwd.canonicalize().unwrap(), dir.canonicalize().unwrap());
     }
 
-    const READY_JS: &str = "!!(document.querySelector('#r'));";
+    const READY_JS: &str = "!!(document.querySelector('#r'))";
     const CDP: &str = "ws://127.0.0.1:9222/devtools/browser/1";
 
     #[test]

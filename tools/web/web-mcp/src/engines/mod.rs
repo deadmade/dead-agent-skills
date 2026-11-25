@@ -395,7 +395,8 @@ mod tests {
     #[test]
     fn every_engine_waits_on_an_expression() {
         for e in Engine::ALL {
-            assert!(e.ready_js().starts_with("!!(") && e.ready_js().ends_with(");"));
+            // agent-browser 0.43.0's `wait --fn` never resolves an expression with a trailing `;`: it runs to its timeout.
+            assert!(e.ready_js().starts_with("!!(") && e.ready_js().ends_with(')'));
         }
     }
 

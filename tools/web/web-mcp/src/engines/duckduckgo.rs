@@ -12,7 +12,7 @@ pub(super) const READY: &str = r#"!!(
       /No results found for/.test(m.textContent),
     ) ||
     document.querySelector('a[href^="mailto:error-lite"], .anomaly-modal__title'))
-);"#;
+)"#;
 
 pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     let mut u = Url::parse_with_params(

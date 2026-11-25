@@ -423,9 +423,7 @@ fn typing(sel: &str, query: &str) -> Vec<Vec<String>> {
 /// The wait after typing: the engine's `ready_js`, on a new document (not the one whose `performance.timeOrigin`
 /// was `origin`), so a block page ends it at once and the old page never does.
 fn typed_ready(ready_js: &str, origin: f64) -> String {
-    let js = ready_js.trim();
-    let js = js.strip_suffix(';').unwrap_or(js);
-    format!("({js}) && performance.timeOrigin !== {origin}")
+    format!("({ready_js}) && performance.timeOrigin !== {origin}")
 }
 
 /// Archives a page that held no results, for whoever fixes the parser; returns its `.web/` path, or the
@@ -1022,7 +1020,7 @@ mod tests {
     #[test]
     fn typed_ready_needs_a_new_document() {
         assert_eq!(
-            typed_ready("!!(x);\n", 1234.5),
+            typed_ready("!!(x)", 1234.5),
             "(!!(x)) && performance.timeOrigin !== 1234.5"
         );
     }
