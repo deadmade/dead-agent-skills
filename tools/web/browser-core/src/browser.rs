@@ -449,8 +449,13 @@ impl Browser {
             return Ok(json!({"closed": false}));
         }
         let config = self.window.attach_config().map_err(BrowserError::Failed)?;
-        // Its own task: a caller that stops waiting (`render`'s 5 s) doesn't stop it, so a tab whose page is still
-        // loading (its `tab close` waits behind the load, measured) still gets its session closed afterwards.
+        if !key.starts_with(FETCH_PREFIX) {
+            return end(&self.bin, &session, &config, Some(&live.url)).await;
+        }
+        // A fetch key is used once, so its close gets its own task: a caller that stops waiting (`render`'s 5 s)
+        // doesn't stop it, and a tab whose page is still loading (its `tab close` waits behind the load, measured)
+        // still gets its session closed afterwards. Any other key may be in use again by then, and a late `close`
+        // would end the daemon under it: dropping that close kills it before it sends more.
         let bin = self.bin.clone();
         tokio::spawn(async move { end(&bin, &session, &config, Some(&live.url)).await })
             .await
@@ -743,11 +748,17 @@ impl Browser {
                 .lock()
                 .expect("window")
                 .as_ref()
-                .map(|l| name(key, l.r#gen));
-            let _ = tokio::time::timeout(CLOSE_TIMEOUT, self.close(key)).await;
+                .map(|l| (name(key, l.r#gen), l.r#gen));
+            let cut = tokio::time::timeout(CLOSE_TIMEOUT, self.close(key))
+                .await
+                .is_err();
             if search.is_some()
-                && let Some(s) = session
+                && let Some((s, g)) = session
             {
+                // A close cut short never ended the daemon: `close_all` ends it, unless the next search takes it.
+                if cut {
+                    self.ran.lock().expect("sessions").insert(s.clone(), g);
+                }
                 self.session_gone(&s).await;
             }
         }

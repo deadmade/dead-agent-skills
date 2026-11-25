@@ -118,7 +118,7 @@ fn each_session_reads_its_own_tab_and_exit_closes_them() {
 /// Fill, click, press, scroll and eval reach a session's tab while another session's tab is in front, with a proxy in
 /// the environment that would swallow web-mcp's raise. Text and a script that start with `-` arrive as they are.
 // Measured 2026-11-25 (agent-browser 0.43.0, headed Chrome for Testing 158): this passes with the raise disabled, and
-// with the raise sent through the proxy (it then fails), so a hidden tab's input is not lost here and this test does
+// with the raise sent through the proxy (the raise then fails), so a hidden tab's input is not lost here and this test does
 // not show the raise is needed. Helium 0.18 under agent-browser 0.41.1 lost it (see `raise`).
 #[test]
 fn input_reaches_a_hidden_tab_despite_a_proxy() {
