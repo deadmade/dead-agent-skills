@@ -384,3 +384,31 @@ fn doi_query_skips_browser_engines() {
     assert!(!text(&r).contains("skipped"), "{r}");
     assert!(!pages.join("calls.jsonl").exists());
 }
+
+#[cfg(debug_assertions)]
+#[test]
+fn paper_engines_log_too() {
+    let fx = Fixture::start(PUBLIC);
+    route_attention(&fx);
+    let pages = pages(&fx);
+    std::fs::write(pages.join("scholar.blocked"), "").unwrap();
+    let mut mcp = start_browser(&fx, &pages, &[]);
+    assert!(!is_error(&papers(&mut mcp, "attention")));
+    let raw = std::fs::read_to_string(mcp.search.join("blocks.jsonl")).unwrap();
+    let mut lines: Vec<(String, String)> = raw
+        .lines()
+        .map(|l| {
+            let v: serde_json::Value = serde_json::from_str(l).unwrap();
+            let get = |k: &str| v[k].as_str().unwrap_or_default().to_owned();
+            (get("engine"), get("outcome"))
+        })
+        .collect();
+    lines.sort();
+    assert_eq!(
+        lines,
+        [
+            ("scholar".to_owned(), "captcha".to_owned()),
+            ("semanticscholar".to_owned(), "ok".to_owned())
+        ]
+    );
+}

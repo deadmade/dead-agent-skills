@@ -129,6 +129,43 @@ impl Filter {
     }
 }
 
+/// What became of one engine's run in a search, as `blocks.jsonl` names it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Outcome {
+    Ok,
+    Empty,
+    Captcha,
+    /// A first consent page, which waits a search out to clear.
+    Consent,
+    /// A consent page met again: the engine rests.
+    Blocked,
+    Busy,
+    Timeout,
+    Resting,
+    Unrecognised,
+    /// Google's result links resolving to nothing, its usual soft block.
+    Unresolved,
+    Error,
+}
+
+impl Outcome {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Empty => "empty",
+            Self::Captcha => "captcha",
+            Self::Consent => "consent",
+            Self::Blocked => "blocked",
+            Self::Busy => "busy",
+            Self::Timeout => "timeout",
+            Self::Resting => "resting",
+            Self::Unrecognised => "unrecognised",
+            Self::Unresolved => "unresolved",
+            Self::Error => "error",
+        }
+    }
+}
+
 /// One engine's result page for `query`, read in its tab of the window within `budget` of winning the engine's turn;
 /// the caller warmed the window first.
 ///
@@ -139,10 +176,16 @@ impl Filter {
 /// deadline, and the cookie extension's click in the tab, which stays open, lands for the next search. Only a
 /// consent page met twice in a row rests the engine.
 ///
+/// Each run but a cancelled one appends one line to `blocks.jsonl` in the search folder, shared by every web-mcp on
+/// the machine: when, the engine, its `Outcome`, the milliseconds since it won its turn (0 without one) and whether
+/// it tried typing, so block rates can be counted. The line is written before this returns; a failed write is
+/// ignored.
+///
 /// # Errors
 /// Why the engine is skipped: resting, busy (no turn within `QUEUE_WAIT`), cancelled while in line, a first consent
 /// page, blocked (it then rests), an unrecognised page, the browser's error, the deadline or, for Google, result links that did not resolve
 /// or that sit on a private address.
+#[allow(clippy::too_many_lines)] // one pass from turn to page, each exit naming its outcome
 pub async fn run_engine(
     ctx: &Ctx,
     e: Engine,
@@ -151,102 +194,159 @@ pub async fn run_engine(
     budget: Duration,
     request: &RequestContext<RoleServer>,
 ) -> Result<Vec<Found>, String> {
-    let profiles = ctx.profiles.as_ref().map_err(Clone::clone)?;
-    let resting = || {
-        profiles
-            .resting(e.name(), Timestamp::now())
-            .map(|t| format!("resting until {t}"))
-    };
-    if let Some(why) = resting() {
-        return Err(why);
-    }
-    // Only the wait is raced: a turn already held ends within its budget.
-    let mut last = tokio::select! {
-        turn = ctx.turns.turn(e, Instant::now() + QUEUE_WAIT) => turn.ok_or("busy")?,
-        () = request.ct.cancelled() => return Err("cancelled".into()),
-    };
-    // Starts with the turn, so a search behind others keeps all of it.
-    let deadline = Instant::now() + budget;
-    // Put back only on results without `since`.
-    let prev = last.take();
-    // Another process may have rested it while we waited.
-    if let Some(why) = resting() {
-        return Err(why);
-    }
-    let session = format!("search-{}", e.name());
-    let url = e.url(query, since);
-    let typed = match e.search_box() {
-        Some(sel) if types(e, prev.as_deref(), query, since) => {
-            typed_page(ctx, e, &session, sel, query, deadline).await
-        }
-        _ => None,
-    };
-    let (html, landed, parsed) = if let Some(page) = typed {
-        page
-    } else {
-        // The tab's first search, or typing that can't be trusted: load the result URL.
-        let left = deadline.saturating_duration_since(Instant::now());
-        if left < READ_MARGIN {
-            return Err("timed out".into());
-        }
-        let run = SearchRun {
-            ready_js: e.ready_js(),
+    // When the turn was won, and whether a typed follow-up was tried: the log line's `ms` and `typed`.
+    let mut won: Option<Instant> = None;
+    let mut tried = false;
+    // The error's outcome is `None` only when cancelled: that run logs nothing.
+    let got: Result<Vec<Found>, (Option<Outcome>, String)> = async {
+        let fail = |o: Outcome, why: String| (Some(o), why);
+        let profiles = ctx
+            .profiles
+            .as_ref()
+            .map_err(|why| fail(Outcome::Error, why.clone()))?;
+        let resting = || {
+            profiles
+                .resting(e.name(), Timestamp::now())
+                .map(|t| fail(Outcome::Resting, format!("resting until {t}")))
         };
-        let (html, landed) = match ctx
-            .browser
-            .render(Some(&url), &session, Some(run), left)
-            .await
-        {
-            Ok(page) => page,
-            Err(BrowserError::Timeout(_)) => return Err("timed out".into()),
-            Err(err) => return Err(err.to_string()),
-        };
-        let parsed = e.parse(&html, &landed);
-        (html, landed, parsed)
-    };
-    let what = match parsed {
-        Parsed::Results(found) => {
-            // The engine's page was read: a consent page is over and the tab holds this query, whatever comes of
-            // its links.
-            profiles.set_consent_seen(e.name(), false);
-            if since.is_none() {
-                *last = Some(query.to_owned());
+        if let Some(why) = resting() {
+            return Err(why);
+        }
+        // Only the wait is raced: a turn already held ends within its budget.
+        let mut last = tokio::select! {
+            turn = ctx.turns.turn(e, Instant::now() + QUEUE_WAIT) => {
+                turn.ok_or_else(|| fail(Outcome::Busy, "busy".into()))?
             }
-            // Google's rows are opaque redirects: read each one's target before ranking. They are asked for on the
-            // page's own host, which is private only when something other than Google served the page: that gets no
-            // request, as web-mcp's public fetches keep off private addresses.
-            return if e == Engine::Google {
-                if crate::archive::is_private(&landed) {
-                    Err("its result links are on a private address".into())
-                } else {
-                    resolve_goto(&ctx.http_public, &ctx.limits, &landed, found, deadline).await
-                }
-            } else {
-                Ok(found)
+            () = request.ct.cancelled() => return Err((None, "cancelled".into())),
+        };
+        // Starts with the turn, so a search behind others keeps all of it.
+        let start = Instant::now();
+        won = Some(start);
+        let deadline = start + budget;
+        // Put back only on results without `since`.
+        let prev = last.take();
+        // Another process may have rested it while we waited.
+        if let Some(why) = resting() {
+            return Err(why);
+        }
+        let session = format!("search-{}", e.name());
+        let url = e.url(query, since);
+        let typed = match e.search_box() {
+            Some(sel) if types(e, prev.as_deref(), query, since) => {
+                tried = true;
+                typed_page(ctx, e, &session, sel, query, deadline).await
+            }
+            _ => None,
+        };
+        let (html, landed, parsed) = if let Some(page) = typed {
+            page
+        } else {
+            // The tab's first search, or typing that can't be trusted: load the result URL.
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left < READ_MARGIN {
+                return Err(fail(Outcome::Timeout, "timed out".into()));
+            }
+            let run = SearchRun {
+                ready_js: e.ready_js(),
             };
-        }
-        Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e.name()) => {
-            profiles.set_consent_seen(e.name(), true);
-            let _ = keep_page(ctx, url, landed, html).await;
-            return Err("consent (clearing)".into());
-        }
-        Parsed::Blocked(b) => {
-            profiles.rest(e.name(), Timestamp::now() + REST);
-            // After the rest, a consent page gets a fresh clearing pass.
-            profiles.set_consent_seen(e.name(), false);
-            match b {
-                Block::Captcha => "captcha",
-                Block::Consent => "consent",
+            let (html, landed) = match ctx
+                .browser
+                .render(Some(&url), &session, Some(run), left)
+                .await
+            {
+                Ok(page) => page,
+                Err(BrowserError::Timeout(_)) => {
+                    return Err(fail(Outcome::Timeout, "timed out".into()));
+                }
+                Err(err) => return Err(fail(Outcome::Error, err.to_string())),
+            };
+            let parsed = e.parse(&html, &landed);
+            (html, landed, parsed)
+        };
+        let (outcome, what) = match parsed {
+            Parsed::Results(found) => {
+                // The engine's page was read: a consent page is over and the tab holds this query, whatever comes
+                // of its links.
+                profiles.set_consent_seen(e.name(), false);
+                if since.is_none() {
+                    *last = Some(query.to_owned());
+                }
+                // Google's rows are opaque redirects: read each one's target before ranking. They are asked for on
+                // the page's own host, which is private only when something other than Google served the page:
+                // that gets no request, as web-mcp's public fetches keep off private addresses.
+                return if e == Engine::Google {
+                    if crate::archive::is_private(&landed) {
+                        Err(fail(
+                            Outcome::Error,
+                            "its result links are on a private address".into(),
+                        ))
+                    } else {
+                        resolve_goto(&ctx.http_public, &ctx.limits, &landed, found, deadline)
+                            .await
+                            .map_err(|why| fail(Outcome::Unresolved, why))
+                    }
+                } else {
+                    Ok(found)
+                };
             }
-        }
-        Parsed::Unrecognised => "unrecognised page",
+            Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e.name()) => {
+                profiles.set_consent_seen(e.name(), true);
+                let _ = keep_page(ctx, url, landed, html).await;
+                return Err(fail(Outcome::Consent, "consent (clearing)".into()));
+            }
+            Parsed::Blocked(b) => {
+                profiles.rest(e.name(), Timestamp::now() + REST);
+                // After the rest, a consent page gets a fresh clearing pass.
+                profiles.set_consent_seen(e.name(), false);
+                match b {
+                    Block::Captcha => (Outcome::Captcha, "captcha"),
+                    Block::Consent => (Outcome::Blocked, "consent"),
+                }
+            }
+            Parsed::Unrecognised => (Outcome::Unrecognised, "unrecognised page"),
+        };
+        Err(fail(
+            outcome,
+            format!(
+                "{what} ({})",
+                keep_page(ctx, url, landed, html)
+                    .await
+                    .unwrap_or_else(|e| e)
+            ),
+        ))
+    }
+    .await;
+    let outcome = match &got {
+        Ok(found) if found.is_empty() => Some(Outcome::Empty),
+        Ok(_) => Some(Outcome::Ok),
+        Err((outcome, _)) => *outcome,
     };
-    Err(format!(
-        "{what} ({})",
-        keep_page(ctx, url, landed, html)
-            .await
-            .unwrap_or_else(|e| e)
-    ))
+    if let (Some(outcome), Some(dir)) = (outcome, &ctx.cfg.search_dir) {
+        let ms = won.map_or(0, |t| {
+            u64::try_from(t.elapsed().as_millis()).unwrap_or(u64::MAX)
+        });
+        let mut line = json!({
+            "at": Timestamp::now().to_string(),
+            "engine": e.name(),
+            "outcome": outcome.as_str(),
+            "ms": ms,
+            "typed": tried,
+        })
+        .to_string();
+        line.push('\n');
+        let path = dir.join("blocks.jsonl");
+        // One `write_all` on an append-mode file: concurrent engines and processes never interleave inside a line.
+        let _ = tokio::task::spawn_blocking(move || {
+            use std::io::Write as _;
+            std::fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(path)?
+                .write_all(line.as_bytes())
+        })
+        .await;
+    }
+    got.map_err(|(_, why)| why)
 }
 
 /// Replaces each Google `/goto` row's URL with the address its redirect points to: one GET per row in rank order,

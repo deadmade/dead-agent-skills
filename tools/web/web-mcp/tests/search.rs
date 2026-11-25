@@ -1191,3 +1191,104 @@ fn bad_since_is_rejected() {
     let t = text(&r["result"]);
     assert!(t.contains("fortnight") && t.contains("`day`"), "{t}");
 }
+
+/// The lines of `mcp`'s block log, each parsed; panics on a line that isn't whole JSON.
+fn blocks(mcp: &Mcp) -> Vec<Value> {
+    std::fs::read_to_string(mcp.search.join("blocks.jsonl"))
+        .unwrap_or_default()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap_or_else(|e| panic!("{e}: {l:?}")))
+        .collect()
+}
+
+/// The outcome logged last for `engine`.
+fn last_outcome(mcp: &Mcp, engine: &str) -> String {
+    blocks(mcp)
+        .iter()
+        .rev()
+        .find(|l| l["engine"] == engine)
+        .and_then(|l| l["outcome"].as_str())
+        .unwrap_or_default()
+        .to_owned()
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn each_engine_logs_one_line() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    all_answer(&mut mcp, json!({"query": "zebra"}));
+    let lines = blocks(&mcp);
+    let mut engines: Vec<&str> = lines
+        .iter()
+        .map(|l| l["engine"].as_str().unwrap())
+        .collect();
+    engines.sort_unstable();
+    assert_eq!(engines, ["bing", "brave", "duckduckgo", "google"]);
+    for l in &lines {
+        let at = l["at"].as_str().unwrap_or_default();
+        assert!(at.parse::<jiff::Timestamp>().is_ok(), "{l}");
+        assert_eq!(l["outcome"], "ok", "{l}");
+        assert!(l["ms"].is_u64(), "{l}");
+        assert_eq!(l["typed"], false, "{l}");
+        assert_eq!(l.as_object().unwrap().len(), 5, "{l}");
+    }
+    all_answer(&mut mcp, json!({"query": "zebra stripes"}));
+    let lines = blocks(&mcp);
+    assert_eq!(lines.len(), 8);
+    for l in &lines[4..] {
+        assert_eq!(l["outcome"], "ok", "{l}");
+        assert_eq!(l["typed"], true, "{l}");
+    }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn captcha_then_resting_are_logged() {
+    let (_fx, pages) = setup();
+    mark(&pages, "google.blocked");
+    let mut mcp = start(&pages, &[]);
+    search(&mut mcp, json!({"query": "zebra"}));
+    assert_eq!(last_outcome(&mcp, "google"), "captcha");
+    assert_eq!(last_outcome(&mcp, "bing"), "ok");
+    search(&mut mcp, json!({"query": "zebra"}));
+    assert_eq!(last_outcome(&mcp, "google"), "resting");
+    assert_eq!(blocks(&mcp).len(), 8);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn first_and_second_consent_are_told_apart() {
+    let (_fx, pages) = setup();
+    let consent = std::fs::read_to_string(pages.join("google-consent.html")).unwrap();
+    std::fs::write(pages.join("google.html"), consent).unwrap();
+    let mut mcp = start(&pages, &[]);
+    search(&mut mcp, json!({"query": "zebra"}));
+    assert_eq!(last_outcome(&mcp, "google"), "consent");
+    search(&mut mcp, json!({"query": "zebra"}));
+    assert_eq!(last_outcome(&mcp, "google"), "blocked");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn unresolved_google_links_are_logged() {
+    let (fx, pages) = setup();
+    goto_google(&fx, &pages, [None, None, None]);
+    let mut mcp = start(&pages, &[]);
+    search(&mut mcp, json!({"query": "zebra"}));
+    assert_eq!(last_outcome(&mcp, "google"), "unresolved");
+}
+
+/// Review Focus 5: four engines finishing together still leave four whole lines.
+#[cfg(debug_assertions)]
+#[test]
+fn concurrent_lines_stay_whole() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    for q in ["zebra", "zebra stripes", "zebra mane"] {
+        all_answer(&mut mcp, json!({"query": q}));
+    }
+    let raw = std::fs::read_to_string(mcp.search.join("blocks.jsonl")).unwrap();
+    assert!(raw.ends_with('\n'), "{raw}");
+    assert_eq!(blocks(&mcp).len(), 12, "{raw}");
+}
