@@ -7,9 +7,10 @@
 - `browser.rs`: the agent-browser driver. It runs agent-browser as a child process, keeps each call's session key, runs
   `batch`, `render` and `rendered_html`, and holds the attached-call timeout (`ATTACHED_TIMEOUT`, 8 s, part of
   agent-browser's daemon fingerprint).
-- `window.rs`: the one window. It names the owner session, starts the window on the first call (a restarted Chrome
-  counts as a new generation), and hands out the attach config. `tie_to_process` makes the window's Chrome die with the
-  server (a kill-on-close job on Windows).
+- `window.rs`: the one window. It names the owner session, starts the window on the first call, relaunches a dead
+  Chrome through the owner's `open` (agent-browser doesn't on its own; a restarted Chrome counts as a new generation),
+  and hands out the attach config. `tie_to_process` makes the window's Chrome die with the server (a kill-on-close job
+  on Windows).
 - `profile.rs`: the search folder. It finds Chrome, downloads the cookie extension (2 MiB cap, sha-256 check), holds a
   profile slot under a lock until exit, writes the config files and keeps the rest and consent marks.
 

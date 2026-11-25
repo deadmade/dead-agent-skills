@@ -68,9 +68,19 @@ impl Window {
                 .map(str::to_owned)
                 .ok_or_else(|| format!("agent-browser answered no cdp url: {v}"))
         };
+        let open = ["open".to_owned(), "about:blank".to_owned()];
         if let Some((config, live)) = state.as_mut() {
-            // The owner relaunches a dead Chrome itself, on a new port; a dead daemon restarts from the config.
-            let url = url(config).await?;
+            // agent-browser 0.43.0 doesn't relaunch a dead Chrome: its owner answers "Browser not launched" until an
+            // `open` launches a new one, on a new port (measured). One `open` and one more ask, then the error stands.
+            // A dead daemon restarts from the config.
+            let url = if let Ok(url) = url(config).await {
+                url
+            } else {
+                b.run_owner(&owner, config, &open)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                url(config).await?
+            };
             if url != live.url {
                 *live = Live {
                     r#gen: live.r#gen + 1,
@@ -92,7 +102,6 @@ impl Window {
             let _ = tokio::time::timeout(Duration::from_secs(5), close).await;
         }
         p.set_owner(&owner);
-        let open = ["open".to_owned(), "about:blank".to_owned()];
         b.run_owner(&owner, &config, &open)
             .await
             .map_err(|e| e.to_string())?;
