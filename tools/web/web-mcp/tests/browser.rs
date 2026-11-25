@@ -521,15 +521,70 @@ fn dash_leading_text_is_passed_as_text() {
 #[test]
 fn dash_leading_text_is_rejected() {
     let (mut mcp, log) = start(FAKE);
-    for action in ["fill", "type"] {
-        let r = mcp.call(
-            "browser",
-            json!({"action": action, "session": "s", "ref": "@e1", "text": "--help"}),
-        );
-        assert!(is_error(&r), "{r}");
-        assert!(text(&r).contains("text may not start with '-'"), "{r}");
-    }
+    let r = mcp.call(
+        "browser",
+        json!({"action": "fill", "session": "s", "ref": "@e1", "text": "--help"}),
+    );
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("text may not start with '-'"), "{r}");
     assert_eq!(calls(&log), Vec::<Value>::new());
+}
+
+/// The `--delay` in ms of the one batch `browser type` sent for `text`. Panics unless the batch has the form
+/// `type <ref> --delay <ms> -- <text>`.
+fn typed(text: &str) -> u64 {
+    let (mut mcp, log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "type", "session": "s", "ref": "@e1", "text": text}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let c = tab_calls(&mcp, &log);
+    assert_eq!(c.len(), 1, "{c:?}");
+    let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
+    let delay: u64 = batch[0][3].as_str().unwrap().parse().unwrap();
+    let expected = json!([["type", "@e1", "--delay", delay.to_string(), "--", text]]);
+    assert_eq!(batch, expected);
+    delay
+}
+
+#[test]
+fn type_is_paced() {
+    let delay = typed("hello");
+    assert!((30..=60).contains(&delay), "{delay}");
+    // `fill` sets the value at once: no delay, no `--`.
+    let (mut mcp, log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "fill", "session": "s", "ref": "@e1", "text": "hello"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let c = tab_calls(&mcp, &log);
+    let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
+    assert_eq!(batch, json!([["fill", "@e1", "hello"]]));
+}
+
+#[test]
+fn long_type_is_capped_at_5s() {
+    let delay = typed(&"ü".repeat(500));
+    assert!(delay <= 10, "{delay}");
+}
+
+#[test]
+fn empty_type_is_rejected() {
+    let (mut mcp, log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "type", "session": "s", "ref": "@e1", "text": ""}),
+    );
+    assert!(is_error(&r), "{r}");
+    assert_eq!(calls(&log), Vec::<Value>::new());
+}
+
+#[test]
+fn dash_leading_type_text_is_typed() {
+    let delay = typed("-x");
+    assert!((30..=60).contains(&delay), "{delay}");
 }
 
 #[test]

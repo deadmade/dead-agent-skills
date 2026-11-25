@@ -22,7 +22,7 @@ use crate::archive::Item;
 use crate::fetch::{self, GetOpts};
 use crate::guard::{self, Scan, UNTRUSTED};
 use crate::images;
-use crate::{lookup, papers, rows, search};
+use crate::{lookup, pace, papers, rows, search};
 
 static SHOTS: AtomicU64 = AtomicU64::new(0);
 const FETCH_DEADLINE: Duration = Duration::from_secs(30);
@@ -213,7 +213,7 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
             cmd.push(u.into());
         }
         Click => cmd.push(plain(args.r#ref.as_ref(), name, "ref")?.clone()),
-        Fill | Type => {
+        Fill => {
             cmd.push(plain(args.r#ref.as_ref(), name, "ref")?.clone());
             let t = need(args.text.as_ref(), name, "text")?;
             // Batch commands are split like argv, so a leading `-` would still be read as a flag.
@@ -223,6 +223,23 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
                 )));
             }
             cmd.push(t.clone());
+        }
+        Type => {
+            cmd.push(plain(args.r#ref.as_ref(), name, "ref")?.clone());
+            let t = need(args.text.as_ref(), name, "text")?;
+            let chars = u64::try_from(t.chars().count()).unwrap_or(u64::MAX);
+            if chars == 0 {
+                return Err(error("browser type: `text` is empty"));
+            }
+            // A key every 30-60 ms, shortened so the whole text takes at most 5 s.
+            let delay = pace::delay_ms(pace::BROWSER).min(5_000 / chars);
+            // `--` ends the options, so text starting with `-` is typed, not read as a flag.
+            cmd.extend([
+                "--delay".to_owned(),
+                delay.to_string(),
+                "--".to_owned(),
+                t.clone(),
+            ]);
         }
         Press => cmd.push(plain(args.key.as_ref(), name, "key")?.clone()),
         Scroll => {
@@ -263,8 +280,8 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
         let now = jiff::Timestamp::now();
         format!("Source: agent-browser session {label} ({name}, {now}{count}). {UNTRUSTED}")
     };
-    // Free text goes through batch's stdin, where no argv parsing can take it for a flag
-    // (agent-browser 0.39.1 documents no `--` end-of-options marker).
+    // Free text goes through batch's stdin rather than the call's argv. agent-browser still reads each entry like
+    // argv, and only `type` takes a `--` end-of-options marker (0.43.0), so `fill` rejects a leading `-`.
     let data = if matches!(args.action, Fill | Type | Eval) {
         let cmd: Vec<&str> = cmd.iter().map(String::as_str).collect();
         ctx.browser

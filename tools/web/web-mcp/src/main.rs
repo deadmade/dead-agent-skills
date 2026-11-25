@@ -9,6 +9,7 @@ mod guard;
 mod images;
 mod limits;
 mod lookup;
+mod pace;
 mod papers;
 mod passages;
 mod rank;
