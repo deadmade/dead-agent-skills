@@ -26,7 +26,7 @@ pub fn extract_html(html: &str, base: &Url) -> Page {
     };
     Page {
         title: article.title.clone(),
-        markdown: htmd::convert(&article.content)
+        markdown: htmd::convert(&*article.content)
             .unwrap_or_default()
             .trim()
             .to_owned(),
