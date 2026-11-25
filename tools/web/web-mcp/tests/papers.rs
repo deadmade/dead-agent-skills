@@ -3,7 +3,7 @@ mod common;
 
 use std::time::{Duration, Instant};
 
-use common::{Fixture, Mcp, PUBLIC, Resp, is_error, pages, tempdir, text};
+use common::{Fixture, Mcp, PUBLIC, Resp, guarded, is_error, pages, tempdir, text};
 use serde_json::json;
 use url::Url;
 
@@ -129,7 +129,9 @@ fn arxiv_id_asks_arxiv_and_openalex_and_lists_that_paper_first() {
         t.contains("DOI 10.1000/GPT3 · arXiv 2005.14165 · http://arxiv.org/abs/2005.14165v4"),
         "{t}"
     );
-    assert!(t.contains("Failed: OpenAlex: HTTP 404"), "{t}");
+    let (body, after) = guarded(t);
+    assert!(body.contains("## [1] Language Models"), "{t}");
+    assert_eq!(after, "\n\nFailed: OpenAlex: HTTP 404", "{t}");
 }
 
 #[cfg(debug_assertions)]
@@ -381,4 +383,32 @@ fn doi_query_skips_browser_engines() {
     assert!(!is_error(&r), "{r}");
     assert!(!text(&r).contains("skipped"), "{r}");
     assert!(!pages.join("calls.jsonl").exists());
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn paper_engines_log_too() {
+    let fx = Fixture::start(PUBLIC);
+    route_attention(&fx);
+    let pages = pages(&fx);
+    std::fs::write(pages.join("scholar.blocked"), "").unwrap();
+    let mut mcp = start_browser(&fx, &pages, &[]);
+    assert!(!is_error(&papers(&mut mcp, "attention")));
+    let raw = std::fs::read_to_string(mcp.search.join("blocks.jsonl")).unwrap();
+    let mut lines: Vec<(String, String)> = raw
+        .lines()
+        .map(|l| {
+            let v: serde_json::Value = serde_json::from_str(l).unwrap();
+            let get = |k: &str| v[k].as_str().unwrap_or_default().to_owned();
+            (get("engine"), get("outcome"))
+        })
+        .collect();
+    lines.sort();
+    assert_eq!(
+        lines,
+        [
+            ("scholar".to_owned(), "captcha".to_owned()),
+            ("semanticscholar".to_owned(), "ok".to_owned())
+        ]
+    );
 }

@@ -20,6 +20,9 @@ use crate::window::{Live, Window};
 
 /// Sessions the fetch fallback names for itself; the `browser` tool may not use them.
 const FETCH_PREFIX: &str = "web-mcp-fetch-";
+/// The HTTP status of the tab's own navigation: a number on a loaded page (agent-browser 0.43.0 answered 403 for a
+/// 403 page and 200 for a 200 and a `data:` page), `undefined` or 0 where the browser doesn't know it.
+const STATUS_JS: &str = "performance.getEntriesByType('navigation')[0]?.responseStatus";
 
 /// A session name for the `browser` tool: short (agent-browser's socket path is length-limited),
 /// plain, not flag-like and not one of web-mcp's own.
@@ -100,6 +103,7 @@ pub struct Browser {
 /// A search's page load, in an engine's tab.
 pub struct SearchRun<'a> {
     /// The `wait --fn` expression that is true once the page shows results, no results or a block.
+    /// It must not end in `;`: agent-browser 0.43.0 never finishes such a wait, so it would run out its whole timeout.
     pub ready_js: &'a str,
 }
 
@@ -728,6 +732,20 @@ impl Browser {
         search: Option<SearchRun<'_>>,
         deadline: Duration,
     ) -> Result<(String, Url), BrowserError> {
+        let (html, landed, _) = self.render_read(url, key, search, deadline, false).await?;
+        Ok((html, landed))
+    }
+
+    /// `render`, and with `status` the HTTP status of the tab's navigation, read in the same batch after the URL
+    /// (`None` without `status`, and where the browser doesn't know it). A failed status read fails nothing.
+    async fn render_read(
+        &self,
+        url: Option<&Url>,
+        key: &str,
+        search: Option<SearchRun<'_>>,
+        deadline: Duration,
+        status: bool,
+    ) -> Result<(String, Url, Option<u16>), BrowserError> {
         // Never 0: what agent-browser makes of a zero timeout is unknown.
         let wait = deadline
             .saturating_sub(READ_MARGIN)
@@ -740,8 +758,14 @@ impl Browser {
             cmds.push(vec!["wait", "--fn", s.ready_js, "--timeout", &wait]);
         }
         cmds.extend([vec!["get", "html", "body"], vec!["get", "url"]]);
+        if status {
+            cmds.push(vec!["eval", STATUS_JS]);
+        }
         // The HTML is data for the extractor: no output cap, no boundary markers.
-        let may_fail = search.as_ref().map(|_| wait_at);
+        let may_fail = search
+            .as_ref()
+            .map(|_| wait_at)
+            .or_else(|| status.then(|| cmds.len() - 1));
         let batch = self.attached(key, Op::Batch(&cmds, false, may_fail));
         let answer = tokio::time::timeout(deadline, batch)
             .await
@@ -765,10 +789,20 @@ impl Browser {
         let answer = answer?;
         let field =
             |v: &Value, key: &str| v.as_str().or_else(|| v[key].as_str()).map(str::to_owned);
-        let n = answer.len(); // one entry per command: at least 3
+        // One entry per command: at least 3, the status read last.
+        let n = answer.len() - usize::from(status);
         let html = field(&answer[n - 2], "html");
         let landed = field(&answer[n - 1], "url").and_then(|u| Url::parse(&u).ok());
+        let code = status
+            .then(|| {
+                let v = &answer[n];
+                v.as_u64().or_else(|| v["result"].as_u64())
+            })
+            .flatten()
+            .and_then(|c| u16::try_from(c).ok())
+            .filter(|c| *c != 0);
         html.zip(landed)
+            .map(|(h, l)| (h, l, code))
             .ok_or_else(|| BrowserError::Failed("agent-browser returned no HTML or URL".into()))
     }
 
@@ -786,17 +820,39 @@ impl Browser {
     }
 
     /// The rendered `<body>` of `url` and the URL the browser ended on (redirects included), from one
-    /// batch in a tab of its own that is closed again. The window starts before the fallback's deadline.
+    /// batch in a tab of its own that is closed again, within `deadline`. The window starts before the deadline.
     ///
     /// # Errors
     /// As `batch`, or when it answers no HTML or no URL.
-    pub async fn rendered_html(&self, url: &Url) -> Result<(String, Url), BrowserError> {
-        static N: AtomicU64 = AtomicU64::new(0);
+    pub async fn rendered_html(
+        &self,
+        url: &Url,
+        deadline: Duration,
+    ) -> Result<(String, Url), BrowserError> {
         self.warm().await?;
-        let key = format!("{FETCH_PREFIX}{}", N.fetch_add(1, Ordering::Relaxed));
-        self.render(Some(url), &key, None, self.fallback_deadline)
+        self.render(Some(url), &fetch_key(), None, deadline).await
+    }
+
+    /// `rendered_html`, and the HTTP status the browser's own load of `url` got: `None` where the browser doesn't
+    /// know it (or the read failed).
+    ///
+    /// # Errors
+    /// As `rendered_html`.
+    pub async fn rendered_page(
+        &self,
+        url: &Url,
+        deadline: Duration,
+    ) -> Result<(String, Url, Option<u16>), BrowserError> {
+        self.warm().await?;
+        self.render_read(Some(url), &fetch_key(), None, deadline, true)
             .await
     }
+}
+
+/// A fetch's own tab key, new on every call.
+fn fetch_key() -> String {
+    static N: AtomicU64 = AtomicU64::new(0);
+    format!("{FETCH_PREFIX}{}", N.fetch_add(1, Ordering::Relaxed))
 }
 
 /// What `attached` runs in a tab.
@@ -969,7 +1025,7 @@ mod tests {
         assert_eq!(cwd.canonicalize().unwrap(), dir.canonicalize().unwrap());
     }
 
-    const READY_JS: &str = "!!(document.querySelector('#r'));";
+    const READY_JS: &str = "!!(document.querySelector('#r'))";
     const CDP: &str = "ws://127.0.0.1:9222/devtools/browser/1";
 
     #[test]

@@ -8,14 +8,15 @@ use url::Url;
 use super::{Parsed, captcha_if, first_text, row, text, verdict};
 
 pub(super) const READY: &str = r#"!!(
+  document.readyState !== 'loading' &&
   document.body &&
   (document.querySelector('[data-test-id="search-result"], .cl-paper-row') ||
     /No results|could not find any|couldn.t find any/i.test(
       (document.querySelector('[data-test-id="search-results"], main') || {}).innerText || '',
     ) ||
-    document.querySelector('#captcha-container, #challenge-container') ||
+    document.querySelector('#captcha-container') ||
     document.title === 'Human Verification')
-);"#;
+)"#;
 
 pub(super) fn url(query: &str) -> Url {
     Url::parse_with_params(

@@ -40,7 +40,7 @@ fn lists_five_tools() {
     assert_eq!(search["annotations"]["readOnlyHint"], true);
     assert_eq!(fetch["annotations"]["readOnlyHint"], true);
     assert_ne!(browser["annotations"]["readOnlyHint"], true);
-    assert_eq!(fetch["_meta"]["anthropic/maxResultSizeChars"], 200_000);
+    assert_eq!(fetch["_meta"]["anthropic/maxResultSizeChars"], 50_000);
     let required = browser["inputSchema"]["required"].as_array().unwrap();
     assert!(required.iter().any(|r| r == "session"));
     let props = &browser["inputSchema"]["properties"];

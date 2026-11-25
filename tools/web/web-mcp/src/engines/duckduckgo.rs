@@ -6,13 +6,14 @@ use url::Url;
 use super::{Found, Parsed, Since, captcha_if, first_text, row, text, verdict};
 
 pub(super) const READY: &str = r#"!!(
+  document.readyState !== 'loading' &&
   document.body &&
   (document.querySelector('article[data-testid="result"]') ||
     [...document.querySelectorAll('[data-testid="mainline"]')].some((m) =>
       /No results found for/.test(m.textContent),
     ) ||
     document.querySelector('a[href^="mailto:error-lite"], .anomaly-modal__title'))
-);"#;
+)"#;
 
 pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     let mut u = Url::parse_with_params(

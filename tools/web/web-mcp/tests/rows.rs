@@ -8,7 +8,7 @@ use std::io::Write as _;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use common::{Mcp, command_of, is_error, logged, tempdir, text};
+use common::{Mcp, command_of, guarded, is_error, logged, tempdir, text};
 use serde_json::{Value, json};
 
 /// A server whose agent-browser is the fake, serving the files `pages` (name, contents), plus the fake's call log.
@@ -75,7 +75,7 @@ fn rows_returns_numbered_groups_and_archives_the_page() {
     let r = mcp.call("rows", json!({"url": url("ads")}));
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
-    assert!(t.contains("Group 1: 8 items"), "{t}");
+    assert!(guarded(t).0.starts_with("Group 1: 8 items"), "{t}");
     assert!(t.contains("Group 2: 6 items"), "{t}");
     assert!(t.lines().any(|l| l.starts_with("1. ")), "{t}");
     let source = t.lines().next().unwrap();
@@ -281,10 +281,12 @@ fn rows_no_group_on_a_body_only_page_uses_the_h1_and_cuts_it() {
     let r = mcp.call("rows", json!({"url": url("bare")}));
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
+    let (body, after) = guarded(t);
     assert!(
-        t.contains(&format!("Heading: \"{}\"", "A".repeat(200))),
+        body.contains(&format!("Heading: \"{}\"", "A".repeat(200))),
         "{t}"
     );
+    assert_eq!(after, "", "{t}");
     assert!(
         t.lines()
             .next()

@@ -10,6 +10,7 @@ use url::Url;
 use super::{Block, Found, Parsed, Since, captcha_if, first_text, on_domain, row, text, verdict};
 
 pub(super) const READY: &str = r#"!!(
+  document.readyState !== 'loading' &&
   document.body &&
   (document.querySelector('#rso a h3, #search a h3') ||
     /did not match any documents/.test(
@@ -17,7 +18,7 @@ pub(super) const READY: &str = r#"!!(
     ) ||
     location.pathname.startsWith('/sorry') ||
     document.querySelector('#captcha-form, form[action="index"] #recaptcha'))
-);"#;
+)"#;
 
 pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     let mut u = Url::parse_with_params(

@@ -7,12 +7,13 @@ use url::Url;
 use super::{Parsed, Since, captcha_if, first_text, row, text, verdict};
 
 pub(super) const READY: &str = r"!!(
+  document.readyState !== 'loading' &&
   document.body &&
   (document.querySelector('#gs_res_ccl_mid .gs_r.gs_or .gs_ri') ||
     /did not match any articles/.test((document.querySelector('#gs_res_ccl_top') || {}).innerText || '') ||
     location.pathname.startsWith('/sorry') ||
     document.querySelector('#gs_captcha_ccl, #captcha-form, #recaptcha'))
-);";
+)";
 
 pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     let mut u = Url::parse_with_params(

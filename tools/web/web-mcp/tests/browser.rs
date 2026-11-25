@@ -3,8 +3,8 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use common::{
-    Fixture, Mcp, PUBLIC, Resp, argv, attached, command_of, images, is_error, logged, session_of,
-    tempdir, text,
+    Fixture, Mcp, PUBLIC, Resp, argv, attached, command_of, guarded, images, is_error, logged,
+    session_of, tempdir, text,
 };
 use serde_json::{Value, json};
 
@@ -483,10 +483,7 @@ fn rendered_page_is_archived_and_cached() {
     // One batch, its tab close and close; the second fetch is a cache hit.
     assert_eq!(tab_calls(&mcp, &log).len(), 3);
     assert!(text(&b).contains("Rendered page for"), "{b}");
-    assert_eq!(
-        text(&a).split_once("\n\n").unwrap().1,
-        text(&b).split_once("\n\n").unwrap().1
-    );
+    assert_eq!(guarded(text(&a)), guarded(text(&b)));
     let pages = mcp.run_dir().join("pages");
     let rendered = std::fs::read_dir(pages)
         .unwrap()
@@ -524,15 +521,70 @@ fn dash_leading_text_is_passed_as_text() {
 #[test]
 fn dash_leading_text_is_rejected() {
     let (mut mcp, log) = start(FAKE);
-    for action in ["fill", "type"] {
-        let r = mcp.call(
-            "browser",
-            json!({"action": action, "session": "s", "ref": "@e1", "text": "--help"}),
-        );
-        assert!(is_error(&r), "{r}");
-        assert!(text(&r).contains("text may not start with '-'"), "{r}");
-    }
+    let r = mcp.call(
+        "browser",
+        json!({"action": "fill", "session": "s", "ref": "@e1", "text": "--help"}),
+    );
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("text may not start with '-'"), "{r}");
     assert_eq!(calls(&log), Vec::<Value>::new());
+}
+
+/// The `--delay` in ms of the one batch `browser type` sent for `text`. Panics unless the batch has the form
+/// `type <ref> --delay <ms> -- <text>`.
+fn typed(text: &str) -> u64 {
+    let (mut mcp, log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "type", "session": "s", "ref": "@e1", "text": text}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let c = tab_calls(&mcp, &log);
+    assert_eq!(c.len(), 1, "{c:?}");
+    let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
+    let delay: u64 = batch[0][3].as_str().unwrap().parse().unwrap();
+    let expected = json!([["type", "@e1", "--delay", delay.to_string(), "--", text]]);
+    assert_eq!(batch, expected);
+    delay
+}
+
+#[test]
+fn type_is_paced() {
+    let delay = typed("hello");
+    assert!((30..=60).contains(&delay), "{delay}");
+    // `fill` sets the value at once: no delay, no `--`.
+    let (mut mcp, log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "fill", "session": "s", "ref": "@e1", "text": "hello"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let c = tab_calls(&mcp, &log);
+    let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
+    assert_eq!(batch, json!([["fill", "@e1", "hello"]]));
+}
+
+#[test]
+fn long_type_is_capped_at_5s() {
+    let delay = typed(&"ü".repeat(500));
+    assert!(delay <= 10, "{delay}");
+}
+
+#[test]
+fn empty_type_is_rejected() {
+    let (mut mcp, log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "type", "session": "s", "ref": "@e1", "text": ""}),
+    );
+    assert!(is_error(&r), "{r}");
+    assert_eq!(calls(&log), Vec::<Value>::new());
+}
+
+#[test]
+fn dash_leading_type_text_is_typed() {
+    let delay = typed("-x");
+    assert!((30..=60).contains(&delay), "{delay}");
 }
 
 #[test]
@@ -546,6 +598,54 @@ fn eval_never_starts_with_dash() {
     let c = tab_calls(&mcp, &log);
     let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
     assert_eq!(batch, json!([["eval", "\n--version"]]));
+}
+
+#[test]
+fn eval_output_is_guarded() {
+    let (mut mcp, _log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "'\u{E0041}x'"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(guarded(text(&r)), ("x", ""));
+    // The agent wrote the script, and there is no archived original: eval output keeps what it matches.
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "'<|im_start|>'"}),
+    );
+    assert_eq!(guarded(text(&r)), ("<|im_start|>", ""));
+    assert!(!text(&r).contains("span"), "{}", text(&r));
+}
+
+#[test]
+fn eval_with_an_inner_quote_gets_the_default_answer() {
+    let (mut mcp, _log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "'a' + 'b'"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    // Not read as the literal `a' + 'b`: the fake answers its default, the tab's URL.
+    assert!(!guarded(text(&r)).0.contains('+'), "{r}");
+}
+
+#[test]
+fn eval_error_is_stripped() {
+    let (mut mcp, _log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "throw 'bad\u{202E}news'"}),
+    );
+    assert!(is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        t.starts_with("Source: agent-browser session s (eval, "),
+        "{t}"
+    );
+    let (body, after) = guarded(t);
+    assert!(body.contains("badnews"), "{t}");
+    assert!(!t.contains('\u{202E}') && after.is_empty(), "{t}");
 }
 
 #[test]
@@ -675,8 +775,11 @@ fn slow_fallback_still_closes_its_session() {
     );
     let r = mcp.call("fetch", json!({"url": fx.url("/slow.html")}));
     assert!(!is_error(&r), "{r}");
+    // web-mcp's own note: after the closer, not in the page text.
+    let (_, after) = guarded(text(&r));
+    assert!(after.starts_with("\n\n(This page looks empty"), "{r}");
     assert!(
-        text(&r).contains("browser fallback failed: the page did not finish within"),
+        after.contains("browser fallback failed: the page did not finish within"),
         "{r}"
     );
     let c = calls(&log);
