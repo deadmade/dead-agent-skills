@@ -121,6 +121,12 @@ A piece of conductor text written once, in `plugins/flows/steps/<name>.toml`, an
 conductor that names it. It reads the same in each.
 _Avoid_: step (alone; a pipeline step is something else), partial, include, snippet
 
+**Naming rubric**:
+The one file, `plugins/flows/references/naming.md`, that says what makes a new name bad (domain, pattern, meaning,
+plan text) and what evidence a naming finding cites. Plan review's Naming angle and `/review-code`'s naming lenses read
+it. Its Naming tail is the closing reporting rules of a naming reviewer's prompt.
+_Avoid_: naming guide, style guide
+
 **Host token**:
 A placeholder in flows text that the build replaces with the wording one harness needs, such as its question tool or
 its model names.

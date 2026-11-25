@@ -133,7 +133,7 @@ Write `plan.md` from the approved spec.
 
 <!-- runs: reviewer subagents per plan-review.md · output: revised plan -->
 
-Follow [references/plan-review.md](references/plan-review.md): 2–3 reviewer subagents with different angles, then
+Follow [references/plan-review.md](references/plan-review.md): four reviewer subagents with different angles, then
 you synthesize and screen. Fit uses pstack `blast-radius`, and the Simpler angle is ponytail `ponytail-review`.
 Present the findings, each with options and a recommendation. The user decides each one; you edit the plan, and the
 spec too if a decision changes it (say so: that edit reopens Gate 1 for that item, recorded on its Gate line).

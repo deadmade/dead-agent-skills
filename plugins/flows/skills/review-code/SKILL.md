@@ -1,6 +1,6 @@
 ---
 name: review-code
-description: 'Review a branch before it merges, the whole repo, or a pull request: run its checks once, settle the intent, pick review lenses from what the diff touches (correctness, lean and spec, tests, docs, security, risk), verify every finding, and report on one screen with the full table in docs/audits/. Fixes only what you pick, then confirms the decisions the build made on its own, makes the commits and offers how to integrate; a pull request is only reported on. Never posts or pushes. Use for /review-code [branch|all|pr <number>] [base].'
+description: 'Review a branch before it merges, the whole repo, or a pull request: run its checks once, settle the intent, pick review lenses from what the diff touches (correctness, lean and spec, tests, docs, security, risk, naming: domain, pattern, meaning), verify every finding, and report on one screen with the full table in docs/audits/. Fixes only what you pick, then confirms the decisions the build made on its own, makes the commits and offers how to integrate; a pull request is only reported on. Never posts or pushes. Use for /review-code [branch|all|pr <number>] [base].'
 disable-model-invocation: true
 argument-hint: '[branch|all|pr <number>] [base branch or commit]'
 uses: superpowers:verification-before-completion, superpowers:systematic-debugging, superpowers:test-driven-development, ponytail:ponytail-review, ponytail:ponytail-audit, pstack-picks:blast-radius, pstack-picks:interrogate, pstack-picks:principle-boundary-discipline, tob-picks:spec-to-code-compliance, tob-picks:mutation-testing, tob-picks:property-based-testing, tob-picks:sharp-edges, security-audit:security-audit, mattpocock-picks:improve-codebase-architecture, mattpocock-picks:grilling
@@ -33,7 +33,7 @@ This flow adds:
   `'` in it written as `'\''`; never inside double quotes. The audit file's scope is `pr-<number>`, never the PR's
   branch name.
 - **Lenses are independent.** A lens gets only the diff command (under `pr`, with the head sha), the file list, the
-  intent, the repo's standards, its brief and, under `pr`, the untrusted-data line, and never sees another lens's
+  intent, the repo's standards, its brief (for naming-domain, the glossary too) and, under `pr`, the untrusted-data line, and never sees another lens's
   findings; the small diff's combined agent is the one exception ([references/lenses.md](references/lenses.md)). Where
   the adapter says a built-in review "runs forked", that is the host's own fresh reviewer, which counts as fresh; a
   fork of this conversation never does.
@@ -115,10 +115,12 @@ those the user says yes to; their findings join the candidates.
 <!-- runs: one fresh agent · output: confirmed or plausible, each with a case -->
 
 One fresh agent that ran no lens gets every candidate (merged: the same issue from two lenses is one, citing both), the
-diff command and the cited files (under `pr`, the head sha, read with `git show`). Per candidate it reads the lines and
+diff command and the cited files (under `pr`, the head sha, read with `git show`), and
+[naming.md](../../references/naming.md) when a naming candidate is among them. Per candidate it reads the lines and
 marks it **confirmed** (it read the line, and the failure follows for the stated case) or **plausible** (likely, not
 shown). A candidate without a concrete case (this input or situation leads to this wrong result) is dropped and counted.
-Security and security-domain findings keep their own severity.
+Security and security-domain findings keep their own severity; naming findings take their case from naming.md
+§ Evidence and keep the severity and bucket of naming.md § Severity.
 
 ## Phase 5: Report
 

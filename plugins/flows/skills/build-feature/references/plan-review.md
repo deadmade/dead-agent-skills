@@ -6,16 +6,21 @@ silently edited plan.
 
 ## Reviewers
 
-Spawn 2–3 fresh subagents in one message (never a fork). Each receives only the named files, not this conversation
+Spawn four fresh subagents in one message (never a fork). Each receives only the named files, not this conversation
 or rejected options. Each gets: the spec, the plan, the grounding and prior-art sections of flow.md, the ADRs, its
-angle below, and the rubric. Run the angles on {{model:other}}, {{model:strongest}} and {{model:standard}}, one angle
-per model where the host offers more than one; every angle below still runs, Simpler included.
+angle below, and the prompt tail below. Run the angles on {{model:other}}, {{model:strongest}} and {{model:standard}}, one angle
+per model where the host offers more than one (with four angles one model runs two, each still a fresh agent);
+every angle below still runs, Simpler and Naming included.
 
 | Angle           | Looks for                                                                                                                                                                                                                                                                                  |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Correctness** | Spec goals with no task. Failure paths with no handling or no test. Wrong use of an API or library against its docs. Concurrency, retries, ordering, data loss.                                                                                                                            |
 | **Fit**         | Contradictions with existing code (`file:line`). Responsibility in the wrong module. Blast radius: callers, data, wire formats, configs the plan changes without saying so (pstack `blast-radius`). Task order: dependencies, a slice that can't be tested alone.                          |
 | **Simpler**     | `<packs>/ponytail/skills/ponytail-review/SKILL.md`, with the plan in place of a diff: tasks the spec doesn't need, a library or built-in that replaces custom code. Also a smaller first slice that delivers the core, and divergence from every prior-art approach with no stated reason. |
+| **Naming**      | [naming.md](../../../references/naming.md), all four kinds, on every name in the plan's `**Adds:**` lines, the task headings, the run's slug and the names the steps use for things.                                                                                                       |
+
+Only the Naming reviewer gets `naming.md`, plus `GLOSSARY.md` (or the file `GLOSSARY-MAP.md` points at) when the
+repo has one; its prompt ends with naming.md's **Naming tail** after the tail below.
 
 Reviewer prompt tail (the Simpler reviewer reports in it, not in ponytail-review's Output format):
 

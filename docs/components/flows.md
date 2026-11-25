@@ -25,6 +25,8 @@ are stale.
 its `references/`); on Claude Code its correctness lens is the built-in `code-review` for a `branch` review against the
 default branch on a clean tree (the host adapter template) and otherwise ponytail-review's brief
 (`references/lenses.md`), and the one agent it vendors is `flows:pr-test-analyzer`, next to tob's checker in `agents/`.
+Plan review's Naming angle (`build-feature/references/plan-review.md`) and the three naming lenses read
+`references/naming.md`, the only place the naming rules live; the lenses don't run under `all`.
 `/self-review` was a plugin of its own through 0.5.0, so the installer keeps flows on a machine that had it.
 
 ## /tidy
