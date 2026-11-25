@@ -5,6 +5,7 @@ mod engines;
 mod extract;
 mod fetch;
 mod fuse;
+mod guard;
 mod images;
 mod limits;
 mod lookup;

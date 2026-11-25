@@ -29,6 +29,7 @@ image = { version = "0.25", default-features = false }
 jiff = "1.0.0"
 jsonpath-rust = "=1.0.13"
 libc = "0.2"
+llm-guard = "0.2"
 model2vec-rs = "0.4.0"
 pdf_oxide = "=0.3.78"
 quick-xml = "0.42"
