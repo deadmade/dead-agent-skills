@@ -1,7 +1,7 @@
 ---
 flow: feature
-phase: finish
-now: Waiting for you: pick how the branch ends.
+phase: done
+now: Done: PR handed over for t3/check-plan-naming.
 ---
 
 # Plan naming check: flow
