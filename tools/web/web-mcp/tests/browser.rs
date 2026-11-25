@@ -49,8 +49,9 @@ fn ref_of(snapshot: &str, element: &str) -> String {
         .lines()
         .find(|l| l.contains(element))
         .unwrap_or_else(|| panic!("no {element} in {snapshot}"));
-    let at = line.find("[ref=").unwrap() + "[ref=".len();
-    format!("@{}", &line[at..at + line[at..].find(']').unwrap()])
+    let at = line.find("ref=").unwrap() + "ref=".len();
+    let len = line[at..].find([']', ',']).unwrap();
+    format!("@{}", &line[at..at + len])
 }
 
 /// The fixture server, with `/other.html` a second page Chrome can show (`article.html` names an image on an outside
@@ -114,9 +115,11 @@ fn each_session_reads_its_own_tab_and_exit_closes_them() {
     assert_eq!(processes_holding(&root), Vec::<u32>::new());
 }
 
-/// Fill, click, press, scroll and eval reach a session's tab while another session's tab is in front (a click or
-/// press sent to a hidden tab is lost unless web-mcp raises it), with a proxy in the environment that would swallow
-/// the raise. Text and a script that start with `-` arrive as they are.
+/// Fill, click, press, scroll and eval reach a session's tab while another session's tab is in front, with a proxy in
+/// the environment that would swallow web-mcp's raise. Text and a script that start with `-` arrive as they are.
+// Measured 2026-11-25 (agent-browser 0.43.0, headed Chrome for Testing 158): this passes with the raise disabled, and
+// with the raise sent through the proxy (it then fails), so a hidden tab's input is not lost here and this test does
+// not show the raise is needed. Helium 0.18 under agent-browser 0.41.1 lost it (see `raise`).
 #[test]
 fn input_reaches_a_hidden_tab_despite_a_proxy() {
     let fx = pages();
@@ -131,9 +134,13 @@ fn input_reaches_a_hidden_tab_despite_a_proxy() {
         ref_of(&snapshot, "textbox \"Query\""),
         ref_of(&snapshot, "button \"Go\""),
     );
+    let other = browse(&mut mcp, json!({"action": "snapshot", "session": "front"}));
+    let heading = ref_of(&other, "heading \"Another page\"");
     for call in [
         json!({"action": "fill", "session": "s", "ref": query, "text": "x --help"}),
         json!({"action": "click", "session": "s", "ref": go}),
+        // Brings `front` back to the front, so the press goes to a hidden tab too.
+        json!({"action": "click", "session": "front", "ref": heading}),
         json!({"action": "press", "session": "s", "key": "z"}),
         json!({"action": "scroll", "session": "s", "text": "down 300"}),
     ] {
@@ -182,8 +189,21 @@ fn a_dead_chrome_is_replaced_on_the_next_action() {
     assert!(mcp.tabs().contains(&fx.url("/form.html")));
 }
 
+/// Where agent-browser keeps its sessions' daemon files (`<session>.pid` and the rest): `XDG_RUNTIME_DIR/agent-browser`
+/// off Windows when that is set (as browser-core assumes), else `~/.agent-browser` (seen on Windows).
+fn daemon_dir() -> std::path::PathBuf {
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR").filter(|d| !cfg!(windows) && !d.is_empty());
+    runtime.map_or_else(
+        || {
+            let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" });
+            std::path::PathBuf::from(home.unwrap()).join(".agent-browser")
+        },
+        |d| std::path::PathBuf::from(d).join("agent-browser"),
+    )
+}
+
 /// A page that is empty without JavaScript and loads too slowly in the browser: the fetch answers the server's page
-/// with a note once the fallback's deadline passes, and the fallback's tab is closed.
+/// with a note once the fallback's deadline passes, and the fallback's tab and session are closed.
 #[test]
 fn a_slow_page_ends_the_fallback_at_its_deadline_and_closes_its_tab() {
     let fx = Fixture::start(PUBLIC);
@@ -209,6 +229,13 @@ fn a_slow_page_ends_the_fallback_at_its_deadline_and_closes_its_tab() {
     }
     let tabs = mcp.tabs();
     assert!(!tabs.contains(&url), "{tabs:?}");
+    // Its session's daemon is gone too: agent-browser removes the `.pid` file when a session closes.
+    let pid = daemon_dir().join(format!("web-mcp-fetch-{}-g1-0.pid", mcp.pid()));
+    let until = Instant::now() + Duration::from_secs(5);
+    while pid.exists() && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    assert!(!pid.exists(), "{} is left", pid.display());
 }
 
 /// An open Chrome can't load (nothing listens on the port) is a tool error with Chrome's own reason.
@@ -279,6 +306,7 @@ fn an_app_shell_is_rendered_archived_and_cached() {
         assert!(md.contains(&format!("Paragraph 119 of {path}")), "{md}");
         assert!(md.chars().count() > 40_000, "{}", md.chars().count());
     }
+    assert!(!mcp.tabs().iter().any(|t| [&ua, &ub].contains(&t)));
     let hits = fx.hits("/a.html");
     let again = mcp.call("fetch", json!({"url": ua}));
     assert_eq!(fx.hits("/a.html"), hits);
