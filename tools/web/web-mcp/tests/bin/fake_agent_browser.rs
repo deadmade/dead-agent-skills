@@ -176,6 +176,11 @@ fn batch(stdin: &str, state: &Path, session: &str, tab_gone: bool, bail: bool) -
             json!({"command": c, "success": false, "result": null, "error": e})
         } else if c[0] == "wait" && wait_fails(url, c, stuck) {
             json!({"command": c, "success": false, "result": null, "error": "timed out"})
+        } else if let Some(answer) = eval_literal(c) {
+            match answer {
+                Ok(v) => json!({"command": c, "success": true, "result": {"result": v}}),
+                Err(e) => json!({"command": c, "success": false, "result": null, "error": e}),
+            }
         } else {
             let result = match c.get(1).map(String::as_str) {
                 Some("html") => json!({"html": html}),
@@ -189,6 +194,24 @@ fn batch(stdin: &str, state: &Path, session: &str, tab_gone: bool, bail: bool) -
         }
     }
     Value::Array(entries)
+}
+
+/// An `eval` of a script `'<literal>'` answers that literal; `throw '<literal>'` fails with it. Other scripts get
+/// the default answer.
+fn eval_literal(c: &[String]) -> Option<Result<String, String>> {
+    if c[0] != "eval" {
+        return None;
+    }
+    let script = c.get(1)?.trim();
+    let quoted = |s: &str| {
+        s.strip_prefix('\'')
+            .and_then(|s| s.strip_suffix('\''))
+            .map(str::to_owned)
+    };
+    match script.strip_prefix("throw ") {
+        Some(thrown) => quoted(thrown).map(Err),
+        None => quoted(script).map(Ok),
+    }
 }
 
 /// A batch entry answering `tab_gone` for command `c`.

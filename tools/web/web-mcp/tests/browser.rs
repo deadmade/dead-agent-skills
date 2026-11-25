@@ -3,8 +3,8 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use common::{
-    Fixture, Mcp, PUBLIC, Resp, argv, attached, command_of, images, is_error, logged, session_of,
-    tempdir, text,
+    Fixture, Mcp, PUBLIC, Resp, argv, attached, command_of, guarded, images, is_error, logged,
+    session_of, tempdir, text,
 };
 use serde_json::{Value, json};
 
@@ -483,10 +483,7 @@ fn rendered_page_is_archived_and_cached() {
     // One batch, its tab close and close; the second fetch is a cache hit.
     assert_eq!(tab_calls(&mcp, &log).len(), 3);
     assert!(text(&b).contains("Rendered page for"), "{b}");
-    assert_eq!(
-        text(&a).split_once("\n\n").unwrap().1,
-        text(&b).split_once("\n\n").unwrap().1
-    );
+    assert_eq!(guarded(text(&a)), guarded(text(&b)));
     let pages = mcp.run_dir().join("pages");
     let rendered = std::fs::read_dir(pages)
         .unwrap()
@@ -546,6 +543,40 @@ fn eval_never_starts_with_dash() {
     let c = tab_calls(&mcp, &log);
     let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
     assert_eq!(batch, json!([["eval", "\n--version"]]));
+}
+
+#[test]
+fn eval_output_is_guarded() {
+    let (mut mcp, _log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "'\u{E0041}x'"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(guarded(text(&r)), ("x", ""));
+    // The agent wrote the script, and there is no archived original: eval output keeps what it matches.
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "'<|im_start|>'"}),
+    );
+    assert_eq!(guarded(text(&r)), ("<|im_start|>", ""));
+    assert!(!text(&r).contains("span"), "{}", text(&r));
+}
+
+#[test]
+fn eval_error_is_stripped() {
+    let (mut mcp, _log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "throw 'bad\u{202E}news'"}),
+    );
+    assert!(is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("badnews"), "{t}");
+    assert!(
+        !t.contains('\u{202E}') && !t.contains("<<untrusted-"),
+        "{t}"
+    );
 }
 
 #[test]

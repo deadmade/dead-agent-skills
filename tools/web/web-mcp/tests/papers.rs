@@ -3,7 +3,7 @@ mod common;
 
 use std::time::{Duration, Instant};
 
-use common::{Fixture, Mcp, PUBLIC, Resp, is_error, pages, tempdir, text};
+use common::{Fixture, Mcp, PUBLIC, Resp, guarded, is_error, pages, tempdir, text};
 use serde_json::json;
 use url::Url;
 
@@ -129,7 +129,9 @@ fn arxiv_id_asks_arxiv_and_openalex_and_lists_that_paper_first() {
         t.contains("DOI 10.1000/GPT3 · arXiv 2005.14165 · http://arxiv.org/abs/2005.14165v4"),
         "{t}"
     );
-    assert!(t.contains("Failed: OpenAlex: HTTP 404"), "{t}");
+    let (body, after) = guarded(t);
+    assert!(body.contains("## [1] Language Models"), "{t}");
+    assert_eq!(after, "\n\nFailed: OpenAlex: HTTP 404", "{t}");
 }
 
 #[cfg(debug_assertions)]

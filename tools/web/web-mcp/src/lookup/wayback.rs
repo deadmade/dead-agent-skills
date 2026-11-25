@@ -51,15 +51,7 @@ pub async fn run(ctx: &Arc<Ctx>, target: &str, at: Option<&str>) -> CallToolResu
         Ok(f) => f,
         Err(e) => return error(format!("Failed: Wayback Machine: {e}")),
     };
-    let mut r = fetch::render(ctx, &f, false).await;
-    let full = crate::fetch::slash(&f.archived.path);
-    if let Some(b) = r.content.first_mut()
-        && let Some(t) = b.as_text()
-    {
-        let note = format!("[Cut at 30,000 characters; the full page is at .web/{full}]");
-        *b = ContentBlock::text(super::cut(&t.text, &note));
-    }
-    r
+    fetch::render(ctx, &f, false, 30_000).await
 }
 
 /// The newest 50 snapshots of `target`, one per distinct content, newest first.
