@@ -177,8 +177,8 @@ impl Outcome {
 /// consent page met twice in a row rests the engine.
 ///
 /// Each run but a cancelled one appends one line to `blocks.jsonl` in the search folder, shared by every web-mcp on
-/// the machine: when, the engine, its `Outcome`, the milliseconds since it won its turn (0 without one) and whether
-/// it tried typing, so block rates can be counted. The line is written before this returns; a failed write is
+/// the machine: when, the engine, its `Outcome`, `ms` (from the won turn until the outcome is known, archiving the
+/// page of a block included; 0 without a turn) and whether it tried typing, so block rates can be counted. The line is written before this returns; a failed write is
 /// ignored.
 ///
 /// # Errors
@@ -283,7 +283,7 @@ pub async fn run_engine(
                     } else {
                         resolve_goto(&ctx.http_public, &ctx.limits, &landed, found, deadline)
                             .await
-                            .map_err(|why| fail(Outcome::Unresolved, why))
+                            .map_err(|(o, why)| fail(o, why))
                     }
                 } else {
                     Ok(found)
@@ -362,7 +362,8 @@ pub async fn run_engine(
 /// first answer that is neither a redirect nor a `404` (that `200`, a `429`, a `5xx`), a redirect to Google's
 /// `/sorry` page (`flagged`), a failed request or the deadline (the wait for the host's slot included) ends the
 /// walk: the rows after it stay unresolved and are dropped, and this search asks Google for nothing more. When rows
-/// were there and none resolved, that is an error, not an empty answer.
+/// were there and none resolved, that is an error, not an empty answer: `Outcome::Timeout` when a failed request or
+/// the deadline ended the walk, `Outcome::Unresolved` when Google's answers did.
 ///
 /// The Google parser keeps only rows on another host and `/goto` rows, so a row on the search host is a `/goto` link.
 async fn resolve_goto(
@@ -371,10 +372,11 @@ async fn resolve_goto(
     page: &Url,
     found: Vec<Found>,
     deadline: Instant,
-) -> Result<Vec<Found>, String> {
+) -> Result<Vec<Found>, (Outcome, String)> {
     let had = found.len();
     let mut resolved = Vec::with_capacity(had);
     let mut walking = true;
+    let mut cut = false;
     for f in found {
         if f.url.host() != page.host() {
             resolved.push(f);
@@ -389,7 +391,7 @@ async fn resolve_goto(
             client.get(f.url.clone()).send().await
         };
         let Ok(Ok(resp)) = tokio::time::timeout_at(deadline.into(), step).await else {
-            walking = false;
+            (walking, cut) = (false, true);
             continue;
         };
         if resp.status() == reqwest::StatusCode::NOT_FOUND {
@@ -409,7 +411,12 @@ async fn resolve_goto(
         }
     }
     if resolved.is_empty() && had > 0 {
-        return Err("its result links did not resolve".into());
+        let outcome = if cut {
+            Outcome::Timeout
+        } else {
+            Outcome::Unresolved
+        };
+        return Err((outcome, "its result links did not resolve".into()));
     }
     Ok(resolved)
 }
@@ -823,14 +830,14 @@ mod tests {
         stub: &Url,
         rows: Vec<Found>,
         deadline: Instant,
-    ) -> Result<Vec<Found>, String> {
+    ) -> Result<Vec<Found>, (Outcome, String)> {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let client = fetch::client(false).unwrap();
         let page = stub.join("search?q=x").unwrap();
         resolve_goto(&client, &HostLimits::default(), &page, rows, deadline).await
     }
 
-    async fn resolve(stub: &Url, rows: Vec<Found>) -> Result<Vec<Found>, String> {
+    async fn resolve(stub: &Url, rows: Vec<Found>) -> Result<Vec<Found>, (Outcome, String)> {
         resolve_by(stub, rows, Instant::now() + Duration::from_secs(10)).await
     }
 
@@ -888,6 +895,23 @@ mod tests {
         let found = resolve(&stub, rows).await.unwrap();
         assert_eq!(titles(&found), ["One", "Plain"]);
         assert_eq!(asked(&seen), ["ok1", "throttled"]);
+    }
+
+    /// Google throttling from the first row is its soft block, not a cut: `unresolved`, not `timeout`.
+    #[tokio::test]
+    async fn resolve_goto_throttled_from_the_start_is_unresolved() {
+        let (stub, _) = goto_stub(vec![reply("200 OK", "", "")]);
+        let rows = vec![
+            row(&goto(&stub, "throttled"), "Throttled"),
+            row(&goto(&stub, "ok2"), "Two"),
+        ];
+        assert_eq!(
+            resolve(&stub, rows).await,
+            Err((
+                Outcome::Unresolved,
+                "its result links did not resolve".into()
+            ))
+        );
     }
 
     /// Any answer that is not a redirect or a dead link (`404`) is Google refusing, not a bad row: the walk stops
@@ -1013,7 +1037,7 @@ mod tests {
         let rows = vec![row(&link, "Waiting")];
         let run = resolve_goto(&client, &limits, &page, rows, deadline);
         let done = tokio::time::timeout(Duration::from_secs(2), run).await;
-        assert!(matches!(done, Ok(Err(_))), "{done:?}");
+        assert!(matches!(done, Ok(Err((Outcome::Timeout, _)))), "{done:?}");
         assert_eq!(paths(&seen), Vec::<String>::new());
     }
 
@@ -1024,7 +1048,13 @@ mod tests {
             row(&goto(&stub, "gone1"), "Gone"),
             row(&goto(&stub, "gone2"), "Gone"),
         ];
-        assert!(resolve(&stub, rows).await.is_err());
+        assert_eq!(
+            resolve(&stub, rows).await,
+            Err((
+                Outcome::Unresolved,
+                "its result links did not resolve".into()
+            ))
+        );
         assert_eq!(resolve(&stub, Vec::new()).await, Ok(Vec::new()));
     }
 
@@ -1036,7 +1066,10 @@ mod tests {
             row(&goto(&stub, "broken"), "Broken"),
             row(&goto(&stub, "ok2"), "Two"),
         ];
-        assert!(resolve(&stub, rows).await.is_err());
+        assert_eq!(
+            resolve(&stub, rows).await,
+            Err((Outcome::Timeout, "its result links did not resolve".into()))
+        );
         assert_eq!(asked(&seen), ["broken"]);
     }
 
@@ -1050,7 +1083,10 @@ mod tests {
         let rows = vec![row(&goto(&server, "slow"), "Slow")];
         let t = Instant::now();
         let deadline = t + Duration::from_millis(300);
-        assert!(resolve_by(&server, rows, deadline).await.is_err());
+        assert_eq!(
+            resolve_by(&server, rows, deadline).await,
+            Err((Outcome::Timeout, "its result links did not resolve".into()))
+        );
         assert!(t.elapsed() < Duration::from_secs(2), "{:?}", t.elapsed());
     }
 

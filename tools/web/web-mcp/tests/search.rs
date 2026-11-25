@@ -912,6 +912,10 @@ fn no_results_rests_nothing() {
         "{t}"
     );
     assert!(!any_rest(&mcp));
+    for e in ["google", "bing", "duckduckgo"] {
+        assert_eq!(last_outcome(&mcp, e), "empty", "{e}");
+    }
+    assert_eq!(last_outcome(&mcp, "brave"), "unrecognised");
 }
 
 #[cfg(debug_assertions)]
@@ -928,6 +932,7 @@ fn offline_engine_skips_without_rest() {
         "{t}"
     );
     assert!(!any_rest(&mcp));
+    assert_eq!(last_outcome(&mcp, "duckduckgo"), "error");
 }
 
 #[cfg(debug_assertions)]
@@ -957,6 +962,7 @@ fn slow_engine_does_not_hold_up_others() {
         log(&pages)
     );
     assert!(!any_rest(&mcp));
+    assert_eq!(last_outcome(&mcp, "brave"), "timeout");
 }
 
 #[cfg(debug_assertions)]
@@ -1279,16 +1285,20 @@ fn unresolved_google_links_are_logged() {
     assert_eq!(last_outcome(&mcp, "google"), "unresolved");
 }
 
-/// Review Focus 5: four engines finishing together still leave four whole lines.
+/// Review Focus 5: two servers on one search folder, each running four engines at once, still leave whole lines.
 #[cfg(debug_assertions)]
 #[test]
 fn concurrent_lines_stay_whole() {
     let (_fx, pages) = setup();
-    let mut mcp = start(&pages, &[]);
-    for q in ["zebra", "zebra stripes", "zebra mane"] {
-        all_answer(&mut mcp, json!({"query": q}));
-    }
-    let raw = std::fs::read_to_string(mcp.search.join("blocks.jsonl")).unwrap();
+    let mut a = start(&pages, &[]);
+    let shared = ("WEB_MCP_SEARCH_DIR", a.search.display().to_string());
+    let mut b = start(&pages, &[shared]);
+    std::thread::scope(|s| {
+        for mcp in [&mut a, &mut b] {
+            s.spawn(|| all_answer(mcp, json!({"query": "zebra"})));
+        }
+    });
+    let raw = std::fs::read_to_string(a.search.join("blocks.jsonl")).unwrap();
     assert!(raw.ends_with('\n'), "{raw}");
-    assert_eq!(blocks(&mcp).len(), 12, "{raw}");
+    assert_eq!(blocks(&a).len(), 8, "{raw}");
 }
