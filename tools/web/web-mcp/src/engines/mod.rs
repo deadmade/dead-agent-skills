@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn urls_keep_site_and_quotes() {
-        let q = "\"select!\" site:docs.rs Ã¼";
+        let q = "\"select!\" site:docs.rs ü";
         for e in Engine::ALL {
             assert_eq!(
                 param(&e.url(q, None), "q").as_deref(),
