@@ -587,6 +587,7 @@ fn blocked_public_page_is_loaded_in_the_browser() {
     let r = fetch(&mut mcp, &url);
     assert!(!is_error(&r), "{r}");
     assert!(opened(&log, &url), "{r}");
+    assert_eq!(fx.hits("/guarded"), 1);
     let t = text(&r);
     assert!(t.contains(", archived at .web/"), "{t}");
     let (inside, after) = guarded(t);
@@ -595,6 +596,34 @@ fn blocked_public_page_is_loaded_in_the_browser() {
         after,
         "\n\n(The plain request got HTTP 403; this is the browser's rendering.)"
     );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn browser_rendering_of_a_blocked_page_is_not_cached() {
+    let fx = Fixture::start(PUBLIC);
+    blocked(&fx, "/guarded", 403);
+    let (mut mcp, _log) = with_browser(&[]);
+    let url = fx.url("/guarded");
+    fetch(&mut mcp, &url);
+    let r = fetch(&mut mcp, &url);
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(fx.hits("/guarded"), 2);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn blocked_page_shows_where_the_browser_ended() {
+    let fx = Fixture::start(PUBLIC);
+    blocked(&fx, "/guarded", 403);
+    let landed = fx.url("/welcome");
+    let (mut mcp, _log) = with_browser(&[("guarded.landed", landed.as_str())]);
+    let r = fetch(&mut mcp, &fx.url("/guarded"));
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.starts_with(&format!("Source: {landed} (fetched ")), "{t}");
+    let index = std::fs::read_to_string(mcp.run_dir().join("index.jsonl")).unwrap();
+    assert!(index.contains(&landed), "{index}");
 }
 
 #[cfg(debug_assertions)]
@@ -616,13 +645,18 @@ fn blocked_page_landing_private_names_the_status() {
 fn blocked_public_page_rendering_empty_keeps_the_error() {
     let fx = Fixture::start(PUBLIC);
     blocked(&fx, "/shell", 503);
-    let (mut mcp, _log) = with_browser(&[(
+    let (mut mcp, log) = with_browser(&[(
         "shell.html",
         "<html><body><p>Checking your browser</p></body></html>",
     )]);
-    let r = fetch(&mut mcp, &fx.url("/shell"));
+    let url = fx.url("/shell");
+    let r = fetch(&mut mcp, &url);
     assert!(is_error(&r), "{r}");
+    assert!(opened(&log, &url), "{r}");
     assert!(text(&r).contains("HTTP 503"), "{r}");
+    assert!(text(&r).contains("looks empty"), "{r}");
+    // The plain 503 is retried once after its Retry-After first.
+    assert_eq!(fx.hits("/shell"), 2);
 }
 
 #[cfg(debug_assertions)]

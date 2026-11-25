@@ -786,16 +786,19 @@ impl Browser {
     }
 
     /// The rendered `<body>` of `url` and the URL the browser ended on (redirects included), from one
-    /// batch in a tab of its own that is closed again. The window starts before the fallback's deadline.
+    /// batch in a tab of its own that is closed again, within `deadline`. The window starts before the deadline.
     ///
     /// # Errors
     /// As `batch`, or when it answers no HTML or no URL.
-    pub async fn rendered_html(&self, url: &Url) -> Result<(String, Url), BrowserError> {
+    pub async fn rendered_html(
+        &self,
+        url: &Url,
+        deadline: Duration,
+    ) -> Result<(String, Url), BrowserError> {
         static N: AtomicU64 = AtomicU64::new(0);
         self.warm().await?;
         let key = format!("{FETCH_PREFIX}{}", N.fetch_add(1, Ordering::Relaxed));
-        self.render(Some(url), &key, None, self.fallback_deadline)
-            .await
+        self.render(Some(url), &key, None, deadline).await
     }
 }
 

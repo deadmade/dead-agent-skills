@@ -78,7 +78,9 @@ pub async fn run(
     item.map(matcher).transpose()?; // a typo costs no page load
     let read = {
         let _slot = ctx.limits.acquire_with(url, GAP).await;
-        ctx.browser.rendered_html(url).await
+        ctx.browser
+            .rendered_html(url, ctx.browser.fallback_deadline)
+            .await
     };
     let (html, landed) = read.map_err(|e| match e {
         BrowserError::Timeout(_) => {

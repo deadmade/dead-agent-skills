@@ -4,7 +4,8 @@
 //! one containing "wait-slow" only after its `--timeout` ms. A batch opening a search engine's host answers from
 //! `$FAKE_AB_PAGES` when that is set (see `engine_page`); so does a batch opening any other host, from the file
 //! `<last path segment of the URL>.html` there when it exists (else the canned page). A file `<engine>.landed` there
-//! holds the URL its `get url` answers (`engine_landed`), else it answers the opened one. A batch with an `open` stores its URL in
+//! (another host: `<last path segment>.landed`) holds the URL its `get url` answers (`engine_landed`), else it
+//! answers the opened one. A batch with an `open` stores its URL in
 //! `<state>/<session>.url`: the session's tab keeps that page, so a batch without an `open` answers for the stored
 //! URL (its `engine_page`, its `get url`, the host lookups and `wait` failures keyed on the URL), and `tab new`
 //! removes it (a blank tab). `get cdp-url` answers `ws://127.0.0.1:<port>/devtools/browser/<chrome>`, `<chrome>` being
@@ -440,9 +441,16 @@ fn engine_of(url: &str) -> Option<&'static str> {
 }
 
 /// Where the engine's result page landed, when `<engine>.landed` in `$FAKE_AB_PAGES` names the URL: the page's own
-/// relative links are then on that address, as when a test serves the engine's links from its stub.
+/// relative links are then on that address, as when a test serves the engine's links from its stub. Another host's
+/// page: `<last path segment>.landed`.
 fn engine_landed(url: &str) -> Option<String> {
-    let name = format!("{}.landed", engine_of(url)?);
+    let name = match engine_of(url) {
+        Some(engine) => format!("{engine}.landed"),
+        None => format!(
+            "{}.landed",
+            url::Url::parse(url).ok()?.path_segments()?.next_back()?
+        ),
+    };
     let url = std::fs::read_to_string(pages_dir()?.join(name)).ok()?;
     Some(url.trim().to_owned())
 }

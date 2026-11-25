@@ -196,10 +196,13 @@ pub async fn get(
             let task = tokio::spawn(async move {
                 let guard = guard;
                 let (ctx, url) = (&guard.0, &guard.1.0);
+                let until = tokio::time::Instant::now() + deadline;
                 match run(ctx, url, deadline, opts).await {
-                    // Only `download` answers a status.
-                    Err(FetchError::Status(s @ (403 | 503))) if wants_retry(opts) => {
-                        blocked_in_browser(ctx, url, s).await
+                    // Only `download` answers a status; only the user's own `fetch` retries, as in `wants_fallback`.
+                    Err(FetchError::Status(s @ (403 | 503)))
+                        if opts.browser_fallback && opts.allow_private =>
+                    {
+                        blocked_in_browser(ctx, url, s, until).await
                     }
                     r => r,
                 }
@@ -339,8 +342,9 @@ async fn run(
                 // A private page that this fetch may not reach was refused in `download` already.
                 if wants_fallback(opts, &page) {
                     let why = "(This page looks empty without JavaScript, and the browser fallback";
-                    match browser_page(ctx, &final_url, opts.allow_private, why).await {
-                        Ok(html) => {
+                    let within = ctx.browser.fallback_deadline;
+                    match browser_page(ctx, &final_url, opts.allow_private, why, within).await {
+                        Ok((html, _)) => {
                             let h = html.clone();
                             page = blocking(Box::new(move || extract_html(&h, &base))).await?;
                             rendered = Some(html);
@@ -400,41 +404,52 @@ fn wants_fallback(opts: GetOpts, page: &Page) -> bool {
     opts.browser_fallback && opts.allow_private && near_empty(page)
 }
 
-/// The user's own `fetch` calls only, as for `wants_fallback`.
-fn wants_retry(opts: GetOpts) -> bool {
-    opts.browser_fallback && opts.allow_private
-}
-
 /// A public site's 403 or 503 to the plain request (often a bot check), loaded once in the browser tab after
 /// the host's request slot. A failed or near-empty rendering keeps the status, with the browser's reason; a
-/// private or loopback host's status is its real answer and stays as it is.
-async fn blocked_in_browser(ctx: &Ctx, url: &Url, status: u16) -> Result<Fetched, FetchError> {
+/// private or loopback host's status is its real answer and stays as it is. The browser gets what is left of the
+/// fetch's deadline (`until`); with nothing left the status stays too.
+async fn blocked_in_browser(
+    ctx: &Ctx,
+    url: &Url,
+    status: u16,
+    until: tokio::time::Instant,
+) -> Result<Fetched, FetchError> {
     if private_landing(url).await {
         return Err(FetchError::Status(status));
     }
-    let failed = |why: String| FetchError::Network(format!("HTTP {status}; {why}"));
     let why = format!("(The plain request got HTTP {status}, and the browser");
-    let html = {
+    let (html, landed) = {
         let _slot = ctx.limits.acquire(url).await;
-        browser_page(ctx, url, false, &why).await.map_err(failed)?
+        let left = until
+            .saturating_duration_since(tokio::time::Instant::now())
+            .min(ctx.browser.fallback_deadline);
+        if left.is_zero() {
+            return Err(FetchError::Status(status));
+        }
+        browser_page(ctx, url, false, &why, left)
+            .await
+            .map_err(FetchError::Network)?
     };
     let page = {
-        let (h, base) = (html.clone(), url.clone());
+        let (h, base) = (html.clone(), landed.clone());
         tokio::task::spawn_blocking(move || extract_html(&h, &base))
             .await
             .map_err(net)?
     };
     if near_empty(&page) {
-        return Err(failed(format!("{why}'s rendering looks empty too.)")));
+        return Err(FetchError::Network(format!(
+            "{why}'s rendering looks empty.)"
+        )));
     }
     let item = Item::Page {
         url: url.clone(),
-        final_url: url.clone(),
+        final_url: landed.clone(),
         raw: html.clone().into_bytes(),
         raw_ext: "html",
         rendered: Some(html),
         markdown: page.markdown.clone(),
         images: Vec::new(),
+        // The plain answer was a block: the next fetch asks the site again rather than reuse this rendering.
         cache: false,
     };
     let archived = ctx
@@ -443,7 +458,7 @@ async fn blocked_in_browser(ctx: &Ctx, url: &Url, status: u16) -> Result<Fetched
         .await
         .map_err(|e| net(format!("could not archive the page: {e}")))?;
     Ok(Fetched {
-        final_url: url.clone(),
+        final_url: landed,
         private: false,
         archived,
         page,
@@ -461,10 +476,11 @@ async fn browser_page(
     url: &Url,
     allow_private: bool,
     why: &str,
-) -> Result<String, String> {
+    deadline: Duration,
+) -> Result<(String, Url), String> {
     let (html, landed) = ctx
         .browser
-        .rendered_html(url)
+        .rendered_html(url, deadline)
         .await
         .map_err(|e| format!("{why} failed: {e})"))?;
     if !allow_private && private_landing(&landed).await {
@@ -472,7 +488,7 @@ async fn browser_page(
             "{why} ended on {landed}, a private-network address this fetch may not reach, so its content was dropped.)"
         ));
     }
-    Ok(html)
+    Ok((html, landed))
 }
 
 /// Private by URL or by any resolved address; unresolvable counts as private.
@@ -1033,9 +1049,14 @@ pub(crate) mod tests {
         let fake = browser_core::browser::fake_agent_browser();
         let ctx = test_ctx_with(&fake.to_string_lossy());
         let url = Url::parse("http://example.com/redirect-private").unwrap();
-        let dropped = browser_page(&ctx, &url, false, "(Why").await.unwrap_err();
+        let within = ctx.browser.fallback_deadline;
+        let dropped = browser_page(&ctx, &url, false, "(Why", within)
+            .await
+            .unwrap_err();
         assert!(dropped.contains("http://127.0.0.1/admin"), "{dropped}");
-        let own = browser_page(&ctx, &url, true, "(Why").await.unwrap();
+        let (own, _) = browser_page(&ctx, &url, true, "(Why", within)
+            .await
+            .unwrap();
         assert!(own.contains("Rendered page for"), "{own}");
     }
 
