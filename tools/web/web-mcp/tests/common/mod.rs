@@ -19,6 +19,8 @@ pub const PUBLIC: &str = "127.0.0.2";
 const ENGINE_HOST: &str = "127.0.0.3";
 /// A capture's scripts never run and nothing loads from an engine's own hosts.
 const ENGINE_CSP: &str = "default-src 'self'; script-src 'none'";
+/// A hand-made typing-fault page (`*-typing-*.html`) runs its own inline handlers, and nothing else.
+const FAULT_CSP: &str = "default-src 'self'; script-src 'unsafe-inline'";
 
 #[derive(Clone)]
 pub struct Resp {
@@ -247,7 +249,35 @@ struct Real {
     results: Fixture,
     /// Each absolute link's target (normalised, as a parser reads it) to its stand-in on `results`.
     links: HashMap<String, String>,
+    /// Each engine's own server.
+    engines: HashMap<String, Fixture>,
     _permit: Permit,
+}
+
+impl Real {
+    /// `tests/fixtures/engines/<name>.html` as its engine (the name up to its first `-`) answers it: its links pointed
+    /// at stand-ins, Google's `/goto` links routed to theirs, and only a typing-fault page's own script run.
+    fn page(&mut self, name: &str) -> Resp {
+        let html =
+            std::fs::read_to_string(fixtures().join(format!("engines/{name}.html"))).unwrap();
+        let engine = &self.engines[name.split('-').next().unwrap()];
+        // Google's result links are its own opaque `/goto?url=<token>[&amp;…]` redirects: each gets a target.
+        for (at, _) in html.match_indices("\"/goto?url=") {
+            let link = &html[at + 1..];
+            let link = link[..link.find('"').unwrap()].replace("&amp;", "&");
+            let token = link["/goto?url=".len()..].split('&').next().unwrap();
+            let path = format!("/{token}");
+            self.results.route(&path, vec![Resp::html(STAND_IN)]);
+            engine.route(&link, vec![Resp::redirect(&self.results.url(&path))]);
+        }
+        let csp = if name.contains("-typing-") {
+            FAULT_CSP
+        } else {
+            ENGINE_CSP
+        };
+        Resp::html(localise(&html, &self.results, &mut self.links))
+            .header("Content-Security-Policy", csp)
+    }
 }
 
 /// What every stand-in for a result answers.
@@ -468,35 +498,30 @@ impl Mcp {
         Self::start_real_with(engines, &[])
     }
 
-    /// `start_real` with extra environment, which wins over the harness's own.
+    /// `start_real` with extra environment, which wins over the harness's own; its `WEB_MCP_TEST_ENGINES` entries
+    /// (an engine on a closed port) join the harness's.
     pub fn start_real_with(engines: &[&str], envs: &[(&str, String)]) -> Self {
         let permit = Permit::take();
-        let root = tempdir();
-        let results = Fixture::start(PUBLIC);
-        let mut links = HashMap::new();
-        let origins: Vec<String> = engines
-            .iter()
-            .map(|e| {
-                let fx = Fixture::start(ENGINE_HOST);
-                let html =
-                    std::fs::read_to_string(fixtures().join(format!("engines/{e}.html"))).unwrap();
-                // Google's result links are its own opaque `/goto?url=<token>[&amp;…]` redirects: each gets a target.
-                for (at, _) in html.match_indices("\"/goto?url=") {
-                    let link = &html[at + 1..];
-                    let link = link[..link.find('"').unwrap()].replace("&amp;", "&");
-                    let token = link["/goto?url=".len()..].split('&').next().unwrap();
-                    let path = format!("/{token}");
-                    results.route(&path, vec![Resp::html(STAND_IN)]);
-                    fx.route(&link, vec![Resp::redirect(&results.url(&path))]);
-                }
-                let html = localise(&html, &results, &mut links);
-                fx.route(
-                    engine_path(e),
-                    vec![Resp::html(html).header("Content-Security-Policy", ENGINE_CSP)],
-                );
-                format!("{e}={}", fx.url(""))
-            })
-            .collect();
+        let mut real = Real {
+            root: tempdir(),
+            results: Fixture::start(PUBLIC),
+            links: HashMap::new(),
+            engines: HashMap::new(),
+            _permit: permit,
+        };
+        let mut origins = Vec::new();
+        for e in engines {
+            let fx = Fixture::start(ENGINE_HOST);
+            origins.push(format!("{e}={}", fx.url("")));
+            real.engines.insert((*e).to_owned(), fx);
+            let page = real.page(e);
+            real.engines[*e].route(engine_path(e), vec![page]);
+        }
+        let mut envs = envs.to_vec();
+        if let Some(at) = envs.iter().position(|(k, _)| *k == "WEB_MCP_TEST_ENGINES") {
+            origins.push(envs.remove(at).1);
+        }
+        let root = real.root.clone();
         let agent_browser = browser_core::browser::real_agent_browser();
         let mut all = vec![
             (
@@ -510,15 +535,25 @@ impl Mcp {
             ("WEB_MCP_TEST_PUBLIC_IP", format!("{PUBLIC},{ENGINE_HOST}")),
             ("WEB_MCP_TEST_ENGINES", origins.join(",")),
         ];
-        all.extend(envs.iter().cloned());
+        all.extend(envs);
         let mut m = Self::start_with(root.join("project"), &all);
-        m.real = Some(Real {
-            root,
-            results,
-            links,
-            _permit: permit,
-        });
+        m.real = Some(real);
         m
+    }
+
+    /// `tests/fixtures/engines/<name>.html` as `start_real` serves it, for `serve`.
+    pub fn page(&mut self, name: &str) -> Resp {
+        self.real.as_mut().unwrap().page(name)
+    }
+
+    /// From now on `engine`'s result path answers `pages`, one per load in turn, the last for good.
+    pub fn serve(&self, engine: &str, pages: Vec<Resp>) {
+        self.engine(engine).route(engine_path(engine), pages);
+    }
+
+    /// The server `start_real` answers `engine` from.
+    pub fn engine(&self, engine: &str) -> &Fixture {
+        &self.real.as_ref().unwrap().engines[engine]
     }
 
     /// Where a captured result link leads under `start_real`: a Google `/goto?url=<token>` link redirects to its

@@ -2,7 +2,7 @@
 
 Real engine pages, each the `get html body` of the engine's tab, read by the engines' inline parser tests and served by
 `Mcp::start_real` (`tests/common/mod.rs`) in place of the engine, which points their links at local stand-ins as it
-serves them. None is hand-shaped. What each scrub replaced is in
+serves them. No capture is hand-shaped. What each scrub replaced is in
 the findings named below; nothing else was changed.
 
 | file                                    | date       | how                        | query or page                                         |
@@ -35,5 +35,13 @@ the findings named below; nothing else was changed.
   engine's session after web-mcp parsed it as results, since web-mcp keeps no result page. In `brave-captcha.html` the
   located country and coordinates are now empty (`country:""`, `geoLocation:""`).
 
-Not captured yet (tried on 2026-11-24): `brave-none.html` (Brave answered with its bot check, now `brave-captcha.html`) and
-`google-none.html` (a fresh profile's Google search timed out, and its tab was gone before it could be read).
+Not captured yet (tried on 2026-11-24, and once more each on 2026-11-25 with agent-browser 0.43.0 and a fresh profile):
+`brave-none.html` (Brave answered with its bot check, now `brave-captcha.html`; the second time the open failed with
+`net::ERR_ABORTED`) and `google-none.html` (a fresh profile's Google search timed out, and its tab was gone before it
+could be read; the second time Google sent it straight to its `/sorry` page). Their engines' no-results answer is not
+covered through the browser.
+
+Hand-made, not captures: `bing-typing-nobox.html` (no search box), `bing-typing-nosubmit.html` (a form that never
+submits) and `bing-typing-stall.html` (a box whose keydown handler holds the page for 30 s), Bing-shaped rows each, for
+the typing faults. `Mcp::start_real` serves only these with their inline handlers allowed; every capture is served with
+its scripts blocked.

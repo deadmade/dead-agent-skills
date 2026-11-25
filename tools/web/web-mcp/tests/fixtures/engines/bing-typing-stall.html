@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Bing whose search box stalls</title></head>
+<body>
+<form action="/search"><input id="sb_form_q" name="q" type="search" onkeydown="const end = Date.now() + 30000; while (Date.now() < end);"></form>
+<ol id="b_results">
+<li class="b_algo"><h2><a href="https://example.org/stall/1">A result whose search box stalls</a></h2><div class="b_caption"><p>Each key holds the page for 30 s.</p></div></li>
+<li class="b_algo"><h2><a href="https://example.org/stall/2">A second result</a></h2><div class="b_caption"><p>Another row of the page.</p></div></li>
+</ol>
+</body></html>

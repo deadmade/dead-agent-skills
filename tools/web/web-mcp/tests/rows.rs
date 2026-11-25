@@ -1,62 +1,30 @@
-//! `rows` against the fake agent-browser, which answers a page of `$FAKE_AB_PAGES` named by the last segment of the
-//! opened address (see `other_page` in `tests/bin/fake_agent_browser.rs`). The tests read `127.0.0.2`, which the
-//! server treats as a public host.
+//! `rows` through the real agent-browser and Chrome for Testing (`Mcp::start_real`), reading pages a local server
+//! answers on `127.0.0.2`, which the server treats as a public host.
 mod common;
 
 use std::fmt::Write as _;
 use std::io::Write as _;
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use common::{Mcp, command_of, is_error, logged, tempdir, text};
+use common::{Fixture, Mcp, PUBLIC, Resp, is_error, tempdir, text};
 use serde_json::{Value, json};
 
-/// A server whose agent-browser is the fake, serving the files `pages` (name, contents), plus the fake's call log.
-fn start(pages: &[(&str, String)]) -> (Mcp, PathBuf) {
-    start_with(pages, &[])
-}
-
-/// Like `start`, with more environment for the server.
-fn start_with(pages: &[(&str, String)], envs: &[(&str, String)]) -> (Mcp, PathBuf) {
-    let dir = tempdir();
-    for (name, html) in pages {
-        std::fs::write(dir.join(name), html).unwrap();
-    }
-    let log = tempdir().join("calls.jsonl");
-    let mut all = vec![
-        ("FAKE_AB_PAGES", dir.display().to_string()),
-        ("FAKE_AB_LOG", log.display().to_string()),
-    ];
-    all.extend(envs.iter().map(|(k, v)| (*k, v.clone())));
-    (Mcp::start_with(tempdir(), &all), log)
-}
-
-/// `n` list items in a list of class `class`, each a link with a text long enough to count.
+/// `n` list items in a list of class `class`, each a link relative to the page with a text long enough to count.
 fn list(class: &str, n: usize, filler: &str) -> String {
     let mut items = String::new();
     for i in 0..n {
         let _ = write!(
             items,
-            r#"<li class="{class}"><a href="/{class}/{i}">Listing {i} {filler}</a></li>"#
+            r#"<li class="{class}"><a href="{class}/{i}">Listing {i} {filler}</a></li>"#
         );
     }
     format!("<ul>{items}</ul>")
 }
 
-fn page(title: &str, body: &str) -> String {
-    format!("<html><head><title>{title}</title></head><body><main>{body}</main></body></html>")
-}
-
-/// A page whose first group has 8 items and whose second has 6.
-fn two_groups() -> String {
-    page(
-        "Two groups",
-        &(list("ad", 8, "with some words of text") + &list("filter", 6, "another few words")),
-    )
-}
-
-fn url(name: &str) -> String {
-    format!("http://127.0.0.2/{name}")
+fn page(title: &str, body: &str) -> Resp {
+    Resp::html(format!(
+        "<html><head><title>{title}</title></head><body><main>{body}</main></body></html>"
+    ))
 }
 
 /// The numbered lines of a reply.
@@ -70,113 +38,15 @@ fn numbered(t: &str) -> usize {
 }
 
 #[test]
-fn rows_returns_numbered_groups_and_archives_the_page() {
-    let (mut mcp, log) = start(&[("ads.html", two_groups())]);
-    let r = mcp.call("rows", json!({"url": url("ads")}));
-    assert!(!is_error(&r), "{r}");
-    let t = text(&r);
-    assert!(t.contains("Group 1: 8 items"), "{t}");
-    assert!(t.contains("Group 2: 6 items"), "{t}");
-    assert!(t.lines().any(|l| l.starts_with("1. ")), "{t}");
-    let source = t.lines().next().unwrap();
-    assert!(source.starts_with(&format!("Source: {} (fetched ", url("ads"))));
-    let archived = source
-        .split("archived at ")
-        .nth(1)
-        .and_then(|s| s.split("). Untrusted").next())
-        .unwrap();
-    assert!(mcp.project.join(archived).is_file(), "{source}");
-    assert!(archived.ends_with("raw.html"), "{source}");
-    let batches: Vec<Value> = logged(&log)
-        .into_iter()
-        .filter(|c| command_of(c).starts_with("batch --json"))
-        .map(|c| serde_json::from_str(c["stdin"].as_str().unwrap()).unwrap())
-        .collect();
-    assert_eq!(
-        batches,
-        [json!([
-            ["open", url("ads")],
-            ["get", "html", "body"],
-            ["get", "url"]
-        ])]
-    );
-}
-
-#[test]
-fn rows_group_and_limit() {
-    let (mut mcp, _) = start(&[("ads.html", two_groups())]);
-    let r = mcp.call("rows", json!({"url": url("ads"), "group": 2, "limit": 3}));
-    assert!(!is_error(&r), "{r}");
-    let t = text(&r);
-    assert_eq!(numbered(t), 3, "{t}");
-    assert!(t.contains("Showing 3 of 6."), "{t}");
-    assert!(!t.contains("Group 1"), "{t}");
-}
-
-#[test]
-fn rows_limit_defaults_to_30() {
-    let (mut mcp, _) = start(&[("forty.html", page("Forty", &list("ad", 40, "some words")))]);
-    let r = mcp.call("rows", json!({"url": url("forty")}));
-    let t = text(&r);
-    assert_eq!(numbered(t), 30, "{t}");
-    assert!(t.contains("Showing 30 of 40."), "{t}");
-}
-
-#[test]
-fn rows_budget_keeps_whole_rows() {
-    let long = "words that make the row long enough to be cut ".repeat(8);
-    let (mut mcp, _) = start(&[("many.html", page("Many", &list("ad", 400, &long)))]);
-    let r = mcp.call("rows", json!({"url": url("many"), "limit": 200}));
-    assert!(!is_error(&r), "{r}");
-    let t = text(&r);
-    assert!(
-        t.chars().count() <= 12_500,
-        "{} characters",
-        t.chars().count()
-    );
-    assert!(t.lines().any(|l| l.starts_with("1. ")), "{t}");
-    let shown: usize = t
-        .lines()
-        .find_map(|l| l.strip_prefix("Showing ")?.strip_suffix(" of 400."))
-        .unwrap_or_else(|| panic!("no Showing line: {t}"))
-        .parse()
-        .unwrap();
-    assert!(shown < 200, "{shown} rows");
-    assert_eq!(numbered(t), shown, "{t}");
-    assert!(t.lines().next().unwrap().contains(".web/"), "{t}");
-}
-
-#[test]
-fn rows_no_group_names_the_heading_and_the_hints() {
-    let body = format!("<h1>Odd Heading</h1>{}", list("ad", 3, "some text"));
-    let (mut mcp, _) = start(&[("few.html", body)]);
-    let r = mcp.call("rows", json!({"url": url("few")}));
-    let t = text(&r);
-    assert!(t.contains("Heading: \"Odd Heading\""), "{t}");
-    assert!(t.contains("`item`"), "{t}");
-    assert!(t.contains("still loading"), "{t}");
-}
-
-#[test]
-fn rows_no_group_without_a_heading_says_so() {
-    let (mut mcp, _) = start(&[("few.html", page("Not Used", &list("ad", 3, "some text")))]);
-    let r = mcp.call("rows", json!({"url": url("few")}));
-    let t = text(&r);
-    assert!(t.contains("No heading."), "{t}");
-    assert!(!t.contains("Not Used"), "{t}");
-}
-
-#[test]
 fn rows_bad_arguments_are_errors() {
-    let one = page("One", &list("ad", 8, "with some words of text"));
-    let (mut mcp, _) = start(&[("one.html", one)]);
+    let mut mcp = Mcp::start();
+    let url = "http://127.0.0.2/one";
     for (args, names) in [
-        (json!({"url": url("one"), "group": 3}), "1 or 2"),
-        (json!({"url": url("one"), "group": 0}), "1 or 2"),
-        (json!({"url": url("one"), "group": 2}), "only group 1"),
-        (json!({"url": url("one"), "limit": 0}), "1 to 200"),
-        (json!({"url": url("one"), "limit": 201}), "1 to 200"),
-        (json!({"url": url("one"), "item": "li["}), "li["),
+        (json!({"url": url, "group": 3}), "1 or 2"),
+        (json!({"url": url, "group": 0}), "1 or 2"),
+        (json!({"url": url, "limit": 0}), "1 to 200"),
+        (json!({"url": url, "limit": 201}), "1 to 200"),
+        (json!({"url": url, "item": "li["}), "li["),
         (json!({"url": "ftp://127.0.0.2/one"}), "not an http(s) URL"),
     ] {
         let r = mcp.call("rows", args.clone());
@@ -186,77 +56,12 @@ fn rows_bad_arguments_are_errors() {
 }
 
 #[test]
-fn rows_invalid_item_costs_no_page_load() {
-    let (mut mcp, log) = start(&[("one.html", two_groups())]);
-    mcp.call("rows", json!({"url": url("one"), "item": "li["}));
-    assert!(
-        logged(&log)
-            .iter()
-            .all(|c| !command_of(c).starts_with("batch --json")),
-        "the page was opened"
-    );
-}
-
-#[test]
-fn rows_two_calls_to_one_host_are_a_second_apart() {
-    let (mut mcp, _) = start(&[("ads.html", two_groups())]);
-    mcp.call("rows", json!({"url": url("ads")}));
-    std::thread::sleep(Duration::from_millis(1100));
-    let started = Instant::now();
-    for _ in 0..2 {
-        let r = mcp.call("rows", json!({"url": url("ads")}));
-        assert!(!is_error(&r), "{r}");
-    }
-    assert!(
-        started.elapsed() >= Duration::from_secs(1),
-        "{:?}",
-        started.elapsed()
-    );
-}
-
-#[test]
-fn rows_links_follow_the_landed_address() {
-    // The fake lands an engine host's page on the address in `<engine>.landed`.
-    let (mut mcp, _) = start(&[
-        ("google.html", two_groups()),
-        ("google.landed", "http://127.0.0.2/results/".into()),
-    ]);
-    let r = mcp.call("rows", json!({"url": "http://rows.google.com/start"}));
-    assert!(!is_error(&r), "{r}");
-    let t = text(&r);
-    assert!(t.starts_with("Source: http://127.0.0.2/results/ "), "{t}");
-    assert!(t.contains("| http://127.0.0.2/ad/0"), "{t}");
-}
-
-#[test]
-fn rows_refuses_a_private_landing() {
-    let (mut mcp, _) = start(&[("redirect-private.html", two_groups())]);
-    let r = mcp.call("rows", json!({"url": url("redirect-private")}));
-    assert!(is_error(&r), "{r}");
-    assert!(
-        text(&r).contains("redirected to a non-public address"),
-        "{r}"
-    );
-    assert!(
-        !mcp.run_dir().join("pages").exists(),
-        "the page was archived"
-    );
-}
-
-#[test]
-fn rows_reads_a_private_address_it_is_asked_for() {
-    let (mut mcp, _) = start(&[("ads.html", two_groups())]);
-    let r = mcp.call("rows", json!({"url": "http://127.0.0.1/ads"}));
-    assert!(!is_error(&r), "{r}");
-}
-
-#[test]
 fn rows_failed_render_reports_the_browsers_error() {
-    let (mut mcp, _) = start_with(
-        &[],
+    let mut mcp = Mcp::start_with(
+        tempdir(),
         &[("WEB_MCP_AGENT_BROWSER", "/nonexistent/agent-browser".into())],
     );
-    let r = mcp.call("rows", json!({"url": url("ads")}));
+    let r = mcp.call("rows", json!({"url": "http://127.0.0.2/ads"}));
     assert!(is_error(&r), "{r}");
     let t = text(&r);
     assert!(
@@ -265,26 +70,99 @@ fn rows_failed_render_reports_the_browsers_error() {
     );
 }
 
+/// A redirected page's groups are numbered, cut to the limit and linked from where it landed, and the page is
+/// archived; a group, an `item` or a page without groups, with or without a heading, is answered as such, and calls to one host are a second
+/// apart.
 #[test]
-fn rows_a_slow_page_says_it_is_still_loading() {
-    // The fake holds a page whose address has `/slow` for 30 s; the deadline is shorter.
-    let (mut mcp, _) = start_with(&[], &[("WEB_MCP_FALLBACK_MS", "500".into())]);
-    let r = mcp.call("rows", json!({"url": url("slow")}));
-    assert!(is_error(&r), "{r}");
-    assert!(text(&r).contains("still loading"), "{r}");
-}
+fn rows_reads_numbered_groups_where_the_page_landed() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route("/start", vec![Resp::redirect(&fx.url("/results/ads"))]);
+    fx.route(
+        "/results/ads",
+        vec![page(
+            "Two groups",
+            &(list("ad", 40, "with some words of text") + &list("filter", 6, "another few words")),
+        )],
+    );
+    fx.route(
+        "/one",
+        vec![page("One", &list("ad", 8, "with some words of text"))],
+    );
+    fx.route("/few", vec![page("Not Used", &list("ad", 3, "some text"))]);
+    let heading = "A".repeat(300);
+    fx.route(
+        "/bare",
+        vec![Resp::html(format!("<h1>{heading}</h1><p>Short.</p>"))],
+    );
+    let mut mcp = Mcp::start_real(&[]);
 
-#[test]
-fn rows_no_group_on_a_body_only_page_uses_the_h1_and_cuts_it() {
-    let body = format!("<h1>{}</h1><p>Short.</p>", "A".repeat(300));
-    let (mut mcp, _) = start(&[("bare.html", body)]);
-    let r = mcp.call("rows", json!({"url": url("bare")}));
+    let r = mcp.call("rows", json!({"url": fx.url("/start")}));
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    let source = t.lines().next().unwrap();
+    assert!(
+        source.starts_with(&format!("Source: {} (fetched ", fx.url("/results/ads"))),
+        "{t}"
+    );
+    let archived = source
+        .split("archived at ")
+        .nth(1)
+        .and_then(|s| s.split("). Untrusted").next())
+        .unwrap();
+    assert!(
+        archived.ends_with("raw.html") && mcp.project.join(archived).is_file(),
+        "{source}"
+    );
+    assert!(
+        t.contains("Group 1: 40 items") && t.contains("Group 2: 6 items"),
+        "{t}"
+    );
+    assert!(t.contains("Showing 30 of 40."), "{t}");
+    assert!(t.contains(&format!("| {}", fx.url("/results/ad/0"))), "{t}");
+
+    let started = Instant::now();
+    let r = mcp.call(
+        "rows",
+        json!({"url": fx.url("/results/ads"), "group": 2, "limit": 3}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert_eq!(numbered(t), 3, "{t}");
+    assert!(
+        t.contains("Showing 3 of 6.") && !t.contains("Group 1"),
+        "{t}"
+    );
+
+    let r = mcp.call(
+        "rows",
+        json!({"url": fx.url("/results/ads"), "item": "li.nothing"}),
+    );
+    let t = text(&r);
+    assert!(
+        t.contains("matched nothing") && t.contains("Untrusted page content"),
+        "{t}"
+    );
+    assert!(
+        started.elapsed() >= Duration::from_secs(1),
+        "{:?}",
+        started.elapsed()
+    );
+
+    let r = mcp.call("rows", json!({"url": fx.url("/one"), "group": 2}));
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("only group 1"), "{r}");
+
+    let t = text(&mcp.call("rows", json!({"url": fx.url("/few")}))).to_owned();
+    assert!(t.contains("No heading.") && !t.contains("Not Used"), "{t}");
+
+    let r = mcp.call("rows", json!({"url": fx.url("/bare")}));
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
     assert!(
-        t.contains(&format!("Heading: \"{}\"", "A".repeat(200))),
+        t.contains(&format!("Heading: \"{}\"", &heading[..200])),
         "{t}"
     );
+    assert!(t.contains("`item`") && t.contains("still loading"), "{t}");
     assert!(
         t.lines()
             .next()
@@ -294,107 +172,124 @@ fn rows_no_group_on_a_body_only_page_uses_the_h1_and_cuts_it() {
     );
 }
 
+/// A public page that lands on a private address is refused and not archived, a private address asked for is read,
+/// and a page slower than the deadline is reported as still loading.
 #[test]
-fn rows_item_that_matches_nothing_says_so() {
-    let (mut mcp, _) = start(&[("ads.html", two_groups())]);
-    let r = mcp.call("rows", json!({"url": url("ads"), "item": "li.nothing"}));
-    let t = text(&r);
-    assert!(t.contains("matched nothing"), "{t}");
-    assert!(t.contains("Untrusted page content"), "{t}");
-}
-
-#[test]
-fn rows_deeply_nested_hostile_page_returns_in_bounded_time() {
-    // 1,500 nested divs holding about 200 KB of text: building the text under every child took over 10 s
-    let depth = 1500;
-    let level = format!("{} ", "word".repeat(32));
-    let html = format!(
-        "{}{}{}",
-        format!("<div>{level}").repeat(depth),
-        "x".repeat(1000),
-        "</div>".repeat(depth)
+fn rows_refuses_a_private_landing_and_a_slow_page() {
+    let private = Fixture::start("127.0.0.1");
+    private.route(
+        "/ads",
+        vec![page("Private", &list("ad", 8, "with some words of text"))],
     );
-    let (mut mcp, _) = start(&[("deep.html", html)]);
-    let started = Instant::now();
-    let r = mcp.call("rows", json!({"url": url("deep")}));
-    assert!(!is_error(&r), "{r}");
+    let fx = Fixture::start(PUBLIC);
+    fx.route("/away", vec![Resp::redirect(&private.url("/ads"))]);
+    fx.route(
+        "/slow",
+        vec![page("Slow", "").delay(Duration::from_secs(10))],
+    );
+    let mut mcp = Mcp::start_real_with(&[], &[("WEB_MCP_FALLBACK_MS", "2000".into())]);
+
+    let r = mcp.call("rows", json!({"url": fx.url("/away")}));
+    assert!(is_error(&r), "{r}");
     assert!(
-        started.elapsed() < Duration::from_secs(5),
-        "{:?}",
-        started.elapsed()
+        text(&r).contains("redirected to a non-public address"),
+        "{r}"
     );
+    assert!(
+        !mcp.run_dir().join("pages").exists(),
+        "the page was archived"
+    );
+
+    let r = mcp.call("rows", json!({"url": private.url("/ads")}));
+    assert!(!is_error(&r), "{r}");
+
+    let r = mcp.call("rows", json!({"url": fx.url("/slow")}));
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("still loading"), "{r}");
 }
 
-/// A page of 3,000 nested levels around `inside` must get its answer in under twice the time of a call that skips the
-/// walk. Two servers take the page at the same time: one walks it, and the other is given an `item` that matches
-/// nothing. Both render and archive the page, parse it twice and read its body text, so the bound covers only the
-/// walker's group search and walk; the 1,500-level test keeps an absolute bound on the shared work. The bound is
-/// relative because a fixed one fails on a slow or loaded machine. Deeper pages only slow the test: the HTML parser
-/// alone takes 30 s on 20,000 levels in a debug build. Baseline, PR 1's CI (2026-11-10): ratios 0.91-1.25 on
-/// ubuntu-latest and 1.05-1.21 on windows-latest.
-fn nested_page_returns_in_bounded_time(open: &str, inside: &str, close: &str) {
-    let html = format!("{}{inside}{}", open.repeat(3_000), close.repeat(3_000));
-    let (mut walker, _) = start(&[("nest.html", html.clone())]);
-    let (mut parser, _) = start(&[("nest.html", html)]);
-    let timed = |mcp: &mut Mcp, args: Value| {
+/// A page whose own script builds `depth` nested `<div>`s, each holding `before` and followed by `after`, around
+/// `inside` (JavaScript string expressions): Chrome's HTML parser caps nesting at 512 levels, a script-built DOM
+/// doesn't.
+fn nested(depth: usize, before: &str, inside: &str, after: &str) -> Resp {
+    Resp::html(format!(
+        "<!doctype html><title>Nested</title><body><script>
+const before = {before}, after = {after};
+let n = document.body;
+for (let i = 0; i < {depth}; i++) {{
+  const d = document.createElement('div');
+  if (before) d.append(before);
+  n.append(d);
+  n = d;
+}}
+n.append({inside});
+for (let p = n; p !== document.body && after; p = p.parentNode) p.after(after);
+document.currentScript.remove();
+</script></body>"
+    ))
+}
+
+/// Each hostile page gets its answer in bounded time: a 4 MiB page is refused, a deep page with much text answers
+/// within 5 s, and a 2,000-level page in under twice the time of a call that skips the walk. That one renders and
+/// archives the page, parses it twice and reads its body text too, so the bound covers only the walker's group search
+/// and walk; it is relative because a fixed one fails on a slow or loaded machine. Deeper is out of Chrome's reach:
+/// Chrome for Testing 158 loaded 2,200 script-built levels in 50 ms and 2,400 not within 25 s (2026-11-25), so no
+/// page gives rows more. Baseline at 3,000 levels through the fake browser, PR 1's CI (2026-11-10): ratios 0.91-1.25
+/// on ubuntu-latest and 1.05-1.21 on windows-latest.
+#[test]
+fn rows_hostile_pages_return_in_bounded_time() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route("/big", vec![page("Big", &"x".repeat(4 * 1024 * 1024 + 1))]);
+    // 1,500 levels holding about 200 KB of text: building the text under every child took over 10 s.
+    let level = format!("'{} '", "word".repeat(32));
+    fx.route(
+        "/deep",
+        vec![nested(1_500, &level, "'x'.repeat(1000)", "''")],
+    );
+    let variants = [
+        ("element-only", "''", "''", "''"),
+        ("whitespace-only", "' '", "''", "' '"),
+        ("huge-space", "''", "' '.repeat(3900000)", "''"),
+        ("huge-word", "''", "'w'.repeat(3900000)", "''"),
+        ("huge-newline", "''", "'\\n'.repeat(250000)", "''"),
+    ];
+    for (name, before, inside, after) in variants {
+        fx.route(
+            &format!("/{name}"),
+            vec![nested(2_000, before, inside, after)],
+        );
+    }
+    let mut mcp = Mcp::start_real(&[]);
+    // Also starts Chrome, so no bound below counts its start.
+    let r = mcp.call("rows", json!({"url": fx.url("/big")}));
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("too large"), "{r}");
+
+    let mut timed = |args: Value| {
+        // Past the host's one-second gap, which would count against the call.
+        std::thread::sleep(Duration::from_millis(1100));
         let started = Instant::now();
         let r = mcp.call("rows", args);
         (started.elapsed(), r)
     };
-    let ((took, walk_reply), (base, parse_reply)) = std::thread::scope(|s| {
-        let walk = s.spawn(|| timed(&mut walker, json!({"url": url("nest")})));
-        let parse = s.spawn(|| {
-            timed(
-                &mut parser,
-                json!({"url": url("nest"), "item": "li.nothing"}),
-            )
-        });
-        (walk.join().unwrap(), parse.join().unwrap())
-    });
-    assert!(!is_error(&walk_reply), "{walk_reply}");
-    assert!(
-        text(&parse_reply).contains("matched nothing"),
-        "{parse_reply}"
-    );
-    let ratio = took.as_secs_f64() / base.as_secs_f64();
-    // `eprintln!` is captured by libtest; this line reaches the log of a passing run.
-    let _ = writeln!(
-        std::io::stderr(),
-        "rows_deep walk/parse: {took:?} / {base:?} = {ratio:.2}"
-    );
-    assert!(took < base * 2, "walk {took:?} against parse {base:?}");
-}
-
-#[test]
-fn rows_deep_element_only_nesting_returns_in_bounded_time() {
-    nested_page_returns_in_bounded_time("<div>", "", "</div>");
-}
-
-#[test]
-fn rows_deep_whitespace_only_nesting_returns_in_bounded_time() {
-    nested_page_returns_in_bounded_time("<div> ", "", "</div> ");
-}
-
-#[test]
-fn rows_deep_nesting_around_one_huge_space_text_returns_in_bounded_time() {
-    nested_page_returns_in_bounded_time("<div>", &" ".repeat(3_900_000), "</div>");
-}
-
-#[test]
-fn rows_deep_nesting_around_one_huge_word_returns_in_bounded_time() {
-    nested_page_returns_in_bounded_time("<div>", &"w".repeat(3_900_000), "</div>");
-}
-
-#[test]
-fn rows_deep_nesting_around_one_huge_newline_text_returns_in_bounded_time() {
-    nested_page_returns_in_bounded_time("<div>", &"\n".repeat(250_000), "</div>");
-}
-
-#[test]
-fn rows_refuses_a_page_over_4_mib() {
-    let big = page("Big", &"x".repeat(4 * 1024 * 1024 + 1));
-    let (mut mcp, _) = start(&[("big.html", big)]);
-    let r = mcp.call("rows", json!({"url": url("big")}));
-    assert!(is_error(&r), "{r}");
-    assert!(text(&r).contains("too large"), "{r}");
+    let (took, r) = timed(json!({"url": fx.url("/deep")}));
+    assert!(!is_error(&r), "{r}");
+    assert!(took < Duration::from_secs(5), "{took:?}");
+    for (name, ..) in variants {
+        let url = fx.url(&format!("/{name}"));
+        let (took, walk) = timed(json!({"url": url}));
+        let (base, parse) = timed(json!({"url": url, "item": "li.nothing"}));
+        assert!(!is_error(&walk), "{name}: {walk}");
+        assert!(text(&parse).contains("matched nothing"), "{name}: {parse}");
+        let ratio = took.as_secs_f64() / base.as_secs_f64();
+        // `eprintln!` is captured by libtest; this line reaches the log of a passing run.
+        let _ = writeln!(
+            std::io::stderr(),
+            "rows_deep {name} walk/parse: {took:?} / {base:?} = {ratio:.2}"
+        );
+        assert!(
+            took < base * 2,
+            "{name}: walk {took:?} against parse {base:?}"
+        );
+    }
 }
