@@ -65,11 +65,23 @@ the markers; that was not measured.
 ## fetch
 
 The plain request sends `Accept-Language: en-US,en;q=0.9`, matching the browser's `--lang=en-US`. A 429 or 503 is
-retried once after its `Retry-After` (at most 10 s). A public site's 403 or 503 that remains is then loaded once in the
-browser, for the `fetch` tool only (not `search`'s page fetches): after the host's request slot and within what is left
-of the fetch's 30 s. The reply names the URL the browser landed on and says it is the browser's rendering. A private or
-loopback host's status is its real answer and is not retried. A failed or near-empty rendering keeps the status with the
-browser's reason. The rendering is archived but not cached, so the next fetch asks the site again.
+retried once after its `Retry-After` (at most 10 s). A public site's 403 or 503 that remains, when its Content-Type is
+HTML, is then loaded once in the browser, for the `fetch` tool only (not `search`'s page fetches): after the host's
+request slot and within what is left of the fetch's 30 s. A JSON, PDF or other non-HTML refusal keeps its error without
+a browser load. The reply names the URL the browser landed on, says it is the browser's rendering, and carries no images.
+A private or loopback host's status is its real answer and is not retried. A failed or near-empty rendering keeps the
+status with the browser's reason. The same batch that reads the rendering reads the browser's own navigation status
+(`performance.getEntriesByType('navigation')[0]?.responseStatus`, `STATUS_JS` in browser-core; agent-browser 0.43.0
+answered 403 for a 403 page, 200 for a 200 and a `data:` page): 400 or more keeps the error, naming both statuses,
+because the browser was refused too and the rendering is the refusal page. A status the browser can't tell (0,
+`undefined`, a failed read) counts as passed. The rendering is archived but not cached, so the next fetch asks the site
+again.
+
+Server-controlled text stays out of errors and notes outside the markers: an unsupported content type keeps only its
+token characters (`[a-z0-9!#$&^_.+/-]`, at most 100), a refused redirect to another scheme names only the scheme, a
+private-network refusal (`FetchError::Blocked`, and a browser landing on a private address) names only the host, and
+`lookup certs` and `wayback` report a reply of the wrong JSON shape by line and column, not serde's message, which
+quotes the reply's strings.
 
 ## Engine ready checks
 
@@ -77,13 +89,21 @@ An engine's `READY` expression must not end in `;`: agent-browser 0.43.0 never f
 expression does (measured: `!!(true)` returned in 256 ms, `!!(true);` ran out its timeout), so every result-URL load
 waited its whole budget until this was fixed. `every_engine_waits_on_an_expression` in `engines/mod.rs` pins it.
 
+Every `READY` starts with `document.readyState !== 'loading' &&`, so a streamed result page is read after it has
+finished parsing, not at its first results (`every_engine_waits_for_the_page_to_finish_parsing`). A challenge that
+clears itself is left out of `READY`, so the wait sits it out within its budget: Semantic Scholar's
+`#challenge-container` and Bing's Turnstile frame (`iframe[src*="challenges.cloudflare.com"]`). Both stay in their
+engine's block detection, so a page that still shows them when the wait ends is read as a CAPTCHA; only a page that
+won't clear on its own (a CAPTCHA form, a `/sorry` or `/challenge` path) ends the wait early.
+
 ## The block log
 
 Each engine run of a `search` (papers' Scholar and Semantic Scholar included), except a cancelled one, appends one
 JSON line to `blocks.jsonl` in the search folder: `at`, `engine`, `outcome`, `ms` (from the won turn until the outcome
 is known, archiving a block page included; 0 without a turn) and `typed` (whether a typed follow-up was tried). Every
 web-mcp process on the machine appends to the same file, each line with one append-mode write; a failed write is
-ignored. Nothing rotates or caps it (about 110 bytes a line).
+ignored. Nothing rotates or caps it (about 110 bytes a line). A search whose browser window can't start logs no line:
+the engines never run.
 
 | outcome        | meaning                                                                                 |
 | -------------- | --------------------------------------------------------------------------------------- |
@@ -101,8 +121,10 @@ ignored. Nothing rotates or caps it (about 110 bytes a line).
 
 ## Typing
 
-The `browser` tool's `type` sends `type <ref> --delay N -- <text>`: N is drawn from 30–60 ms per key (`pace.rs`) and
-lowered so the whole text takes at most 5 s (`5000 / chars`). The `--` keeps text that starts with `-` from being read
+The `browser` tool's `type` sends `type <ref> --delay N -- <text>`: N is drawn from 30–60 ms per character
+(`pace.rs`) and lowered so the whole text takes at most 5 s (`5000 / chars`). agent-browser's `type --delay` inserts
+one character every N ms as input events, without keydown or keyup (measured), so `type` inserts text rather than
+pressing keys; agent-browser 0.43.0 is the minimum for `--delay` and `--`. The `--` keeps text that starts with `-` from being read
 as a flag. Empty text is rejected.
 
 Search typing is unchanged: one `press` per key, as fast as agent-browser sends them. Pacing it was measured and

@@ -13,13 +13,16 @@ they pull is archived in `.web/` in the project before Claude sees it.
   See "How search reads engines" below.
 - `fetch { url, images? }`: a whole page as markdown (HTML main content, PDFs and JSON as text). With `images: true`, up to six
   content images come back downscaled. A page that is empty without JavaScript is re-fetched through the browser, and so
-  is a public site's HTTP 403 or 503 (once, often a bot check; the browser's copy is not reused by a later fetch). The
-  reply's text is capped at 50,000 characters; a longer page ends with the archive path of the whole page. A URL
+  is a public site's HTTP 403 or 503 HTML page (once, often a bot check; the browser's copy comes without images and is
+  not reused by a later fetch). A 403 or 503 that isn't HTML (JSON, a PDF) stays an error, and so does one the browser's
+  own load gets 400 or more for too. The reply's text is capped at 50,000 characters, counted in UTF-16 code units; a
+  longer page ends with the archive path of the whole page. An error names a server's content type by its plain
+  characters only, and a refused redirect by its scheme or host, not its full URL. A URL
   fetched earlier in the run comes from the archive, except localhost, private-network addresses and JSON.
 - `browser { action, session, url?, ref?, text?, key?, js? }`: drives agent-browser. `session` is required, and each
   session is a tab of web-mcp's browser window (named per server process, and closed again when the server exits). Actions: `open`, `snapshot`, `click`, `fill`, `type`, `press`, `scroll`, `screenshot`,
-  `console`, `network`, `eval`, `close`. `type` presses one key every 30 to 60 ms, faster for a long text so it takes
-  at most 5 s.
+  `console`, `network`, `eval`, `close`. `type` inserts one character every 30 to 60 ms, faster for a long text so it
+  takes at most 5 s.
 - `rows { url, group?, item?, limit? }`: opens one page in a throwaway tab of web-mcp's browser window and returns its
   repeating items (ads, products, search hits) as numbered rows: the item's text on one line, cut at about 200
   characters, and its first link, made absolute. It finds sibling elements of one kind outside `nav`, `header` and
@@ -109,8 +112,8 @@ deadline once its turn comes; only a wait of over a minute skips the engine as b
 
 Every engine run (except one cancelled) adds a line to `blocks.jsonl` in the search folder: when, the engine, what came
 of it (`ok`, `empty`, `captcha`, `consent`, `blocked`, `busy`, `timeout`, `resting`, `unrecognised`, `unresolved` or
-`error`), how long it took and whether it typed. Every web-mcp on the machine writes to it, and nothing trims it;
-delete it when you like.
+`error`), how long it took and whether it typed. A search whose browser window can't start logs no line. Every web-mcp on the
+machine writes to it, and nothing trims it; delete it when you like.
 
 ## The archive
 
@@ -144,7 +147,7 @@ so a hand-built binary only sticks if you do not rerun the installer.
 
 ## Configuration
 
-Environment variables, set in `.mcp.json`: `WEB_MCP_PROJECT_DIR` (where `.web/` lives; falls back to `CLAUDE_PROJECT_DIR`, then the server working directory), `WEB_MCP_AGENT_BROWSER` (the `agentBrowserPath` userConfig, default `agent-browser`),
+Environment variables, set in `.mcp.json`: `WEB_MCP_PROJECT_DIR` (where `.web/` lives; falls back to `CLAUDE_PROJECT_DIR`, then the server working directory), `WEB_MCP_AGENT_BROWSER` (the `agentBrowserPath` userConfig, default `agent-browser`; at least agent-browser 0.43.0, whose `type` takes `--delay` and `--`),
 `WEB_MCP_SEARCH_DIR` and `WEB_MCP_CHROME` (see above). `WEB_MCP_ARXIV_URL`,
 `WEB_MCP_OPENALEX_URL` and `WEB_MCP_CROSSREF_URL` repoint the paper APIs (for tests); `WEB_MCP_PAPERS_MS` shortens each paper source's deadline. The lookup sources are repointed by `WEB_MCP_DOH_URL`, `WEB_MCP_RDAP_URL`, `WEB_MCP_CRTSH_URL`,
 `WEB_MCP_CDX_URL`, `WEB_MCP_WAYBACK_URL`, `WEB_MCP_INTERNETDB_URL`, `WEB_MCP_OSV_URL`, `WEB_MCP_NVD_URL`,
