@@ -281,9 +281,8 @@ fn a_screenshot_is_a_jpeg_and_archived() {
     assert_eq!(scratch, 0);
 }
 
-/// A page that is empty without JavaScript is rendered in Chrome: two at once each get their own page, whole (past
-/// agent-browser's 40,000-character output cap), the rendered HTML is archived, and the next fetch comes from the
-/// archive.
+/// A page that is empty without JavaScript is rendered in Chrome: two at once each get their own page, whole (over
+/// 40,000 characters), the rendered HTML is archived, and the next fetch comes from the archive.
 // Release builds treat the fixture as private, and private pages are never cached.
 #[cfg(debug_assertions)]
 #[test]

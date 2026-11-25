@@ -48,8 +48,6 @@ pub fn check_session(s: &str) -> Result<(), String> {
 
 /// Per call; a browser that hangs is killed.
 const CALL_TIMEOUT: Duration = Duration::from_secs(60);
-/// Characters of page output per call: under Claude Code's 25,000-token cap on MCP results.
-const MAX_OUTPUT: &str = "40000";
 
 #[derive(Debug)]
 pub enum BrowserError {
@@ -207,15 +205,11 @@ async fn call(
     session: &str,
     args: &[String],
     stdin: Option<&str>,
-    limits: bool,
     via: Via<'_>,
 ) -> Result<Value, BrowserError> {
     let mut cmd = Command::new(bin);
     cmd.args(["--session", session, "--json"]);
     isolate(&mut cmd, via, std::env::vars_os());
-    if limits {
-        cmd.args(["--max-output", MAX_OUTPUT, "--content-boundaries"]);
-    }
     let mut child = cmd
         .args(args)
         .stdin(if stdin.is_some() {
@@ -279,7 +273,7 @@ async fn end(
         Some(cdp) => {
             let tab_close = ["tab".to_owned(), "close".to_owned()];
             let via = Via::Tab { config, cdp };
-            call(bin, session, &tab_close, None, false, via).await
+            call(bin, session, &tab_close, None, via).await
         }
         None => Ok(Value::Null),
     };
@@ -290,7 +284,7 @@ async fn end(
         t => t,
     };
     let close = ["close".to_owned()];
-    let closed = call(bin, session, &close, None, false, Via::Detached(config)).await;
+    let closed = call(bin, session, &close, None, Via::Detached(config)).await;
     tab.and(closed)
 }
 
@@ -376,7 +370,7 @@ impl Browser {
         tokio::spawn(async move {
             let close = ["close".to_owned()];
             futures::future::join_all(old.keys().map(|s| {
-                let close = call(&bin, s, &close, None, false, Via::Detached(&config));
+                let close = call(&bin, s, &close, None, Via::Detached(&config));
                 tokio::time::timeout(CLOSE_TIMEOUT, close)
             }))
             .await;
@@ -405,12 +399,12 @@ impl Browser {
             };
             let answer = match op {
                 Op::Run(args) if args.first().is_some_and(|c| is_input(c)) => {
-                    let input = self.run_with(&session, args, None, true, via);
+                    let input = self.run_with(&session, args, None, via);
                     self.with_front(&session, via, input).await
                 }
-                Op::Run(args) => self.run_with(&session, args, None, true, via).await,
-                Op::Batch(cmds, limits, may_fail) => self
-                    .batch_with(&session, cmds, limits, via, may_fail, false)
+                Op::Run(args) => self.run_with(&session, args, None, via).await,
+                Op::Batch(cmds, may_fail) => self
+                    .batch_with(&session, cmds, via, may_fail, false)
                     .await
                     .map(Value::Array),
             };
@@ -418,7 +412,7 @@ impl Browser {
                 Err(BrowserError::TabGone(_)) if !rebound => {
                     rebound = true;
                     let new = ["tab".to_owned(), "new".to_owned()];
-                    self.run_with(&session, &new, None, false, via).await?;
+                    self.run_with(&session, &new, None, via).await?;
                 }
                 Err(BrowserError::Failed(e)) if !renewed => {
                     renewed = true;
@@ -521,20 +515,17 @@ impl Browser {
         args: &[String],
     ) -> Result<Value, BrowserError> {
         *self.owner_config.lock().expect("owner") = Some(config.to_owned());
-        self.run_with(session, args, None, false, Via::Owner(config))
-            .await
+        self.run_with(session, args, None, Via::Owner(config)).await
     }
 
-    /// `limits`: cap and wrap the page output (for answers read as text; off where the output is data).
     async fn run_with(
         &self,
         session: &str,
         args: &[String],
         stdin: Option<&str>,
-        limits: bool,
         via: Via<'_>,
     ) -> Result<Value, BrowserError> {
-        call(&self.bin, session, args, stdin, limits, via).await
+        call(&self.bin, session, args, stdin, via).await
     }
 
     /// Runs `commands` as one `batch --json` (read from stdin, so no value is parsed as a flag) in `key`'s tab and
@@ -547,7 +538,7 @@ impl Browser {
         key: &str,
         commands: &[Vec<&str>],
     ) -> Result<Vec<Value>, BrowserError> {
-        let answer = self.attached(key, Op::Batch(commands, true, None)).await;
+        let answer = self.attached(key, Op::Batch(commands, None)).await;
         answer.map(entries)
     }
 
@@ -578,7 +569,7 @@ impl Browser {
         let input = commands
             .iter()
             .any(|c| c.first().is_some_and(|c| is_input(c)));
-        let batch = self.batch_with(&session, &cmds, false, via, None, true);
+        let batch = self.batch_with(&session, &cmds, via, None, true);
         tokio::time::timeout_at(until.into(), async {
             if input {
                 self.with_front(&session, via, batch).await
@@ -622,7 +613,7 @@ impl Browser {
             return;
         };
         let list = ["tab".to_owned(), "list".to_owned()];
-        let Ok(listing) = self.run_with(session, &list, None, false, via).await else {
+        let Ok(listing) = self.run_with(session, &list, None, via).await else {
             return;
         };
         let target = listing["tabs"]
@@ -671,7 +662,6 @@ impl Browser {
         &self,
         session: &str,
         commands: &[Vec<&str>],
-        limits: bool,
         via: Via<'_>,
         may_fail: Option<usize>,
         bail: bool,
@@ -681,9 +671,7 @@ impl Browser {
         if bail {
             args.push("--bail".to_owned());
         }
-        let answer = self
-            .run_with(session, &args, Some(&input), limits, via)
-            .await?;
+        let answer = self.run_with(session, &args, Some(&input), via).await?;
         // One entry per command: {"command", "success", "result"}.
         let entries = answer.as_array().ok_or_else(|| {
             BrowserError::Failed("agent-browser's batch answer is not a list".into())
@@ -741,9 +729,9 @@ impl Browser {
             cmds.push(vec!["wait", "--fn", s.ready_js, "--timeout", &wait]);
         }
         cmds.extend([vec!["get", "html", "body"], vec!["get", "url"]]);
-        // The HTML is data for the extractor: no output cap, no boundary markers.
+        // The HTML is data for the extractor: agent-browser's `--json` answer carries it whole.
         let may_fail = search.as_ref().map(|_| wait_at);
-        let batch = self.attached(key, Op::Batch(&cmds, false, may_fail));
+        let batch = self.attached(key, Op::Batch(&cmds, may_fail));
         let answer = tokio::time::timeout(deadline, batch)
             .await
             .unwrap_or(Err(BrowserError::Timeout(deadline)))
@@ -803,10 +791,10 @@ impl Browser {
 /// What `attached` runs in a tab.
 #[derive(Clone, Copy)]
 enum Op<'a> {
-    /// A call's args, its output limited.
+    /// A call's args.
     Run(&'a [String]),
-    /// A batch's commands, whether its output is limited, and the index of a command that may fail.
-    Batch(&'a [Vec<&'a str>], bool, Option<usize>),
+    /// A batch's commands, and the index of a command that may fail.
+    Batch(&'a [Vec<&'a str>], Option<usize>),
 }
 
 /// A batch's results, from `attached`'s answer to an `Op::Batch`.
