@@ -129,6 +129,22 @@
           "real_chrome_rows_match_the_parser"
           "--skip"
           "a_dropped_server_leaves_no_chrome"
+          "--skip"
+          "each_session_reads_its_own_tab_and_exit_closes_them"
+          "--skip"
+          "input_reaches_a_hidden_tab_despite_a_proxy"
+          "--skip"
+          "a_closed_tab_is_replaced_and_closing_it_again_is_no_error"
+          "--skip"
+          "a_dead_chrome_is_replaced_on_the_next_action"
+          "--skip"
+          "a_slow_page_ends_the_fallback_at_its_deadline_and_closes_its_tab"
+          "--skip"
+          "an_open_chrome_cannot_load_is_a_tool_error"
+          "--skip"
+          "a_screenshot_is_a_jpeg_and_archived"
+          "--skip"
+          "an_app_shell_is_rendered_archived_and_cached"
         ];
         meta = {
           inherit (webMcp) description;

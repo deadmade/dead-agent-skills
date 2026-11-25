@@ -167,6 +167,7 @@ fn file(path: &str) -> Resp {
         Some("jpg") => "image/jpeg",
         Some("png") => "image/png",
         Some("md") => "text/markdown",
+        Some("js") => "text/javascript",
         _ => "application/octet-stream",
     };
     Resp::new(200, ct, std::fs::read(p).unwrap())
@@ -311,13 +312,21 @@ fn engine_path(engine: &str) -> &'static str {
 /// The processes whose command line holds a path inside `dir`. The separator keeps root `…-5` from matching a
 /// concurrent test's `…-50`; Chrome's and agent-browser's arguments carry it on both OSes.
 pub fn processes_holding(dir: &Path) -> Vec<u32> {
+    command_lines_holding(dir)
+        .into_iter()
+        .map(|(pid, _)| pid)
+        .collect()
+}
+
+/// `processes_holding`, with each process's command line.
+fn command_lines_holding(dir: &Path) -> Vec<(u32, String)> {
     let dir = format!("{}{}", dir.to_str().unwrap(), std::path::MAIN_SEPARATOR);
     let dir = dir.as_str();
     #[cfg(windows)]
     {
         // Not this PowerShell, whose own command line holds it too.
         let script = format!(
-            "Get-CimInstance Win32_Process | Where-Object {{ $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('{}') }} | ForEach-Object {{ $_.ProcessId }}",
+            "Get-CimInstance Win32_Process | Where-Object {{ $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('{}') }} | ForEach-Object {{ \"$($_.ProcessId) $($_.CommandLine)\" }}",
             dir.replace('\'', "''")
         );
         let out = Command::new("powershell")
@@ -325,8 +334,11 @@ pub fn processes_holding(dir: &Path) -> Vec<u32> {
             .output()
             .unwrap();
         String::from_utf8_lossy(&out.stdout)
-            .split_whitespace()
-            .filter_map(|p| p.parse().ok())
+            .lines()
+            .filter_map(|l| {
+                let (pid, cmdline) = l.split_once(' ')?;
+                Some((pid.parse().ok()?, cmdline.to_owned()))
+            })
             .collect()
     }
     #[cfg(not(windows))]
@@ -337,12 +349,41 @@ pub fn processes_holding(dir: &Path) -> Vec<u32> {
             .filter_map(|e| {
                 let pid = e.file_name().to_str()?.parse().ok()?;
                 let cmdline = std::fs::read(e.path().join("cmdline")).ok()?;
-                String::from_utf8_lossy(&cmdline)
-                    .contains(dir)
-                    .then_some(pid)
+                let cmdline = String::from_utf8_lossy(&cmdline).replace('\0', " ");
+                cmdline.contains(dir).then_some((pid, cmdline))
             })
             .collect()
     }
+}
+
+/// A GET of `path` on Chrome's debug port, on this machine and without a proxy.
+fn devtools_get(port: u16, path: &str) -> String {
+    let mut conn = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(10)))
+        .unwrap();
+    write!(
+        conn,
+        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+    )
+    .unwrap();
+    // Chrome keeps the connection open: read the body by its length.
+    let mut reader = BufReader::new(conn);
+    let mut len = 0;
+    loop {
+        let mut h = String::new();
+        reader.read_line(&mut h).unwrap();
+        if h == "\r\n" {
+            break;
+        }
+        if let Some((k, v)) = h.split_once(':')
+            && k.eq_ignore_ascii_case("content-length")
+        {
+            len = v.trim().parse().unwrap();
+        }
+    }
+    let mut body = vec![0; len];
+    reader.read_exact(&mut body).unwrap();
+    String::from_utf8(body).unwrap()
 }
 
 impl Mcp {
@@ -424,6 +465,11 @@ impl Mcp {
     /// answered from `tests/fixtures/engines/<engine>.html` by its own server on `127.0.0.3` at the engine's path,
     /// any query.
     pub fn start_real(engines: &[&str]) -> Self {
+        Self::start_real_with(engines, &[])
+    }
+
+    /// `start_real` with extra environment, which wins over the harness's own.
+    pub fn start_real_with(engines: &[&str], envs: &[(&str, String)]) -> Self {
         let permit = Permit::take();
         let root = tempdir();
         let results = Fixture::start(PUBLIC);
@@ -452,21 +498,20 @@ impl Mcp {
             })
             .collect();
         let agent_browser = browser_core::browser::real_agent_browser();
-        let mut m = Self::start_with(
-            root.join("project"),
-            &[
-                (
-                    "WEB_MCP_SEARCH_DIR",
-                    root.join("search").display().to_string(),
-                ),
-                ("WEB_MCP_CHROME", String::new()),
-                // Unused by the real agent-browser; inside the root, so it goes with it.
-                ("FAKE_AB_STATE", root.join("state").display().to_string()),
-                ("WEB_MCP_AGENT_BROWSER", agent_browser.display().to_string()),
-                ("WEB_MCP_TEST_PUBLIC_IP", format!("{PUBLIC},{ENGINE_HOST}")),
-                ("WEB_MCP_TEST_ENGINES", origins.join(",")),
-            ],
-        );
+        let mut all = vec![
+            (
+                "WEB_MCP_SEARCH_DIR",
+                root.join("search").display().to_string(),
+            ),
+            ("WEB_MCP_CHROME", String::new()),
+            // Unused by the real agent-browser; inside the root, so it goes with it.
+            ("FAKE_AB_STATE", root.join("state").display().to_string()),
+            ("WEB_MCP_AGENT_BROWSER", agent_browser.display().to_string()),
+            ("WEB_MCP_TEST_PUBLIC_IP", format!("{PUBLIC},{ENGINE_HOST}")),
+            ("WEB_MCP_TEST_ENGINES", origins.join(",")),
+        ];
+        all.extend(envs.iter().cloned());
+        let mut m = Self::start_with(root.join("project"), &all);
         m.real = Some(Real {
             root,
             results,
@@ -494,6 +539,89 @@ impl Mcp {
                 .cloned()
                 .unwrap_or_else(|| url.to_string()),
         }
+    }
+
+    /// The window's debug port and browser path, from the `DevToolsActivePort` its Chrome writes into the profile.
+    fn devtools(&self) -> (u16, String) {
+        let file = self.search.join("profiles/1/profile/DevToolsActivePort");
+        let text = std::fs::read_to_string(&file).unwrap();
+        let mut lines = text.lines();
+        let port = lines.next().unwrap().trim().parse().unwrap();
+        (port, lines.next().unwrap().trim().to_owned())
+    }
+
+    /// The window's tabs as Chrome lists them: each page's URL.
+    pub fn tabs(&self) -> Vec<String> {
+        let list: Value =
+            serde_json::from_str(&devtools_get(self.devtools().0, "/json/list")).unwrap();
+        list.as_array()
+            .unwrap()
+            .iter()
+            .filter(|t| t["type"] == "page")
+            .map(|t| t["url"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    /// The real agent-browser on the agent-browser session `session`, attached to the window as web-mcp attaches
+    /// its tabs; its JSON answer.
+    pub fn agent_browser(&self, session: &str, args: &[&str]) -> Value {
+        let (port, path) = self.devtools();
+        let cdp = format!("ws://127.0.0.1:{port}{path}");
+        let config = self.search.join("attach.json");
+        let mut cmd = Command::new(browser_core::browser::real_agent_browser());
+        for (k, _) in std::env::vars_os() {
+            if k.to_string_lossy()
+                .to_ascii_uppercase()
+                .starts_with("AGENT_BROWSER_")
+            {
+                cmd.env_remove(k);
+            }
+        }
+        let out = cmd
+            .current_dir(&self.search)
+            .env(
+                "AGENT_BROWSER_DEFAULT_TIMEOUT",
+                browser_core::browser::ATTACHED_TIMEOUT
+                    .as_millis()
+                    .to_string(),
+            )
+            .args([
+                "--session",
+                session,
+                "--json",
+                "--cdp",
+                &cdp,
+                "--pin-tab",
+                "--config",
+            ])
+            .arg(&config)
+            .args(args)
+            .output()
+            .unwrap();
+        serde_json::from_slice(&out.stdout)
+            .unwrap_or_else(|e| panic!("{e}: {}", String::from_utf8_lossy(&out.stderr)))
+    }
+
+    /// Kills the window's Chrome: its browser process, the one with the profile's `--user-data-dir` and no `--type`.
+    pub fn kill_chrome(&self) {
+        let profile = self.search.join("profiles");
+        let pid = command_lines_holding(&profile)
+            .into_iter()
+            .find(|(_, c)| c.contains("--user-data-dir=") && !c.contains("--type="))
+            .unwrap_or_else(|| panic!("no Chrome holds {}", profile.display()))
+            .0;
+        let pid_s = pid.to_string();
+        let killed = if cfg!(windows) {
+            Command::new("taskkill")
+                .args(["/F", "/PID", &pid_s])
+                .output()
+        } else {
+            Command::new("kill").args(["-9", &pid_s]).output()
+        };
+        assert!(
+            killed.unwrap().status.success(),
+            "could not kill Chrome {pid}"
+        );
     }
 
     pub fn send(&mut self, m: &Value) {

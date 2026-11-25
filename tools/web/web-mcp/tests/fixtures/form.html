@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Form</title></head>
+<body>
+<label>Query <input id="q"></label>
+<button onclick="document.title = 'clicked ' + document.getElementById('q').value">Go</button>
+<output id="keys"></output>
+<script>
+// Keys pressed outside the field: `fill` may type into it.
+document.addEventListener('keydown', (e) => { if (e.target.id !== 'q') document.getElementById('keys').textContent += e.key; });
+</script>
+<div style="height: 5000px"></div>
+</body></html>
