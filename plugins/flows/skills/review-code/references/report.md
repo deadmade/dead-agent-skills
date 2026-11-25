@@ -9,7 +9,7 @@ line, the findings table, the user's pick per finding, and what was fixed. Older
 conductors it replaced (`test-audit`, `doc-audit`, `harden`).
 
 One ranked table of every verified finding, most severe first. `bucket` is `fix before merge` (it ships something
-wrong) or `worth doing`, so `all fix` resolves from the file alone:
+wrong, or [naming.md](../../../references/naming.md) puts it there) or `worth doing`, so `all fix` resolves from the file alone:
 
 | #   | severity     | where       | finding      | evidence                   | fix (recommended) | bucket                         |
 | --- | ------------ | ----------- | ------------ | -------------------------- | ----------------- | ------------------------------ |
@@ -42,7 +42,7 @@ a · <decision> — <your recommendation>
 <n> more worth doing in docs/audits/<file>. Not checked: <what wasn't, and any risk you must know>.
 ```
 
-- **Fix before merge**: every finding that ships something wrong, however many. **Worth doing**: at most 5 more; the
+- **Fix before merge**: every finding whose bucket is `fix before merge`, however many. **Worth doing**: at most 5 more; the
   last line counts the rest. Numbers run on across both and match the file's table, so a pick by number works from
   either.
 - **Waiting on you**: every decision the user owes, each answerable from the reply alone (the decision, the options

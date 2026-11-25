@@ -147,6 +147,9 @@ Read `docs/components/ci.md` for how a release is built and published.
   A new worktree has no `.pre-commit-config.yaml` (it is generated and untracked), so its first commit fails until
   `nix develop` runs in that worktree. treefmt's hook fails on any file it changes: run `treefmt` on the files you
   changed (never a folder: it reformats files you didn't touch), then `npm run build:harnesses`, then stage.
+- Without nix (plain Windows), format only the files you changed with prettier and `treefmt.toml`'s options:
+  `npx prettier@3 --write --no-config --print-width 120 --single-quote <files>`; the next treefmt run may still
+  differ if nix pins another prettier.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt, taplo for TOML).
   Formatter options live in `treefmt.toml`; flow steps use `#:schema ./step.schema.json` for editor validation.
   Without the nix shell (no `treefmt` on PATH, as on Windows), run
