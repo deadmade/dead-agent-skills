@@ -196,8 +196,8 @@ fn batch(stdin: &str, state: &Path, session: &str, tab_gone: bool, bail: bool) -
     Value::Array(entries)
 }
 
-/// An `eval` of a script `'<literal>'` answers that literal; `throw '<literal>'` fails with it. Other scripts get
-/// the default answer.
+/// An `eval` of a script `'<literal>'` (no `'` inside) answers that literal; `throw '<literal>'` fails with it.
+/// Other scripts get the default answer.
 fn eval_literal(c: &[String]) -> Option<Result<String, String>> {
     if c[0] != "eval" {
         return None;
@@ -206,6 +206,7 @@ fn eval_literal(c: &[String]) -> Option<Result<String, String>> {
     let quoted = |s: &str| {
         s.strip_prefix('\'')
             .and_then(|s| s.strip_suffix('\''))
+            .filter(|s| !s.contains('\''))
             .map(str::to_owned)
     };
     match script.strip_prefix("throw ") {

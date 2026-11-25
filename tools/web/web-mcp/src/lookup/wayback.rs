@@ -13,8 +13,8 @@ use crate::fetch::{self, GetOpts};
 
 const SOURCE: &str = "Wayback CDX";
 
-fn error(e: String) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(e)])
+fn error(e: &str) -> CallToolResult {
+    CallToolResult::error(vec![ContentBlock::text(crate::guard::strip(e))])
 }
 
 pub async fn run(ctx: &Arc<Ctx>, target: &str, at: Option<&str>) -> CallToolResult {
@@ -24,7 +24,9 @@ pub async fn run(ctx: &Arc<Ctx>, target: &str, at: Option<&str>) -> CallToolResu
         return super::render(ctx, "wayback", target, o).await;
     };
     if at.is_empty() || at.len() > 14 || !at.bytes().all(|b| b.is_ascii_digit()) {
-        return error("at must be 1 to 14 digits: a timestamp such as 20240102030405, or a prefix such as 2024".into());
+        return error(
+            "at must be 1 to 14 digits: a timestamp such as 20240102030405, or a prefix such as 2024",
+        );
     }
     let target = if target.contains("://") {
         target.to_owned()
@@ -34,12 +36,12 @@ pub async fn run(ctx: &Arc<Ctx>, target: &str, at: Option<&str>) -> CallToolResu
     let url = format!("{}web/{at}id_/{target}", ctx.cfg.lookup_urls.wayback);
     let url = match Url::parse(&url) {
         Ok(u) => u,
-        Err(e) => return error(format!("{target}: not a URL ({e})")),
+        Err(e) => return error(&format!("{target}: not a URL ({e})")),
     };
     // Dot segments (also %2e%2e) in the target must not climb out of /web/<at>id_/.
     let base = ctx.cfg.lookup_urls.wayback.path();
     if !url.path().starts_with(&format!("{base}web/{at}id_/")) {
-        return error(format!("{target}: path escapes the snapshot prefix"));
+        return error(&format!("{target}: path escapes the snapshot prefix"));
     }
     // A capture never changes, so it is cached and indexed like any page; no browser re-render of a raw capture.
     let opts = GetOpts {
@@ -49,7 +51,7 @@ pub async fn run(ctx: &Arc<Ctx>, target: &str, at: Option<&str>) -> CallToolResu
     };
     let f = match fetch::get(ctx, &url, deadline(ctx, Duration::from_secs(30)), opts).await {
         Ok(f) => f,
-        Err(e) => return error(format!("Failed: Wayback Machine: {e}")),
+        Err(e) => return error(&format!("Failed: Wayback Machine: {e}")),
     };
     fetch::render(ctx, &f, false, 30_000).await
 }

@@ -564,6 +564,18 @@ fn eval_output_is_guarded() {
 }
 
 #[test]
+fn eval_with_an_inner_quote_gets_the_default_answer() {
+    let (mut mcp, _log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "'a' + 'b'"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    // Not read as the literal `a' + 'b`: the fake answers its default, the tab's URL.
+    assert!(!guarded(text(&r)).0.contains('+'), "{r}");
+}
+
+#[test]
 fn eval_error_is_stripped() {
     let (mut mcp, _log) = start(FAKE);
     let r = mcp.call(
@@ -572,11 +584,13 @@ fn eval_error_is_stripped() {
     );
     assert!(is_error(&r), "{r}");
     let t = text(&r);
-    assert!(t.contains("badnews"), "{t}");
     assert!(
-        !t.contains('\u{202E}') && !t.contains("<<untrusted-"),
+        t.starts_with("Source: agent-browser session s (eval, "),
         "{t}"
     );
+    let (body, after) = guarded(t);
+    assert!(body.contains("badnews"), "{t}");
+    assert!(!t.contains('\u{202E}') && after.is_empty(), "{t}");
 }
 
 #[test]
@@ -706,8 +720,11 @@ fn slow_fallback_still_closes_its_session() {
     );
     let r = mcp.call("fetch", json!({"url": fx.url("/slow.html")}));
     assert!(!is_error(&r), "{r}");
+    // web-mcp's own note: after the closer, not in the page text.
+    let (_, after) = guarded(text(&r));
+    assert!(after.starts_with("\n\n(This page looks empty"), "{r}");
     assert!(
-        text(&r).contains("browser fallback failed: the page did not finish within"),
+        after.contains("browser fallback failed: the page did not finish within"),
         "{r}"
     );
     let c = calls(&log);

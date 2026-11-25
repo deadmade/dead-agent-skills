@@ -258,6 +258,11 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
         ),
         Snapshot | Console | Close => {}
     }
+    let label = &args.session;
+    let source = |count: &str| {
+        let now = jiff::Timestamp::now();
+        format!("Source: agent-browser session {label} ({name}, {now}{count}). {UNTRUSTED}")
+    };
     // Free text goes through batch's stdin, where no argv parsing can take it for a flag
     // (agent-browser 0.39.1 documents no `--` end-of-options marker).
     let data = if matches!(args.action, Fill | Type | Eval) {
@@ -271,13 +276,8 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
     } else {
         ctx.browser.run(&session, &cmd).await
     }
-    // A page script's thrown message lands here: stripped, but not wrapped.
-    .map_err(|e| error(guard::strip(&e.to_string())))?;
-    let now = jiff::Timestamp::now();
-    let session = &args.session;
-    let source = |count: &str| {
-        format!("Source: agent-browser session {session} ({name}, {now}{count}). {UNTRUSTED}")
-    };
+    // A page script's thrown message lands here: guarded like the page text it may quote.
+    .map_err(|e| error(guard::reply(&source, &e.to_string(), "", Scan::Keep)))?;
     if !matches!(args.action, Screenshot) {
         // The agent wrote an eval's script, and there is no archived original to recover a removal from.
         let scan = if matches!(args.action, Eval) {
@@ -372,7 +372,7 @@ impl Server {
         let n = args.max_passages.map_or(8, |n| n.clamp(1, 20)) as usize;
         match search::web(&self.ctx, &args.query, n, &filter, &request).await {
             Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
-            Err(e) => error(e.to_string()),
+            Err(e) => error(guard::strip(&e.to_string())),
         }
     }
 
@@ -393,7 +393,7 @@ impl Server {
         };
         match fetch::get(&self.ctx, &url, FETCH_DEADLINE, opts).await {
             Ok(f) => fetch::render(&self.ctx, &f, images, FETCH_CAP).await,
-            Err(e) => error(format!("Fetching {url} failed: {e}")),
+            Err(e) => error(guard::strip(&format!("Fetching {url} failed: {e}"))),
         }
     }
 
@@ -409,7 +409,7 @@ impl Server {
         let limit = args.limit.unwrap_or(30);
         match rows::run(&self.ctx, &url, args.group, args.item.as_deref(), limit).await {
             Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
-            Err(e) => error(e),
+            Err(e) => error(guard::strip(&e)),
         }
     }
 

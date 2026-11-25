@@ -580,7 +580,8 @@ fn wayback_snapshot_keeps_its_closer() {
     );
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
-    assert!(t.chars().count() <= 30_000, "{}", t.chars().count());
+    let units = t.encode_utf16().count();
+    assert!(units <= 30_000, "{units}");
     let (page, after) = guarded(t);
     assert!(page.contains("paragraph of filler words"), "{t}");
     assert!(

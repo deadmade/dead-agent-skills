@@ -35,6 +35,11 @@ fn long_html(chars: usize, imgs: &[String]) -> String {
     )
 }
 
+/// A reply's length as the client measures it: UTF-16 code units.
+fn units(t: &str) -> usize {
+    t.encode_utf16().count()
+}
+
 fn fetch(mcp: &mut Mcp, url: &str) -> serde_json::Value {
     mcp.call("fetch", json!({ "url": url }))
 }
@@ -193,7 +198,7 @@ fn long_page_capped_at_50k() {
     let mut mcp = Mcp::start();
     let r = fetch(&mut mcp, &fx.url("/long"));
     let t = text(&r);
-    assert!(t.chars().count() <= 50_000, "{}", t.chars().count());
+    assert!(units(t) <= 50_000, "{}", units(t));
     let (body, after) = guarded(t);
     assert!(body.contains("Lorem ipsum"), "{t}");
     let path = after
@@ -207,20 +212,21 @@ fn long_page_capped_at_50k() {
     let md = "word word word.\n\n".repeat(49_990 / 17);
     fx.route("/near", vec![Resp::new(200, "text/markdown", md)]);
     let t = text(&fetch(&mut mcp, &fx.url("/near"))).to_owned();
-    assert!(t.chars().count() <= 50_000, "{}", t.chars().count());
+    assert!(units(&t) <= 50_000, "{}", units(&t));
     assert!(guarded(&t).1.contains("[… truncated: "), "{t}");
 }
 
 #[test]
 fn cap_cut_near_multibyte() {
     let fx = Fixture::start(PUBLIC);
-    let md = format!("{}\n\n", "ü".repeat(499)).repeat(240);
+    // One unbroken run: the cut lands mid-run, not at a paragraph break.
+    let md = "ü".repeat(120_000);
     fx.route("/umlaut", vec![Resp::new(200, "text/markdown", md)]);
     let mut mcp = Mcp::start();
     let r = fetch(&mut mcp, &fx.url("/umlaut"));
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
-    assert!(t.chars().count() <= 50_000, "{}", t.chars().count());
+    assert!(units(t) <= 50_000, "{}", units(t));
     let (body, after) = guarded(t);
     assert!(body.starts_with("üüü"), "{body}");
     assert!(after.starts_with("\n\n[… truncated: "), "{after}");
@@ -237,14 +243,42 @@ fn sentinel_flood_stays_under_the_cap() {
     let r = fetch(&mut mcp, &fx.url("/flood"));
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
-    assert!(t.chars().count() <= 50_000, "{}", t.chars().count());
+    assert!(units(t) <= 50_000, "{}", units(t));
     let (body, after) = guarded(t);
-    // Placeholders outgrow the sentinels they replace, so the re-cut may leave little or nothing of the flood.
-    assert!(
-        body.is_empty() || body.starts_with("[removed by web-mcp: template]"),
-        "{t}"
-    );
+    assert!(body.starts_with("[removed by web-mcp: template]"), "{t}");
+    assert!(body.len() > 10_000, "{}", body.len());
     assert!(after.starts_with("\n\n[… truncated: "), "{after}");
+}
+
+#[test]
+fn astral_page_stays_under_the_cap_in_utf16_units() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        "/astral",
+        vec![Resp::new(200, "text/markdown", "\u{1D400}".repeat(49_000))],
+    );
+    let mut mcp = Mcp::start();
+    let r = fetch(&mut mcp, &fx.url("/astral"));
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(units(t) <= 50_000, "{}", units(t));
+    let (body, after) = guarded(t);
+    assert!(body.starts_with("\u{1D400}"), "{t}");
+    assert!(after.starts_with("\n\n[… truncated: "), "{after}");
+}
+
+#[test]
+fn other_images_follow_the_closer() {
+    let fx = Fixture::start(PUBLIC);
+    gallery(&fx, 9, 6_000);
+    let mut mcp = Mcp::start();
+    let r = mcp.call(
+        "fetch",
+        json!({ "url": fx.url("/gallery"), "images": true }),
+    );
+    let (body, after) = guarded(text(&r));
+    assert!(!body.contains("Other images"), "{body}");
+    assert!(after.starts_with("\n\nOther images: .web/"), "{after}");
 }
 
 #[test]

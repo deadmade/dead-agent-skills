@@ -29,7 +29,7 @@ const MAX_REDIRECTS: usize = 10;
 /// Room in a reply for the nonce markers and for placeholders longer than the sentinels they replace.
 const GUARD_MARGIN: usize = 2_000;
 /// The longest final URL a Source line shows; an absurd one would crowd out the page.
-const SHOWN_URL: usize = 2_000;
+const SHOWN_URL: usize = 300;
 
 #[derive(Clone, Copy)]
 pub struct GetOpts {
@@ -677,28 +677,41 @@ pub async fn render(ctx: &Ctx, f: &Fetched, with_images: bool, cap: usize) -> Ca
     let other_line = (!others.is_empty()).then(|| format!("Other images: {}", others.join(", ")));
     let cut_note =
         format!("[… truncated: the full page is at .web/{full}; it is untrusted page content too]");
-    let fixed = source("").chars().count()
-        + other_line.as_ref().map_or(0, |l| l.chars().count() + 2)
-        + f.note.as_ref().map_or(0, |n| n.chars().count() + 2);
-    let mut limit = cap.saturating_sub(fixed + GUARD_MARGIN);
-    let mut text = String::new();
-    // Placeholders can outgrow the sentinels they replace: a reply still over the cap is cut again, at most twice.
-    for _ in 0..3 {
-        let (md, cut) = truncate(&f.page.markdown, limit);
-        let notes: Vec<&str> = [
+    let notes = |cut: bool| {
+        [
             other_line.as_deref(),
             f.note.as_deref(),
             cut.then_some(cut_note.as_str()),
         ]
         .into_iter()
         .flatten()
-        .collect();
-        text = guard::reply(&source, md, &notes.join("\n\n"), Scan::Remove);
-        let over = text.chars().count().saturating_sub(cap);
-        if over == 0 {
+        .collect::<Vec<_>>()
+        .join("\n\n")
+    };
+    // The client's cap counts UTF-16 code units (JavaScript's `length`); `truncate` counts chars.
+    let units = |t: &str| t.encode_utf16().count();
+    let fixed = units(&source(""))
+        + other_line.as_deref().map_or(0, |l| units(l) + 2)
+        + f.note.as_deref().map_or(0, |n| units(n) + 2);
+    let mut limit = cap.saturating_sub(fixed + GUARD_MARGIN);
+    let mut text = String::new();
+    // Placeholders can outgrow the sentinels they replace, and astral characters count twice: a reply still over
+    // the cap is cut again, at most twice; first in proportion, then by the excess.
+    for pass in 0..3 {
+        let (md, cut) = truncate(&f.page.markdown, limit);
+        text = guard::reply(&source, md, &notes(cut), Scan::Remove);
+        let len = units(&text);
+        if len <= cap {
             break;
         }
-        limit = limit.saturating_sub(over + 1_000);
+        limit = if pass == 0 {
+            (limit * cap / len).saturating_sub(1_000)
+        } else {
+            limit.saturating_sub(len - cap + 1_000)
+        };
+    }
+    if units(&text) > cap {
+        text = guard::reply(&source, "", &notes(true), Scan::Remove);
     }
     let mut content = vec![ContentBlock::text(text)];
     content.extend(blocks);
@@ -976,7 +989,8 @@ pub(crate) mod tests {
         };
         let r = render(&ctx, &f, false, 50_000).await;
         let t = &r.content[0].as_text().unwrap().text;
-        assert!(t.chars().count() <= 50_000, "{}", t.chars().count());
+        let units = t.encode_utf16().count();
+        assert!(units <= 50_000, "{units}");
     }
 
     #[tokio::test]
