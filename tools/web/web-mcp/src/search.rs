@@ -128,8 +128,19 @@ impl Filter {
     }
 }
 
+/// The session key of `e`'s tab.
+pub fn tab(e: Engine) -> String {
+    format!("search-{}", e.name())
+}
+
+/// Binds the tabs of `run`'s engines that aren't bound yet, before any of them navigates (`Browser::bind`).
+pub async fn bind(ctx: &Ctx, run: &[Engine]) {
+    let keys: Vec<String> = run.iter().map(|&e| tab(e)).collect();
+    ctx.browser.bind(&keys).await;
+}
+
 /// One engine's result page for `query`, read in its tab of the window within `budget` of winning the engine's turn;
-/// the caller warmed the window first.
+/// the caller warmed the window and bound the tabs first.
 ///
 /// A follow-up search (see `types`) types its query into the result page the tab already holds, as a person would;
 /// when typing fails or lands on another query, the same search loads the result URL instead, and nothing rests.
@@ -172,7 +183,7 @@ pub async fn run_engine(
     if let Some(why) = resting() {
         return Err(why);
     }
-    let session = format!("search-{}", e.name());
+    let session = tab(e);
     let url = e.url(query, since);
     let typed = match e.search_box() {
         Some(sel) if types(e, prev.as_deref(), query, since) => {
@@ -510,6 +521,7 @@ pub async fn web(
             .warm()
             .await
             .map_err(|e| SearchError::Failed(e.to_string()))?;
+        bind(ctx, &run).await;
         let outcomes = join_all(run.iter().map(|&e| async move {
             let got = run_engine(ctx, e, query, f.since, ENGINE_DEADLINE, request).await;
             (e, got)

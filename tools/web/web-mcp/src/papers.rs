@@ -13,7 +13,7 @@ use url::Url;
 use crate::Ctx;
 use crate::archive::Item;
 use crate::engines::{Engine, Found};
-use crate::search::{Filter, Since, run_engine};
+use crate::search::{Filter, Since, bind, run_engine};
 
 /// Records asked of a list query.
 const LIMIT: &str = "5";
@@ -653,6 +653,7 @@ async fn engines(
     // The window starts before the engines' deadline; the API sources don't wait for it.
     match ctx.browser.warm().await {
         Ok(()) => {
+            bind(ctx, &run).await;
             out.extend(
                 futures::future::join_all(run.into_iter().map(|e| async move {
                     let got =

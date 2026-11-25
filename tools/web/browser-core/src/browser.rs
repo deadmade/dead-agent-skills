@@ -185,6 +185,9 @@ fn loopback_client() -> Option<reqwest::Client> {
 }
 /// How long a `close` may take.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How long `bind` waits for one tab: it runs before the engines' deadlines start, so it adds to the search.
+const BIND_TIMEOUT: Duration = Duration::from_secs(2);
 /// What a search batch keeps back from the daemon's wait for everything else: web-mcp-search/findings.md measured ~1 s
 /// of process start, `open` and reads beyond the wait (3000/8000 ms waits: 4.0/8.9 s calls) and up to 2 s for a whole
 /// warm batch, so 2 s lets a page that never gets ready still be read inside the deadline.
@@ -325,6 +328,40 @@ impl Browser {
     /// When there is no search folder, browser or extension, or the owner fails.
     pub async fn warm(&self) -> Result<(), BrowserError> {
         self.live(true).await.map(drop)
+    }
+
+    /// Binds each of `keys`' tabs that no call has run in this window yet, all at once, each within `BIND_TIMEOUT`,
+    /// after `warm` and before any of them navigates: a session's first call waits on another tab's pending page
+    /// load in agent-browser 0.43.0 (measured: 4 s headless, 10 s and more in the window). A tab that doesn't bind is
+    /// left to its first call, as before. The window's lock, held throughout, keeps a second caller from running any
+    /// of these keys before their binds end: it waits, then finds them run.
+    ///
+    /// # Panics
+    /// When another thread panicked holding the window or session lock.
+    pub async fn bind(&self, keys: &[String]) {
+        let _window = self.window.hold().await;
+        let live = self.live.lock().expect("window").clone();
+        let (Some(live), Ok(config)) = (live, self.window.attach_config()) else {
+            return;
+        };
+        let fresh: Vec<String> = {
+            let mut ran = self.ran.lock().expect("sessions");
+            keys.iter()
+                .map(|k| name(k, live.r#gen))
+                .filter(|s| ran.insert(s.clone(), live.r#gen).is_none())
+                .collect()
+        };
+        let via = Via::Tab {
+            config: &config,
+            cdp: &live.url,
+        };
+        let get_url = ["get".to_owned(), "url".to_owned()];
+        futures::future::join_all(
+            fresh
+                .iter()
+                .map(|s| tokio::time::timeout(BIND_TIMEOUT, self.run_with(s, &get_url, None, via))),
+        )
+        .await;
     }
 
     /// The window: the one last seen unless `fresh` (or none was), else the owner's answer now. A newer generation

@@ -51,6 +51,11 @@ impl Window {
             .attach_config()
     }
 
+    /// Waits for, and holds, the lock every start and owner call of the window takes.
+    pub(crate) async fn hold(&self) -> tokio::sync::MutexGuard<'_, Option<(PathBuf, Live)>> {
+        self.state.lock().await
+    }
+
     /// The window's generation and cdp url, starting it on the first call.
     ///
     /// # Errors

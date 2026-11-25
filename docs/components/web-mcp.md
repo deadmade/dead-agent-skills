@@ -17,6 +17,9 @@ tab's `click`/`press`, agent-browser's install and a Windows Chrome quirk).
 The browser, window and profile code (the agent-browser driver, the one window, the profile slots and the cookie
 extension download) lives in the `tools/web/browser-core/` library crate, which web-mcp depends on
 (`docs/components/browser-core.md`). The search policy (engines, their turns, rests and deadlines) stays here.
+`search` and `papers` bind their engines' tabs (`Browser::bind`) after the window starts and before any engine
+navigates: in agent-browser a tab's first call waits on another tab's pending page, so one hanging engine would
+otherwise time the others out on a fresh window.
 
 `rows` opens its pages as a tab of that window too, holds a 1 s gap per host, and its group detection is tested on
 captured pages in `tests/fixtures/rows/` (`docs/adr/0013-rows-tool-and-shop-skill.md`). Its tree walk is bounded by a
