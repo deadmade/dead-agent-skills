@@ -64,7 +64,7 @@ implement
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
 ├ flows: diagrams
 ├ mattpocock-picks: setup-matt-pocock-skills
-├ pstack-picks: blast-radius, how, interrogate, why
+├ pstack-picks: how, interrogate, why
 ├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees
 └ web-mcp: fetch
