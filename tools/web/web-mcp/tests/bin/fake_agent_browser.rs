@@ -5,7 +5,8 @@
 //! `$FAKE_AB_PAGES` when that is set (see `engine_page`); so does a batch opening any other host, from the file
 //! `<last path segment of the URL>.html` there when it exists (else the canned page). A file `<engine>.landed` there
 //! (another host: `<last path segment>.landed`) holds the URL its `get url` answers (`engine_landed`), else it
-//! answers the opened one. A batch with an `open` stores its URL in
+//! answers the opened one, and a file `<last path segment>.status` the number its `eval` of the navigation's
+//! `responseStatus` answers (else 200). A batch with an `open` stores its URL in
 //! `<state>/<session>.url`: the session's tab keeps that page, so a batch without an `open` answers for the stored
 //! URL (its `engine_page`, its `get url`, the host lookups and `wait` failures keyed on the URL), and `tab new`
 //! removes it (a blank tab). `get cdp-url` answers `ws://127.0.0.1:<port>/devtools/browser/<chrome>`, `<chrome>` being
@@ -177,6 +178,8 @@ fn batch(stdin: &str, state: &Path, session: &str, tab_gone: bool, bail: bool) -
             json!({"command": c, "success": false, "result": null, "error": e})
         } else if c[0] == "wait" && wait_fails(url, c, stuck) {
             json!({"command": c, "success": false, "result": null, "error": "timed out"})
+        } else if c[0] == "eval" && c.get(1).is_some_and(|js| js.contains("responseStatus")) {
+            json!({"command": c, "success": true, "result": {"result": page_status(url)}})
         } else if let Some(answer) = eval_literal(c) {
             match answer {
                 Ok(v) => json!({"command": c, "success": true, "result": {"result": v}}),
@@ -453,6 +456,18 @@ fn engine_landed(url: &str) -> Option<String> {
     };
     let url = std::fs::read_to_string(pages_dir()?.join(name)).ok()?;
     Some(url.trim().to_owned())
+}
+
+/// The navigation status an `eval` of `responseStatus` answers for `url`: the number in
+/// `$FAKE_AB_PAGES/<last path segment of url>.status`, else 200.
+fn page_status(url: &str) -> u64 {
+    let name = url::Url::parse(url)
+        .ok()
+        .and_then(|u| u.path_segments()?.next_back().map(str::to_owned));
+    name.zip(pages_dir())
+        .and_then(|(n, d)| std::fs::read_to_string(d.join(format!("{n}.status"))).ok())
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(200)
 }
 
 /// `$FAKE_AB_PAGES`.

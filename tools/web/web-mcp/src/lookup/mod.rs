@@ -92,6 +92,11 @@ pub fn pretty(body: &str) -> String {
         .unwrap_or_else(|| body.to_owned())
 }
 
+/// Where a reply failed to parse, without serde's message: a wrong-shape error quotes the reply's own strings.
+pub fn json_error(e: &serde_json::Error) -> String {
+    format!("line {}, column {}", e.line(), e.column())
+}
+
 pub fn deadline(ctx: &Ctx, default: Duration) -> Duration {
     ctx.cfg.lookup_deadline.unwrap_or(default)
 }

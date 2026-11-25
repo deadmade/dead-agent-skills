@@ -66,26 +66,30 @@ pub struct Fetched {
 
 #[derive(Clone, Debug)]
 pub enum FetchError {
-    Status(u16),
+    /// A non-success status, and whether its body was HTML (only an HTML refusal is retried in the browser).
+    Status {
+        code: u16,
+        html: bool,
+    },
     TooLarge,
     UnsupportedType(String),
     Timeout,
     Network(String),
-    /// A private-network target that this fetch may not reach.
+    /// A private-network target that this fetch may not reach, by host: a redirect's path is the server's text.
     Blocked(String),
 }
 
 impl fmt::Display for FetchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Status(c) => write!(f, "HTTP {c}"),
+            Self::Status { code, .. } => write!(f, "HTTP {code}"),
             Self::TooLarge => write!(f, "the response is larger than 20 MB"),
             Self::UnsupportedType(t) => write!(f, "unsupported content type: {t}"),
             Self::Timeout => write!(f, "the download timed out"),
             Self::Network(m) => f.write_str(m),
-            Self::Blocked(u) => write!(
+            Self::Blocked(host) => write!(
                 f,
-                "{u} is a private-network address, which this fetch may not reach"
+                "{host} is a private-network address, which this fetch may not reach"
             ),
         }
     }
@@ -93,6 +97,21 @@ impl fmt::Display for FetchError {
 
 fn net(e: impl fmt::Display) -> FetchError {
     FetchError::Network(e.to_string())
+}
+
+fn blocked(url: &Url) -> FetchError {
+    FetchError::Blocked(url.host_str().unwrap_or_default().to_owned())
+}
+
+/// The longest content type an error shows.
+const SHOWN_TYPE: usize = 100;
+
+/// A server's content type as an error may show it: its token characters only, at most `SHOWN_TYPE` of them.
+fn shown_type(mime: &str) -> String {
+    mime.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || "!#$&^_.+/-".contains(*c))
+        .take(SHOWN_TYPE)
+        .collect()
 }
 
 /// The HTTP client. It follows no redirects (`send` does, checking each hop). With `public_only`
@@ -152,7 +171,7 @@ fn send_error(url: &Url, e: &reqwest::Error) -> FetchError {
     let mut src: Option<&(dyn std::error::Error + 'static)> = Some(e);
     while let Some(err) = src {
         if err.is::<OnlyPrivate>() {
-            return FetchError::Blocked(url.to_string());
+            return blocked(url);
         }
         src = err.source();
     }
@@ -199,9 +218,10 @@ pub async fn get(
                 let until = tokio::time::Instant::now() + deadline;
                 match run(ctx, url, deadline, opts).await {
                     // Only `download` answers a status; only the user's own `fetch` retries, as in `wants_fallback`.
-                    Err(FetchError::Status(s @ (403 | 503)))
-                        if opts.browser_fallback && opts.allow_private =>
-                    {
+                    Err(FetchError::Status {
+                        code: s @ (403 | 503),
+                        html: true,
+                    }) if opts.browser_fallback && opts.allow_private => {
                         blocked_in_browser(ctx, url, s, until).await
                     }
                     r => r,
@@ -280,7 +300,7 @@ fn classify(headers: &HeaderMap) -> Result<Kind, FetchError> {
             Ok(Kind::Json)
         }
         "" => Err(FetchError::UnsupportedType("none given".into())),
-        m => Err(FetchError::UnsupportedType(m.to_owned())),
+        m => Err(FetchError::UnsupportedType(shown_type(m))),
     }
 }
 
@@ -342,9 +362,9 @@ async fn run(
                 // A private page that this fetch may not reach was refused in `download` already.
                 if wants_fallback(opts, &page) {
                     let why = "(This page looks empty without JavaScript, and the browser fallback";
-                    let within = ctx.browser.fallback_deadline;
-                    match browser_page(ctx, &final_url, opts.allow_private, why, within).await {
-                        Ok((html, _)) => {
+                    let (within, allow) = (ctx.browser.fallback_deadline, opts.allow_private);
+                    match browser_page(ctx, &final_url, allow, why, within, false).await {
+                        Ok((html, ..)) => {
                             let h = html.clone();
                             page = blocking(Box::new(move || extract_html(&h, &base))).await?;
                             rendered = Some(html);
@@ -404,32 +424,42 @@ fn wants_fallback(opts: GetOpts, page: &Page) -> bool {
     opts.browser_fallback && opts.allow_private && near_empty(page)
 }
 
-/// A public site's 403 or 503 to the plain request (often a bot check), loaded once in the browser tab after
-/// the host's request slot. A failed or near-empty rendering keeps the status, with the browser's reason; a
-/// private or loopback host's status is its real answer and stays as it is. The browser gets what is left of the
-/// fetch's deadline (`until`); with nothing left the status stays too.
+/// A public site's 403 or 503 HTML page to the plain request (often a bot check), loaded once in the browser tab
+/// after the host's request slot. A failed or near-empty rendering keeps the status, with the browser's reason, and
+/// so does a load the browser got 400 or more for too (a real refusal, not a check the browser passed); a status the
+/// browser can't tell counts as passed. A private or loopback host's status is its real answer and stays as it is.
+/// The browser gets what is left of the fetch's deadline (`until`); with nothing left the status stays too.
 async fn blocked_in_browser(
     ctx: &Ctx,
     url: &Url,
     status: u16,
     until: tokio::time::Instant,
 ) -> Result<Fetched, FetchError> {
+    let refused = FetchError::Status {
+        code: status,
+        html: true,
+    };
     if private_landing(url).await {
-        return Err(FetchError::Status(status));
+        return Err(refused);
     }
     let why = format!("(The plain request got HTTP {status}, and the browser");
-    let (html, landed) = {
+    let (html, landed, got) = {
         let _slot = ctx.limits.acquire(url).await;
         let left = until
             .saturating_duration_since(tokio::time::Instant::now())
             .min(ctx.browser.fallback_deadline);
         if left.is_zero() {
-            return Err(FetchError::Status(status));
+            return Err(refused);
         }
-        browser_page(ctx, url, false, &why, left)
+        browser_page(ctx, url, false, &why, left, true)
             .await
             .map_err(FetchError::Network)?
     };
+    if let Some(got) = got.filter(|c| *c >= 400) {
+        return Err(FetchError::Network(format!(
+            "HTTP {status}, and the browser got HTTP {got} too"
+        )));
+    }
     let page = {
         let (h, base) = (html.clone(), landed.clone());
         tokio::task::spawn_blocking(move || extract_html(&h, &base))
@@ -468,27 +498,35 @@ async fn blocked_in_browser(
     })
 }
 
-/// The page rendered by agent-browser. The browser follows redirects on its own, so where it ended
-/// is checked like a fetch hop: a landing on a private address is dropped unless `allow_private`.
-/// The `Err` is a note for the reader, opened by `why` (the reason the browser was asked).
+/// The page rendered by agent-browser, where it ended and, when `status` asks for it, the HTTP status of its load
+/// (`None`: not asked, or unknown). The browser follows redirects on its own, so where it ended is checked like a
+/// fetch hop: a landing on a private address is dropped unless `allow_private`. The `Err` is a note for the reader,
+/// opened by `why` (the reason the browser was asked); it names a private landing by host only, as the redirect's
+/// path is the server's text.
 async fn browser_page(
     ctx: &Ctx,
     url: &Url,
     allow_private: bool,
     why: &str,
     deadline: Duration,
-) -> Result<(String, Url), String> {
-    let (html, landed) = ctx
-        .browser
-        .rendered_html(url, deadline)
-        .await
-        .map_err(|e| format!("{why} failed: {e})"))?;
+    status: bool,
+) -> Result<(String, Url, Option<u16>), String> {
+    let rendered = if status {
+        ctx.browser.rendered_page(url, deadline).await
+    } else {
+        ctx.browser
+            .rendered_html(url, deadline)
+            .await
+            .map(|(html, landed)| (html, landed, None))
+    };
+    let (html, landed, status) = rendered.map_err(|e| format!("{why} failed: {e})"))?;
     if !allow_private && private_landing(&landed).await {
+        let host = landed.host_str().unwrap_or_default();
         return Err(format!(
-            "{why} ended on {landed}, a private-network address this fetch may not reach, so its content was dropped.)"
+            "{why} ended on {host}, a private-network address this fetch may not reach, so its content was dropped.)"
         ));
     }
-    Ok((html, landed))
+    Ok((html, landed, status))
 }
 
 /// Private by URL or by any resolved address; unresolvable counts as private.
@@ -519,7 +557,8 @@ async fn download(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<Download,
             continue;
         }
         if !resp.status().is_success() {
-            return Err(FetchError::Status(status));
+            let html = matches!(classify(resp.headers()), Ok(Kind::Html));
+            return Err(FetchError::Status { code: status, html });
         }
         let kind = classify(resp.headers())?;
         let body = read_capped(resp, MAX_BODY)
@@ -547,17 +586,21 @@ async fn send(
     let (mut url, mut private) = (url.clone(), false);
     for _ in 0..=MAX_REDIRECTS {
         if !matches!(url.scheme(), "http" | "https") {
-            return Err(net(format!("refusing to follow a redirect to {url}")));
+            // The scheme alone: the rest of a `Location` is the server's text.
+            let scheme: String = url.scheme().chars().take(32).collect();
+            return Err(net(format!(
+                "refusing to follow a redirect to a {scheme}: URL"
+            )));
         }
         let resolved = if proxy || !allow_private {
             resolve(&url).await
         } else {
             None
         };
-        let blocked = |r: Option<&[IpAddr]>| {
+        let refused = |r: Option<&[IpAddr]>| {
             is_private(&url) || r.is_none_or(|r| r.iter().any(|ip| is_private_ip(*ip)))
         };
-        if !allow_private && blocked(resolved.as_deref()) {
+        if !allow_private && refused(resolved.as_deref()) {
             // A name that doesn't resolve is a dead link, not a private address (it stays refused either way).
             if resolved.is_none() && !is_private(&url) {
                 return Err(net(format!(
@@ -565,7 +608,7 @@ async fn send(
                     url.host_str().unwrap_or("")
                 )));
             }
-            return Err(FetchError::Blocked(url.to_string()));
+            return Err(blocked(&url));
         }
         let permit = ctx.limits.acquire(&url).await;
         // shortcut: behind a proxy the proxy resolves the name, so DNS rebinding isn't closed there.
@@ -583,7 +626,7 @@ async fn send(
         let peer = resp.remote_addr().map(|a| a.ip());
         let hop_private = private_target(&url, peer, resolved.as_deref(), proxy);
         if hop_private && !allow_private {
-            return Err(FetchError::Blocked(url.to_string()));
+            return Err(blocked(&url));
         }
         private |= hop_private;
         // A public address must not hand the fetch to a private one the caller never named.
@@ -1050,11 +1093,12 @@ pub(crate) mod tests {
         let ctx = test_ctx_with(&fake.to_string_lossy());
         let url = Url::parse("http://example.com/redirect-private").unwrap();
         let within = ctx.browser.fallback_deadline;
-        let dropped = browser_page(&ctx, &url, false, "(Why", within)
+        let dropped = browser_page(&ctx, &url, false, "(Why", within, false)
             .await
             .unwrap_err();
-        assert!(dropped.contains("http://127.0.0.1/admin"), "{dropped}");
-        let (own, _) = browser_page(&ctx, &url, true, "(Why", within)
+        assert!(dropped.contains("ended on 127.0.0.1,"), "{dropped}");
+        assert!(!dropped.contains("/admin"), "{dropped}");
+        let (own, ..) = browser_page(&ctx, &url, true, "(Why", within, false)
             .await
             .unwrap();
         assert!(own.contains("Rendered page for"), "{own}");

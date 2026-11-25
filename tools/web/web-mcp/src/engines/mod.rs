@@ -384,6 +384,33 @@ mod tests {
         }
     }
 
+    #[test]
+    fn every_engine_waits_for_the_page_to_finish_parsing() {
+        // A streamed result page shows its first results before the rest has arrived.
+        for e in Engine::ALL {
+            let js = e.ready_js();
+            assert!(
+                js.starts_with("!!(\n  document.readyState !== 'loading' &&"),
+                "{e:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_challenge_that_clears_itself_does_not_end_the_wait() {
+        // Semantic Scholar's challenge container and Bing's Turnstile frame clear on their own: the wait sits them out.
+        assert!(
+            !Engine::SemanticScholar
+                .ready_js()
+                .contains("#challenge-container")
+        );
+        assert!(
+            !Engine::Bing
+                .ready_js()
+                .contains("challenges.cloudflare.com")
+        );
+    }
+
     /// A page captured in `tests/fixtures/engines/`.
     fn fixture(name: &str) -> String {
         let path = format!(

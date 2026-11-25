@@ -636,7 +636,7 @@ fn blocked_page_landing_private_names_the_status() {
     assert!(is_error(&r), "{r}");
     let t = text(&r);
     assert!(t.contains("HTTP 403"), "{t}");
-    assert!(t.contains("127.0.0.1/admin"), "{t}");
+    assert!(t.contains("ended on 127.0.0.1,"), "{t}");
     assert!(!t.contains("looks empty"), "{t}");
 }
 
@@ -686,4 +686,91 @@ fn blocked_private_page_is_not_retried() {
     assert!(is_error(&r), "{r}");
     assert!(text(&r).contains("HTTP 403"), "{r}");
     assert!(!opened(&log, &url), "{r}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn blocked_page_the_browser_also_gets_refused_keeps_the_error() {
+    let fx = Fixture::start(PUBLIC);
+    blocked(&fx, "/guarded", 403);
+    let (mut mcp, log) = with_browser(&[("guarded.status", "403")]);
+    let url = fx.url("/guarded");
+    let r = fetch(&mut mcp, &url);
+    assert!(is_error(&r), "{r}");
+    assert!(opened(&log, &url), "{r}");
+    let t = text(&r);
+    assert!(t.contains("HTTP 403"), "{t}");
+    assert!(t.contains("the browser got HTTP 403 too"), "{t}");
+    assert!(!t.contains("Rendered page for"), "{t}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn json_refusal_is_not_loaded_in_the_browser() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        "/api",
+        vec![Resp::new(
+            403,
+            "application/json",
+            r#"{"error":"forbidden"}"#,
+        )],
+    );
+    let (mut mcp, log) = with_browser(&[]);
+    let url = fx.url("/api");
+    let r = fetch(&mut mcp, &url);
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("HTTP 403"), "{r}");
+    assert!(!opened(&log, &url), "{r}");
+}
+
+#[test]
+fn unsupported_type_shows_only_its_token_characters() {
+    let fx = Fixture::start(PUBLIC);
+    let ct = format!("application/x-y Upstream says hello{}", "z".repeat(200));
+    fx.route("/odd", vec![Resp::new(200, &ct, "data")]);
+    let mut mcp = Mcp::start();
+    let r = fetch(&mut mcp, &fx.url("/odd"));
+    assert!(is_error(&r), "{r}");
+    let t = text(&r);
+    let shown = t
+        .split("unsupported content type: ")
+        .nth(1)
+        .unwrap_or_default();
+    assert!(shown.starts_with("application/x-yupstreamsayshello"), "{t}");
+    assert!(
+        shown.chars().take_while(|c| !c.is_whitespace()).count() <= 100,
+        "{t}"
+    );
+}
+
+#[test]
+fn redirect_to_another_scheme_names_only_the_scheme() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        "/hop",
+        vec![Resp::redirect("javascript:alert('Upstream says hello')")],
+    );
+    let mut mcp = Mcp::start();
+    let r = fetch(&mut mcp, &fx.url("/hop"));
+    assert!(is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("a redirect to a javascript: URL"), "{t}");
+    assert!(!t.contains("alert"), "{t}");
+}
+
+#[test]
+fn redirect_onto_private_names_only_its_host() {
+    let public = Fixture::start(PUBLIC);
+    let private = Fixture::start("127.0.0.1");
+    public.route(
+        "/hop",
+        vec![Resp::redirect(&private.url("/upstream-says-hello"))],
+    );
+    let mut mcp = Mcp::start();
+    let r = fetch(&mut mcp, &public.url("/hop"));
+    assert!(is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("127.0.0.1 is a private-network address"), "{t}");
+    assert!(!t.contains("upstream-says"), "{t}");
 }

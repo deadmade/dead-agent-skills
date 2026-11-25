@@ -91,7 +91,8 @@ async fn ask(ctx: &Ctx, target: &str) -> Result<Part, String> {
     let rows: Vec<Vec<String>> = if got.body.trim().is_empty() {
         Vec::new()
     } else {
-        serde_json::from_str(&got.body).map_err(|e| format!("not a JSON list of rows ({e})"))?
+        serde_json::from_str(&got.body)
+            .map_err(|e| format!("not a JSON list of rows ({})", super::json_error(&e)))?
     };
     // The first row is the header.
     let shown = rows

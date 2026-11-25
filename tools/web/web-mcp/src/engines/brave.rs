@@ -7,6 +7,7 @@ use url::Url;
 use super::{Found, Parsed, Since, captcha_if, first_text, row, verdict};
 
 pub(super) const READY: &str = r#"!!(
+  document.readyState !== 'loading' &&
   document.body &&
   (document.querySelector('.snippet[data-type="web"]') ||
     /No results found|Not many great matches/.test(

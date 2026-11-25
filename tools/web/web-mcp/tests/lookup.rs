@@ -612,6 +612,47 @@ fn wayback_at_refuses_dot_segment_escape() {
     assert_eq!(fx.hits("/cdx?url=a"), 0);
 }
 
+#[cfg(debug_assertions)]
+#[test]
+fn wayback_reply_of_the_wrong_shape_does_not_echo_it() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        CDX_PATH,
+        vec![Resp::new(
+            200,
+            "application/json",
+            r#""Upstream says hello""#,
+        )],
+    );
+    let mut mcp = wayback_start(&fx);
+    let r = mcp.call(
+        "lookup",
+        json!({"kind": "wayback", "target": "example.com"}),
+    );
+    let t = text(&r);
+    assert!(t.contains("not a JSON list of rows"), "{t}");
+    assert!(!t.contains("Upstream says"), "{t}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn certs_reply_of_the_wrong_shape_does_not_echo_it() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        CERTS_PATH,
+        vec![Resp::new(
+            200,
+            "application/json",
+            r#""Upstream says hello""#,
+        )],
+    );
+    let mut mcp = certs_start(&fx, None);
+    let r = certs(&mut mcp, "example.com");
+    let t = text(&r);
+    assert!(t.contains("not a JSON list"), "{t}");
+    assert!(!t.contains("Upstream says"), "{t}");
+}
+
 #[test]
 fn wayback_at_must_be_digits() {
     let fx = Fixture::start(PUBLIC);
