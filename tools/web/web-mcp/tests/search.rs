@@ -32,6 +32,16 @@ fn loads(mcp: &Mcp, e: engines::Engine, query: &str, since: Option<engines::Sinc
         .hits(&format!("{}?{}", u.path(), u.query().unwrap()))
 }
 
+/// Starts `mcp`'s window with a `rows` call on a page of its own, so a timed search after it pays no window start
+/// and no engine's tab is bound yet.
+fn warm(mcp: &mut Mcp) {
+    let page = "<!doctype html><title>Warm</title><p>Warm.</p>";
+    mcp.results().route("/warm", vec![Resp::html(page)]);
+    let url = mcp.results().url("/warm");
+    mcp.call("rows", json!({"url": url}));
+    assert_eq!(mcp.results().hits("/warm"), 1);
+}
+
 /// The saved records of `mcp`'s searches.
 fn records(mcp: &Mcp) -> Vec<Value> {
     std::fs::read_dir(mcp.run_dir().join("searches"))
@@ -253,6 +263,65 @@ fn four_engines_fuse_into_one_answer_and_record() {
     assert_eq!(loads(&mcp, engines::Engine::Bing, q, year), 1);
 }
 
+/// The top results a search fetches name the ones it couldn't read: a result on a private address is refused without
+/// a request, one slower than the 3 s wait and one that fails are listed, the failing one with the fetch hint.
+#[cfg(debug_assertions)]
+#[test]
+fn unread_results_are_named_and_a_private_one_is_never_asked() {
+    use engines::{Engine, Parsed};
+    let q = captured_query("bing");
+    let html = std::fs::read_to_string(format!(
+        "{}/tests/fixtures/engines/bing.html",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let Parsed::Results(rows) = Engine::Bing.parse(&html, &Engine::Bing.url(q, None)) else {
+        panic!("the capture parses as no rows");
+    };
+    let mut mcp = Mcp::start_real(&["bing"]);
+    let [private_row, slow, failing] = [0, 1, 2].map(|i| mcp.stand_in(&rows[i].url));
+    let path = |u: &str| url::Url::parse(u).unwrap().path().to_owned();
+    let late =
+        Resp::html("<!doctype html><title>Late</title><p>Late.</p>").delay(Duration::from_secs(6));
+    mcp.results().route(&path(&slow), vec![late]);
+    mcp.results()
+        .route(&path(&failing), vec![Resp::new(404, "text/plain", "")]);
+    // The first result leads to the user's own network instead of its stand-in.
+    let private = Fixture::start("127.0.0.1");
+    private.route(
+        "/p",
+        vec![Resp::html(
+            "<!doctype html><title>Private</title><p>Private.</p>",
+        )],
+    );
+    let mut page = mcp.page("bing");
+    let body = String::from_utf8(page.body).unwrap();
+    let href = format!("href=\"{private_row}\"");
+    assert!(body.contains(&href), "{href}");
+    page.body = body
+        .replace(&href, &format!("href=\"{}\"", private.url("/p")))
+        .into_bytes();
+    mcp.serve("bing", vec![page]);
+    let r = search(&mut mcp, json!({"query": q, "engines": "bing"}));
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        t.contains(&format!(
+            "\n\nNot fetched within 3 s: {slow}\n\nNot fetched: {failing} (HTTP 404)\nTry those with the fetch tool"
+        )),
+        "{t}"
+    );
+    assert!(
+        t.ends_with(&format!(
+            "\n\nRefused (private address): {}",
+            private.url("/p")
+        )),
+        "{t}"
+    );
+    assert_eq!(private.hits("/p"), 0);
+    assert_eq!(mcp.results().hits(&path(&failing)), 1);
+}
+
 /// A follow-up search types its query into the engine's result page; when it can't (no search box, a form that
 /// never submits) the same search loads the result URL, and typing that stalls times the engine out without a
 /// second load. None of it rests the engine.
@@ -361,6 +430,54 @@ fn a_captcha_rests_its_engine_and_the_others_answer() {
     );
 }
 
+/// Brave's own bot check ("Verifying you're not a bot") is a captcha too: it rests Brave and the others answer.
+#[cfg(debug_assertions)]
+#[test]
+fn brave_s_bot_check_rests_brave() {
+    let mut mcp = Mcp::start_real(&["brave", "bing"]);
+    let check = mcp.page("brave-captcha");
+    mcp.serve("brave", vec![check]);
+    let r = search(&mut mcp, json!({"query": "zebra", "engines": "bing,brave"}));
+    let line = first_line(text(&r));
+    assert!(
+        line.starts_with("Source: bing (skipped: brave: captcha (.web/"),
+        "{line}"
+    );
+    assert!(mcp.search.join("brave/rest").exists());
+}
+
+/// A captcha met by typing a follow-up rests the engine at once, without loading the result URL as well. Not on
+/// Google, whose capture types into a `<textarea>` that only its own (blocked) scripts submit.
+#[cfg(debug_assertions)]
+#[test]
+#[ignore = "flaky in a headed window (3 of ~140 runs, about 1%): the click and keys miss the search box and focus \
+            stays on the body, so the search loads the URL; suspected a focus race after the tab's raise"]
+fn a_typed_follow_up_that_meets_a_captcha_rests_without_a_load() {
+    use engines::Engine::DuckDuckGo;
+    let mut mcp = Mcp::start_real(&["duckduckgo"]);
+    let pages = vec![mcp.page("duckduckgo"), mcp.page("duckduckgo-captcha")];
+    mcp.serve("duckduckgo", pages);
+    let r = search(
+        &mut mcp,
+        json!({"query": captured_query("duckduckgo"), "engines": "duckduckgo"}),
+    );
+    assert!(
+        first_line(text(&r)).starts_with("Source: duckduckgo (searched "),
+        "{r}"
+    );
+    let r = search(
+        &mut mcp,
+        json!({"query": "zebra stripes", "engines": "duckduckgo"}),
+    );
+    assert!(is_error(&r), "{r}");
+    assert!(
+        text(&r).starts_with("No engine answered: duckduckgo: captcha (.web/"),
+        "{r}"
+    );
+    assert!(mcp.search.join("duckduckgo/rest").exists());
+    assert_eq!(loads(&mcp, DuckDuckGo, "zebra stripes", None), 0);
+}
+
 /// A first consent page waits its search out within the deadline and rests nothing; the next search reads the
 /// results. A consent page met twice in a row counts as blocked.
 #[cfg(debug_assertions)]
@@ -378,6 +495,7 @@ fn consent_clears_by_the_next_search_unless_it_comes_back() {
     mcp.serve("google", pages);
     let seen = mcp.search.join("profiles/1/google/consent-seen");
     let q = json!({"query": captured_query("google"), "engines": "google"});
+    warm(&mut mcp);
     let t0 = Instant::now();
     let r = search(&mut mcp, q.clone());
     // A wall never gets ready: the wait runs out (8 s of the 10) before the page is read.
@@ -403,8 +521,10 @@ fn consent_clears_by_the_next_search_unless_it_comes_back() {
     assert!(!seen.exists());
 }
 
-/// An engine that never answers in time and one whose host refuses the connection are skipped with Chrome's own
-/// reason, without holding up the others and without rest.
+/// An engine that never answers in time and one whose host refuses the connection are skipped, the refused one with
+/// Chrome's own reason, without holding up the others and without rest. The slow one runs first, with every tab still
+/// unbound (`Browser::bind`); the refused one runs once the slow page is gone, because next to a loading page
+/// agent-browser reports a refusal only after about 8.4 s of the 10 s deadline (measured).
 #[cfg(debug_assertions)]
 #[test]
 fn slow_and_offline_engines_are_skipped_without_rest() {
@@ -412,20 +532,26 @@ fn slow_and_offline_engines_are_skipped_without_rest() {
     let offline = format!("duckduckgo=http://{}", closed.local_addr().unwrap());
     drop(closed);
     let mut mcp = Mcp::start_real_with(&["bing", "brave"], &[("WEB_MCP_TEST_ENGINES", offline)]);
-    let slow = mcp.page("brave").delay(Duration::from_secs(30));
+    // Past the 10 s deadline, and answered before the next search, which the closing tab waits for.
+    let slow = mcp.page("brave").delay(Duration::from_secs(12));
     mcp.serve("brave", vec![slow]);
+    warm(&mut mcp);
     let t0 = Instant::now();
+    let r = search(&mut mcp, json!({"query": "zebra", "engines": "bing,brave"}));
+    assert!(t0.elapsed() < Duration::from_secs(25), "{:?}", t0.elapsed());
+    assert!(
+        first_line(text(&r)).starts_with("Source: bing (skipped: brave: timed out) (searched "),
+        "{r}"
+    );
     let r = search(
         &mut mcp,
-        json!({"query": "zebra", "engines": "bing,duckduckgo,brave"}),
+        json!({"query": "zebra", "engines": "bing,duckduckgo"}),
     );
-    assert!(t0.elapsed() < Duration::from_secs(25), "{:?}", t0.elapsed());
-    assert!(!is_error(&r), "{r}");
     let line = first_line(text(&r));
     assert!(
         line.starts_with("Source: bing (skipped: duckduckgo: ")
             && line.contains("net::ERR_CONNECTION_REFUSED")
-            && line.contains(", brave: timed out) (searched "),
+            && line.contains(") (searched "),
         "{line}"
     );
     assert!(!any_rest(&mcp));

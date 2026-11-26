@@ -556,6 +556,12 @@ impl Mcp {
         &self.real.as_ref().unwrap().engines[engine]
     }
 
+    /// The server the stand-ins answer from: a test routes a stand-in's path (from `stand_in`) to make that result slow
+    /// or failing.
+    pub fn results(&self) -> &Fixture {
+        &self.real.as_ref().unwrap().results
+    }
+
     /// Where a captured result link leads under `start_real`: a Google `/goto?url=<token>` link redirects to its
     /// stand-in, an absolute link is served as one; any other URL stays.
     pub fn stand_in(&self, url: &url::Url) -> String {
