@@ -40,7 +40,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   before changing it.
 - `plugins/opt-in/mcp/mcp-github/`: an MCP server config only.
 - `plugins/shared/serena/`: Serena's MCP server (symbol lookup over language servers) in its `ide` context, without
-  memories, onboarding or an opened dashboard, on both harnesses; it writes `.serena/` into each repository it
+  memories, onboarding or a dashboard, on both harnesses; it writes `.serena/` into each repository it
   activates. flows pulls it in and its grounding step uses it. The installer installs `serena-agent` with its own uv on
   either host and points `serenaPath` (Codex: the `codex mcp add` command) at that copy (ADR 0016).
 - `plugins/shared/agent-review/`: vendored skill that checks agent work at three levels, Claude Code only. The dead-skills

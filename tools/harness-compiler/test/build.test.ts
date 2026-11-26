@@ -192,7 +192,7 @@ test('Codex flows README lists declared companion plugins in dependency order', 
 test('the real tree ships serena and no graphify', () => {
   const out = mkdtempSync(join(tmpdir(), 'compiler-real-'));
   buildTree(join(import.meta.dirname, '../../..'), out);
-  const args = 'start-mcp-server --context ide --project-from-cwd --open-web-dashboard False --add-mode no-memories';
+  const args = 'start-mcp-server --context ide --project-from-cwd --enable-web-dashboard False --open-web-dashboard False --add-mode no-memories';
   const read = (path: string) => readFileSync(join(out, path), 'utf8');
   assert.deepEqual(JSON.parse(read('.claude-plugin/serena/.mcp.json')), {
     mcpServers: { serena: { command: '${user_config.serenaPath}', args: args.split(' ') } },

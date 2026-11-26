@@ -9,7 +9,7 @@ quality, 233 median tokens; report of 2026-11-22).
 
 So the `serena` plugin takes graphify's place: flows depends on it, and the grounding step uses its symbol tools when
 they are present, else the Explore fallback. It ships as an MCP server in `plugin.json`, not as a vendored skill, and
-runs as `serena start-mcp-server --context ide --project-from-cwd --open-web-dashboard False --add-mode
+runs as `serena start-mcp-server --context ide --project-from-cwd --enable-web-dashboard False --open-web-dashboard False --add-mode
 no-memories` on both hosts. The installer installs `serena-agent` with its own uv (ADR 0008), unpinned as graphify
 was (ADR 0012), points `serenaPath` at that copy, and uninstalls the old `graphifyy` tool.
 
