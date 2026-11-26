@@ -154,6 +154,8 @@ test('Codex adds serena with the path uv installed it to, the built args and a s
       '--context',
       'ide',
       '--project-from-cwd',
+      '--enable-web-dashboard',
+      'False',
       '--open-web-dashboard',
       'False',
       '--add-mode',
