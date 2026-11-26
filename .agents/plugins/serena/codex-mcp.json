@@ -1,0 +1,15 @@
+{
+  "args": [
+    "start-mcp-server",
+    "--context",
+    "ide",
+    "--project-from-cwd",
+    "--enable-web-dashboard",
+    "False",
+    "--open-web-dashboard",
+    "False",
+    "--add-mode",
+    "no-memories"
+  ],
+  "envVars": []
+}

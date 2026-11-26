@@ -1,0 +1,7 @@
+{
+  "envVars": [
+    "ADO_ORG_URL",
+    "ADO_PAT",
+    "ADO_PROJECT_DIR"
+  ]
+}

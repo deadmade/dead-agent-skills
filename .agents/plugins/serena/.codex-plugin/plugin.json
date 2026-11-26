@@ -1,0 +1,10 @@
+{
+  "name": "serena",
+  "version": "0.6.66",
+  "description": "Serena's symbol-level code search and editing over language servers, as an MCP server, started in its ide context without memories, onboarding or a dashboard. Writes .serena/project.yml into each repository it activates and starts that repository's language servers, which may run its build scripts. Needs the serena CLI, which the installer installs with uv.",
+  "interface": {
+    "displayName": "serena",
+    "shortDescription": "Serena's symbol-level code search and editing over language servers, as an MCP server, started in it"
+  },
+  "skills": "./skills/"
+}

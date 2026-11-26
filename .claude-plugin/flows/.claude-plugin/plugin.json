@@ -1,0 +1,17 @@
+{
+  "name": "flows",
+  "version": "0.6.66",
+  "description": "Conductor skills, most with approval gates and resumable state: build, research, evaluate, review and learn, with the skill packs they run.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-agent-skills",
+  "dependencies": [
+    "claude-md-management@claude-plugins-official",
+    "dead-skills",
+    "serena",
+    "web-mcp"
+  ],
+  "skills": "./skills/"
+}
