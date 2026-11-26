@@ -12,7 +12,7 @@ pub(super) const READY: &str = r#"!!(
     /No results found|Not many great matches/.test(
       (document.querySelector('#results, main') || {}).innerText || '',
     ) ||
-    document.querySelector('#captcha, form[action*="captcha"]'))
+    document.querySelector('#captcha, form[action*="captcha"], .captcha-wrapper'))
 )"#;
 
 pub(super) fn url(query: &str, since: Option<Since>) -> Url {
@@ -50,7 +50,7 @@ pub(super) fn parse(doc: &Document, page: &Url) -> Parsed {
         .filter(|f: &Found| f.url.host() != page.host())
         .collect();
     // No title check: Brave puts the query in the title (R14).
-    let block = captcha_if(doc, "#captcha, form[action*=\"captcha\"]");
+    let block = captcha_if(doc, "#captcha, form[action*=\"captcha\"], .captcha-wrapper");
     verdict(found, block, false)
 }
 
@@ -82,6 +82,15 @@ mod tests {
         let html =
             "<html><head><title>captcha solver - Brave Search</title></head><body></body></html>";
         assert_eq!(Engine::Brave.parse(html, &page()), Parsed::Unrecognised);
+    }
+
+    #[test]
+    fn brave_bot_check_is_a_block() {
+        let html = include_str!("../../tests/fixtures/engines/brave-captcha.html");
+        assert_eq!(
+            Engine::Brave.parse(html, &page()),
+            Parsed::Blocked(Block::Captcha)
+        );
     }
 
     #[test]
