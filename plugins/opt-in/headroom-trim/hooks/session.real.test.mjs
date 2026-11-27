@@ -38,7 +38,9 @@ const read = (file) => {
 // The whole tree on Windows, so the python uv started goes too; detached on POSIX, so its group.
 const killTree = (pid) => {
   if (WIN)
-    startSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe'), ['/T', '/F', '/PID', pid]);
+    startSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe'), ['/T', '/F', '/PID', pid], {
+      timeout: 10_000,
+    });
   else
     try {
       process.kill(-Number(pid), 'SIGKILL');
@@ -74,8 +76,14 @@ test('the trim server outlives the SessionStart hook', { timeout: 300_000 }, asy
     assert.ok(!read(join(f.parentPath, f.name)).includes('47811'), `${f.name} still names the developer's port`);
 
   const pathKey = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';
+  // No API key, login or parent Claude Code session reaches the nested claude, so it makes no paid call.
+  const own = Object.entries(process.env).filter(([k]) => !/^(ANTHROPIC_|CLAUDE)/i.test(k));
   const child = start(claude, ['-p', 'hi', '--plugin-dir', copy], {
-    env: { ...process.env, CLAUDE_CONFIG_DIR: home, [pathKey]: `${dirname(uv)}${delimiter}${process.env[pathKey]}` },
+    env: {
+      ...Object.fromEntries(own),
+      CLAUDE_CONFIG_DIR: home,
+      [pathKey]: `${dirname(uv)}${delimiter}${process.env[pathKey]}`,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let said = '';
