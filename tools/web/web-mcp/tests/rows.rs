@@ -230,12 +230,13 @@ document.currentScript.remove();
 }
 
 /// Each hostile page gets its answer in bounded time: a 4 MiB page is refused, a deep page with much text answers
-/// within 5 s, and a 2,000-level page in under twice the time of a call that skips the walk. That one renders and
-/// archives the page, parses it twice and reads its body text too, so the bound covers only the walker's group search
-/// and walk; it is relative because a fixed one fails on a slow or loaded machine. Deeper is out of Chrome's reach:
-/// Chrome for Testing 158 loaded 2,200 script-built levels in 50 ms and 2,400 not within 25 s (2026-11-25), so no
-/// page gives rows more. Baseline at 3,000 levels through the fake browser, PR 1's CI (2026-11-10): ratios 0.91-1.25
-/// on ubuntu-latest and 1.05-1.21 on windows-latest.
+/// within 5 s, and a 2,000-level page within twice the time of a call that skips the walk, plus 5 s. That one renders
+/// and archives the page, parses it twice and reads its body text too, so the bound covers only the walker's group
+/// search and walk: twice absorbs a slow machine, the 5 s a loaded one's jitter, and a walk that rebuilds the text
+/// under every level (over 10 s at 1,500 levels) still fails it. Deeper is out of Chrome's reach: Chrome for Testing
+/// 158 loaded 2,200 script-built levels in 50 ms and 2,400 not within 25 s (2026-11-25), so no page gives rows more.
+/// Baseline in real Chrome for Testing on Windows (2026-11-27, three runs): ratios 0.80-1.58, the walk at most 0.9 s
+/// over the parse.
 #[test]
 fn rows_hostile_pages_return_in_bounded_time() {
     let fx = Fixture::start(PUBLIC);
@@ -288,7 +289,7 @@ fn rows_hostile_pages_return_in_bounded_time() {
             "rows_deep {name} walk/parse: {took:?} / {base:?} = {ratio:.2}"
         );
         assert!(
-            took < base * 2,
+            took < base * 2 + Duration::from_secs(5),
             "{name}: walk {took:?} against parse {base:?}"
         );
     }
