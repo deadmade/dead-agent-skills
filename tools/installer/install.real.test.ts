@@ -4,34 +4,18 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer as httpServer } from 'node:http';
-import { createServer, type AddressInfo } from 'node:net';
+import type { AddressInfo } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { realTool } from '../../scripts/test.mjs';
+import { BUILD, debugBuild, portCopy, realTool } from '../../scripts/test.mjs';
 import { resolveTool } from './core/tools.ts';
 import { start, startSync, which } from './system/proc.ts';
 
 const WIN = process.platform === 'win32';
 const ROOT = join(import.meta.dirname, '..', '..');
 const VERSION: string = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
-const BUILD = 'run cargo build --locked -p web-mcp -p http-runner -p ado-mcp';
 const exe = (name: string) => (WIN ? `${name}.exe` : name);
-
-const freePort = () =>
-  new Promise<number>((resolve, reject) => {
-    const s = createServer()
-      .once('error', reject)
-      .listen(0, '127.0.0.1', () => {
-        const { port } = s.address() as AddressInfo;
-        s.close(() => resolve(port));
-      });
-  });
-
-const files = (dir: string) =>
-  readdirSync(dir, { recursive: true, withFileTypes: true })
-    .filter((e) => e.isFile())
-    .map((e) => join(e.parentPath, e.name));
 
 test('a full install on fresh homes', { timeout: 1_200_000 }, async (t) => {
   const claude = realTool(t, 'claude');
@@ -40,7 +24,7 @@ test('a full install on fresh homes', { timeout: 1_200_000 }, async (t) => {
   const built = (name: string) => {
     const hinted = { skip: (m?: string) => t.skip(`${m}: ${BUILD}`) };
     try {
-      return realTool(hinted, name, { candidates: [join(ROOT, 'target', 'debug', exe(name))] });
+      return realTool(hinted, name, { candidates: [debugBuild(ROOT, name)] });
     } catch (error) {
       throw new Error(`${(error as Error).message}: ${BUILD}`);
     }
@@ -78,12 +62,7 @@ test('a full install on fresh homes', { timeout: 1_200_000 }, async (t) => {
   });
 
   // The marketplace: a copy of the built tree, its trim server on a port of its own.
-  cpSync(join(ROOT, '.claude-plugin'), join(market, '.claude-plugin'), { recursive: true });
-  port = await freePort();
-  const hooks = join(market, '.claude-plugin', 'headroom-trim', 'hooks', 'hooks.json');
-  writeFileSync(hooks, readFileSync(hooks, 'utf8').replaceAll('47811', String(port)));
-  for (const f of files(market))
-    assert.ok(!readFileSync(f, 'utf8').includes('47811'), `${f} still names the developer's port`);
+  port = await portCopy(join(ROOT, '.claude-plugin'), join(market, '.claude-plugin'));
 
   // The release: each binary packed as the archive the installer resolves, with its checksum beside it.
   mkdirSync(releases, { recursive: true });

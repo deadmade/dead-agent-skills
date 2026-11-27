@@ -1,7 +1,19 @@
 // The one list of what runs: each suite, its test files and how it starts. It uses only the Node standard library and
 // tools/installer/system/proc.ts, because crates.yml runs it without `npm ci`.
 import { createHash } from 'node:crypto';
-import { copyFileSync, cpSync, existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  globSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createServer } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -63,6 +75,7 @@ const NODE_FLAGS = [
 const COVERAGE_FLOOR = '--test-coverage-lines=84';
 const TREES = { file: process.execPath, args: ['tools/harness-compiler/src/cli.ts', 'build'] };
 
+const isInstaller = (path) => path.startsWith('tools/installer/');
 const findTool = (name, candidates = []) => candidates.find((c) => existsSync(c)) ?? which(name);
 
 // The packages whose tests drive the real agent-browser, and where they find it (real_agent_browser in browser-core):
@@ -76,13 +89,13 @@ function agentBrowser() {
 }
 
 // What the installer's end-to-end test needs, and why it is missing: claude, codex and this checkout's debug builds.
-const BUILD = 'run cargo build --locked -p web-mcp -p http-runner -p ado-mcp';
+export const BUILD = 'run cargo build --locked -p web-mcp -p http-runner -p ado-mcp';
+export const debugBuild = (root, name) =>
+  join(root, 'target', 'debug', process.platform === 'win32' ? `${name}.exe` : name);
 function installerToolMissing(root) {
   for (const name of ['claude', 'codex']) if (!findTool(name)) return `${name} not found`;
-  for (const name of ['web-mcp', 'http-runner', 'ado-mcp']) {
-    const exe = process.platform === 'win32' ? `${name}.exe` : name;
-    if (!findTool(name, [join(root, 'target', 'debug', exe)])) return `${name} not found: ${BUILD}`;
-  }
+  for (const name of ['web-mcp', 'http-runner', 'ado-mcp'])
+    if (!findTool(name, [debugBuild(root, name)])) return `${name} not found: ${BUILD}`;
 }
 
 // A real tool for a test: the first existing candidate, else the one on PATH, else a failure under strict (the door's
@@ -92,6 +105,33 @@ export function realTool(t, name, { candidates = [], strict = process.env.DEAD_S
   if (found) return found;
   if (strict) throw new Error(`${name} not found`);
   t.skip(`${name} not found`);
+}
+
+// A loopback port nothing listens on right now.
+export const freePort = () =>
+  new Promise((resolve, reject) => {
+    const s = createServer()
+      .once('error', reject)
+      .listen(0, '127.0.0.1', () => {
+        const { port } = s.address();
+        s.close(() => resolve(port));
+      });
+  });
+
+// Copies a built tree with headroom-trim's port (47811, the developer's own trim server) moved to a free one in its
+// hooks.json files, and throws when any other file still names 47811. Returns the port.
+export async function portCopy(from, to) {
+  cpSync(from, to, { recursive: true });
+  const port = await freePort();
+  const files = readdirSync(to, { recursive: true, withFileTypes: true }).filter((e) => e.isFile());
+  for (const f of files.filter((e) => e.name === 'hooks.json')) {
+    const file = join(f.parentPath, f.name);
+    writeFileSync(file, readFileSync(file, 'utf8').replaceAll('47811', String(port)));
+  }
+  for (const f of files)
+    if (readFileSync(join(f.parentPath, f.name), 'utf8').includes('47811'))
+      throw new Error(`${join(f.parentPath, f.name)} still names the developer's port`);
+  return port;
 }
 
 // Each suite gives { commands, fail } (fail: why it cannot start) or { notRun } (why it is skipped).
@@ -109,22 +149,24 @@ const SUITES = {
       fail: modules ?? (files.length ? undefined : 'node: no test files'),
     };
   },
-  // The real tests that gate themselves, then the installer's tests with its end-to-end run, which hold the coverage
-  // floor: without claude, codex or a debug build the floor would fail for a skipped run, so they are NOT RUN instead.
+  // The real tests that gate themselves; the installer's end-to-end test is the installer suite's.
   real: ({ root, modules }) => {
-    const { node, real } = suiteFiles(root);
-    const installer = (p) => p.startsWith('tools/installer/');
-    const own = real.filter((p) => !installer(p));
-    const files = [...real.filter(installer), ...node.filter(installer)];
-    const missing = installerToolMissing(root);
+    const own = suiteFiles(root).real.filter((p) => !isInstaller(p));
     return {
-      commands: [
-        ...(own.length ? [{ file: process.execPath, args: [...NODE_FLAGS, ...own] }] : []),
-        missing
-          ? { notRun: `installer tests: ${missing}` }
-          : { file: process.execPath, args: [...NODE_FLAGS, COVERAGE_FLOOR, ...files] },
-      ],
-      fail: modules ?? (own.length || files.length ? undefined : 'real: no test files'),
+      commands: [{ file: process.execPath, args: [...NODE_FLAGS, ...own] }],
+      fail: modules ?? (own.length ? undefined : 'real: no test files'),
+    };
+  },
+  // The installer's tests with its end-to-end run, which hold the coverage floor: without claude, codex or a debug
+  // build the floor would fail for a skipped run, so the suite is NOT RUN instead.
+  installer: ({ root, modules }) => {
+    const { node, real } = suiteFiles(root);
+    const files = [...real.filter(isInstaller), ...node.filter(isInstaller)];
+    const missing = !modules && installerToolMissing(root);
+    if (missing) return { notRun: missing };
+    return {
+      commands: [{ file: process.execPath, args: [...NODE_FLAGS, COVERAGE_FLOOR, ...files] }],
+      fail: modules ?? (files.length ? undefined : 'installer: no test files'),
     };
   },
   mods: ({ root, modules }) => {
@@ -228,7 +270,7 @@ const SUITES = {
 };
 
 const USAGE =
-  'usage: node scripts/test.mjs [--strict] [--list] [--packages a,b] [--each-package] [repo|node|real|mods|python|rust ...]';
+  'usage: node scripts/test.mjs [--strict] [--list] [--packages a,b] [--each-package] [repo|node|real|installer|mods|python|rust ...]';
 
 function usage(message) {
   console.error(`${message}\n${USAGE}`);
@@ -267,7 +309,7 @@ function main(argv) {
   const modules = existsSync(join(root, 'node_modules')) ? undefined : 'node_modules missing: run npm ci';
   const plan = (suite) => SUITES[suite]({ root, modules, packages, each, strict });
   // When repo is selected, check-repo builds the generated trees itself.
-  const needsTrees = (suite) => (suite === 'node' || suite === 'real' || suite === 'mods') && !suites.includes('repo');
+  const needsTrees = (suite) => ['node', 'real', 'installer', 'mods'].includes(suite) && !suites.includes('repo');
 
   if (list) {
     let treesListed = false;
@@ -323,7 +365,7 @@ function main(argv) {
     const [status, reason] = execute(suite);
     results.push({ suite, status, reason: reason ?? `${((performance.now() - started) / 1000).toFixed(1)} s` });
   }
-  for (const { suite, status, reason } of results) console.log(`${suite.padEnd(7)} ${status.padEnd(8)} ${reason}`);
+  for (const { suite, status, reason } of results) console.log(`${suite.padEnd(9)} ${status.padEnd(8)} ${reason}`);
   return results.some((r) => r.status === 'failed' || (strict && r.status === 'NOT RUN')) ? 1 : 0;
 }
 

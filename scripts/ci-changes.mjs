@@ -12,18 +12,24 @@ const roots = {
 };
 // Library crates: a change in one selects the binary that links it, whose checks then test the library too.
 const libraries = { 'browser-core': { root: 'tools/web/browser-core/', binary: 'web-mcp' } };
+// What the installer's end-to-end test (tools/installer/install.real.test.ts) reads besides its own folder: the plugin
+// catalog and the crates it builds and installs.
+const installerInputs = ['plugins/catalog.json', ...crates.map((c) => roots[c][0]), libraries['browser-core'].root];
 
 export function selectChecks(paths, all = false) {
   const selected = new Set();
   let node = all;
   let skills = all;
+  let installer = all;
   const everything = () => {
-    node = skills = true;
+    node = skills = installer = true;
     crates.forEach((c) => selected.add(c));
   };
   if (all) everything();
   for (const path of paths) {
     if (isTestName(path)) node = true;
+    if (path.startsWith('tools/installer/') || installerInputs.some((input) => path.startsWith(input)))
+      installer = true;
     // Their tests run the agent-browser this file pins.
     if (path === 'tools/installer/assets/tools.json') ['web-mcp', 'http-runner'].forEach((c) => selected.add(c));
     const crate =
@@ -70,7 +76,15 @@ export function selectChecks(paths, all = false) {
   }
   const binaries = crates.filter((c) => selected.has(c));
   const libs = Object.keys(libraries).filter((l) => selected.has(libraries[l].binary));
-  return { node, skills, rust: binaries.length > 0, binaries, packages: [...binaries, ...libs] };
+  // The end-to-end test runs in the Node job.
+  return {
+    node: node || installer,
+    skills,
+    installer,
+    rust: binaries.length > 0,
+    binaries,
+    packages: [...binaries, ...libs],
+  };
 }
 
 export function changedPaths(eventName, event, git = (args) => execFileSync('git', args, { encoding: 'utf8' })) {

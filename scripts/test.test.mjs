@@ -287,7 +287,7 @@ test('without repo, the real suite builds the native trees first', (t) => {
   assert.match(r.log[0], /^check-repo ::/);
 });
 
-test('the real suite runs the gating real tests, then the installer tests under the coverage floor', (t) => {
+test('the real suite runs the gating real tests, the installer suite the installer tests under the coverage floor', (t) => {
   const d = door(t, { tools: ['claude', 'codex'] });
   d.put('plugins/x/a.real.test.mjs', '');
   d.put('plugins/x/b.test.mjs', '');
@@ -297,8 +297,10 @@ test('the real suite runs the gating real tests, then the installer tests under 
   const files = suiteFiles(d.root);
   assert.deepEqual(files.real, ['plugins/x/a.real.test.mjs', 'tools/installer/d.real.test.ts']);
   assert.deepEqual(files.node, ['plugins/x/b.test.mjs', 'tools/installer/c.test.ts']);
-  const r = d.run(['--list', 'node', 'real']);
-  const [own, installer] = r.out.split('\n').filter((l) => l.startsWith('real: ') && !l.endsWith(' build'));
+  const r = d.run(['--list', 'node', 'real', 'installer']);
+  const lines = (suite) => r.out.split('\n').filter((l) => l.startsWith(`${suite}: `) && !l.endsWith(' build'));
+  assert.equal(lines('real').length, 1);
+  const [[own], [installer]] = [lines('real'), lines('installer')];
   assert.ok(own.endsWith(' plugins/x/a.real.test.mjs') && !own.includes('--test-coverage-lines'));
   assert.ok(installer.includes('--test-coverage-lines=84'));
   assert.ok(installer.endsWith(' tools/installer/d.real.test.ts tools/installer/c.test.ts'));
@@ -306,25 +308,28 @@ test('the real suite runs the gating real tests, then the installer tests under 
   assert.doesNotMatch(r.out, /^node: .*a[.]real[.]test/m);
 });
 
-test('without codex or a debug build the installer tests are NOT RUN, after the gating real tests ran', (t) => {
+test('without codex or a debug build the installer suite is NOT RUN, and the real suite still passes', (t) => {
   const d = door(t, { tools: ['claude'] });
   d.put(
     'plugins/x/a.real.test.mjs',
     "import { appendFileSync } from 'node:fs';\nappendFileSync(process.env.FAKE_LOG, 'a ran\\n');\n",
   );
   d.put('tools/installer/c.test.ts', '');
-  const listed = d.run(['--list', 'real']).out;
+  const listed = d.run(['--list', 'real', 'installer']).out;
   assert.match(listed, /^real: .* plugins\/x\/a\.real\.test\.mjs$/m);
-  assert.match(listed, /^real: NOT RUN installer tests: codex not found$/m);
-  const r = d.run(['real']);
+  assert.match(listed, /^installer: NOT RUN codex not found$/m);
+  const r = d.run(['--strict', 'real']);
   assert.equal(r.status, 0);
   assert.ok(r.log.includes('a ran'));
-  assert.match(r.out, /^real +NOT RUN +installer tests: codex not found$/m);
-  assert.equal(d.run(['--strict', 'real']).status, 1);
+  assert.match(r.out, /^real +passed/m);
+  const i = d.run(['installer']);
+  assert.equal(i.status, 0);
+  assert.match(i.out, /^installer +NOT RUN +codex not found$/m);
+  assert.equal(d.run(['--strict', 'installer']).status, 1);
   d.fake('codex');
   assert.match(
-    d.run(['--list', 'real']).out,
-    /^real: NOT RUN installer tests: web-mcp not found: run cargo build --locked -p web-mcp -p http-runner -p ado-mcp$/m,
+    d.run(['--list', 'installer']).out,
+    /^installer: NOT RUN web-mcp not found: run cargo build --locked -p web-mcp -p http-runner -p ado-mcp$/m,
   );
 });
 

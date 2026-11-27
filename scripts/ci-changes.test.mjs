@@ -15,8 +15,9 @@ test('full runs select exactly the remaining binaries and workspace packages', (
 
 test('a browser-core change selects web-mcp, and browser-core is a package, never a binary', () => {
   assert.deepEqual(selectChecks(['tools/web/browser-core/src/browser.rs']), {
-    node: false,
+    node: true,
     skills: false,
+    installer: true,
     rust: true,
     binaries: ['web-mcp'],
     packages: ['web-mcp', 'browser-core'],
@@ -25,10 +26,11 @@ test('a browser-core change selects web-mcp, and browser-core is a package, neve
   assert.ok(!selectChecks([], true).binaries.includes('browser-core'));
 });
 
-test('an ado implementation change selects only ado checks', () => {
+test('an ado implementation change selects the ado checks and the installer test that builds it', () => {
   assert.deepEqual(selectChecks(['tools/ado-mcp/src/wi.rs']), {
-    node: false,
+    node: true,
     skills: false,
+    installer: true,
     rust: true,
     binaries: ['ado-mcp'],
     packages: ['ado-mcp'],
@@ -87,6 +89,7 @@ test('installer changes skip Rust and scanning; skill changes scan', () => {
   assert.deepEqual(selectChecks(['tools/installer/core/options.ts']), {
     node: true,
     skills: false,
+    installer: true,
     rust: false,
     binaries: [],
     packages: [],
@@ -99,10 +102,39 @@ test('the installer tools pin also selects the crates whose tests run the pinned
   assert.deepEqual(selectChecks(['tools/installer/assets/tools.json']), {
     node: true,
     skills: false,
+    installer: true,
     rust: true,
     binaries: ['web-mcp', 'http-runner'],
     packages: ['web-mcp', 'http-runner', 'browser-core'],
   });
+});
+
+test("the installer's end-to-end test runs for its sources, the door, the catalog, the pin and the crates it builds", () => {
+  assert.equal(selectChecks([], true).installer, true);
+  for (const path of [
+    'tools/installer/steps/codex.ts',
+    'tools/installer/assets/tools.json',
+    'scripts/test.mjs',
+    'plugins/catalog.json',
+    'tools/web/web-mcp/src/lib.rs',
+    'tools/http-runner/src/main.rs',
+    'tools/ado-mcp/src/wi.rs',
+    'tools/web/browser-core/src/browser.rs',
+  ]) {
+    const result = selectChecks([path]);
+    // It runs in the Node job, so selecting it selects that job.
+    assert.deepEqual([result.installer, result.node], [true, true], path);
+  }
+  for (const path of [
+    'plugins/flows/steps/run-rules.toml',
+    'plugins/opt-in/headroom-trim/hooks/launcher.mjs',
+    'plugins/shared/web-mcp/skills/a/SKILL.md',
+    'tools/harness-compiler/src/flows/compose.ts',
+    'scripts/check-repo.mjs',
+    'README.md',
+    'docs/adr/example.md',
+  ])
+    assert.equal(selectChecks([path]).installer, false, path);
 });
 
 test('docs skip expensive checks, but root readmes and crate manifests get consistency checks', () => {
@@ -177,6 +209,7 @@ test('PR 122 selects only web-mcp', () => {
   assert.deepEqual(selectChecks(paths), {
     node: true,
     skills: true,
+    installer: true,
     rust: true,
     binaries: ['web-mcp'],
     packages: ['web-mcp', 'browser-core'],
@@ -242,7 +275,7 @@ test("test files and fixtures route like their component, at today's path and in
   for (const path of ['docs/zz.test.mjs', 'docs/a/test_b.py', 'docs/a/b_test.py']) {
     assert.deepEqual(
       selectChecks([path]),
-      { node: true, skills: false, rust: false, binaries: [], packages: [] },
+      { node: true, skills: false, installer: false, rust: false, binaries: [], packages: [] },
       path,
     );
   }
