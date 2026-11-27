@@ -636,7 +636,14 @@ mod tests {
         let h = tokio::spawn(async move { a2.put(page("https://example.com/x", None)).await });
         tokio::task::yield_now().await;
         h.abort();
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        // A put that got going finishes on its own task and caches the page last; one that didn't never caches it.
+        let url = u("https://example.com/x");
+        for _ in 0..1000 {
+            if a.cached(&url).is_some() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
         let lines = index_lines(&a);
         let mut files = Vec::new();
         walk(&a.0.run, &mut files);
