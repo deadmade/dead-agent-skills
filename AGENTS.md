@@ -39,9 +39,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   REST Client `.http` files and returns real replies with their secrets masked. Read `docs/components/http-runner.md`
   before changing it.
 - `plugins/opt-in/mcp/mcp-github/`: an MCP server config only.
-- `plugins/shared/graphify/`: vendored knowledge-graph skill and `tool.starting` hooks that nudge towards `graphify-out/`, on both
-  harnesses. flows pulls it in (on Codex flows also embeds its skills); the installer's Tools page offers it and runs
-  `uv tool install` for its CLI.
+- `plugins/shared/serena/`: Serena's MCP server (symbol lookup over language servers) in its `ide` context, without
+  memories, onboarding or a dashboard, on both harnesses; it writes `.serena/` into each repository it
+  activates. flows pulls it in and its grounding step uses it. The installer installs `serena-agent` with its own uv on
+  either host and points `serenaPath` (Codex: the `codex mcp add` command) at that copy (ADR 0016).
 - `plugins/shared/agent-review/`: vendored skill that checks agent work at three levels, Claude Code only. The dead-skills
   bundle pulls it in.
 - `plugins/opt-in/hallmark/`: vendored frontend-design skill, on both harnesses. Nothing pulls it in.
@@ -81,7 +82,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 `treefmt.toml`'s `excludes` lists every vendored path (`docs/vendor-a-pack.md` is the checklist for adding one).
 `tools/upstream-sync/src/adapters/*.ts` and `sources.ts` copy these paths from upstream (the weekly `sync.yml` opens the PRs),
 and every sync overwrites them. To change one, change its sync script's transform, not the vendored files. A sync skips
-these hand-written exceptions: `plugin.json` for csharp-skills, rust-skills, postgres, hallmark, graphify and agent-review, and the
+these hand-written exceptions: `plugin.json` for csharp-skills, rust-skills, postgres, hallmark and agent-review, and the
 `*-skills` plugins' `evals/`. ponytail and superpowers vendor no manifest at all (a pack is a plain resource folder; the compiler never
 loads one as a plugin). `tob-picks` is CC BY-SA 4.0; THIRD_PARTY.md has every pack's actual license.
 When what's vendored or its license changes, update THIRD_PARTY.md.
@@ -119,7 +120,7 @@ Read `docs/components/ci.md` for how a release is built and published.
   (`--test-coverage-lines` on the `real` suite; raise it, never lower it), and `tools/installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
-- Tests use the real thing (ADR 0017): the real process, CLI, browser and files, never a fake that makes up answers. Only
+- Tests use the real thing (ADR 0018): the real process, CLI, browser and files, never a fake that makes up answers. Only
   what CI cannot reach is answered from captures by a replay server, and a fake stays only with a `// fake: <why>` beside it.
   Node tests find a real tool through `realTool` in `scripts/test.mjs`, Rust tests through `real_agent_browser`. A missing
   tool skips a Node test, or fails it under `DEAD_SKILLS_STRICT=1`, which `scripts/test.mjs --strict` (CI) sets; a Rust
@@ -138,6 +139,9 @@ Read `docs/components/ci.md` for how a release is built and published.
 - `flows:diagrams`' checker installs into one user cache folder (`dead-agent-skills/diagrams-node`) shared by every
   checkout: running its tests in a worktree whose `package.json` or `outline.mjs` differs reinstalls the cache for all
   of them, so the next run elsewhere reinstalls again (minutes, about 350 MB).
+- On Windows without symlink rights (no Developer Mode), five node tests fail with `EPERM ... symlink` (glance's
+  symlinked-folder test and four installer tests). That's the machine, not your change: compare with the base commit
+  in a scratch worktree before chasing them.
 - Don't share `CARGO_TARGET_DIR` between worktrees: a test binary keeps the `CARGO_MANIFEST_DIR` of the worktree that
   built it, and web-mcp's integration tests start whichever server binary was built last.
 - mod tests: after a build, copy `plugins/default/hooks/*.test.*` into `.claude-plugin/dead-skills/hooks/` and run `claude plugin test .`
@@ -150,8 +154,17 @@ Read `docs/components/ci.md` for how a release is built and published.
   A new worktree has no `.pre-commit-config.yaml` (it is generated and untracked), so its first commit fails until
   `nix develop` runs in that worktree. treefmt's hook fails on any file it changes: run `treefmt` on the files you
   changed (never a folder: it reformats files you didn't touch), then `npm run build:harnesses`, then stage.
+- Without nix (plain Windows), format only the files you changed with prettier and `treefmt.toml`'s options:
+  `npx prettier@3 --write --no-config --print-width 120 --single-quote <files>`; the next treefmt run may still
+  differ if nix pins another prettier.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt, taplo for TOML).
   Formatter options live in `treefmt.toml`; flow steps use `#:schema ./step.schema.json` for editor validation.
+  Without the nix shell (no `treefmt` on PATH, as on Windows), run
+  `npx -y prettier@3 --write --no-config --print-width 120 --single-quote <files>` on the files you changed: treefmt's
+  prettier settings; TOML then goes unformatted.
+- Run `npm run build:harnesses` (and `npm test`, which builds) in one process at a time: two at once, subagents
+  included, fail on Windows with `EPERM` renaming `.native-build-*` and can leave `.claude-plugin/` missing until a
+  rebuild.
 - `npm run scan-skills` (needs `pipx`) runs Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`
   and the composed flows conductors in `.claude-plugin/flows/skills/`; it fails on a high or critical finding. A
   finding judged benign gets a scoped suppression with its reason in `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR except the `uv` and `agent-browser` pin bumps (`scan: false` in `sources.ts`).
@@ -163,7 +176,7 @@ Read `docs/components/ci.md` before changing a workflow, renaming a `test.yml` j
 
 `plugins/` is agent-neutral: no `.claude-plugin`, `.codex-plugin`, `.mcp.json`, native hook files, install instructions
 or harness paths. Each local plugin has a neutral `plugin.json` (description, author, dependencies, `config`, `mcpServers`,
-`lsp`, `themes`, `extensions`, `instructions`, `embeds`, `hooks`) and, if it has hooks, a neutral `hooks/hooks.json` (events such as `session.started`,
+`lsp`, `themes`, `extensions`, `instructions`, `hooks`) and, if it has hooks, a neutral `hooks/hooks.json` (events such as `session.started`,
 `tool.completed`; tools such as `file.write`). `plugins/catalog.json` lists the plugins, their source, resources,
 dependencies and targets. UI mods (TypeScript against Claude's UI engine) stay in their plugin and are declared in `plugin.json` as an
 `extensions` entry; a harness that cannot run them gets a build warning and the mod is left out of its package.

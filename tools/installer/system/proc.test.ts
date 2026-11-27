@@ -9,7 +9,7 @@ const M = 'dead-claude-skills';
 const WIN = process.platform === 'win32';
 
 test('safeArg rejects shell metacharacters', () => {
-  assert.equal(safeArg(`graphify@${M}`), `graphify@${M}`);
+  assert.equal(safeArg(`serena@${M}`), `serena@${M}`);
   for (const bad of ['a&b', '%PATH%', 'a"b', 'a b']) assert.throws(() => safeArg(bad));
 });
 

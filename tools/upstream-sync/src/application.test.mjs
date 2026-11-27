@@ -50,8 +50,8 @@ function fixture(t) {
 
 test('all registered sources validate the current tree and all adapters are represented', () => {
   const all = sources(ROOT);
-  assert.equal(new Set(all.map((s) => s.name)).size, 16);
-  assert.equal(new Set(all.map((s) => s.adapter)).size, 12);
+  assert.equal(new Set(all.map((s) => s.name)).size, 15);
+  assert.equal(new Set(all.map((s) => s.adapter)).size, 11);
   for (const s of all) {
     for (const p of s.paths) assert.ok(existsSync(join(ROOT, p)), p);
     s.check({ tag: 'v1.2.3' });
@@ -186,7 +186,7 @@ const manifestFixture = () => ({
         },
       },
     },
-    graphify: { source: 'pypi', package: 'graphifyy', version: '0.9.9' },
+    serena: { source: 'pypi', package: 'serena-agent', version: '0.9.9' },
   },
 });
 const stringify = (manifest) => JSON.stringify(manifest, null, 2) + '\n';

@@ -162,6 +162,7 @@ export async function main({ argv, env, fetch, spawn, isFile }) {
       child = spawn(s.cmd, s.args, {
         cwd: data,
         env: serverEnv(env, s.env),
+        // Detached on Windows too: Node puts every attached child into a job object that kills it when the launcher exits.
         detached: true,
         windowsHide: true,
         stdio: ['ignore', out, out],

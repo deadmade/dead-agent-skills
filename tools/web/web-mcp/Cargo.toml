@@ -27,6 +27,8 @@ reqwest = { workspace = true, features = ["rustls-no-provider", "http2", "gzip",
 rustls = { workspace = true, features = ["ring", "std", "tls12"] }
 futures = { workspace = true, features = ["std"] }
 base64 = { workspace = true }
+getrandom = { workspace = true }
+llm-guard = { workspace = true }
 # Without zstd: no C toolchain needed to build.
 tantivy = { workspace = true }
 model2vec-rs = { workspace = true, optional = true }

@@ -1,26 +1,10 @@
 {
-  "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus core plugins from claude-plugins-official as dependencies.",
+  "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus agent-review as a dependency.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
   },
   "dependencies": [
-    {
-      "name": "claude-code-setup",
-      "marketplace": "claude-plugins-official"
-    },
-    {
-      "name": "claude-md-management",
-      "marketplace": "claude-plugins-official"
-    },
-    {
-      "name": "security-guidance",
-      "marketplace": "claude-plugins-official"
-    },
-    {
-      "name": "claude-security",
-      "marketplace": "claude-plugins-official"
-    },
     {
       "name": "agent-review",
       "targets": ["claude-code"]

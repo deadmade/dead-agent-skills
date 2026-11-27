@@ -4,7 +4,7 @@ mod common;
 
 use std::time::{Duration, Instant};
 
-use common::{Fixture, Mcp, PUBLIC, Resp, is_error, tempdir, text};
+use common::{Fixture, Mcp, PUBLIC, Resp, guarded, is_error, tempdir, text};
 use serde_json::json;
 use url::Url;
 
@@ -130,7 +130,9 @@ fn arxiv_id_asks_arxiv_and_openalex_and_lists_that_paper_first() {
         t.contains("DOI 10.1000/GPT3 · arXiv 2005.14165 · http://arxiv.org/abs/2005.14165v4"),
         "{t}"
     );
-    assert!(t.contains("Failed: OpenAlex: HTTP 404"), "{t}");
+    let (body, after) = guarded(t);
+    assert!(body.contains("## [1] Language Models"), "{t}");
+    assert_eq!(after, "\n\nFailed: OpenAlex: HTTP 404", "{t}");
 }
 
 #[cfg(debug_assertions)]
@@ -225,7 +227,7 @@ fn route_attention(fx: &Fixture) {
 /// `route_attention` narrowed to the year before today, as `since: year` asks.
 fn route_attention_since_a_year(fx: &Fixture) {
     let day = jiff::Timestamp::now()
-        .to_zoned(jiff::tz::TimeZone::UTC)
+        .to_zoned_datetime(jiff::tz::TimeZone::UTC)
         .date()
         .saturating_sub(jiff::ToSpan::year(1));
     // The server may read the clock just after UTC midnight: route the next day too.
@@ -296,6 +298,24 @@ fn papers_merge_browser_engines_with_the_apis() {
         "{t}"
     );
     assert!(t.contains("Rust-Like Borrow Checker"), "{t}");
+    // The paper engines log their outcome to the block log as the search engines do.
+    let raw = std::fs::read_to_string(mcp.search.join("blocks.jsonl")).unwrap();
+    let mut logged: Vec<(String, String)> = raw
+        .lines()
+        .map(|l| {
+            let v: serde_json::Value = serde_json::from_str(l).unwrap();
+            let get = |k: &str| v[k].as_str().unwrap_or_default().to_owned();
+            (get("engine"), get("outcome"))
+        })
+        .collect();
+    logged.sort();
+    assert_eq!(
+        logged,
+        [
+            ("scholar".to_owned(), "ok".to_owned()),
+            ("semanticscholar".to_owned(), "ok".to_owned())
+        ]
+    );
 
     let r = mcp.call(
         "search",

@@ -6,7 +6,7 @@ use std::fmt::Write as _;
 use std::io::Write as _;
 use std::time::{Duration, Instant};
 
-use common::{Fixture, Mcp, PUBLIC, Resp, is_error, tempdir, text};
+use common::{Fixture, Mcp, PUBLIC, Resp, guarded, is_error, tempdir, text};
 use serde_json::{Value, json};
 
 /// `n` list items in a list of class `class`, each a link relative to the page with a text long enough to count.
@@ -114,7 +114,7 @@ fn rows_reads_numbered_groups_where_the_page_landed() {
         "{source}"
     );
     assert!(
-        t.contains("Group 1: 40 items") && t.contains("Group 2: 6 items"),
+        guarded(t).0.starts_with("Group 1: 40 items") && t.contains("Group 2: 6 items"),
         "{t}"
     );
     assert!(t.contains("Showing 30 of 40."), "{t}");
@@ -158,10 +158,12 @@ fn rows_reads_numbered_groups_where_the_page_landed() {
     let r = mcp.call("rows", json!({"url": fx.url("/bare")}));
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
+    let (body, after) = guarded(t);
     assert!(
-        t.contains(&format!("Heading: \"{}\"", &heading[..200])),
+        body.contains(&format!("Heading: \"{}\"", &heading[..200])),
         "{t}"
     );
+    assert_eq!(after, "", "{t}");
     assert!(t.contains("`item`") && t.contains("still loading"), "{t}");
     assert!(
         t.lines()

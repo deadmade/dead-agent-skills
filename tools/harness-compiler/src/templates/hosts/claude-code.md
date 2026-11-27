@@ -9,8 +9,8 @@ Load cross-plugin skills through Skill when possible. For path-only resources, l
 using Claude's plugin metadata or use the marketplace source path when running from a checkout; do not assume
 cache depth or select an arbitrary version. The resource index lists package names and paths.
 
-For security review use `security-review` or `claude-security` when available; otherwise ask the reviewer to
-check the scoped diff for exploitable vulnerabilities, grounding each finding in a concrete input and code path.
+For security review use `security-review` when available; otherwise ask the reviewer to check the scoped diff for
+exploitable vulnerabilities, grounding each finding in a concrete input and code path.
 For instruction-file review use claude-md-management's `claude-md-improver` when available; otherwise compare
 applicable AGENTS.md, CLAUDE.md and their referenced rules with the scoped changes and propose corrections without
 applying them.

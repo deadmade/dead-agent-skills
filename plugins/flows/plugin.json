@@ -8,11 +8,6 @@
     {
       "name": "claude-md-management",
       "marketplace": "claude-plugins-official"
-    },
-    {
-      "name": "claude-security",
-      "marketplace": "claude-plugins-official"
     }
-  ],
-  "embeds": ["graphify"]
+  ]
 }

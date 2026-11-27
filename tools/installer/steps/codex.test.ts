@@ -40,8 +40,13 @@ function fixture() {
       calls.push(args);
       if (args[0] === 'plugin' && args[1] === 'list')
         return JSON.stringify({ installed: installed.map((name) => ({ pluginId: `${name}@dead-agent-skills` })) });
-      if (args[0] === 'mcp' && args[1] === 'add' && args[2] === 'dead-agent-skills-mcp-azure')
-        appendFileSync(join(home, 'config.toml'), '[mcp_servers.dead-agent-skills-mcp-azure]\ncommand = "node"\n');
+      // Codex writes the table; the fake does so for the servers whose table the installer then edits.
+      if (
+        args[0] === 'mcp' &&
+        args[1] === 'add' &&
+        ['dead-agent-skills-mcp-azure', 'dead-agent-skills-serena'].includes(args[2])
+      )
+        appendFileSync(join(home, 'config.toml'), `[mcp_servers.${args[2]}]\ncommand = "node"\n`);
       if (args[0] === 'mcp' && args[1] === 'list') return JSON.stringify(mcps.map((name) => ({ name })));
       if (args[0] === 'plugin' && args[1] === 'add') installed.push(args[2].split('@')[0]);
       if (args[0] === 'plugin' && args[1] === 'remove')
@@ -51,6 +56,10 @@ function fixture() {
     screen: async (state: any) =>
       ({ ...state, chosen: Object.fromEntries(selected.map((n) => [n, true])), result: 'apply' }) as any,
     ask: async () => true,
+    // fake: serena-agent installs unpinned, which a gating test never runs (ADR 0018).
+    serena: async () => undefined,
+    // fake: graphify's CLI is unpinned too, and the real cleanup runs uv on the developer's own bin folder.
+    cleanup: async () => {},
   };
   return {
     temp,
@@ -63,6 +72,9 @@ function fixture() {
     },
     mcp: (names: string[]) => {
       mcps = names;
+    },
+    installed: (names: string[]) => {
+      installed = names;
     },
     state: () => JSON.parse(readFileSync(join(home, 'dead-agent-skills/state.json'), 'utf8')),
     close: () => rmSync(temp, { recursive: true, force: true }),
@@ -106,6 +118,117 @@ test('Codex writes the GitHub and Atlassian url servers, and removes a deselecte
     f.select([]);
     await applyCodex(f.io);
     assert.ok(f.calls.some((c) => c[0] === 'mcp' && c[1] === 'remove' && c[2] === 'dead-agent-skills-mcp-github'));
+  } finally {
+    f.close();
+  }
+});
+test('Codex adds serena with the path uv installed it to, the built args and a start timeout', async () => {
+  const f = fixture();
+  try {
+    f.select(['serena']);
+    f.io.serena = async () => '/tools/uv-bin/serena';
+    await applyCodex(f.io);
+    const add = f.calls.find((c) => c[0] === 'mcp' && c[1] === 'add' && c[2] === 'dead-agent-skills-serena');
+    assert.deepEqual(add, [
+      'mcp',
+      'add',
+      'dead-agent-skills-serena',
+      '--',
+      '/tools/uv-bin/serena',
+      'start-mcp-server',
+      '--context',
+      'ide',
+      '--project-from-cwd',
+      '--enable-web-dashboard',
+      'False',
+      '--open-web-dashboard',
+      'False',
+      '--add-mode',
+      'no-memories',
+    ]);
+    assert.match(
+      readFileSync(join(f.home, 'config.toml'), 'utf8'),
+      /\[mcp_servers\.dead-agent-skills-serena\]\nstartup_timeout_sec = 15\n/,
+    );
+  } finally {
+    f.close();
+  }
+});
+test('a failed serena install adds no serena server', async () => {
+  const f = fixture();
+  try {
+    let asked = 0;
+    f.io.serena = async () => {
+      asked++;
+      return undefined;
+    };
+    f.select(['serena']);
+    await applyCodex(f.io);
+    assert.equal(asked, 1);
+    assert.ok(!f.calls.some((c) => c[0] === 'mcp' && c[1] === 'add' && c[2] === 'dead-agent-skills-serena'));
+  } finally {
+    f.close();
+  }
+});
+test('a rerun on a machine with graphify removes it and cleans up its CLI once', async () => {
+  const f = fixture();
+  try {
+    let cleaned = 0;
+    f.io.cleanup = async () => {
+      cleaned++;
+    };
+    f.installed(['dead-skills', 'graphify']);
+    f.select(['postgres']);
+    await applyCodex(f.io);
+    assert.ok(f.calls.some((c) => c[0] === 'plugin' && c[1] === 'remove' && c[2] === 'graphify@dead-agent-skills'));
+    assert.equal(cleaned, 1);
+  } finally {
+    f.close();
+  }
+});
+test('a graphify removal Codex refuses is one failure line, and the rest of the step still runs', async () => {
+  const f = fixture();
+  try {
+    const command = f.io.command!;
+    f.io.command = (...args) => {
+      if (args[1] === 'remove' && args[2] === 'graphify@dead-agent-skills') throw new Error('not in marketplace');
+      return command(...args);
+    };
+    f.installed(['dead-skills', 'graphify']);
+    f.select(['postgres']);
+    await applyCodex(f.io);
+    assert.ok(f.calls.some((c) => c[1] === 'add' && c[2] === 'postgres@dead-agent-skills'));
+    assert.ok(failures.some((line) => line.includes('codex plugin remove graphify@dead-agent-skills')));
+    assert.equal(f.state().version, VERSION);
+  } finally {
+    f.close();
+  }
+});
+test('a failed removal of a plugin still in the catalog stops the step', async () => {
+  const f = fixture();
+  try {
+    const command = f.io.command!;
+    f.io.command = (...args) => {
+      if (args[1] === 'remove' && args[2] === 'postgres@dead-agent-skills') throw new Error('locked');
+      return command(...args);
+    };
+    f.installed(['dead-skills', 'postgres']);
+    f.select([]);
+    await assert.rejects(applyCodex(f.io), /locked/);
+  } finally {
+    f.close();
+  }
+});
+test('a machine without graphify gets no graphify cleanup', async () => {
+  const f = fixture();
+  try {
+    let cleaned = 0;
+    f.io.cleanup = async () => {
+      cleaned++;
+    };
+    f.select(['postgres']);
+    await applyCodex(f.io);
+    assert.equal(cleaned, 0);
   } finally {
     f.close();
   }

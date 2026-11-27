@@ -16,6 +16,14 @@ No runtime npm dependencies: Node's standard library only (`typescript` and `@ty
 `install.ts` or a step. `core/release.ts` reading `package.json` and `core/tools.ts` reading `assets/tools.json` at load
 time are the two exceptions, needed to make each the single owner of the repository slug and of the tool pins.
 
+The uv step (`steps/uv.ts`) also installs serena: `uv tool install --upgrade -p 3.13 serena-agent` with the
+installer's own uv, then `uv tool dir --bin` gives the command's path, which becomes serena's `serenaPath` on Claude Code
+(`claude plugin configure --values-stdin`) and the `codex mcp add dead-agent-skills-serena` command on Codex, where
+`startup_timeout_sec = 15` goes into that server's `config.toml` table (`mcpTableLine` in `core/codex.ts`). A failed
+install leaves the path unset and adds no Codex server. The run that retires graphify (Claude Code: `retiredPlugins`;
+Codex: `RETIRED` in `core/codex.ts`) uninstalls `graphifyy` with a uv copy already present, never one downloaded just
+for that (`uninstallGraphify`); ADR 0016.
+
 Programs start through `system/proc.ts` (`which`, `start`/`startSync`), never by bare name: on Windows that searches the
 current folder first, and a `.cmd` shim needs cmd.exe. The one exception is `system/net.ts`'s `tar` (System32's on
 Windows, elsewhere `which` with a bare `tar` as the fallback).
@@ -48,7 +56,8 @@ self-update check). With the file present the TTY guard passes. The steps read n
 
 `install.real.test.ts` is the end-to-end test through it: the whole installer for Claude Code and Codex into temporary
 homes, with the real `claude` and `codex` CLIs, a copy of the built marketplace (headroom-trim on a free port) and this
-checkout's debug builds of web-mcp, http-runner and ado-mcp served as a local release. It runs in the `real` suite under
+checkout's debug builds of web-mcp, http-runner and ado-mcp served as a local release. Its answers leave dcg, serena
+and flows (which brings serena) unpicked: their installs are unpinned (ADR 0018). It runs in the `real` suite under
 the 84 % coverage floor, which reports it NOT RUN without claude, codex or `cargo build --locked -p web-mcp -p
 http-runner -p ado-mcp`. The step tests left keep only what one fresh install can't reach (reruns, upgrades, foreign
 entries, failures, darwin, the legacy rules block), each fake marked `// fake:`.

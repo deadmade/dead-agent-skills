@@ -7,15 +7,15 @@ Claude proposes and recommends; you decide.
 
 | Command                                          | Job                                                             | Runs                                                                                                                                                                                                                                                                                                                                                                                                                                         | Ends in                                           |
 | ------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `/understand <topic>`                            | learn a codebase, subsystem or concept                          | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                                                                                                                                                                                                             | terms in GLOSSARY.md                              |
-| `/build-feature <what>`                          | a new feature with a design                                     | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                                                                                                                                                                                                                                                                                                            | `/review-code`, `/learn`                          |
+| `/understand <topic>`                            | learn a codebase, subsystem or concept                          | serena, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                                                                                                                                                                                                                                                                                                               | terms in GLOSSARY.md                              |
+| `/build-feature <what>`                          | a new feature with a design                                     | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review (naming included), execute                                                                                                                                                                                                                                                                                                                          | `/review-code`, `/learn`                          |
 | `/research-feature <question>`                   | research a design question before building                      | frame, papers and engineering sources (web-mcp, paper-lookup), source check, a claim vote on what the options rest on, `grilling` on the options; no build, no benchmark                                                                                                                                                                                                                                                                     | a decision report, then `/build-feature`          |
 | `/evaluate <url or name> [purpose]`              | is this tool useful here?                                       | identifies the tool, reads the project, prior art, source check; reads only, never runs the tool                                                                                                                                                                                                                                                                                                                                             | one page: adopt, try or skip                      |
 | `/implement <ticket or plan>`                    | build a ticket or a given plan                                  | reads and checks the input, one gate to confirm it; a ticket in this session, a plan through superpowers execution; never plans, never changes a plan                                                                                                                                                                                                                                                                                        | `/review-code`, `/learn`                          |
 | `/fix <symptom>`                                 | fix a bug                                                       | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                                                                                                                                                                                                                                                                                                               | `/review-code`, `/learn`                          |
 | `/upgrade <pkg>[@v] …`                           | bump one dependency, a list, or all outdated                    | changelogs via web-mcp and context7, `blast-radius`; patch and minor bumps as one task, majors through a plan; bump, fix test-first in batches                                                                                                                                                                                                                                                                                               | `/review-code`, `/learn`                          |
 | `/refactor <what>`                               | restructure code without changing behaviour                     | `how` and the suite, shape and size the target, a plan, characterization tests where coverage is thin, the moves on a branch                                                                                                                                                                                                                                                                                                                 | `/review-code`, `/learn`                          |
-| `/review-code [branch\|all\|pr <number>] [base]` | review a branch before merge, the whole repo, or a pull request | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes; `pr` only reports                                                                                                                                                                  | merge, or a PR (`!` lines to push) and CI watched |
+| `/review-code [branch\|all\|pr <number>] [base]` | review a branch before merge, the whole repo, or a pull request | checks once, lenses picked from the diff (correctness: the host's `code-review` or ponytail; lean and spec; tests; docs; security; risk; naming: domain, pattern, meaning), one verifier, a one-screen report; `all` adds mutation testing, hardening and a full security scan on your yes; `pr` only reports                                                                                                                                | merge, or a PR (`!` lines to push) and CI watched |
 | `/learn [flow]`                                  | keep what the work taught                                       | no questions: the few lessons that matter, written to AGENTS.md/CLAUDE.md, `domain-modeling`, a `docs/solutions/` note or memory; ADRs, checks and skill fixes to the Parking lot                                                                                                                                                                                                                                                            | done                                              |
 | `/flows:diagrams <file.md>`                      | check a spec or plan's pictures and show it as one page         | `check.mjs` parses each Mermaid diagram with Mermaid itself, checks file maps against the repo and each mapped file's symbols against its tree-sitter outline; `render.mjs` writes the text and pictures as one HTML page, each file map a Files/Relations panel; every gate that shows a spec or plan runs both                                                                                                                             | a page, or its path                               |
 | `/flows:tidy`                                    | recheck memory notes and flow folders                           | a read-only agent proposes; the main session checks each proposal and drops what fails. It edits memory notes and `flow.md`, writes findings under `docs/` and runs `git rm` on finished flow folders. It asks first about what looks strange: closing a flow, promoting a finding to `docs/`, `user` or `feedback` notes, a note's `name` or `description`, rules about behaviour, and new text without evidence from git or a tracked file | changes applied and reported, uncommitted         |
@@ -35,28 +35,25 @@ Installing flows installs every plugin below except `claude-code`, which names t
 build-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: codebase-design, domain-modeling, grilling, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
 ├ pstack-picks: architect, arena, blast-radius, how, interrogate, principle-boundary-discipline, principle-redesign-from-first-principles, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: brainstorming, executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees, writing-plans
 └ web-mcp: fetch, search
 
 evaluate
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ graphify: graphify
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: how, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 └ web-mcp: fetch, search
 
 fix
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
 ├ pstack-picks: blast-radius, how, interrogate, why
 ├ superpowers: finishing-a-development-branch, systematic-debugging, test-driven-development, using-git-worktrees
@@ -65,18 +62,16 @@ fix
 implement
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: setup-matt-pocock-skills
-├ pstack-picks: blast-radius, how, interrogate, why
+├ pstack-picks: how, interrogate, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees
 └ web-mcp: fetch
 
 learn
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills
 ├ pstack-picks: recall
 ├ superpowers: writing-skills
@@ -85,30 +80,27 @@ learn
 refactor
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: codebase-design, setup-matt-pocock-skills
 ├ ponytail: ponytail-review
 ├ pstack-picks: blast-radius, how, interrogate, principle-boundary-discipline, principle-redesign-from-first-principles, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, using-git-worktrees, writing-plans
 └ web-mcp: fetch
 
 research-feature
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), WebFetch (claude-code), WebSearch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: grilling, setup-matt-pocock-skills
 ├ paper-lookup: paper-lookup
 ├ pstack-picks: how, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 └ web-mcp: fetch, search
 
 review-code
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ flows: diagrams
 ├ mattpocock-picks: grilling, improve-codebase-architecture
 ├ ponytail: ponytail-audit, ponytail-review
@@ -123,21 +115,19 @@ tidy
 understand
 ├ claude-code: Explore (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
-├ graphify: graphify
 ├ mattpocock-picks: domain-modeling, setup-matt-pocock-skills, teach
 ├ pstack-picks: how, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 └ web-mcp: fetch
 
 upgrade
 ├ claude-code: AskUserQuestion (claude-code), Explore (claude-code), Monitor (claude-code), WebFetch (claude-code), code-review (claude-code), security-review (claude-code)
 ├ claude-md-management@claude-plugins-official: claude-md-improver (claude-code)
-├ claude-security@claude-plugins-official: claude-security (claude-code)
 ├ dead-skills: context7
 ├ flows: diagrams
-├ graphify: graphify
 ├ mattpocock-picks: setup-matt-pocock-skills
 ├ pstack-picks: blast-radius, how, interrogate, why
+├ serena: find_referencing_symbols, find_symbol, get_symbols_overview
 ├ superpowers: executing-plans, finishing-a-development-branch, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, writing-plans
 └ web-mcp: fetch
 ```

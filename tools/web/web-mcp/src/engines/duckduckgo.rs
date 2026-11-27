@@ -6,6 +6,7 @@ use url::Url;
 use super::{Found, Parsed, Since, captcha_if, first_text, row, text, verdict};
 
 pub(super) const READY: &str = r#"!!(
+  document.readyState !== 'loading' &&
   document.body &&
   (document.querySelector('article[data-testid="result"]') ||
     [...document.querySelectorAll('[data-testid="mainline"]')].some((m) =>

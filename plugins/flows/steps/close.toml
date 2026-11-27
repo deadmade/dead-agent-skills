@@ -2,7 +2,6 @@
 uses = [
   "superpowers:finishing-a-development-branch",
   "superpowers:systematic-debugging",
-  "pstack-picks:blast-radius",
 ]
 requires = ["decide"]
 
@@ -25,10 +24,14 @@ and merge again; or abort and keep the branch.
 writes; pushing is the owner's call and their hooks block it.
 <!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "git push -u origin <feature-branch>" -->
 
-- The body, saved to a scratchpad file: why; what changed, opening with the smallest picture of it (a call tree, a
-  before/after line, a few boxes in plain text); blast radius (pstack `blast-radius` over the diff) with a **Door**
-  line (one-way: data, a wire format, a public interface; two-way: a revert undoes it); verification, with the
-  before/after output where behaviour changed.
+- The title is concise and specific.
+- The body, saved to a scratchpad file, is markdown. When the repository has a pull request template
+  (`pull_request_template.md`, or a `PULL_REQUEST_TEMPLATE/` folder of them, in its root, `docs/` or `.github/`, any
+  case), the body follows the template's markdown structure, fills its sections for this change and drops its HTML
+  comments; with several, pick the one that fits and name it at the PR gate below. Otherwise it has the headings
+  `## Summary`, with short bullet points, and `## Testing`, with one bullet per command of Decide's **Checks** row and
+  its result, and `Not run: <check>` for each **Skipped** row.
+- Never put absolute local paths, image embeds or attachment links in the body: reviewers can't open them.
 - **Gate:** show the title, the body and the closing commit below, and ask once: one yes approves all three. Make the
   closing commit first, so the PR carries it; then hand over `git push -u origin <branch>`, then
   `gh pr create --title "<title>" --body-file <file>`, one at a time: {{user-runs}}.

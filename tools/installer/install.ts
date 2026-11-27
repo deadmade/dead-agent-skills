@@ -3,11 +3,12 @@
 // each thing it applies in steps/.
 import { AGENTS, selectedAgents } from './core/agents.ts';
 import { applyCodex } from './steps/codex.ts';
-import { readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { SELF_CONFIGURED } from './core/config.ts';
 import { collectConfig } from './steps/config.ts';
 import { missingBinaries } from './core/binaries.ts';
+import { toolPath } from './core/tools.ts';
 import { HINTS, TOGGLES, categorize, unavailable } from './core/options.ts';
 import {
   type Marketplace,
@@ -42,6 +43,7 @@ import {
 } from './core/settings.ts';
 import {
   ask,
+  BIN_DIR,
   CONFIG,
   FLAGS,
   PKG,
@@ -56,12 +58,18 @@ import {
   tryJson,
 } from './context.ts';
 import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
-import { HEADROOM_TRIM, installGraphify, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
+import {
+  HEADROOM_TRIM,
+  installSerena,
+  installUv,
+  prepareTrimServer,
+  stopTrimServer,
+  uninstallGraphify,
+} from './steps/uv.ts';
 import { HTTP_RUNNER, MCP_AZURE, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
 import { applyDcg } from './steps/dcg.ts';
-import { applyOutputStyle } from './steps/output-style.ts';
 import { addMarketplaces, applyPlugins, listed, removeForeign } from './steps/plugins.ts';
 import { applySettings } from './steps/settings.ts';
 import { clearTargets } from './system/files.ts';
@@ -113,6 +121,9 @@ if (!agents.includes('claude-code')) {
 }
 
 const RULES = join(CONFIG, 'rules', 'dead-claude-skills.md');
+// Earlier installers wrote their own concise style here; Claude Code's built-in Concise replaced it.
+const OLD_STYLE = join(CONFIG, 'output-styles', 'concise.md');
+const OLD_STYLE_MARK = 'description: Short, direct answers with no preamble, recap or filler.';
 const HANDOFF: Record<string, string[]> = {
   'mcp-github': [
     'Needs a fine-grained PAT: https://github.com/settings/personal-access-tokens/new',
@@ -300,12 +311,29 @@ const webBuiltinsOff = webBuiltinsDecision({
   installed: has(WEB_MCP),
   healthy: browser.works,
 });
-const withGraphify = selected.some((id) => nameOf(id) === 'graphify');
-if (selected.includes(HEADROOM_TRIM) || withGraphify) {
-  const uv = await installUv();
+const withSerena = selected.some((id) => nameOf(id) === 'serena');
+const graphifyRetired = retired.includes(`graphify@${MARKETPLACE}`);
+let uv: string | undefined;
+if (selected.includes(HEADROOM_TRIM) || withSerena) {
+  uv = await installUv();
   if (uv && selected.includes(HEADROOM_TRIM)) await prepareTrimServer(uv);
-  if (uv && withGraphify) installGraphify(uv);
+  const serenaPath = uv && withSerena ? installSerena(uv) : undefined;
+  if (serenaPath) {
+    const r = await claude(
+      JSON.stringify({ serenaPath }),
+      'plugin',
+      'configure',
+      `serena@${MARKETPLACE}`,
+      '--values-stdin',
+    );
+    if (r.ok) done.push(`serena: serenaPath is ${serenaPath}`);
+    else
+      failures.push(
+        `serena: could not set serenaPath (${r.err}); set it to ${serenaPath} with /plugin configure serena`,
+      );
+  }
 }
+if (graphifyRetired) uninstallGraphify([uv, toolPath(BIN_DIR, 'uv', process.platform)]);
 
 const toggles = {
   statusLine: on('ccstatusline'),
@@ -318,7 +346,8 @@ await applyCcstatusline(current.ccstatusline, on('ccstatusline'));
 await applyDcg(current.dcg, on('dcg'));
 if (browser.path) await configureAgentBrowser(browser.path);
 if (clean) done.push(...clearTargets(CONFIG));
-await applyOutputStyle(join(CONFIG, 'output-styles', 'concise.md'), (question) => ask(question, false));
+// Only the file the installer wrote: its frontmatter names it; a style edited by hand under that name stays.
+if (existsSync(OLD_STYLE) && readFileSync(OLD_STYLE, 'utf8').includes(OLD_STYLE_MARK)) remove(OLD_STYLE, OLD_STYLE);
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);
 

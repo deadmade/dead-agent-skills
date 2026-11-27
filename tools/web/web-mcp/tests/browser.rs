@@ -3,7 +3,7 @@ mod common;
 use std::time::{Duration, Instant};
 
 use common::{
-    Fixture, Mcp, PUBLIC, Resp, images, is_error, kill, processes_holding, tempdir, text,
+    Fixture, Mcp, PUBLIC, Resp, guarded, images, is_error, kill, processes_holding, tempdir, text,
 };
 use serde_json::{Value, json};
 
@@ -54,6 +54,14 @@ fn ref_of(snapshot: &str, element: &str) -> String {
     let at = line.find("ref=").unwrap() + "ref=".len();
     let len = line[at..].find([']', ',']).unwrap();
     format!("@{}", &line[at..at + len])
+}
+
+/// An eval reply's value: agent-browser's answer also carries the session's `lifecycle` and `origin`.
+fn eval_result(t: &str) -> &str {
+    guarded(t)
+        .0
+        .rsplit_once("\n\nresult: ")
+        .map_or("", |(_, r)| r)
 }
 
 /// The fixture server, with `/other.html` a second page Chrome can show (`article.html` names an image on an outside
@@ -320,8 +328,11 @@ fn a_slow_page_ends_the_fallback_at_its_deadline_and_closes_its_tab() {
     let url = fx.url("/slow.html");
     let r = mcp.call("fetch", json!({"url": url}));
     assert!(!is_error(&r), "{r}");
+    // web-mcp's own note: after the closer, not in the page text.
+    let (_, after) = guarded(text(&r));
+    assert!(after.starts_with("\n\n(This page looks empty"), "{r}");
     assert!(
-        text(&r).contains("browser fallback failed: the page did not finish within 3 s"),
+        after.contains("browser fallback failed: the page did not finish within 3 s"),
         "{r}"
     );
     // Measured: the tab outlives the fetch and goes once the page arrives (the close waits behind the load).
@@ -401,7 +412,8 @@ fn an_app_shell_is_rendered_archived_and_cached() {
         ("fetch", json!({"url": ua})),
         ("fetch", json!({"url": ub})),
     ]);
-    let body = |r: &Value| text(r).split_once("\n\n").unwrap().1.to_owned();
+    // Inside the guard's markers: each reply has its own nonce.
+    let body = |r: &Value| guarded(text(r)).0.to_owned();
     for (r, path) in rs.iter().zip(["/a.html", "/b.html"]) {
         assert!(!is_error(r), "{r}");
         let md = body(r);
@@ -453,13 +465,96 @@ fn dash_leading_or_missing_ref_is_rejected() {
 #[test]
 fn dash_leading_text_is_rejected() {
     let mut mcp = no_browser();
-    for action in ["fill", "type"] {
-        let r = mcp.call(
-            "browser",
-            json!({"action": action, "session": "s", "ref": "@e1", "text": "--help"}),
+    let r = mcp.call(
+        "browser",
+        json!({"action": "fill", "session": "s", "ref": "@e1", "text": "--help"}),
+    );
+    refused(&r, "text may not start with '-'");
+}
+
+#[test]
+fn empty_type_is_rejected() {
+    let mut mcp = no_browser();
+    let r = mcp.call(
+        "browser",
+        json!({"action": "type", "session": "s", "ref": "@e1", "text": ""}),
+    );
+    refused(&r, "`text` is empty");
+}
+
+/// `type` presses one key at a time, 30 to 60 ms apart, and a text that starts with `-` arrives as it is; a long
+/// text's pace is cut so the whole of it takes at most about 5 s. The gaps are the page's own input-event times.
+#[test]
+fn typing_is_paced_and_a_long_text_capped() {
+    let fx = pages();
+    let mut mcp = Mcp::start_real(&[]);
+    open(&mut mcp, "s", &fx.url("/form.html"));
+    let snapshot = browse(&mut mcp, json!({"action": "snapshot", "session": "s"}));
+    let query = ref_of(&snapshot, "textbox \"Query\"");
+    let listen = "window.keys = []; document.getElementById('q').addEventListener('input', () => \
+                  keys.push(performance.now())); 'listening'";
+    let gaps = |mcp: &mut Mcp, typed: &str| -> Vec<f64> {
+        browse(
+            mcp,
+            json!({"action": "eval", "session": "s", "js": "document.getElementById('q').value = ''"}),
         );
-        refused(&r, "text may not start with '-'");
-    }
+        browse(mcp, json!({"action": "eval", "session": "s", "js": listen}));
+        browse(
+            mcp,
+            json!({"action": "type", "session": "s", "ref": query, "text": typed}),
+        );
+        let value = browse(
+            mcp,
+            json!({"action": "eval", "session": "s", "js": "document.getElementById('q').value"}),
+        );
+        assert_eq!(eval_result(&value), typed);
+        let times = browse(
+            mcp,
+            json!({"action": "eval", "session": "s", "js": "JSON.stringify(keys)"}),
+        );
+        let times: Vec<f64> = serde_json::from_str(eval_result(&times)).unwrap();
+        times.windows(2).map(|w| w[1] - w[0]).collect()
+    };
+    let short = gaps(&mut mcp, "-hello");
+    // Timer slop: a 30 ms delay is never measured as much less.
+    assert!(short.iter().all(|g| *g >= 25.0), "{short:?}");
+    let long = gaps(&mut mcp, &"ü".repeat(500));
+    let mean = long.iter().sum::<f64>() / long.len() as f64;
+    // At most 10 ms each, plus the key's own dispatch; an uncapped pace would be at least 30.
+    assert!(mean < 25.0, "{mean}");
+}
+
+#[test]
+fn eval_output_is_guarded() {
+    let mut mcp = Mcp::start_real(&[]);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "'\u{E0041}x'"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(eval_result(text(&r)), "x");
+    assert_eq!(guarded(text(&r)).1, "");
+    // The agent wrote the script, and there is no archived original: eval output keeps what it matches.
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "'<|im_start|>'"}),
+    );
+    assert_eq!(eval_result(text(&r)), "<|im_start|>");
+    assert!(!text(&r).contains("span"), "{}", text(&r));
+    // A thrown error's text is stripped and guarded too.
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "throw new Error('bad\u{202E}news')"}),
+    );
+    assert!(is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        t.starts_with("Source: agent-browser session s (eval, "),
+        "{t}"
+    );
+    let (body, after) = guarded(t);
+    assert!(body.contains("badnews"), "{t}");
+    assert!(!t.contains('\u{202E}') && after.is_empty(), "{t}");
 }
 
 #[test]

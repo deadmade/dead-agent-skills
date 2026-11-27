@@ -117,11 +117,7 @@ test('expectedDeps: every plugin once, sorted, builtins and packs left out', () 
 test("expectedDeps takes Claude Code's composed uses, host text included", () => {
   const fx = repo(conductor('picks:how', 'Ask how.\n[step: host]\n'));
   const claude = composeFlows(join(fx, FLOWS), CLAUDE_CODE).uses;
-  assert.deepEqual(expectedDeps(claude, []), [
-    'claude-md-management@claude-plugins-official',
-    'claude-security@claude-plugins-official',
-    'picks',
-  ]);
+  assert.deepEqual(expectedDeps(claude, []), ['claude-md-management@claude-plugins-official', 'picks']);
   assert.deepEqual(expectedDeps(composeFlows(join(fx, FLOWS), CODEX).uses, []), ['picks']);
 });
 

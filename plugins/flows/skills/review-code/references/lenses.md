@@ -1,16 +1,20 @@
 # Lenses
 
 One agent per lens that runs, each a fresh agent on the model named, unless the brief names a skill
-or agent that runs itself. Every brief ends with the shared tail below.
+or agent that runs itself. Every brief ends with the shared tail below, except the naming lenses, which end with naming.md's Naming tail;
+in the small diff's combined agent each tail governs only its own briefs.
 
-| Lens        | Runs when                                                                                         | Model               |
-| ----------- | ------------------------------------------------------------------------------------------------- | ------------------- |
-| correctness | always                                                                                            | {{model:standard}}  |
-| lean        | always                                                                                            | {{model:strongest}} |
-| tests       | source or tests changed                                                                           | {{model:standard}}  |
-| docs        | a doc, an instruction file, a manifest description, or a documented command, path or flag changed | {{model:standard}}  |
-| security    | the diff touches input parsing, auth, the network, files, processes, secrets or dependencies      | {{model:strongest}} |
-| risk        | migrations, a public interface, a wire format, config or a hot path                               | {{model:strongest}} |
+| Lens           | Runs when                                                                                                                    | Model               |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| correctness    | always                                                                                                                       | {{model:standard}}  |
+| lean           | always                                                                                                                       | {{model:strongest}} |
+| tests          | source or tests changed                                                                                                      | {{model:standard}}  |
+| docs           | a doc, an instruction file, a manifest description, or a documented command, path or flag changed                            | {{model:standard}}  |
+| security       | the diff touches input parsing, auth, the network, files, processes, secrets or dependencies                                 | {{model:strongest}} |
+| risk           | migrations, a public interface, a wire format, config or a hot path                                                          | {{model:strongest}} |
+| naming-domain  | the diff adds or renames names (as naming-pattern; prose alone adds none), and the repo has a glossary or the run has a spec | {{model:standard}}  |
+| naming-pattern | the diff adds or renames names (source, tests, files, config keys, flags)                                                    | {{model:standard}}  |
+| naming-meaning | the diff adds or renames names in source or tests                                                                            | {{model:standard}}  |
 
 **Small diff** (at most 3 files and about 50 changed lines): agents cost more than they find. One fresh agent on
 {{model:strongest}} runs every lens that applies, one brief after another, and the report's Lenses line says
@@ -49,8 +53,7 @@ finding too.
 instruction-file review, leading with statements the diff made untrue. Prose findings only for docs the diff changed.
 
 **security.** One agent following the adapter's security review, with the diff from Phase 1 in place of a branch diff
-a skill builds itself. Where the adapter offers more than one, this lens takes the one-agent review; a many-agent
-pipeline (`claude-security`) runs only as the `all` pass full scan.
+a skill builds itself.
 
 **risk.** pstack `blast-radius` over the change (callers, data, wire formats, configs), plus:
 
@@ -58,6 +61,13 @@ pipeline (`claude-security`) runs only as the `all` pass full scan.
   against the new schema during a deploy;
 - a public interface or wire format: what an existing caller or stored value now breaks;
 - a hot path: work repeated per item or per request, unbounded growth.
+
+**naming-domain, naming-pattern, naming-meaning.** Each follows [naming.md](../../../references/naming.md) for its one kind
+(Domain, Pattern, Meaning) on the names the diff adds or renames; naming-domain also gets the glossary (or the file
+`GLOSSARY-MAP.md` points at) and the spec. Each ends with naming.md's **Naming tail** in place of the shared tail.
+Under `pr`, the glossary and the conventions are read from the base, names are searched with `git grep` at the head
+sha (a name from the PR quoted as SKILL.md says), and naming-pattern is skipped, and recorded, when the head couldn't be
+fetched.
 
 ### Shared tail
 
@@ -70,11 +80,11 @@ style taste, no praise, no summary. "No findings" is a valid answer.
 ## `all`
 
 `all` runs the lenses on every tracked file (vendored skipped, as Phase 1 says), then the main session offers these
-passes, each with a recommendation and its cost in agents, and runs only those the user says yes to:
+passes, each with a recommendation and its cost in agents, and runs only those the user says yes to. The naming lenses
+don't run under `all`: with no change there are no new names to judge, and the Lenses line lists them as skipped.
 
-| Pass        | Follows                                                                                          |
-| ----------- | ------------------------------------------------------------------------------------------------ |
-| tests, deep | [tests-all.md](tests-all.md): mutation testing, property candidates, untested requirements       |
-| hardening   | [harden-all.md](harden-all.md): security domains, sharp edges, bloat, architecture               |
-| full scan   | `claude-security:claude-security` where the host has it, a scoped scan (its own pipeline, panel) |
-| every claim | [docs.md](docs.md) **Every claim**                                                               |
+| Pass        | Follows                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| tests, deep | [tests-all.md](tests-all.md): mutation testing, property candidates, untested requirements |
+| hardening   | [harden-all.md](harden-all.md): security domains, sharp edges, bloat, architecture         |
+| every claim | [docs.md](docs.md) **Every claim**                                                         |

@@ -28,9 +28,9 @@ compiler enforces that. They still carry web-mcp's session-name conventions: see
 What web-mcp uses, and nothing else:
 
 - `browser::{Browser, BrowserError, SearchRun, ATTACHED_TIMEOUT, READ_MARGIN, check_session}`. `Browser` has `new`,
-  `session`, `warm`, `bind`, `run`, `batch`, `batch_once`, `render`, `rendered_html`, `close`, `close_all` and the public field
-  `fallback_deadline`. `SearchRun` has the public field `ready_js`; `BrowserError` has the variants `Missing`, `Failed`,
-  `Timeout` and `TabGone`.
+  `session`, `warm`, `bind`, `run`, `batch`, `batch_once`, `render`, `rendered_html`, `rendered_page` (with the HTTP
+  status of the browser's own load), `close`, `close_all` and the public field `fallback_deadline`. `SearchRun` has the
+  public field `ready_js`; `BrowserError` has the variants `Missing`, `Failed`, `Timeout` and `TabGone`.
 - `bind(keys)` binds, after `warm` and before any of them navigates, each key's tab that no call has run in this
   window yet, each within 2 s. agent-browser 0.43.0 holds a session's first call while another tab's page is still
   loading (measured: 4 s headless, 10 s and more in the window), so a hanging page would cost tabs bound after it

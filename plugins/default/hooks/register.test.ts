@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing';
 import type { On } from 'claude-code';
 import type { Engine } from 'claude-code/testing';
 
-import { FLARE_MS, GLITCH_MS } from './register';
+import { FLARE_MS } from './register';
 import { SPINNER_WORDS, TURN_WORDS, pick } from './words';
 
 // The bottom hook stands for the engine and records the props the plugin passed on.
@@ -47,48 +47,26 @@ test('pick is stable for one seed', () => {
   expect(SPINNER_WORDS.length).toBeGreaterThanOrEqual(12);
 });
 
-// Fakes the host beneath the plugin: tool calls fail when their command says so; the status line is recorded.
+// Fakes the host beneath the plugin: the status line is recorded.
 function reactions(on: On) {
   const clock = mock.clock(on);
   const status: (string | undefined)[] = [];
-  on(
-    'tool.call',
-    (_$, e) =>
-      ((e as { command?: string }).command === 'fail' ? { isError: true, result: 'x' } : { result: 'ok' }) as never,
-  );
   on('ui.status', (_$, e) => {
     status.push(e.text);
     return { value: undefined };
   });
   on('turn.complete', () => ({ text: '' }));
-  on('turn.start', (_$, e) => ({ turnId: e.turnId }));
   return { clock, status };
 }
 
-const fail = ($: Engine, agentId?: string) => $.tool.call({ tool: 'Bash', command: 'fail', agentId } as never);
-const begin = ($: Engine) => $.turn.start({ text: 'go', turnId: 't' });
 const complete = ($: Engine, agentId?: string, turnId = 't') =>
   $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId, agentId, reason: 'answer' } as never);
-test('ten failing tool calls in one turn glitch once', async ($, on) => {
-  const r = reactions(on);
-  await begin($);
-  for (let i = 0; i < 10; i++) await fail($);
-  expect(r.status.filter((t) => t !== undefined)).toHaveLength(1);
-});
 
-test('the next turn can glitch again', async ($, on) => {
+// Claude Code won't start Code Mode while a mod hooks tool calls.
+test('no tool call reaches the plugin', async ($, on) => {
   const r = reactions(on);
-  await begin($);
-  await fail($);
-  await begin($);
-  await fail($);
-  expect(r.status.filter((t) => t !== undefined)).toHaveLength(2);
-});
-
-test('a subagent failure does not glitch', async ($, on) => {
-  const r = reactions(on);
-  await begin($);
-  await fail($, 'agent-1');
+  on('tool.call', () => ({ isError: true, result: 'x' }) as never);
+  await $.tool.call({ tool: 'Bash', command: 'fail' } as never);
   expect(r.status).toEqual([]);
 });
 
@@ -100,18 +78,13 @@ test('a main turn end flares, a subagent end does not', async ($, on) => {
   expect(r.status.filter((t) => t !== undefined)).toHaveLength(1);
 });
 
-test('reactions clear themselves', async ($, on) => {
+test('the flare clears itself', async ($, on) => {
   const r = reactions(on);
-  await begin($);
-  await fail($);
-  await r.clock.advance(GLITCH_MS - 1);
+  await complete($);
+  await r.clock.advance(FLARE_MS - 1);
   expect(r.status.at(-1)).toBeDefined();
   await r.clock.advance(1);
   expect(r.status.at(-1)).toBeUndefined();
-  await complete($);
-  await r.clock.advance(FLARE_MS);
-  expect(r.status.at(-1)).toBeUndefined();
-  expect(r.status.filter((t) => t !== undefined)).toHaveLength(2);
 });
 
 const band = (view = {}) =>

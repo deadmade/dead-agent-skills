@@ -10,7 +10,7 @@ import { checkMarkdown, extractBlocks, parseDiagrams, parseFilesBlock, planMap, 
 
 // Bumped by hand: Dependabot cannot read these.
 const MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@12.3.0/dist/mermaid.esm.min.mjs';
-const MARKED_URL = 'https://cdn.jsdelivr.net/npm/marked@18.1.3/lib/marked.esm.js';
+const MARKED_URL = 'https://cdn.jsdelivr.net/npm/marked@18.2.0/lib/marked.esm.js';
 
 // Every tunable look-and-feel value of the page, and the only place that holds a colour or a font. `light` and `dark`
 // become the CSS tokens and, through `mermaid`, the diagrams' theme variables.

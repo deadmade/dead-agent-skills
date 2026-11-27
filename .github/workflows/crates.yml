@@ -72,7 +72,7 @@ jobs:
             process.exit(0);
           "
 
-      # Chrome for Testing, whichever version agent-browser installs (ADR 0017's one unpinned download).
+      # Chrome for Testing, whichever version agent-browser installs (ADR 0018's one unpinned download).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.agent-browser/browsers

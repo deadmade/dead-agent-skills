@@ -26,7 +26,7 @@ pub fn extract_html(html: &str, base: &Url) -> Page {
     };
     Page {
         title: article.title.clone(),
-        markdown: htmd::convert(&article.content)
+        markdown: htmd::convert(&*article.content)
             .unwrap_or_default()
             .trim()
             .to_owned(),
@@ -109,6 +109,45 @@ mod tests {
                 "https://cdn.example.org/charts/adoption.jpg"
             ]
         );
+    }
+
+    #[test]
+    fn hidden_elements_stay_out() {
+        let para = "Rust's ownership model lets teams ship systems code without a garbage collector, \
+                    and the compiler catches whole classes of memory bugs before they reach production.";
+        let html = format!(
+            r#"<html><head><title>Hidden Things</title><style>.x{{content:"SECRET-E"}}</style></head>
+<body><article><h1>Hidden Things</h1>
+<p>{para}</p>
+<p hidden>SECRET-A</p>
+<div aria-hidden="true">SECRET-B</div>
+<template>SECRET-C</template>
+<script>var s = "SECRET-D";</script>
+<p>{para} Ordinary paragraph two.</p>
+<img data-src="/lazy.jpg"><noscript><img src="/real.jpg"></noscript>
+<p>{para} Ordinary paragraph three.</p>
+</article></body></html>"#
+        );
+        let page = extract_html(&html, &base());
+        assert!(
+            page.markdown.contains("Ordinary paragraph two."),
+            "{}",
+            page.markdown
+        );
+        assert!(
+            page.markdown.contains("Ordinary paragraph three."),
+            "{}",
+            page.markdown
+        );
+        for secret in ["SECRET-A", "SECRET-B", "SECRET-C", "SECRET-D", "SECRET-E"] {
+            assert!(
+                !page.markdown.contains(secret),
+                "{secret} in {}",
+                page.markdown
+            );
+        }
+        let got: Vec<&str> = page.images.iter().map(Url::as_str).collect();
+        assert!(got.iter().any(|u| u.ends_with("/real.jpg")), "{got:?}");
     }
 
     #[test]

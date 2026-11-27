@@ -189,3 +189,22 @@ test('Codex flows README lists declared companion plugins in dependency order', 
   ]);
   assert.doesNotMatch(readme, /^codex plugin add graphify@/m);
 });
+test('the real tree ships serena and no graphify', () => {
+  const out = mkdtempSync(join(tmpdir(), 'compiler-real-'));
+  buildTree(join(import.meta.dirname, '../../..'), out);
+  const args = 'start-mcp-server --context ide --project-from-cwd --enable-web-dashboard False --open-web-dashboard False --add-mode no-memories';
+  const read = (path: string) => readFileSync(join(out, path), 'utf8');
+  assert.deepEqual(JSON.parse(read('.claude-plugin/serena/.mcp.json')), {
+    mcpServers: { serena: { command: '${user_config.serenaPath}', args: args.split(' ') } },
+  });
+  assert.deepEqual(JSON.parse(read('.agents/plugins/serena/codex-mcp.json')).args, args.split(' '));
+  const setup = read('.agents/plugins/serena/skills/setup-serena/SKILL.md');
+  assert.ok(setup.includes(`codex mcp add dead-agent-skills-serena -- serena ${args}`));
+  assert.ok(setup.includes('startup_timeout_sec = 15'));
+  assert.ok(setup.includes('uv tool install -p 3.13 serena-agent'));
+  assert.equal(existsSync(join(out, '.claude-plugin/graphify')), false);
+  assert.equal(existsSync(join(out, '.agents/plugins/graphify')), false);
+  assert.equal(existsSync(join(out, '.agents/plugins/flows/resources.json')), false);
+  assert.ok(JSON.parse(read('.claude-plugin/flows/.claude-plugin/plugin.json')).dependencies.includes('serena'));
+  assert.match(read('.agents/plugins/flows/README.md'), /^codex plugin add serena@dead-agent-skills$/m);
+});

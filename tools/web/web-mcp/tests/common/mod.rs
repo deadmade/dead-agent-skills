@@ -882,3 +882,22 @@ pub fn images(result: &Value) -> usize {
 pub fn is_error(result: &Value) -> bool {
     result["isError"] == true
 }
+
+/// A guarded reply split at its nonce markers: the text inside them and what follows the closer. Panics unless the
+/// text after the Source line's `\n\n` opens with `<<untrusted-{nonce}>>` and its matching closer follows.
+pub fn guarded(t: &str) -> (&str, &str) {
+    let (_, rest) = t
+        .split_once("\n\n")
+        .unwrap_or_else(|| panic!("no Source line: {t}"));
+    let opener = rest.lines().next().unwrap_or_default();
+    let nonce = opener
+        .strip_prefix("<<untrusted-")
+        .and_then(|n| n.strip_suffix(">>"))
+        .unwrap_or_else(|| panic!("no opening marker after the Source line: {t}"));
+    let closer = format!("\n<</untrusted-{nonce}>>");
+    let start = opener.len() + 1;
+    let end = rest
+        .rfind(&closer)
+        .unwrap_or_else(|| panic!("no matching closer: {t}"));
+    (&rest[start..end], &rest[end + closer.len()..])
+}

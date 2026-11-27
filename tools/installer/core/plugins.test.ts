@@ -41,7 +41,6 @@ test('opt-ins from the real manifests', () => {
       ...[
         'csharp-skills',
         'flows',
-        'graphify',
         'hallmark',
         'headroom-trim',
         'http-runner',
@@ -50,6 +49,7 @@ test('opt-ins from the real manifests', () => {
         'nix-lsp',
         'postgres',
         'rust-skills',
+        'serena',
         'shop',
         'web-mcp',
       ].map((n) => `${n}@${M}`),
@@ -60,14 +60,14 @@ test('opt-ins from the real manifests', () => {
 
 test('bundle ids resolve bare names to our marketplace; flows carries the packs, so the bundle has none', () => {
   const ids = bundleIds(bundle);
-  assert.ok(ids.includes(`dead-skills@${M}`) && ids.includes(`claude-security@${O}`));
-  for (const gone of [`superpowers@${M}`, `ponytail@${M}`, `code-review@${O}`]) assert.ok(!ids.includes(gone), gone);
+  assert.ok(ids.includes(`dead-skills@${M}`) && ids.includes(`agent-review@${M}`));
+  for (const gone of [`superpowers@${M}`, `ponytail@${M}`, `code-review@${O}`, `security-guidance@${O}`, `claude-security@${O}`]) assert.ok(!ids.includes(gone), gone);
 });
 
 test('token plugins', () => {
   assert.equal(needsToken(json('.claude-plugin/mcp-github/.claude-plugin/plugin.json')), true);
   assert.equal(needsToken(json('.claude-plugin/mcp-azure/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('.claude-plugin/graphify/.claude-plugin/plugin.json')), false);
+  assert.equal(needsToken(json('.claude-plugin/serena/.claude-plugin/plugin.json')), false);
 });
 
 test('select installs, deselect uninstalls, token plugins hand off', () => {
@@ -101,9 +101,10 @@ test('foreign plugins and marketplaces spare ours and the official plugins we us
 
 test('retired plugins are ours but no longer in the marketplace', () => {
   const managed = [...bundleIds(bundle), ...optIns(marketplace, bundle)];
-  assert.deepEqual(retiredPlugins([`dev-feature@${M}`, `graphify@${M}`, `code-review@${O}`, 'x@y'], managed), [
-    `dev-feature@${M}`,
-  ]);
+  assert.deepEqual(
+    retiredPlugins([`dev-feature@${M}`, `graphify@${M}`, `serena@${M}`, `code-review@${O}`, 'x@y'], managed),
+    [`dev-feature@${M}`, `graphify@${M}`],
+  );
 });
 
 test('a flow-cockpit install is retired once the real catalog no longer lists it', () => {

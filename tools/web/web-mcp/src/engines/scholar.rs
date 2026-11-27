@@ -7,6 +7,7 @@ use url::Url;
 use super::{Parsed, Since, captcha_if, first_text, row, text, verdict};
 
 pub(super) const READY: &str = r"!!(
+  document.readyState !== 'loading' &&
   document.body &&
   (document.querySelector('#gs_res_ccl_mid .gs_r.gs_or .gs_ri') ||
     /did not match any articles/.test((document.querySelector('#gs_res_ccl_top') || {}).innerText || '') ||
@@ -22,7 +23,7 @@ pub(super) fn url(query: &str, since: Option<Since>) -> Url {
     .expect("static URL");
     if since == Some(Since::Year) {
         let year = jiff::Timestamp::now()
-            .to_zoned(jiff::tz::TimeZone::UTC)
+            .to_zoned_datetime(jiff::tz::TimeZone::UTC)
             .year();
         u.query_pairs_mut()
             .append_pair("as_ylo", &(year - 1).to_string());

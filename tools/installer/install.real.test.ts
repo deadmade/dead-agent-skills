@@ -119,7 +119,10 @@ test('a full install on fresh homes', { timeout: 1_200_000 }, async (t) => {
       chosen: {
         ...Object.fromEntries([...ids, 'web-mcp', 'http-runner', 'mcp-azure'].map((k) => [k, true])),
         ccstatusline: true,
+        // Unpinned installs never run in a gating test (ADR 0018); flows, which brings serena, stays unpicked too.
         dcg: false,
+        'serena@dead-claude-skills': false,
+        serena: false,
         'strip-defaults': false,
         clean: false,
       },

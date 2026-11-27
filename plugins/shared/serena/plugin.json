@@ -1,0 +1,32 @@
+{
+  "description": "Serena's symbol-level code search and editing over language servers, as an MCP server, started in its ide context without memories, onboarding or a dashboard. Writes .serena/project.yml into each repository it activates and starts that repository's language servers, which may run its build scripts. Needs the serena CLI, which the installer installs with uv.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "config": {
+    "serenaPath": {
+      "type": "string",
+      "title": "serena command",
+      "description": "Path to the serena command. Default: serena on PATH.",
+      "default": "serena"
+    }
+  },
+  "mcpServers": {
+    "serena": {
+      "command": "${config.serenaPath}",
+      "args": [
+        "start-mcp-server",
+        "--context",
+        "ide",
+        "--project-from-cwd",
+        "--enable-web-dashboard",
+        "False",
+        "--open-web-dashboard",
+        "False",
+        "--add-mode",
+        "no-memories"
+      ]
+    }
+  }
+}

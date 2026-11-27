@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { copy, json, text } from '../emit/fs.ts';
+import { json, text } from '../emit/fs.ts';
 import { renderCodexTheme } from '../transforms/themes.ts';
 import { INTEGRATIONS, MCP_SETTINGS, READMES, mcpSettings, packageReadme, setupSkill } from '../templates/codex.ts';
 import { codexThemeSetup, projectRulesSkill } from '../templates/skills.ts';
@@ -12,7 +12,6 @@ const ROOT = '${CODEX_PLUGIN_ROOT}';
 // Codex listings say what the plugin does there.
 const DESCRIPTIONS: Record<string, string> = {
   'dead-skills': 'Shared coding conventions, desktop notifications and Context7 setup for Codex.',
-  graphify: 'Graphify skills for querying a codebase knowledge graph. Requires the graphify CLI.',
   flows:
     'Portable conductor skills, most with approval gates and resumable flow documents. Install the companion plugins listed in README.md from the same marketplace.',
 };
@@ -42,7 +41,7 @@ export const codex: Target = {
   },
   supportsUiMod: () => false,
   emit(context) {
-    const { plugin, dest, root, hooks, all } = context;
+    const { plugin, dest, root, hooks } = context;
     const m = plugin.manifest;
     const description = (DESCRIPTIONS[plugin.name] ?? plugin.description).replaceAll('for Claude', 'for coding agents');
     for (const theme of m?.themes ?? []) {
@@ -54,14 +53,6 @@ export const codex: Target = {
         join(dest, 'skills/project-rules/SKILL.md'),
         projectRulesSkill(readFileSync(join(plugin.dir!, m.instructions), 'utf8')),
       );
-    for (const name of m?.embeds ?? []) {
-      const embedded = all.find((p) => p.name === name);
-      if (!embedded?.dir) continue;
-      copy(join(embedded.dir, 'skills'), join(dest, `resources/${name}/skills`));
-      for (const file of ['LICENSE', 'NOTICE', 'UPSTREAM'])
-        if (existsSync(join(embedded.dir, file))) copy(join(embedded.dir, file), join(dest, `resources/${name}`, file));
-      json(join(dest, 'resources.json'), { [name]: `./resources/${name}/skills/${name}/SKILL.md` });
-    }
     if (INTEGRATIONS.includes(plugin.name))
       text(join(dest, 'skills', `setup-${plugin.name}`, 'SKILL.md'), setupSkill(context));
     if (READMES.includes(plugin.name)) text(join(dest, 'README.md'), packageReadme(context));

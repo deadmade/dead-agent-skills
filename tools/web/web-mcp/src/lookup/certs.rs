@@ -43,7 +43,8 @@ async fn ask(ctx: &Ctx, domain: &str) -> Result<Part, String> {
     let rows: Vec<Value> = if got.body.trim().is_empty() {
         Vec::new()
     } else {
-        serde_json::from_str(&got.body).map_err(|e| format!("not a JSON list ({e})"))?
+        serde_json::from_str(&got.body)
+            .map_err(|e| format!("not a JSON list ({})", super::json_error(&e)))?
     };
     let shown = if rows.is_empty() {
         format!("No certificates found for {domain} and its subdomains.")

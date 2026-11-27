@@ -104,7 +104,7 @@ pub struct Archive(Arc<Inner>);
 impl Archive {
     /// # Errors
     /// When the folders or files under `.web` can't be created.
-    pub fn open(project: &Path, now: &jiff::Zoned) -> io::Result<Self> {
+    pub fn open(project: &Path, now: &jiff::ZonedDateTime) -> io::Result<Self> {
         let web = std::path::absolute(project)?.join(".web");
         match std::fs::symlink_metadata(&web) {
             Ok(m) if !m.is_dir() => {
@@ -547,7 +547,7 @@ mod tests {
     }
 
     fn open(dir: &Path) -> Archive {
-        Archive::open(dir, &jiff::Zoned::now()).unwrap()
+        Archive::open(dir, &jiff::ZonedDateTime::now()).unwrap()
     }
 
     fn page(url: &str, rendered: Option<&str>) -> Item {
@@ -667,7 +667,7 @@ mod tests {
         assert_eq!(a.cached(&url), Some(got));
         let b = Archive::open(
             &d,
-            &jiff::Zoned::now()
+            &jiff::ZonedDateTime::now()
                 .checked_add(jiff::Span::new().seconds(5))
                 .unwrap(),
         )
@@ -785,7 +785,7 @@ mod tests {
         let outside = tempdir().join("victim");
         std::fs::create_dir_all(d.join(".web")).unwrap();
         std::os::unix::fs::symlink(&outside, d.join(".web/.gitignore")).unwrap();
-        Archive::open(&d, &jiff::Zoned::now()).unwrap();
+        Archive::open(&d, &jiff::ZonedDateTime::now()).unwrap();
         assert!(!outside.exists());
     }
 
@@ -894,14 +894,14 @@ mod tests {
         let d = tempdir();
         let target = tempdir();
         std::os::unix::fs::symlink(&target, d.join(".web")).unwrap();
-        assert!(Archive::open(&d, &jiff::Zoned::now()).is_err());
+        assert!(Archive::open(&d, &jiff::ZonedDateTime::now()).is_err());
         assert!(std::fs::read_dir(&target).unwrap().next().is_none());
     }
 
     #[test]
     fn existing_run_dir_name_is_refused() {
         let d = tempdir();
-        let now = jiff::Zoned::now();
+        let now = jiff::ZonedDateTime::now();
         Archive::open(&d, &now).unwrap();
         assert!(Archive::open(&d, &now).is_err());
     }

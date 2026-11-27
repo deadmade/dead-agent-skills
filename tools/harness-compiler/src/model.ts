@@ -102,7 +102,6 @@ export interface Manifest {
   extensions: Extension[];
   themes: Theme[];
   instructions?: string; // a Markdown file of standing instructions, inside the plugin
-  embeds: string[]; // plugins whose skills a target without dependency installs must carry itself
 }
 
 export interface CatalogEntry {

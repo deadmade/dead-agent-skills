@@ -13,7 +13,14 @@ export function safeArg(s: string) {
 
 export const errCode = (e: Error | undefined) => (e as NodeJS.ErrnoException | undefined)?.code;
 
-const isFile = (f: string) => statSync(f, { throwIfNoEntry: false })?.isFile() ?? false;
+// An entry we can't stat (EACCES on the Microsoft Store's python3.exe alias in WindowsApps) isn't something we can start.
+function isFile(f: string) {
+  try {
+    return statSync(f, { throwIfNoEntry: false })?.isFile() ?? false;
+  } catch {
+    return false;
+  }
+}
 // What Windows can start: npm's global folder also holds an extensionless sh script next to claude.cmd.
 const STARTABLE = ['.exe', '.com', '.cmd', '.bat'];
 

@@ -121,7 +121,7 @@
         # Debug checks: the fetch tests' WEB_MCP_TEST_PUBLIC_IP hook exists only in debug builds or the `test-hooks` feature.
         checkType = "debug";
         # The sandbox has no agent-browser, Chrome or display: the tests that start a browser run in crates.yml's rust
-        # job instead (docs/adr/0017-tests-use-the-real-thing.md).
+        # job instead (docs/adr/0018-tests-use-the-real-thing.md).
         checkFlags = [
           "--skip"
           "search_through_real_chrome_reads_captured_google"
@@ -150,6 +150,18 @@
           "--skip"
           "queued_searches_each_keep_their_whole_deadline"
           "--skip"
+          "titles_without_passages_are_guarded"
+          "--skip"
+          "unresolved_google_links_are_logged"
+          "--skip"
+          "concurrent_lines_stay_whole"
+          "--skip"
+          "blocked_page_"
+          "--skip"
+          "blocked_public_page_"
+          "--skip"
+          "refusals_that_are_not_a_bot_check_are_not_loaded_in_the_browser"
+          "--skip"
           "rows_reads_numbered_groups_where_the_page_landed"
           "--skip"
           "rows_refuses_a_private_landing_and_a_slow_page"
@@ -167,6 +179,10 @@
           "a_closed_tab_is_replaced_and_closing_it_again_is_no_error"
           "--skip"
           "a_dead_chrome_is_replaced_on_the_next_action"
+          "--skip"
+          "typing_is_paced_and_a_long_text_capped"
+          "--skip"
+          "eval_output_is_guarded"
           "--skip"
           "a_slow_page_ends_the_fallback_at_its_deadline_and_closes_its_tab"
           "--skip"
@@ -238,7 +254,7 @@
         checkType = "debug";
         # The sandbox has no agent-browser, Chrome or display: the tests that open a login page in the browser, or
         # start agent-browser as a browser that cannot open, run in crates.yml's rust job instead
-        # (docs/adr/0017-tests-use-the-real-thing.md).
+        # (docs/adr/0018-tests-use-the-real-thing.md).
         checkFlags = [
           "--skip"
           "a_real_browser_submits_the_login_form"
