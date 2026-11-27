@@ -134,6 +134,8 @@ Read `docs/components/ci.md` for how a release is built and published.
   its Chrome for Testing: run the installer or set `WEB_MCP_AGENT_BROWSER`), `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
   `cargo fmt --all -- --check`. Use `-p web-mcp` or another member instead of `--workspace`
   for independent checks. The workspace policy is `scripts/cargo-workspace.mjs`, tested by `scripts/cargo-workspace.test.mjs`.
+  A Rust test that starts agent-browser or Chrome is named `real_…`, and no other Rust test's name contains `real_`:
+  `flake.nix` skips them with one `--skip real_` per package, and libtest matches that filter anywhere in a name.
   CI lints with latest stable Rust and separately checks the selected packages with the workspace's declared `rust-version` (1.97).
 - On Windows, run cargo from PowerShell, not Git Bash: Git Bash's `/usr/bin/link` shadows MSVC's `link.exe`, so
   linking fails.
