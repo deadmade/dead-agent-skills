@@ -56,8 +56,9 @@ stdio MCP server for one Azure DevOps Server collection and PAT: `pr_*`, `wi_*`,
   `00000000-0000-0000-0000-<n>`, descriptors and SIDs `descriptor-<n>` (one identity keeps its `<n>` for the whole
   session), projects `Project<n>`, repos `Repo<n>`, the collection `Coll` and the configured host `dev.example`. Other
   GUIDs stay. Not masked: names that appear only in free text (titles, descriptions, comments, logs) before any answer
-  in the session named them, team, wiki, pipeline and branch names, AD domains outside a unique name, and host names
-  other than `ADO_ORG_URL`'s. That is why every file is read before it is committed.
+  in the session named them, team, wiki, pipeline and branch names, AD domains outside a unique name, an identity's
+  `DN` and `Description` properties (an AD distinguished name such as `CN=Doe\, John,OU=…,DC=…` keeps the person's
+  name and the directory's), and host names other than `ADO_ORG_URL`'s. That is why every file is read before it is committed.
 
 ## Checks
 

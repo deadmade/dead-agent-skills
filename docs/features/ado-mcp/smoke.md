@@ -200,8 +200,9 @@ every time, and especially any error line from step 3 or naming `lastMergeSource
 
 The tests answer from fixtures shaped like the Server docs' samples; real answers make them better. This step writes
 your server's answers into files, with names, emails, identity ids, descriptors, the collection, project and repo
-names and the host replaced. The masking misses names in free text (titles, descriptions, comments, logs) and team,
-wiki, pipeline and branch names, so every file is read before it leaves your machine.
+names and the host replaced. The masking misses names in free text (titles, descriptions, comments, logs), team,
+wiki, pipeline and branch names, and an identity's `DN` and `Description` properties (an AD distinguished name keeps
+the person's name), so every file is read before it leaves your machine.
 
 1. Quit Claude Code, set `ADO_CAPTURE_DIR` to an empty folder (PowerShell: `$env:ADO_CAPTURE_DIR = "$HOME\ado-capture"`)
    and start Claude Code from that same shell.
