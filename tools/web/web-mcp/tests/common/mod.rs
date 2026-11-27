@@ -508,13 +508,7 @@ impl Mcp {
             .iter()
             .find(|(k, _)| *k == "WEB_MCP_SEARCH_DIR")
             .map_or_else(tempdir, |(_, v)| PathBuf::from(v));
-        let ext = search.join("extensions/idcac-8f70ab94");
-        std::fs::create_dir_all(&ext).unwrap();
-        std::fs::write(
-            ext.join("manifest.json"),
-            r#"{"manifest_version": 3, "name": "test", "version": "1"}"#,
-        )
-        .unwrap();
+        browser_core::browser::test_extension(&search);
         std::fs::write(search.join("chrome"), "").unwrap();
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_web-mcp"));
         // The machine's proxy settings never reach a test, unless the test names them in `envs` (a `NO_PROXY` that

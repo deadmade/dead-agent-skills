@@ -227,19 +227,19 @@ fn a_resting_engine_gets_no_tab() {
         "{line}"
     );
     // A bound tab's session keeps its daemon, and so its `.pid`, while web-mcp runs.
-    let daemons: Vec<String> = std::fs::read_dir(mcp.daemon_dir())
+    let files: Vec<String> = std::fs::read_dir(mcp.daemon_dir())
         .unwrap()
         .flatten()
         .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|f| f.starts_with(&format!("web-mcp-{}-", mcp.pid())) && f.ends_with(".pid"))
+        .filter(|f| f.starts_with(&format!("web-mcp-{}-", mcp.pid())))
         .collect();
     assert!(
-        daemons.iter().any(|f| f.ends_with("-search-bing.pid")),
-        "{daemons:?}"
+        files.iter().any(|f| f.ends_with("-search-bing.pid")),
+        "{files:?}"
     );
     assert!(
-        !daemons.iter().any(|f| f.contains("-search-google.")),
-        "{daemons:?}"
+        !files.iter().any(|f| f.contains("-search-google.")),
+        "{files:?}"
     );
 }
 

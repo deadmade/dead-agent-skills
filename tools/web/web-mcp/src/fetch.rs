@@ -902,9 +902,17 @@ pub(crate) mod tests {
         assert!(private_target(&local, Some(public), Some(&[public]), true));
     }
 
-    /// A context whose browser is an agent-browser that doesn't exist: these tests open no browser.
+    /// A context whose browser is an agent-browser that doesn't exist, over a temp search dir: these tests open no
+    /// browser.
     pub(crate) fn test_ctx() -> Arc<Ctx> {
-        test_ctx_with("/nonexistent/agent-browser")
+        let search =
+            std::env::temp_dir().join(format!("web-mcp-fetch-search-{}-{}", std::process::id(), {
+                static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+                N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            }));
+        let _ = std::fs::remove_dir_all(&search);
+        browser_core::browser::test_extension(&search);
+        test_ctx_in(search, "/nonexistent/agent-browser")
     }
 
     /// The raw requests a `stub` was sent, in order.
@@ -952,23 +960,10 @@ pub(crate) mod tests {
             .collect()
     }
 
-    /// A context whose browser runs `agent_browser`, over a temp search dir with a minimal extension in place of the
-    /// cookie extension; its window is Chrome for Testing (or `WEB_MCP_CHROME`).
-    fn test_ctx_with(agent_browser: &str) -> Arc<Ctx> {
+    /// A context whose browser runs `agent_browser` over the search dir `search`; its window is Chrome for Testing (or
+    /// `WEB_MCP_CHROME`).
+    fn test_ctx_in(search: std::path::PathBuf, agent_browser: &str) -> Arc<Ctx> {
         let _ = rustls::crypto::ring::default_provider().install_default();
-        let search =
-            std::env::temp_dir().join(format!("web-mcp-fetch-search-{}-{}", std::process::id(), {
-                static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-                N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-            }));
-        let _ = std::fs::remove_dir_all(&search);
-        let ext = search.join("extensions/idcac-8f70ab94");
-        std::fs::create_dir_all(&ext).unwrap();
-        std::fs::write(
-            ext.join("manifest.json"),
-            r#"{"manifest_version": 3, "name": "test", "version": "1"}"#,
-        )
-        .unwrap();
         let profiles = browser_core::profile::Profiles::new(Some(search.clone())).map(Arc::new);
         let browser = browser_core::browser::Browser::new(
             agent_browser,
@@ -1094,14 +1089,10 @@ pub(crate) mod tests {
     /// real agent-browser and Chrome for Testing.
     #[tokio::test]
     async fn fallback_landing_on_private_url_is_dropped() {
-        let runtime =
-            std::env::temp_dir().join(format!("web-mcp-fetch-real-{}", std::process::id()));
-        let previous = std::env::var_os("XDG_RUNTIME_DIR");
-        if cfg!(windows) {
-            // agent-browser keeps its session files in `%XDG_RUNTIME_DIR%/agent-browser`, else in `~/.agent-browser`.
-            // SAFETY: setting a variable is always safe on Windows (std's docs); no other test here runs agent-browser.
-            unsafe { std::env::set_var("XDG_RUNTIME_DIR", &runtime) };
-        }
+        // browser-core's test setup: its dir (on Windows also the `XDG_RUNTIME_DIR`) goes on drop. The context runs a
+        // `Browser` of its own over that dir, which it closes itself; `real.b` runs nothing.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let real = browser_core::browser::Real::new("fetch");
         let page = "<!doctype html><title>Admin</title><p>The admin page, rendered.</p>";
         let (base, _) = stub(
             vec![
@@ -1111,31 +1102,16 @@ pub(crate) mod tests {
             Duration::ZERO,
         );
         let url = base.join("start").unwrap();
-        let ctx = test_ctx_with(&browser_core::browser::real_agent_browser().to_string_lossy());
+        let ctx = test_ctx_in(
+            real.dir.clone(),
+            &browser_core::browser::real_agent_browser().to_string_lossy(),
+        );
         let within = ctx.browser.fallback_deadline;
         let dropped = browser_page(&ctx, &url, false, "(Why", within, false).await;
         let own = browser_page(&ctx, &url, true, "(Why", within, false).await;
         // Closed before anything is checked, so a failure leaves no browser behind.
         ctx.browser.close_all().await;
-        if cfg!(windows) {
-            // SAFETY: as above.
-            unsafe {
-                match previous {
-                    Some(p) => std::env::set_var("XDG_RUNTIME_DIR", p),
-                    None => std::env::remove_var("XDG_RUNTIME_DIR"),
-                }
-            }
-        }
-        // Windows frees a closed process's files a moment later.
-        let until = std::time::Instant::now() + Duration::from_secs(5);
-        for dir in [&runtime, ctx.cfg.search_dir.as_ref().unwrap()] {
-            while std::fs::remove_dir_all(dir).is_err()
-                && dir.exists()
-                && std::time::Instant::now() < until
-            {
-                std::thread::sleep(Duration::from_millis(100));
-            }
-        }
+        drop(real);
         let dropped = dropped.unwrap_err();
         assert!(dropped.contains("ended on 127.0.0.1,"), "{dropped}");
         assert!(!dropped.contains("/admin"), "{dropped}");

@@ -1023,26 +1023,47 @@ pub fn real_agent_browser() -> PathBuf {
         .expect("agent-browser not found: run the installer or set WEB_MCP_AGENT_BROWSER")
 }
 
+/// Writes a minimal extension into the search folder `dir` in place of the cookie extension, so no test downloads it.
+///
+/// # Panics
+///
+/// When the files can't be written.
+#[cfg(any(test, feature = "test-support"))]
+pub fn test_extension(dir: &Path) {
+    let ext = dir.join("extensions/idcac-8f70ab94");
+    std::fs::create_dir_all(&ext).unwrap();
+    std::fs::write(
+        ext.join("manifest.json"),
+        r#"{"manifest_version": 3, "name": "test", "version": "1"}"#,
+    )
+    .unwrap();
+}
+
 /// One real window at a time: every `Browser` in a test process shares the owner's name (it carries the pid) and, on
 /// Windows, the `XDG_RUNTIME_DIR` its calls inherit.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 static ONE_REAL: Mutex<()> = Mutex::new(());
 
 /// A `Browser` on the real agent-browser over a fresh search dir, whose window is Chrome for Testing (or
 /// `WEB_MCP_CHROME`). Dropping it closes every session and the window, then removes the dir. On Windows the dir is
 /// also the `XDG_RUNTIME_DIR` agent-browser keeps its session files in, so they go with it; not elsewhere, where
 /// Chrome finds its Wayland socket there and a socket path in a temp dir can outgrow agent-browser's ~103 bytes. On
-/// Windows the test process is tied to its children too, so a daemon a failed test never closed dies with it.
-#[cfg(test)]
-pub(crate) struct Real {
+/// Windows the test process is tied to its children too, so a daemon a failed test never closed dies with it. Another
+/// crate's test (`test-support`) installs rustls' crypto provider itself.
+#[cfg(any(test, feature = "test-support"))]
+pub struct Real {
     pub dir: PathBuf,
     pub b: Browser,
     runtime: Option<OsString>,
     _one: std::sync::MutexGuard<'static, ()>,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Real {
+    /// # Panics
+    ///
+    /// When the dir can't be made or agent-browser isn't found (`real_agent_browser`).
+    #[must_use]
     pub fn new(tag: &str) -> Self {
         static TIED: std::sync::Once = std::sync::Once::new();
         TIED.call_once(crate::window::tie_to_process);
@@ -1051,20 +1072,14 @@ impl Real {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = std::env::temp_dir().join(format!("web-mcp-real-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        // A minimal extension in place of the cookie extension, so no test downloads it.
-        let ext = dir.join("extensions/idcac-8f70ab94");
-        std::fs::create_dir_all(&ext).unwrap();
-        std::fs::write(
-            ext.join("manifest.json"),
-            r#"{"manifest_version": 3, "name": "test", "version": "1"}"#,
-        )
-        .unwrap();
+        test_extension(&dir);
         let runtime = std::env::var_os("XDG_RUNTIME_DIR");
         if cfg!(windows) {
             // SAFETY: setting a variable is always safe on Windows (std's docs); `ONE_REAL` keeps the other real
             // tests' calls from reading it meanwhile.
             unsafe { std::env::set_var("XDG_RUNTIME_DIR", &dir) };
         }
+        #[cfg(test)]
         let _ = rustls::crypto::ring::default_provider().install_default();
         let profiles = crate::profile::Profiles::new(Some(dir.clone())).unwrap();
         let bin = real_agent_browser();
@@ -1081,13 +1096,18 @@ impl Real {
     }
 
     /// Another window over the same search dir, for `Window`'s own tests; `b` runs its owner, and closes it on drop.
+    ///
+    /// # Panics
+    ///
+    /// When the dir's profiles can't be read.
+    #[must_use]
     pub fn window(&self) -> Window {
         let profiles = crate::profile::Profiles::new(Some(self.dir.clone())).unwrap();
         Window::new(Ok(std::sync::Arc::new(profiles)))
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Drop for Real {
     fn drop(&mut self) {
         // On a thread of its own: this one may be inside the test's runtime, or unwinding from it.

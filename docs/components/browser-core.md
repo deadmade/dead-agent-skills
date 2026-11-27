@@ -43,7 +43,9 @@ What web-mcp uses, and nothing else:
 - `profile::Profiles`: `new`, `rest`, `resting`, `consent_seen` and `set_consent_seen`. With the feature `test-support`,
   also `with_chrome`, which gives a test a browser instead of the lookup through `WEB_MCP_CHROME`, HOME and PATH.
 - With the feature `test-support`, `browser::real_agent_browser`: the agent-browser a test runs (`WEB_MCP_AGENT_BROWSER`,
-  else the installer's copy in `<CLAUDE_CONFIG_DIR or ~/.claude>/bin`, else it panics).
+  else the installer's copy in `<CLAUDE_CONFIG_DIR or ~/.claude>/bin`, else it panics); `browser::test_extension`,
+  the minimal extension a test's search folder gets in place of the cookie extension; and `browser::Real`, the
+  crate's own test setup (below), which web-mcp's fetch unit test runs its context's `Browser` in.
 
 ## What a consumer must do
 
@@ -53,7 +55,8 @@ What web-mcp uses, and nothing else:
   it under the held profile slot (the search folder until one is held). Pass one path segment: nothing checks it.
 - Session names that start with `search-`, `web-mcp-search-` or `web-mcp-fetch-`, and the name `window`, are reserved:
   `check_session` rejects them, and a key with the fetch prefix is named differently from a user's.
-- A crate that runs `Profiles::with_chrome` or `real_agent_browser` in its own tests enables `test-support`.
+- A crate that runs `Profiles::with_chrome`, `real_agent_browser`, `test_extension` or `Real` in its own tests enables
+  `test-support`, and installs the rustls provider before `Real::new` (the crate's own tests install it there).
 
 ## Tests
 
