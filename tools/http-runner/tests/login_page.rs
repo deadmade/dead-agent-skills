@@ -294,14 +294,15 @@ async fn idle_connection_does_not_block_the_page() {
 
 #[tokio::test]
 async fn expires_after_its_lifetime() {
-    // Long enough for the browser to show the page first: an expired one is an error page with no address.
-    let rig = rig("expires", Duration::from_secs(2), Page::Browser);
-    let started = Instant::now();
-    let asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
+    // Long enough for a slow browser to show the page first: an expired one is an error page with no address. The
+    // ask waits longer, so its end is the page's lifetime, not the wait (which would leave it `StillOpen`).
+    let rig = rig("expires", TEN, Page::Browser);
+    let asking = rig.start(&[("a.example", &["USER", "PASS"])], LONG);
     let url = rig.address(1).await;
-    let outcome = asking.await.unwrap();
-    assert!(matches!(outcome, Outcome::Failed(_)), "{outcome:?}");
-    assert!(started.elapsed() < Duration::from_secs(5));
+    assert_eq!(
+        asking.await.unwrap(),
+        Outcome::Failed("the login page expired".into())
+    );
     assert_eq!(post(&url, &form(&A_VALUES)).0, 404);
     assert!(!rig.store.is_confirmed("a.example").unwrap());
 }
