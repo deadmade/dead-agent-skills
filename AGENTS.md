@@ -121,13 +121,15 @@ Read `docs/components/ci.md` for how a release is built and published.
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
 - Tests use the real thing (ADR 0017): the real process, CLI, browser and files, never a fake that makes up answers. Only
   what CI cannot reach is answered from captures by a replay server, and a fake stays only with a `// fake: <why>` beside it.
-  Node tests find a real tool through `realTool` in `scripts/test.mjs`, Rust tests through `real_agent_browser`; a missing
-  tool skips the test, or fails it under `DEAD_SKILLS_STRICT=1`, which `scripts/test.mjs --strict` (CI) sets. The slow
+  Node tests find a real tool through `realTool` in `scripts/test.mjs`, Rust tests through `real_agent_browser`. A missing
+  tool skips a Node test, or fails it under `DEAD_SKILLS_STRICT=1`, which `scripts/test.mjs --strict` (CI) sets; a Rust
+  test panics with the tool's name, and `scripts/test.mjs` reports the packages that need it NOT RUN. The slow
   real Node tests are `*.real.test.{mjs,ts}` and run only in the `real` suite: `npm test` and CI run it, the pre-commit
   hook and the release jobs run `repo node`.
 - Run `npm ci` once, then `npm run typecheck`, which is also one list: `tsc --noEmit` over `tools/installer/` (sources and tests,
   strict), then the harness-compiler's and upstream-sync's own `typecheck`.
-- Rust, from the root: `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
+- Rust, from the root: `cargo test --workspace --locked` (web-mcp, browser-core and http-runner need agent-browser and
+  its Chrome for Testing: run the installer or set `WEB_MCP_AGENT_BROWSER`), `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
   `cargo fmt --all -- --check`. Use `-p web-mcp` or another member instead of `--workspace`
   for independent checks. The workspace policy is `scripts/cargo-workspace.mjs`, tested by `scripts/cargo-workspace.test.mjs`.
   CI lints with latest stable Rust and separately checks the selected packages with the workspace's declared `rust-version` (1.97).

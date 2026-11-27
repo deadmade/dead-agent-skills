@@ -5,8 +5,9 @@ Fakes kept the suites green while the real thing broke: headroom-trim's launcher
 missed bugs real Chrome showed (`docs/solutions/`). So every test runs the real process, CLI, browser and files, in
 one suite that gates every merge in CI on Linux and Windows. Only what CI cannot reach (live search engines, the
 user's Azure DevOps Server, a paid carrier API) is answered by a local replay server, and only from captures: real
-answers with credentials and identities masked. A test whose real tool is missing fails under `--strict`. A fake is
-kept only for a behaviour nothing real can produce, with its reason beside it.
+answers with credentials and identities masked. One exception: http-runner's test carrier answers with replies its
+tests shape by hand, because the runner only passes on whatever a carrier sends. A test whose real tool is missing
+fails under `--strict`. A fake is kept only for a behaviour nothing real can produce, with its reason beside it.
 
 The real paths need test-only switches in shipped code: debug-build-only environment settings in the Rust servers
 (an engine base-URL override, like `WEB_MCP_TEST_PUBLIC_IP`) and, in the installer, which has no debug build, an
