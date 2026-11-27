@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   appendFileSync,
+  chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -119,6 +121,39 @@ test('Codex writes the GitHub and Atlassian url servers, and removes a deselecte
     await applyCodex(f.io);
     assert.ok(f.calls.some((c) => c[0] === 'mcp' && c[1] === 'remove' && c[2] === 'dead-agent-skills-mcp-github'));
   } finally {
+    f.close();
+  }
+});
+test('a symlinked config.toml is edited at a writable target; a read-only one is one failure line', async (t) => {
+  const f = fixture();
+  const target = join(f.temp, 'dotfiles', 'config.toml');
+  try {
+    mkdirSync(join(f.temp, 'dotfiles'));
+    writeFileSync(target, 'model = "o3"\n');
+    try {
+      symlinkSync(target, join(f.home, 'config.toml'), 'file');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EPERM') throw error;
+      return t.skip('creating a symlink needs symlink rights here');
+    }
+    f.select(['mcp-github']);
+    await applyCodex(f.io);
+    assert.ok(lstatSync(join(f.home, 'config.toml')).isSymbolicLink());
+    assert.match(readFileSync(target, 'utf8'), /^model = "o3"\n[\s\S]*\[mcp_servers\.dead-agent-skills-mcp-github\]/);
+
+    // home-manager's link points into the read-only nix store.
+    writeFileSync(target, 'model = "o3"\n');
+    chmodSync(target, 0o444);
+    const before = failures.length;
+    await applyCodex(f.io);
+    assert.equal(readFileSync(target, 'utf8'), 'model = "o3"\n');
+    const lines = failures.slice(before);
+    assert.equal(lines.length, 1, lines.join('\n'));
+    assert.match(lines[0], /dead-agent-skills-dead-skills/);
+    assert.match(lines[0], /dead-agent-skills-mcp-github/);
+    assert.equal(f.state().version, VERSION);
+  } finally {
+    if (existsSync(target)) chmodSync(target, 0o644);
     f.close();
   }
 });

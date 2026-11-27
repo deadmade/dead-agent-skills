@@ -43,7 +43,10 @@ Codex owns its plugin cache and configuration: `steps/codex.ts` installs plugins
 itself (`mcpUrlServer` in `core/codex.ts`, idempotent; it replaces only a table's `url` and `bearer_token_env_var`
 lines, so keys and subtables the user added and other tables stay), because `codex mcp add --url` starts an OAuth
 sign-in that fails the add after 5 minutes without a browser (Codex CLI 0.172.0); signing in stays `codex mcp login`.
-Its only other direct edit is the Azure `env_vars` allowlist.
+Its only other direct edit is the Azure `env_vars` allowlist. A symlinked `config.toml` (dotfiles, home-manager) is
+edited at its target when that is writable; when the target is read-only (the nix store), the url servers it lacks
+become one failure line naming their tables to add where the file is managed, and the rest of the install goes on;
+a missing Azure `env_vars` or serena timeout line there stops the Codex step, naming what to add.
 
 ## Test seam: the answers file
 

@@ -4,9 +4,9 @@
 import { createHash } from 'node:crypto';
 import { rulesMigration } from '../core/rules-migration.ts';
 import { installCodexTheme, readRulesReceipt } from '../system/harness-setup.ts';
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync } from 'node:fs';
+import { accessSync, constants, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { CODEX_MARKETPLACE } from '../core/agents.ts';
 import { selectTarget } from '../core/catalog.ts';
 import { readCatalog } from '../system/catalog.ts';
@@ -172,15 +172,28 @@ export async function applyCodex(io: CodexIO = {}) {
   const mcp = [...(previous?.mcp ?? [])];
   const existingMcp = JSON.parse(run('mcp', 'list', '--json'));
   if (!Array.isArray(existingMcp)) throw new Error('Unrecognized codex mcp list JSON');
-  // Its own symlink and managed-elsewhere check, for each direct edit. what: what to add by hand there.
+  // A symlinked config.toml (dotfiles, home-manager) is edited at its target; false when that target needs the change
+  // but is read-only, such as one in the nix store.
   const config = join(home, 'config.toml');
-  const editConfig = (what: string, change: (raw: string) => string) => {
-    if (existsSync(config) && lstatSync(config).isSymbolicLink())
-      throw new Error(`Codex config.toml is a symlink; add ${what} where it is managed`);
-    const raw = existsSync(config) ? readFileSync(config, 'utf8') : '';
+  const editConfig = (change: (raw: string) => string) => {
+    const file = existsSync(config) && lstatSync(config).isSymbolicLink() ? realpathSync(config) : config;
+    const raw = existsSync(file) ? readFileSync(file, 'utf8') : '';
     const next = change(raw);
-    if (next !== raw) writeAtomic(config, next);
+    if (next === raw) return true;
+    if (file !== config)
+      try {
+        accessSync(file, constants.W_OK);
+        accessSync(dirname(file), constants.W_OK);
+      } catch {
+        return false;
+      }
+    writeAtomic(file, next);
+    return true;
   };
+  const managedElsewhere = (what: string) =>
+    new Error(`Codex config.toml links to a read-only ${realpathSync(config)}; add ${what} where it is managed`);
+  // The url server tables a read-only config.toml didn't take, for one failure line at the end.
+  const unwritten: string[] = [];
   // server: the stdio command line `codex mcp add` takes, or a url server, which is written directly.
   const configure = (component: string, server: string[] | { url: string; bearerTokenEnvVar?: string }) => {
     const name = mcpName(component);
@@ -194,7 +207,8 @@ export async function applyCodex(io: CodexIO = {}) {
       throw new Error(`MCP name ${name} already exists outside this install; left unchanged`);
     }
     if (Array.isArray(server)) run('mcp', 'add', name, ...server);
-    else editConfig(`the ${name} server`, (raw) => mcpUrlServer(raw, name, server.url, server.bearerTokenEnvVar));
+    else if (!editConfig((raw) => mcpUrlServer(raw, name, server.url, server.bearerTokenEnvVar)))
+      unwritten.push(mcpUrlServer('', name, server.url, server.bearerTokenEnvVar).trim().split('\n').join(' '));
     if (!mcp.includes(component)) mcp.push(component);
     save();
   };
@@ -282,7 +296,8 @@ export async function applyCodex(io: CodexIO = {}) {
     }
     configure('mcp-azure', ['--', binary]);
     const { envVars } = settings('mcp-azure');
-    editConfig('Azure env_vars', (raw) => mcpEnvironment(raw, mcpName('mcp-azure'), envVars));
+    if (!editConfig((raw) => mcpEnvironment(raw, mcpName('mcp-azure'), envVars)))
+      throw managedElsewhere('Azure env_vars');
     note('Codex Azure authentication', [
       `Set ${envVars.join(', ')} in the environment that starts Codex; the setup-mcp-azure skill says which are optional.`,
     ]);
@@ -297,11 +312,14 @@ export async function applyCodex(io: CodexIO = {}) {
     )();
     if (path) {
       configure('serena', ['--', path, ...(settings('serena').args ?? [])]);
-      editConfig("serena's startup_timeout_sec", (raw) =>
-        mcpTableLine(raw, mcpName('serena'), 'startup_timeout_sec = 15'),
-      );
+      if (!editConfig((raw) => mcpTableLine(raw, mcpName('serena'), 'startup_timeout_sec = 15')))
+        throw managedElsewhere("serena's startup_timeout_sec");
     }
   }
+  if (unwritten.length)
+    failures.push(
+      `Codex: config.toml links to a read-only ${realpathSync(config)}; add where it is managed: ${unwritten.join('; ')}`,
+    );
   if (plan.retired.includes('graphify'))
     await (
       io.cleanup ??
