@@ -137,7 +137,8 @@ test('a full install on fresh homes', { timeout: 1_200_000 }, async (t) => {
   );
 
   const env = {
-    ...process.env,
+    // Unset, the XDG folders uv and the other tools write to default to under the temp HOME.
+    ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^XDG_\w+_HOME$/.test(k))),
     HOME: home,
     USERPROFILE: home,
     CLAUDE_CONFIG_DIR: config,
