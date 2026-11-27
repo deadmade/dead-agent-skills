@@ -744,8 +744,9 @@ pub(crate) mod tests {
         assert!(private_target(&local, Some(public), Some(&[public]), true));
     }
 
+    /// A context whose browser is an agent-browser that doesn't exist: these tests open no browser.
     pub(crate) fn test_ctx() -> Arc<Ctx> {
-        test_ctx_with("agent-browser")
+        test_ctx_with("/nonexistent/agent-browser")
     }
 
     /// The raw requests a `stub` was sent, in order.
@@ -793,8 +794,8 @@ pub(crate) mod tests {
             .collect()
     }
 
-    /// A context whose browser runs `agent_browser`, over a temp search dir with the extension unpacked and a dummy
-    /// browser.
+    /// A context whose browser runs `agent_browser`, over a temp search dir with a minimal extension in place of the
+    /// cookie extension; its window is Chrome for Testing (or `WEB_MCP_CHROME`).
     fn test_ctx_with(agent_browser: &str) -> Arc<Ctx> {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let search =
@@ -805,10 +806,12 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(&search);
         let ext = search.join("extensions/idcac-8f70ab94");
         std::fs::create_dir_all(&ext).unwrap();
-        std::fs::write(ext.join("manifest.json"), "{}").unwrap();
-        std::fs::write(search.join("browser"), "").unwrap();
-        let profiles = browser_core::profile::Profiles::new(Some(search.clone()))
-            .map(|p| Arc::new(p.with_chrome(search.join("browser"))));
+        std::fs::write(
+            ext.join("manifest.json"),
+            r#"{"manifest_version": 3, "name": "test", "version": "1"}"#,
+        )
+        .unwrap();
+        let profiles = browser_core::profile::Profiles::new(Some(search.clone())).map(Arc::new);
         let browser = browser_core::browser::Browser::new(
             agent_browser,
             browser_core::window::Window::new(profiles.clone()),
@@ -929,15 +932,55 @@ pub(crate) mod tests {
         assert!(!wants_fallback(off, &shell));
     }
 
+    /// The browser follows a redirect onto this machine: the page is dropped unless the fetch may reach it. On the
+    /// real agent-browser and Chrome for Testing.
     #[tokio::test]
     async fn fallback_landing_on_private_url_is_dropped() {
-        let fake = browser_core::browser::fake_agent_browser();
-        let ctx = test_ctx_with(&fake.to_string_lossy());
-        let url = Url::parse("http://example.com/redirect-private").unwrap();
-        let dropped = browser_page(&ctx, &url, false).await.unwrap_err();
-        assert!(dropped.contains("http://127.0.0.1/admin"), "{dropped}");
-        let own = browser_page(&ctx, &url, true).await.unwrap();
-        assert!(own.contains("Rendered page for"), "{own}");
+        let runtime =
+            std::env::temp_dir().join(format!("web-mcp-fetch-real-{}", std::process::id()));
+        let previous = std::env::var_os("XDG_RUNTIME_DIR");
+        if cfg!(windows) {
+            // agent-browser keeps its session files in `%XDG_RUNTIME_DIR%/agent-browser`, else in `~/.agent-browser`.
+            // SAFETY: setting a variable is always safe on Windows (std's docs); no other test here runs agent-browser.
+            unsafe { std::env::set_var("XDG_RUNTIME_DIR", &runtime) };
+        }
+        let page = "<!doctype html><title>Admin</title><p>The admin page, rendered.</p>";
+        let (base, _) = stub(
+            vec![
+                "HTTP/1.1 302 Found\r\nLocation: /admin\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+                reply("200 OK", "Content-Type: text/html\r\n", page),
+            ],
+            Duration::ZERO,
+        );
+        let url = base.join("start").unwrap();
+        let ctx = test_ctx_with(&browser_core::browser::real_agent_browser().to_string_lossy());
+        let dropped = browser_page(&ctx, &url, false).await;
+        let own = browser_page(&ctx, &url, true).await;
+        // Closed before anything is checked, so a failure leaves no browser behind.
+        ctx.browser.close_all().await;
+        if cfg!(windows) {
+            // SAFETY: as above.
+            unsafe {
+                match previous {
+                    Some(p) => std::env::set_var("XDG_RUNTIME_DIR", p),
+                    None => std::env::remove_var("XDG_RUNTIME_DIR"),
+                }
+            }
+        }
+        // Windows frees a closed process's files a moment later.
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        for dir in [&runtime, ctx.cfg.search_dir.as_ref().unwrap()] {
+            while std::fs::remove_dir_all(dir).is_err()
+                && dir.exists()
+                && std::time::Instant::now() < until
+            {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        }
+        let dropped = dropped.unwrap_err();
+        assert!(dropped.contains(&format!("{base}admin")), "{dropped}");
+        let own = own.unwrap();
+        assert!(own.contains("The admin page, rendered."), "{own}");
     }
 
     #[tokio::test]

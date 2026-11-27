@@ -82,8 +82,7 @@ jobs:
       - name: Chrome for Testing
         run: '"$WEB_MCP_AGENT_BROWSER" install'
 
-      # The rust suite builds the fake first: unit tests reach it by path, not CARGO_BIN_EXE. On Linux the headed Chrome
-      # gets a virtual display.
+      # On Linux the headed Chrome gets a virtual display.
       - name: Rust tests
         shell: pwsh
         run: |

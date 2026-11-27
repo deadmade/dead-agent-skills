@@ -217,9 +217,6 @@ const SUITES = {
     const workspace = ['--workspace', ...skipped.flatMap((p) => ['--exclude', p])];
     return {
       commands: [
-        ...((chosen ? chosen.includes('web-mcp') : !skipped.length)
-          ? [{ file, args: ['build', '--locked', '-p', 'web-mcp', '--bin', 'fake-agent-browser'] }]
-          : []),
         ...(chosen?.length === 0 ? [] : [test(...(chosen ? chosen.flatMap(select) : workspace))]),
         ...(each && chosen.length > 1 ? chosen.map((p) => test(...select(p))) : []),
         ...(skipped.length ? [{ notRun: `${skipped.join(', ')}: agent-browser not found` }] : []),

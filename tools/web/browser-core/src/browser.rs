@@ -941,25 +941,6 @@ fn resolve_in(name: &str, path: &OsStr, pathext: Option<&str>) -> Option<PathBuf
     std::env::split_paths(path).find_map(|d| find(&d))
 }
 
-/// The fake agent-browser that `cargo build --locked -p web-mcp --bin fake-agent-browser` puts in the profile folder
-/// (`target/debug`). Unit tests can't use `CARGO_BIN_EXE`, so they look in each folder above the test binary: cargo
-/// keeps that in `debug/deps/` up to Rust 1.99 and in `debug/build/<package>/<hash>/out/` from 1.100.
-///
-/// # Panics
-///
-/// When the fake hasn't been built.
-#[cfg(any(test, feature = "test-support"))]
-#[must_use]
-pub fn fake_agent_browser() -> PathBuf {
-    let name = format!("fake-agent-browser{}", std::env::consts::EXE_SUFFIX);
-    let exe = std::env::current_exe().unwrap();
-    exe.ancestors()
-        .skip(1)
-        .map(|dir| dir.join(&name))
-        .find(|bin| bin.is_file())
-        .expect("build the fake first: cargo build --locked -p web-mcp --bin fake-agent-browser")
-}
-
 /// The real agent-browser for tests: `WEB_MCP_AGENT_BROWSER` if set, else the installer's copy in
 /// `<CLAUDE_CONFIG_DIR or ~/.claude>/bin`.
 ///
@@ -988,12 +969,147 @@ pub fn real_agent_browser() -> PathBuf {
         .expect("agent-browser not found: run the installer or set WEB_MCP_AGENT_BROWSER")
 }
 
+/// One real window at a time: every `Browser` in a test process shares the owner's name (it carries the pid) and, on
+/// Windows, the `XDG_RUNTIME_DIR` its calls inherit.
+#[cfg(test)]
+static ONE_REAL: Mutex<()> = Mutex::new(());
+
+/// A `Browser` on the real agent-browser over a fresh search dir, whose window is Chrome for Testing (or
+/// `WEB_MCP_CHROME`). Dropping it closes every session and the window, then removes the dir. On Windows the dir is
+/// also the `XDG_RUNTIME_DIR` agent-browser keeps its session files in, so they go with it; not elsewhere, where
+/// Chrome finds its Wayland socket there and a socket path in a temp dir can outgrow agent-browser's ~103 bytes. On
+/// Windows the test process is tied to its children too, so a daemon a failed test never closed dies with it.
+#[cfg(test)]
+pub(crate) struct Real {
+    pub dir: PathBuf,
+    pub b: Browser,
+    runtime: Option<OsString>,
+    _one: std::sync::MutexGuard<'static, ()>,
+}
+
+#[cfg(test)]
+impl Real {
+    pub fn new(tag: &str) -> Self {
+        static TIED: std::sync::Once = std::sync::Once::new();
+        TIED.call_once(crate::window::tie_to_process);
+        let one = ONE_REAL
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let dir = std::env::temp_dir().join(format!("web-mcp-real-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        // A minimal extension in place of the cookie extension, so no test downloads it.
+        let ext = dir.join("extensions/idcac-8f70ab94");
+        std::fs::create_dir_all(&ext).unwrap();
+        std::fs::write(
+            ext.join("manifest.json"),
+            r#"{"manifest_version": 3, "name": "test", "version": "1"}"#,
+        )
+        .unwrap();
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR");
+        if cfg!(windows) {
+            // SAFETY: setting a variable is always safe on Windows (std's docs); `ONE_REAL` keeps the other real
+            // tests' calls from reading it meanwhile.
+            unsafe { std::env::set_var("XDG_RUNTIME_DIR", &dir) };
+        }
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let profiles = crate::profile::Profiles::new(Some(dir.clone())).unwrap();
+        let bin = real_agent_browser();
+        let b = Browser::new(
+            &bin.to_string_lossy(),
+            Window::new(Ok(std::sync::Arc::new(profiles))),
+        );
+        Self {
+            dir,
+            b,
+            runtime,
+            _one: one,
+        }
+    }
+
+    /// Another window over the same search dir, for `Window`'s own tests; `b` runs its owner, and closes it on drop.
+    pub fn window(&self) -> Window {
+        let profiles = crate::profile::Profiles::new(Some(self.dir.clone())).unwrap();
+        Window::new(Ok(std::sync::Arc::new(profiles)))
+    }
+}
+
+#[cfg(test)]
+impl Drop for Real {
+    fn drop(&mut self) {
+        // On a thread of its own: this one may be inside the test's runtime, or unwinding from it.
+        let b = &self.b;
+        std::thread::scope(|s| {
+            let _ = s
+                .spawn(|| {
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap()
+                        .block_on(b.close_all());
+                })
+                .join();
+        });
+        if cfg!(windows) {
+            // SAFETY: as in `new`.
+            unsafe {
+                match &self.runtime {
+                    Some(r) => std::env::set_var("XDG_RUNTIME_DIR", r),
+                    None => std::env::remove_var("XDG_RUNTIME_DIR"),
+                }
+            }
+        }
+        // Windows frees a closed process's files a moment later.
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        while std::fs::remove_dir_all(&self.dir).is_err()
+            && self.dir.exists()
+            && std::time::Instant::now() < until
+        {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+}
+
+/// Ends the window's Chrome at `cdp` through its debug port (`Browser.close`), as a crash would: the owner's daemon
+/// outlives it.
+#[cfg(test)]
+pub(crate) fn end_chrome(cdp: &str) {
+    use std::io::{Read, Write};
+    let url = Url::parse(cdp).unwrap();
+    let (host, port) = (url.host_str().unwrap(), url.port().unwrap());
+    let mut s = std::net::TcpStream::connect((host, port)).unwrap();
+    write!(
+        s,
+        "GET {} HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\
+         Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+        url.path()
+    )
+    .unwrap();
+    let mut head = Vec::new();
+    let mut byte = [0];
+    while !head.ends_with(b"\r\n\r\n") {
+        s.read_exact(&mut byte).unwrap();
+        head.push(byte[0]);
+    }
+    assert!(
+        head.starts_with(b"HTTP/1.1 101"),
+        "{}",
+        String::from_utf8_lossy(&head)
+    );
+    // One masked text frame; a zero mask leaves the payload as it is.
+    let msg = br#"{"id":1,"method":"Browser.close"}"#;
+    let mut frame = vec![0x81, 0x80 | u8::try_from(msg.len()).unwrap(), 0, 0, 0, 0];
+    frame.extend_from_slice(msg);
+    s.write_all(&frame).unwrap();
+    // Chrome drops the connection as it exits.
+    let _ = s.read_to_end(&mut Vec::new());
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+    use std::time::Instant;
 
     use super::*;
-    use crate::profile::Profiles;
 
     /// The raw requests a `stub` was sent, in order.
     pub(crate) type Seen = Arc<std::sync::Mutex<Vec<String>>>;
@@ -1052,53 +1168,94 @@ mod tests {
         assert_eq!(resolve_in("nope", &path, Some(".CMD")), None);
     }
 
-    /// The fake agent-browser with a window over a fresh search dir (the extension unpacked, a dummy browser, a
-    /// socket dir). The fake logs beside each call's config: the owner's in `profiles/1/calls.jsonl`, attached
-    /// calls in `calls.jsonl`.
-    fn fake(tag: &str) -> (PathBuf, Browser) {
-        let bin = fake_agent_browser();
-        let dir =
-            std::env::temp_dir().join(format!("web-mcp-browser-{tag}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        let ext = dir.join("extensions/idcac-8f70ab94");
-        std::fs::create_dir_all(&ext).unwrap();
-        std::fs::write(ext.join("manifest.json"), "{}").unwrap();
-        std::fs::create_dir_all(dir.join("sock")).unwrap();
-        std::fs::write(dir.join("browser"), "").unwrap();
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        let p = Profiles::new(Some(dir.clone()))
+    const READY_JS: &str = "!!(document.querySelector('#r'))";
+
+    /// A page with a `#r` (`READY_JS`) and a button that retitles it `clicked`, served by a `stub`.
+    fn page() -> (Url, Seen) {
+        let body = "<title>P</title><button id=b onclick=\"document.title = 'clicked'\">Go</button><p id=r>ready</p>";
+        stub(
+            vec![reply("200 OK", "Content-Type: text/html\r\n", body)],
+            Duration::ZERO,
+        )
+    }
+
+    /// How often `seen` loaded the page: Chrome's own `/favicon.ico` requests left out.
+    fn loads(seen: &Seen) -> usize {
+        paths(seen).iter().filter(|p| *p != "/favicon.ico").count()
+    }
+
+    /// `args` as a command.
+    fn cmd(args: &[&str]) -> Vec<String> {
+        args.iter().map(|a| (*a).to_owned()).collect()
+    }
+
+    fn until() -> Instant {
+        Instant::now() + Duration::from_secs(5)
+    }
+
+    /// A server that takes connections and never answers until it is dropped; then it closes them, so a page waiting
+    /// on it fails at once.
+    struct Silent {
+        url: Url,
+        held: Arc<std::sync::Mutex<Option<Vec<std::net::TcpStream>>>>,
+    }
+
+    impl Silent {
+        fn new() -> Self {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let url =
+                Url::parse(&format!("http://{}/slow", listener.local_addr().unwrap())).unwrap();
+            let held = Arc::new(std::sync::Mutex::new(Some(Vec::new())));
+            let h = Arc::clone(&held);
+            std::thread::spawn(move || {
+                for c in listener.incoming().flatten() {
+                    // After the drop a connection is closed as it comes.
+                    if let Some(v) = h.lock().unwrap().as_mut() {
+                        v.push(c);
+                    }
+                }
+            });
+            Self { url, held }
+        }
+    }
+
+    impl Drop for Silent {
+        fn drop(&mut self) {
+            self.held.lock().unwrap().take();
+        }
+    }
+
+    /// The window's tabs as Chrome lists them: each page's URL.
+    async fn tabs(b: &Browser) -> Vec<String> {
+        let live = b.live.lock().unwrap().clone().unwrap();
+        let port = Url::parse(&live.url).unwrap().port().unwrap();
+        let list = loopback_client()
             .unwrap()
-            .with_chrome(dir.join("browser"));
-        let mut b = Browser::new(&bin.to_string_lossy(), Window::new(Ok(Arc::new(p))));
-        b.socket_dir = Some(dir.join("sock"));
-        b.session_dir = dir.join("sock");
-        (dir, b)
-    }
-
-    fn calls(dir: &Path) -> Vec<Value> {
-        std::fs::read_to_string(dir.join("calls.jsonl"))
-            .unwrap_or_default()
-            .lines()
-            .map(|l| serde_json::from_str(l).unwrap())
-            .collect()
-    }
-
-    fn args(call: &Value) -> Vec<&str> {
-        call["args"]
-            .as_array()
+            .get(format!("http://127.0.0.1:{port}/json/list"))
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+        let list: Value = serde_json::from_str(&list).unwrap();
+        list.as_array()
             .unwrap()
             .iter()
-            .map(|a| a.as_str().unwrap())
+            .filter(|t| t["type"] == "page")
+            .map(|t| t["url"].as_str().unwrap().to_owned())
             .collect()
     }
 
-    fn same_dir(cwd: &Value, dir: &Path) {
-        let cwd = PathBuf::from(cwd.as_str().unwrap());
-        assert_eq!(cwd.canonicalize().unwrap(), dir.canonicalize().unwrap());
+    /// Opens the page in `keys`' tabs, in order, so the last one's is in front.
+    async fn open_all(b: &Browser, url: &Url, keys: &[&str]) {
+        for key in keys {
+            let run = SearchRun { ready_js: READY_JS };
+            b.render(Some(url), key, Some(run), Duration::from_secs(10))
+                .await
+                .unwrap();
+        }
     }
-
-    const READY_JS: &str = "!!(document.querySelector('#r'))";
-    const CDP: &str = "ws://127.0.0.1:9222/devtools/browser/1";
 
     #[test]
     fn check_session_reserves_search() {
@@ -1164,192 +1321,90 @@ mod tests {
         );
     }
 
+    /// A search page whose ready check never turns true is read anyway once its wait (the deadline less
+    /// `READ_MARGIN`) runs out, before the deadline, and its tab stays open for the next search.
     #[tokio::test]
-    async fn owner_calls_run_in_the_search_dir_without_timeout() {
-        let (dir, b) = fake("owner");
-        let slot = dir.join("profiles/1");
-        std::fs::create_dir_all(&slot).unwrap();
-        let config = slot.join("agent-browser.json");
-        std::fs::write(&config, "{}").unwrap();
-        b.run_owner(
-            "web-mcp-1-window",
-            &config,
-            &["open".into(), "about:blank".into()],
-        )
-        .await
-        .unwrap();
-        let c = calls(&slot);
-        assert_eq!(
-            args(&c[0]),
-            [
-                "--session",
-                "web-mcp-1-window",
-                "--json",
-                "--config",
-                config.to_str().unwrap(),
-                "open",
-                "about:blank"
-            ]
+    async fn render_reads_a_page_that_never_gets_ready() {
+        let r = Real::new("never");
+        r.b.warm().await.unwrap();
+        // Its daemon starts here, outside the deadline, as a search binds its tabs first.
+        r.b.bind(&["search-google".to_owned()]).await;
+        let (url, _) = page();
+        let run = SearchRun { ready_js: "false" };
+        let deadline = Duration::from_secs(5);
+        let t = Instant::now();
+        let (html, landed) =
+            r.b.render(Some(&url), "search-google", Some(run), deadline)
+                .await
+                .unwrap();
+        let took = t.elapsed();
+        assert!(
+            (deadline.saturating_sub(READ_MARGIN)..deadline).contains(&took),
+            "{took:?}"
         );
-        assert_eq!(c[0]["env"], json!({}));
-        same_dir(&c[0]["cwd"], &dir);
-    }
-
-    #[tokio::test]
-    async fn render_search_tolerates_failed_wait() {
-        let (dir, b) = fake("wait");
-        let url = Url::parse("http://example.com/wait-fail?q=x").unwrap();
-        let run = SearchRun { ready_js: READY_JS };
-        let (html, landed) = b
-            .render(
-                Some(&url),
-                "search-brave",
-                Some(run),
-                Duration::from_secs(5),
-            )
-            .await
-            .unwrap();
-        assert!(html.contains("Rendered page for"), "{html}");
+        assert!(html.contains("ready"), "{html}");
         assert_eq!(landed, url);
-        let c = calls(&dir);
-        assert_eq!(c.len(), 1, "a tab that answered stays open: {c:?}");
-        let session = name("search-brave", 1);
-        let attach = dir.join("attach.json");
-        assert_eq!(
-            args(&c[0]),
-            [
-                "--session",
-                &session,
-                "--json",
-                "--cdp",
-                CDP,
-                "--pin-tab",
-                "--config",
-                attach.to_str().unwrap(),
-                "batch",
-                "--json"
-            ]
-        );
-        let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
-        assert_eq!(
-            batch,
-            json!([
-                ["open", url.as_str()],
-                ["wait", "--fn", READY_JS, "--timeout", "3000"],
-                ["get", "html", "body"],
-                ["get", "url"]
-            ])
-        );
-        assert_eq!(
-            c[0]["env"],
-            json!({"AGENT_BROWSER_DEFAULT_TIMEOUT": "8000"})
-        );
-        same_dir(&c[0]["cwd"], &dir);
+        assert!(tabs(&r.b).await.contains(&url.to_string()));
     }
 
+    /// A search without a URL reads the page its tab already shows, without loading it again.
     #[tokio::test]
     async fn render_search_without_open_reads_the_tab() {
-        let (dir, b) = fake("tab");
-        let url = Url::parse("http://example.com/q?x=1").unwrap();
+        let r = Real::new("tab");
+        let (url, seen) = page();
         let run = || SearchRun { ready_js: READY_JS };
-        let deadline = Duration::from_secs(5);
-        let loaded = b
-            .render(Some(&url), "search-bing", Some(run()), deadline)
-            .await
-            .unwrap();
-        let read = b
-            .render(None, "search-bing", Some(run()), deadline)
-            .await
-            .unwrap();
+        let deadline = Duration::from_secs(10);
+        let loaded =
+            r.b.render(Some(&url), "search-bing", Some(run()), deadline)
+                .await
+                .unwrap();
+        let read =
+            r.b.render(None, "search-bing", Some(run()), deadline)
+                .await
+                .unwrap();
         assert_eq!(read, loaded);
         assert_eq!(read.1, url);
-        let c = calls(&dir);
-        assert_eq!(c.len(), 2, "no close: {c:?}");
-        let batch: Value = serde_json::from_str(c[1]["stdin"].as_str().unwrap()).unwrap();
-        assert_eq!(
-            batch,
-            json!([
-                ["wait", "--fn", READY_JS, "--timeout", "3000"],
-                ["get", "html", "body"],
-                ["get", "url"]
-            ])
-        );
+        assert_eq!(loads(&seen), 1, "{:?}", paths(&seen));
     }
 
+    /// A page that never loads ends `render` at its deadline. The tab's close waits behind the load and is cut short
+    /// (`CLOSE_TIMEOUT`), then `session_gone` waits for the session's files (at most 1 s), so the call ends within
+    /// those; the session is kept, and a later close ends it and its tab once the page has failed.
     #[tokio::test]
-    async fn render_closes_on_deadline() {
-        let (dir, b) = fake("deadline");
-        b.warm().await.unwrap();
-        let url = Url::parse("http://example.com/slow").unwrap();
+    async fn a_hung_page_ends_render_at_its_deadline_and_is_closed_later() {
+        let r = Real::new("hung");
+        r.b.warm().await.unwrap();
+        let hung = Silent::new();
+        let url = hung.url.clone();
+        let key = "search-bing";
+        let deadline = Duration::from_millis(500);
         let run = SearchRun { ready_js: READY_JS };
-        let err = b
-            .render(
-                Some(&url),
-                "search-bing",
-                Some(run),
-                Duration::from_millis(500),
-            )
-            .await
-            .unwrap_err();
-        assert!(err.to_string().contains("did not finish"), "{err}");
-        let c = calls(&dir);
-        assert_eq!(c.len(), 3, "{c:?}");
-        let tab = args(&c[1]);
-        assert_eq!(tab[tab.len() - 2..], ["tab", "close"]);
-        assert!(
-            tab.contains(&"--cdp") && tab.contains(&"--pin-tab"),
-            "{tab:?}"
-        );
-        let close = args(&c[2]);
-        assert_eq!(close.last(), Some(&"close"));
-        assert!(close.contains(&"--config"), "{close:?}");
-        assert!(
-            !close.contains(&"--cdp") && !close.contains(&"--pin-tab"),
-            "{close:?}"
-        );
-        for call in &c[1..] {
-            assert_eq!(
-                call["env"],
-                json!({"AGENT_BROWSER_DEFAULT_TIMEOUT": "8000"})
-            );
-            same_dir(&call["cwd"], &dir);
-        }
-    }
-
-    #[tokio::test]
-    async fn close_waits_for_session_files() {
-        let (dir, b) = fake("gone");
-        b.warm().await.unwrap();
-        let sock = dir.join("sock");
-        let key = "search-duckduckgo";
-        let session = name(key, 1);
-        let files = [
-            sock.join(format!("{session}.pid")),
-            sock.join(format!("{session}.sock")),
-        ];
-        // A page that hangs past the deadline: the render fails, and its tab is closed.
-        let url = Url::parse("http://example.com/slow").unwrap();
-        let deadline = Duration::from_millis(300);
-        let run = || SearchRun { ready_js: READY_JS };
-        for f in &files {
-            std::fs::write(f, "").unwrap();
-        }
-        // Files that never go: the render waits for them, after the deadline and the two closing calls. The
-        // wait's own 1 s cap is `session_gone_waits_for_the_files_up_to_a_second`'s.
-        let t = std::time::Instant::now();
-        b.render(Some(&url), key, Some(run()), deadline)
-            .await
-            .unwrap_err();
-        let capped = t.elapsed();
-        assert!(capped >= deadline + Duration::from_secs(1), "{capped:?}");
-        assert_eq!(args(calls(&dir).last().unwrap()).last(), Some(&"close"));
+        let t = Instant::now();
+        let err =
+            r.b.render(Some(&url), key, Some(run), deadline)
+                .await
+                .unwrap_err();
+        let took = t.elapsed();
+        assert!(matches!(err, BrowserError::Timeout(_)), "{err}");
+        let most = deadline + CLOSE_TIMEOUT + Duration::from_secs(1);
+        // Slack for a loaded machine.
+        let most = most + Duration::from_secs(2);
+        assert!((deadline + CLOSE_TIMEOUT..most).contains(&took), "{took:?}");
+        assert!(r.b.ran.lock().unwrap().contains_key(&name(key, 1)));
+        drop(hung);
+        r.b.close(key).await.unwrap();
+        let left = tabs(&r.b).await;
+        assert!(!left.contains(&url.to_string()), "{left:?}");
     }
 
     #[tokio::test(start_paused = true)]
     async fn session_gone_waits_for_the_files_up_to_a_second() {
-        let (dir, b) = fake("gone-paused");
+        let dir = std::env::temp_dir().join(format!("web-mcp-gone-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut b = Browser::new("agent-browser", Window::new(Err("unused".into())));
+        b.socket_dir = Some(dir.clone());
         let session = name("search-duckduckgo", 1);
-        let files = ["pid", "sock"].map(|ext| dir.join("sock").join(format!("{session}.{ext}")));
+        let files = ["pid", "sock"].map(|ext| dir.join(format!("{session}.{ext}")));
         for f in &files {
             std::fs::write(f, "").unwrap();
         }
@@ -1372,197 +1427,107 @@ mod tests {
             (Duration::from_millis(500)..=Duration::from_millis(550)).contains(&waited),
             "{waited:?}"
         );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// A tab whose bind failed is bound again by the next `bind`; one that bound is not.
-    // fake: the real agent-browser fails a bind only by chance (a page loading in another tab), not on demand.
+    /// A tab whose bind failed is bound again by the next `bind`; one that bound stays bound. Here the bind fails as
+    /// it does when an earlier daemon of the session ended with its tab gone: agent-browser keeps the session's binding
+    /// to that tab (its `.target`), and the next daemon answers `tab_gone`.
     #[tokio::test]
     async fn bind_tries_a_failed_tab_again() {
-        let (dir, b) = fake("bind");
+        let r = Real::new("bind");
+        let b = &r.b;
         b.warm().await.unwrap();
-        let (bing, brave) = (name("search-bing", 1), name("search-brave", 1));
-        let gone = dir.join(format!("{bing}.gone"));
-        std::fs::write(&gone, "").unwrap();
-        let keys = ["search-bing".to_owned(), "search-brave".to_owned()];
-        b.bind(&keys).await;
-        std::fs::remove_file(&gone).unwrap();
-        b.bind(&keys).await;
-        let binds = |s: &str| {
-            calls(&dir)
-                .iter()
-                .filter(|c| args(c).contains(&s) && args(c).ends_with(&["get", "url"]))
-                .count()
+        let live = b.live.lock().unwrap().clone().unwrap();
+        let config = b.window.attach_config().unwrap();
+        let via = Via::Tab {
+            config: &config,
+            cdp: &live.url,
         };
-        assert_eq!((binds(&bing), binds(&brave)), (2, 1));
+        let bing = name("search-bing", 1);
+        // A daemon of bing's session that `b` never ran binds a tab, closes it, and ends.
+        for c in [&["get", "url"][..], &["tab", "close"]] {
+            call(&b.bin, &bing, &cmd(c), None, via).await.unwrap();
+        }
+        let close = cmd(&["close"]);
+        let end = || call(&b.bin, &bing, &close, None, Via::Detached(&config));
+        end().await.unwrap();
+        let keys = ["search-bing".to_owned(), "search-brave".to_owned()];
+        let bound = || {
+            let ran = b.ran.lock().unwrap();
+            keys.each_ref().map(|k| ran.contains_key(&name(k, 1)))
+        };
+        b.bind(&keys).await;
+        assert_eq!(bound(), [false, true]);
+        // Its daemon ended and its binding gone, as a successful `close` leaves it: bing binds now.
+        end().await.unwrap();
+        forget_binding(&b.session_dir, &bing);
+        b.bind(&keys).await;
+        assert_eq!(bound(), [true, true]);
     }
 
+    /// `batch_once` stops at a failed command, and a gone tab fails it with `TabGone` without binding a new one: its
+    /// caller has another way to the page.
     #[tokio::test]
     async fn batch_once_bails_and_never_rebinds() {
-        let (dir, b) = fake("once");
-        b.warm().await.unwrap();
-        let owner = dir.join("profiles/1");
-        let count =
-            |d: &Path, cmd: &[&str]| calls(d).iter().filter(|c| args(c).ends_with(cmd)).count();
-        let before = (calls(&dir).len(), count(&owner, &["get", "cdp-url"]));
-        std::fs::write(dir.join(format!("{}.gone", name("search-bing", 1))), "").unwrap();
-        let cmds = [vec!["eval".to_owned(), "1".to_owned()]];
-        let until = std::time::Instant::now() + Duration::from_secs(5);
-        let err = b.batch_once("search-bing", &cmds, until).await.unwrap_err();
+        let r = Real::new("once");
+        let (url, _) = page();
+        open_all(&r.b, &url, &["search-bing", "search-brave"]).await;
+        let stop = [
+            cmd(&["eval", "throw new Error('stop')"]),
+            cmd(&["eval", "document.title = 'ran on'"]),
+        ];
+        let err = r.b.batch_once("search-brave", &stop, until()).await;
+        assert!(matches!(err, Err(BrowserError::Failed(_))), "{err:?}");
+        let title = [cmd(&["eval", "document.title"])];
+        let t = r.b.batch_once("search-brave", &title, until()).await;
+        assert_eq!(t.unwrap()[0]["result"], "P");
+        r.b.run("search-bing", &cmd(&["tab", "close"]))
+            .await
+            .unwrap();
+        let before = tabs(&r.b).await;
+        let err =
+            r.b.batch_once("search-bing", &[cmd(&["eval", "1"])], until())
+                .await
+                .unwrap_err();
         assert!(matches!(err, BrowserError::TabGone(_)), "{err}");
-        let c = calls(&dir);
-        assert_eq!(c.len(), before.0 + 1, "{c:?}");
-        assert!(
-            args(c.last().unwrap()).ends_with(&["batch", "--json", "--bail"]),
-            "{c:?}"
-        );
-        assert_eq!(count(&dir, &["tab", "new"]), 0);
-        assert_eq!(count(&owner, &["get", "cdp-url"]), before.1);
+        assert_eq!(tabs(&r.b).await, before);
+        assert_eq!(r.b.live.lock().unwrap().as_ref().unwrap().r#gen, 1);
     }
 
-    fn typing() -> [Vec<String>; 2] {
-        [
-            vec!["click".to_owned(), "#q".to_owned()],
-            vec!["press".to_owned(), "Enter".to_owned()],
-        ]
-    }
-
-    /// Chrome's debug-port HTTP endpoint as the shared stub, answering every request with `status`; the fake
-    /// agent-browser reports its port as the window's, so call it before `warm`.
-    fn chrome_stub(dir: &Path, status: &str) -> Seen {
-        let (url, seen) = stub(vec![reply(status, "", "")], Duration::ZERO);
-        // The window's cdp url comes from the owner's call, whose state is its slot's folder.
-        let slot = dir.join("profiles/1");
-        std::fs::create_dir_all(&slot).unwrap();
-        std::fs::write(slot.join("cdp-port"), url.port().unwrap().to_string()).unwrap();
-        seen
-    }
+    const SEEN: &str = "document.visibilityState + ' ' + document.title";
 
     /// Input reaches only the front tab (agent-browser#2146): a batch with a `click` or `press` raises the session's
     /// own tab first (found with `tab list`, activated through Chrome's endpoint, never with agent-browser's own
-    /// `tab <id>`, which makes it forget its refs); a batch that only reads does not.
+    /// `tab <id>`, which makes it forget its refs); a batch that only reads does not. Chrome for Testing 158 delivers
+    /// a click to a hidden tab anyway (measured), so the raise shows in the page's visibility, not in the click.
     #[tokio::test]
     async fn batch_once_raises_the_tab_only_for_input() {
-        let (dir, b) = fake("raise-once");
-        let activated = chrome_stub(&dir, "200 OK");
-        b.warm().await.unwrap();
-        let session = name("search-bing", 1);
-        std::fs::write(
-            dir.join(format!("{session}.url")),
-            "https://www.bing.com/search?q=a",
-        )
-        .unwrap();
-        let until = || std::time::Instant::now() + Duration::from_secs(5);
-        let before = calls(&dir).len();
-        let read = [vec!["eval".to_owned(), "1".to_owned()]];
-        b.batch_once("search-bing", &read, until()).await.unwrap();
-        let after_read = calls(&dir).len();
-        assert_eq!(after_read, before + 1, "a read raises nothing");
-        b.batch_once("search-bing", &typing(), until())
-            .await
-            .unwrap();
-        let c = calls(&dir);
-        let tail: Vec<_> = c[after_read..].iter().map(args).collect();
-        assert_eq!(tail.len(), 2, "{tail:?}");
-        assert!(tail[0].ends_with(&["tab", "list"]), "{tail:?}");
-        assert!(
-            tail[1].ends_with(&["batch", "--json", "--bail"]),
-            "{tail:?}"
-        );
-        assert_eq!(paths(&activated), [format!("/json/activate/T-t-{session}")]);
+        let r = Real::new("raise");
+        let (url, _) = page();
+        open_all(&r.b, &url, &["search-bing", "search-brave"]).await;
+        let read =
+            r.b.batch_once("search-bing", &[cmd(&["eval", SEEN])], until())
+                .await;
+        assert_eq!(read.unwrap()[0]["result"], "hidden P");
+        let click = [cmd(&["click", "#b"]), cmd(&["eval", SEEN])];
+        let clicked = r.b.batch_once("search-bing", &click, until()).await;
+        assert_eq!(clicked.unwrap()[1]["result"], "visible clicked");
     }
 
-    /// Chrome refusing to activate the tab (here a `404`) leaves the input to run as it is.
-    #[tokio::test]
-    async fn a_refused_raise_does_not_fail_the_input() {
-        let (dir, b) = fake("raise-refused");
-        let activated = chrome_stub(&dir, "404 Not Found");
-        b.warm().await.unwrap();
-        let session = name("search-bing", 1);
-        std::fs::write(
-            dir.join(format!("{session}.url")),
-            "https://www.bing.com/search?q=a",
-        )
-        .unwrap();
-        let until = std::time::Instant::now() + Duration::from_secs(5);
-        b.batch_once("search-bing", &typing(), until).await.unwrap();
-        assert_eq!(paths(&activated).len(), 1);
-        assert!(dir.join(format!("{session}.typed")).exists());
-    }
-
-    /// Engines start typing together, and raising one tab hides the others: a session's raise and its input are one step,
-    /// so another session's raise cannot land before the input is done. With every typing batch taking `DELAY`, two
-    /// sessions typing together take twice that if the lock is held through the input, and about once if it is
-    /// let go after the raise (the sleeps add up either way, so a slow machine cannot fail the lower bound).
+    /// Sessions typing at once take the front tab one at a time: each raises its tab and sends its input as one step,
+    /// so no other session's raise hides its tab before its input is done.
     #[tokio::test]
     async fn input_takes_the_front_tab_one_session_at_a_time() {
-        const DELAY: Duration = Duration::from_millis(400);
-        let (dir, b) = fake("front");
-        let _activated = chrome_stub(&dir, "200 OK");
-        b.warm().await.unwrap();
-        for key in ["search-bing", "search-brave"] {
-            std::fs::write(
-                dir.join(format!("{}.url", name(key, 1))),
-                "https://example.com/search?q=a",
-            )
-            .unwrap();
-        }
-        std::fs::write(dir.join("typedelay"), DELAY.as_millis().to_string()).unwrap();
-        let t0 = std::time::Instant::now();
-        let until = t0 + Duration::from_secs(5);
-        let cmds = typing();
-        let before = calls(&dir).len();
+        let r = Real::new("front");
+        let (url, _) = page();
+        open_all(&r.b, &url, &["search-bing", "search-brave"]).await;
+        let click = [cmd(&["click", "#b"]), cmd(&["eval", SEEN])];
         let (x, y) = tokio::join!(
-            b.batch_once("search-bing", &cmds, until),
-            b.batch_once("search-brave", &cmds, until)
+            r.b.batch_once("search-bing", &click, until()),
+            r.b.batch_once("search-brave", &click, until())
         );
-        x.unwrap();
-        y.unwrap();
-        assert!(t0.elapsed() >= 2 * DELAY, "{:?}", t0.elapsed());
-        // The raise is inside the turn: a session's `tab list` (its raise) is followed by its own batch before the
-        // other session's raise. With the raise before the lock, both `tab list`s would come first.
-        let c = calls(&dir);
-        let steps: Vec<(String, &str)> = c[before..]
-            .iter()
-            .map(args)
-            .filter_map(|a| {
-                let kind = if a.ends_with(&["tab", "list"]) {
-                    "list"
-                } else if a.ends_with(&["batch", "--json", "--bail"]) {
-                    "batch"
-                } else {
-                    return None;
-                };
-                let at = a.iter().position(|x| *x == "--session")?;
-                Some((a[at + 1].to_owned(), kind))
-            })
-            .collect();
-        let kinds: Vec<_> = steps.iter().map(|s| s.1).collect();
-        assert_eq!(kinds, ["list", "batch", "list", "batch"], "{steps:?}");
-        assert_eq!(steps[0].0, steps[1].0, "{steps:?}");
-        assert_eq!(steps[2].0, steps[3].0, "{steps:?}");
-    }
-
-    #[tokio::test]
-    async fn render_reads_a_page_that_never_gets_ready() {
-        let (dir, b) = fake("never");
-        b.warm().await.unwrap();
-        let url = Url::parse("http://example.com/wait-slow").unwrap();
-        let run = SearchRun { ready_js: READY_JS };
-        let deadline = READ_MARGIN + Duration::from_millis(700);
-        let t = std::time::Instant::now();
-        let (html, landed) = b
-            .render(Some(&url), "search-google", Some(run), deadline)
-            .await
-            .unwrap();
-        assert!(t.elapsed() < deadline, "{:?}", t.elapsed());
-        assert!(html.contains("Rendered page for"), "{html}");
-        assert_eq!(landed, url);
-        let c = calls(&dir);
-        let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
-        assert_eq!(
-            batch[1],
-            json!(["wait", "--fn", READY_JS, "--timeout", "700"])
-        );
-        assert_eq!(c.len(), 1, "a read page keeps its tab: {c:?}");
+        assert_eq!(x.unwrap()[1]["result"], "visible clicked");
+        assert_eq!(y.unwrap()[1]["result"], "visible clicked");
     }
 }

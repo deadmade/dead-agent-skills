@@ -175,21 +175,6 @@ fn file(path: &str) -> Resp {
     Resp::new(200, ct, std::fs::read(p).unwrap())
 }
 
-/// A copy of `tests/fixtures/search/` with `{{STUB}}` pointing at `fx`, for the fake's `$FAKE_AB_PAGES`.
-pub fn pages(fx: &Fixture) -> PathBuf {
-    let dir = tempdir();
-    for e in std::fs::read_dir(fixtures().join("search")).unwrap() {
-        let p = e.unwrap().path();
-        let html = std::fs::read_to_string(&p).unwrap();
-        std::fs::write(
-            dir.join(p.file_name().unwrap()),
-            html.replace("{{STUB}}", &fx.url("")),
-        )
-        .unwrap();
-    }
-    dir
-}
-
 pub fn tempdir() -> PathBuf {
     static N: AtomicU64 = AtomicU64::new(0);
     let d = std::env::temp_dir().join(format!(
@@ -207,8 +192,6 @@ pub struct Mcp {
     pub project: PathBuf,
     /// The server's `WEB_MCP_SEARCH_DIR`.
     pub search: PathBuf,
-    /// The fake agent-browser's `FAKE_AB_STATE`: its `chrome`, `dead-g<n>` and `<session>.gone` files.
-    pub state: PathBuf,
     child: Child,
     stdin: Option<ChildStdin>,
     out: BufReader<ChildStdout>,
@@ -517,9 +500,9 @@ impl Mcp {
     }
 
     /// In `project` (so a second server there sees the first one's `.web`), with extra environment.
-    /// Unless `envs` says otherwise, agent-browser is the fake, the browser a dummy file, and the search
-    /// folder a fresh one; whichever it is gets a minimal extension in place of the cookie extension, so no test
-    /// downloads it.
+    /// Unless `envs` says otherwise, agent-browser is a path that doesn't exist (a call that reaches it answers the
+    /// install note), the browser a dummy file, and the search folder a fresh one; whichever it is gets a minimal
+    /// extension in place of the cookie extension, so no test downloads it.
     pub fn start_with(project: PathBuf, envs: &[(&str, String)]) -> Self {
         let search = envs
             .iter()
@@ -533,10 +516,6 @@ impl Mcp {
         )
         .unwrap();
         std::fs::write(search.join("chrome"), "").unwrap();
-        let state = envs
-            .iter()
-            .find(|(k, _)| *k == "FAKE_AB_STATE")
-            .map_or_else(tempdir, |(_, v)| PathBuf::from(v));
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_web-mcp"));
         // The machine's proxy settings never reach a test, unless the test names them in `envs` (a `NO_PROXY` that
         // lists loopback would hide a request that wrongly goes through a proxy).
@@ -553,12 +532,8 @@ impl Mcp {
             cmd.env_remove(k);
         }
         cmd.env("WEB_MCP_SEARCH_DIR", &search)
-            .env("FAKE_AB_STATE", &state)
             .env("WEB_MCP_CHROME", search.join("chrome"))
-            .env(
-                "WEB_MCP_AGENT_BROWSER",
-                env!("CARGO_BIN_EXE_fake-agent-browser"),
-            )
+            .env("WEB_MCP_AGENT_BROWSER", "/nonexistent/agent-browser")
             .env("WEB_MCP_TEST_PUBLIC_IP", PUBLIC)
             .envs(envs.iter().map(|(k, v)| (k, v)))
             .env("CLAUDE_PROJECT_DIR", &project)
@@ -570,7 +545,6 @@ impl Mcp {
         let mut m = Self {
             project,
             search,
-            state,
             child,
             stdin: Some(stdin),
             out,
@@ -624,8 +598,6 @@ impl Mcp {
                 root.join("search").display().to_string(),
             ),
             ("WEB_MCP_CHROME", String::new()),
-            // Unused by the real agent-browser; inside the root, so it goes with it.
-            ("FAKE_AB_STATE", root.join("state").display().to_string()),
             ("WEB_MCP_AGENT_BROWSER", agent_browser.display().to_string()),
             ("WEB_MCP_TEST_PUBLIC_IP", format!("{PUBLIC},{ENGINE_HOST}")),
             ("WEB_MCP_TEST_ENGINES", origins.join(",")),
@@ -885,52 +857,6 @@ impl Drop for Mcp {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
-}
-
-/// The fake agent-browser's calls logged to `log`.
-pub fn logged(log: &Path) -> Vec<Value> {
-    std::fs::read_to_string(log)
-        .unwrap_or_default()
-        .lines()
-        .map(|l| serde_json::from_str(l).unwrap())
-        .collect()
-}
-
-/// A logged call's argv.
-pub fn argv(call: &Value) -> Vec<&str> {
-    call["args"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|a| a.as_str().unwrap())
-        .collect()
-}
-
-/// A logged call's `--session`.
-pub fn session_of(call: &Value) -> &str {
-    let a = argv(call);
-    let at = a.iter().position(|x| *x == "--session").unwrap();
-    call["args"][at + 1].as_str().unwrap()
-}
-
-/// A logged call's command, after the global flags, joined by spaces.
-pub fn command_of(call: &Value) -> String {
-    let a = argv(call);
-    let mut i = 0;
-    while i < a.len() {
-        i += match a[i] {
-            "--session" | "--config" | "--cdp" | "--max-output" => 2,
-            "--json" | "--content-boundaries" | "--pin-tab" => 1,
-            _ => break,
-        };
-    }
-    a[i..].join(" ")
-}
-
-/// Whether a logged call attached to the window (`--cdp … --pin-tab`).
-pub fn attached(call: &Value) -> bool {
-    let a = argv(call);
-    a.contains(&"--cdp") || a.contains(&"--pin-tab")
 }
 
 /// The text of the first text block.

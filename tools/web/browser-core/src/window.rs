@@ -164,125 +164,55 @@ pub fn tie_to_process() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// The fake agent-browser, with a window of its own that these tests never start.
-    fn fake() -> Browser {
-        let fake = crate::browser::fake_agent_browser();
-        Browser::new(&fake.to_string_lossy(), Window::new(Err("unused".into())))
-    }
-
-    /// A search dir with the extension unpacked and a dummy browser, and its window.
-    fn window(tag: &str) -> (PathBuf, Window) {
-        let dir = std::env::temp_dir().join(format!("web-mcp-window-{tag}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        let ext = dir.join("extensions/idcac-8f70ab94");
-        std::fs::create_dir_all(&ext).unwrap();
-        std::fs::write(ext.join("manifest.json"), "{}").unwrap();
-        let chrome = dir.join("browser");
-        std::fs::write(&chrome, "").unwrap();
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        let p = Profiles::new(Some(dir.clone()))
-            .unwrap()
-            .with_chrome(chrome);
-        (dir, Window::new(Ok(Arc::new(p))))
-    }
-
-    /// The fake's calls in slot 1, as their commands after the global flags.
-    fn calls(dir: &Path) -> Vec<(String, String)> {
-        std::fs::read_to_string(dir.join("profiles/1/calls.jsonl"))
-            .unwrap_or_default()
-            .lines()
-            .map(|l| {
-                let v: serde_json::Value = serde_json::from_str(l).unwrap();
-                let a: Vec<&str> = v["args"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|a| a.as_str().unwrap())
-                    .collect();
-                // --session <s> --json --config <path> <command…>
-                assert_eq!([a[0], a[2], a[3]], ["--session", "--json", "--config"]);
-                (a[1].to_owned(), a[5..].join(" "))
-            })
-            .collect()
-    }
-
-    fn url(c: &str) -> String {
-        format!("ws://127.0.0.1:9222/devtools/browser/{c}")
-    }
+    use crate::browser::{Real, end_chrome};
 
     #[tokio::test]
     async fn live_starts_once_for_parallel_callers() {
-        let (dir, w) = window("parallel");
-        let b = fake();
-        let (x, y) = tokio::join!(w.live(&b), w.live(&b));
-        let first = Live {
-            r#gen: 1,
-            url: url("1"),
-        };
-        assert_eq!(x.unwrap(), first);
-        assert_eq!(y.unwrap(), first);
-        let opens: Vec<_> = calls(&dir)
-            .into_iter()
-            .filter(|(_, c)| c.starts_with("open"))
-            .collect();
-        assert_eq!(opens, [(w.owner(), "open about:blank".to_owned())]);
+        let r = Real::new("parallel");
+        let w = r.window();
+        let (x, y) = tokio::join!(w.live(&r.b), w.live(&r.b));
+        let x = x.unwrap();
+        assert_eq!(x.r#gen, 1);
+        assert_eq!(y.unwrap(), x);
     }
 
     #[tokio::test]
     async fn same_url_keeps_the_generation() {
-        let (dir, w) = window("same");
-        let b = fake();
-        w.live(&b).await.unwrap();
-        let before = calls(&dir);
-        assert_eq!(
-            w.live(&b).await.unwrap(),
-            Live {
-                r#gen: 1,
-                url: url("1")
-            }
-        );
-        let after = calls(&dir);
-        assert_eq!(
-            after[before.len()..],
-            [(w.owner(), "get cdp-url".to_owned())]
-        );
+        let r = Real::new("same");
+        let w = r.window();
+        let first = w.live(&r.b).await.unwrap();
+        assert_eq!(first.r#gen, 1);
+        assert_eq!(w.live(&r.b).await.unwrap(), first);
     }
 
+    /// Chrome gone under the window: the owner starts another, on a new url, which is the next generation.
     #[tokio::test]
     async fn changed_url_starts_next_generation() {
-        let (dir, w) = window("changed");
-        let b = fake();
-        assert_eq!(w.live(&b).await.unwrap().r#gen, 1);
-        std::fs::write(dir.join("profiles/1/chrome"), "2").unwrap();
-        assert_eq!(
-            w.live(&b).await.unwrap(),
-            Live {
-                r#gen: 2,
-                url: url("2")
-            }
-        );
+        let r = Real::new("changed");
+        let w = r.window();
+        let first = w.live(&r.b).await.unwrap();
+        end_chrome(&first.url);
+        let next = w.live(&r.b).await.unwrap();
+        assert_eq!(next.r#gen, 2);
+        assert_ne!(next.url, first.url);
     }
 
+    /// The owner a killed web-mcp left in the slot is closed (it has no daemon, so its close starts none), its tab
+    /// binding goes with it, and the slot names the new owner.
     #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn previous_owner_is_closed_first() {
-        let (dir, w) = window("previous");
-        std::fs::create_dir_all(dir.join("profiles/1")).unwrap();
-        std::fs::write(dir.join("profiles/1/owner"), "web-mcp-999999-window").unwrap();
-        // Off the user's agent-browser folder: the close removes the previous owner's `.target` there.
-        let mut b = fake();
-        b.session_dir = dir.join("sessions");
-        w.live(&b).await.unwrap();
-        let c = calls(&dir);
-        assert_eq!(
-            c[..2],
-            [
-                ("web-mcp-999999-window".to_owned(), "close".to_owned()),
-                (w.owner(), "open about:blank".to_owned())
-            ]
-        );
-        let owner = std::fs::read_to_string(dir.join("profiles/1/owner")).unwrap();
+        let r = Real::new("previous");
+        let w = r.window();
+        let previous = "web-mcp-999999-window";
+        std::fs::create_dir_all(r.dir.join("profiles/1")).unwrap();
+        std::fs::write(r.dir.join("profiles/1/owner"), previous).unwrap();
+        std::fs::create_dir_all(&r.b.session_dir).unwrap();
+        let target = r.b.session_dir.join(format!("{previous}.target"));
+        std::fs::write(&target, "{}").unwrap();
+        w.live(&r.b).await.unwrap();
+        assert!(!target.exists(), "{} is left", target.display());
+        let owner = std::fs::read_to_string(r.dir.join("profiles/1/owner")).unwrap();
         assert_eq!(owner, w.owner());
     }
 

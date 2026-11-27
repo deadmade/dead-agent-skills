@@ -156,26 +156,24 @@ test('under Git Bash the rust suite refuses to run cargo', (t) => {
   assert.deepEqual(r.log, []);
 });
 
-test('the rust suite builds the fake, tests the packages together, then each one', (t) => {
+test('the rust suite tests the packages together, then each one', (t) => {
   const d = door(t);
   const cargo = (args) => d.run(args, { WEB_MCP_AGENT_BROWSER: d.agentBrowser }).log.map((l) => l.split(' :: ')[1]);
-  const build = 'build --locked -p web-mcp --bin fake-agent-browser';
   const test = 'test --locked --no-fail-fast';
   assert.deepEqual(cargo(['rust', '--packages', 'web-mcp,ado-mcp', '--each-package']), [
-    build,
     `${test} -p web-mcp -p ado-mcp`,
     `${test} -p web-mcp`,
     `${test} -p ado-mcp`,
   ]);
   assert.deepEqual(cargo(['rust', '--packages', 'ado-mcp', '--each-package']), [`${test} -p ado-mcp`]);
-  assert.deepEqual(cargo(['rust']), [build, `${test} --workspace`]);
+  assert.deepEqual(cargo(['rust']), [`${test} --workspace`]);
   // Every command runs, and one failing fails the suite.
   writeFileSync(join(d.root, 'fail'), '');
   const f = d.run(['rust', '--packages', 'web-mcp,ado-mcp', '--each-package'], {
     WEB_MCP_AGENT_BROWSER: d.agentBrowser,
   });
   assert.equal(f.status, 1);
-  assert.equal(f.log.length, 4);
+  assert.equal(f.log.length, 3);
 });
 
 test('cargo gets the agent-browser it found, the installer copy when nothing is set', (t) => {
@@ -364,7 +362,6 @@ test('--list prints each command and runs nothing', (t) => {
   assert.match(r.out, /^node: .*--test-timeout=300000 /m);
   assert.doesNotMatch(r.out, /^node: .*--test-coverage-lines/m);
   assert.match(r.out, /^node: .* tools\/harness-compiler\/src\/cli\.ts build$/m);
-  assert.match(r.out, /^rust: .*cargo(\.cmd)? build --locked -p web-mcp --bin fake-agent-browser$/m);
   assert.match(r.out, /^rust: .*cargo(\.cmd)? test --locked --no-fail-fast --workspace$/m);
   assert.deepEqual(r.log, []);
 });

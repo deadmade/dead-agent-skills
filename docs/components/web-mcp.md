@@ -32,11 +32,9 @@ stay in order. Adding the hint would reorder them.
 
 ## Contributor rules
 
-Contributor rules: tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`;
-`cargo build --locked -p web-mcp --bin fake-agent-browser` before the unit tests), which changes with any agent-browser
-answer web-mcp reads and doesn't model every upstream quirk
-(`docs/solutions/click-and-press-reach-nothing-in-a-hidden-tab.md`). Test-only hooks: the fake's `$FAKE_AB_PAGES` folder
-serves a result page for an engine host and, for any other host, `<last path segment of the URL>.html`;
+Contributor rules: no fake agent-browser is left. A test that opens a browser runs the real one (`Mcp::start_real`
+below, or `real_agent_browser()` in an inline test); `Mcp::start` and the inline `test_ctx` give web-mcp an
+agent-browser path that doesn't exist, for tests that never reach a browser. Test-only hooks:
 `WEB_MCP_TEST_PUBLIC_IP` (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public;
 `WEB_MCP_TEST_ENGINES` (the same builds, `google=http://127.0.0.3:8080,…`) moves a listed engine's result URL to that
 scheme, host and port, keeping its path and query, so `/sorry` and `/goto` stay real;

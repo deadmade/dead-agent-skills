@@ -42,6 +42,8 @@ What web-mcp uses, and nothing else:
   does nothing off Windows.
 - `profile::Profiles`: `new`, `rest`, `resting`, `consent_seen` and `set_consent_seen`. With the feature `test-support`,
   also `with_chrome`, which gives a test a browser instead of the lookup through `WEB_MCP_CHROME`, HOME and PATH.
+- With the feature `test-support`, `browser::real_agent_browser`: the agent-browser a test runs (`WEB_MCP_AGENT_BROWSER`,
+  else the installer's copy in `<CLAUDE_CONFIG_DIR or ~/.claude>/bin`, else it panics).
 
 ## What a consumer must do
 
@@ -51,8 +53,20 @@ What web-mcp uses, and nothing else:
   it under the held profile slot (the search folder until one is held). Pass one path segment: nothing checks it.
 - Session names that start with `search-`, `web-mcp-search-` or `web-mcp-fetch-`, and the name `window`, are reserved:
   `check_session` rejects them, and a key with the fetch prefix is named differently from a user's.
-- Build `fake-agent-browser` before the crate's unit tests: `cargo build --locked -p web-mcp --bin fake-agent-browser`.
-  The fake stays in web-mcp. A crate that runs `Profiles::with_chrome` in its own tests enables `test-support`.
+- A crate that runs `Profiles::with_chrome` or `real_agent_browser` in its own tests enables `test-support`.
+
+## Tests
+
+The `Browser` and `Window` tests run the real agent-browser (`real_agent_browser`) and Chrome for Testing (or
+`WEB_MCP_CHROME`) against pages a local listener serves; no fake agent-browser is left. `Real` in `browser.rs` gives
+each one a fresh search folder and holds one lock, so one window runs at a time: every `Browser` in a test process
+shares the owner's name, which carries the pid. Dropping it closes every session and the window, then removes the
+folder. On Windows that folder is also the process's `XDG_RUNTIME_DIR` while the test runs, so agent-browser's session
+files go with it, and the test process is tied to its children (`tie_to_process`), so a daemon a failed test never
+closed dies with it. Off Windows the variable is left alone, as in web-mcp's harness. A Chrome that went away is ended
+through its debug port (`Browser.close`). A refused tab raise has no real trigger (Chrome activates every tab it
+lists) and has no test. The Nix package check skips these tests (`checkFlags` in `flake.nix`); crates.yml's rust job
+runs them.
 
 ## Names that stay web-mcp's
 

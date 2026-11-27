@@ -127,8 +127,7 @@ Read `docs/components/ci.md` for how a release is built and published.
   hook and the release jobs run `repo node`.
 - Run `npm ci` once, then `npm run typecheck`, which is also one list: `tsc --noEmit` over `tools/installer/` (sources and tests,
   strict), then the harness-compiler's and upstream-sync's own `typecheck`.
-- Rust, from the root: `cargo build --locked -p web-mcp --bin fake-agent-browser`, then
-  `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
+- Rust, from the root: `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
   `cargo fmt --all -- --check`. Use `-p web-mcp` or another member instead of `--workspace`
   for independent checks. The workspace policy is `scripts/cargo-workspace.mjs`, tested by `scripts/cargo-workspace.test.mjs`.
   CI lints with latest stable Rust and separately checks the selected packages with the workspace's declared `rust-version` (1.97).

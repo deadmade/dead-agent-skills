@@ -47,11 +47,6 @@ windows-sys = { workspace = true, features = ["Wdk_System_Threading", "Win32_Fou
 name = "extract"
 harness = false
 
-# Test double for agent-browser; only the tests use it, the release ships `web-mcp` alone.
-[[bin]]
-name = "fake-agent-browser"
-path = "tests/bin/fake_agent_browser.rs"
-
 # H4 experiment only (examples/h4.rs); the server never links embeddings.
 [features]
 h4 = ["dep:model2vec-rs"]
