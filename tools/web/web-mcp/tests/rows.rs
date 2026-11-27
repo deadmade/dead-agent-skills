@@ -6,7 +6,7 @@ use std::fmt::Write as _;
 use std::io::Write as _;
 use std::time::{Duration, Instant};
 
-use common::{Fixture, Mcp, PUBLIC, Resp, guarded, is_error, tempdir, text};
+use common::{Fixture, Mcp, PUBLIC, Resp, guarded, is_error, text};
 use serde_json::{Value, json};
 
 /// `n` list items in a list of class `class`, each a link relative to the page with a text long enough to count.
@@ -57,10 +57,7 @@ fn rows_bad_arguments_are_errors() {
 
 #[test]
 fn rows_failed_render_reports_the_browsers_error() {
-    let mut mcp = Mcp::start_with(
-        tempdir(),
-        &[("WEB_MCP_AGENT_BROWSER", "/nonexistent/agent-browser".into())],
-    );
+    let mut mcp = Mcp::start();
     let r = mcp.call("rows", json!({"url": "http://127.0.0.2/ads"}));
     assert!(is_error(&r), "{r}");
     let t = text(&r);

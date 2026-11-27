@@ -378,7 +378,6 @@ fn doi_query_skips_browser_engines() {
         &[
             ("WEB_MCP_OPENALEX_URL", fx.url("/openalex")),
             ("WEB_MCP_CROSSREF_URL", fx.url("/crossref")),
-            ("WEB_MCP_AGENT_BROWSER", "/nonexistent/agent-browser".into()),
         ],
     );
     let r = papers(&mut mcp, "doi:10.7717/peerj.4375");
