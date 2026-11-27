@@ -8,8 +8,8 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::Duration;
 
@@ -173,21 +173,209 @@ fn seeded_store(dir: &Path, confirmed: Confirmed) -> Arc<Store> {
     store
 }
 
-/// The `n`th address (from 1) the fake browser wrote to `out`.
-fn nth_address(out: &Path, n: usize) -> Option<String> {
-    let text = std::fs::read_to_string(out).unwrap_or_default();
-    text.lines().nth(n - 1).map(str::to_string)
+/// The real agent-browser, a short copy of browser-core's `real_agent_browser`: `WEB_MCP_AGENT_BROWSER` if set, else
+/// the installer's copy in `<CLAUDE_CONFIG_DIR or ~/.claude>/bin`. Unchecked, for the program a page opens with.
+fn agent_browser_path() -> PathBuf {
+    let var = |k: &str| {
+        std::env::var_os(k)
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+    };
+    var("WEB_MCP_AGENT_BROWSER").unwrap_or_else(|| {
+        let home = var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).unwrap_or_default();
+        var("CLAUDE_CONFIG_DIR")
+            .unwrap_or_else(|| home.join(".claude"))
+            .join("bin")
+            .join(format!("agent-browser{}", std::env::consts::EXE_SUFFIX))
+    })
 }
 
-/// Waits for `nth_address`, from a thread that may block.
-fn wait_address(out: &Path, n: usize) -> String {
-    for _ in 0..250 {
-        if let Some(address) = nth_address(out, n) {
-            return address;
+/// `agent_browser_path`, for a test that drives the browser itself.
+pub fn agent_browser() -> PathBuf {
+    let path = agent_browser_path();
+    assert!(
+        path.is_file(),
+        "agent-browser not found: run the installer or set WEB_MCP_AGENT_BROWSER"
+    );
+    path
+}
+
+/// Where agent-browser keeps its sessions' files (`.pid`, `.port`, `.target`, …): `$XDG_RUNTIME_DIR/agent-browser`
+/// (0.43.0, on Windows too), else `~/.agent-browser`. On Windows this process points the variable at a temp folder of
+/// its own first, so the files don't pile up in `~/.agent-browser`; not elsewhere, where Chrome finds its Wayland
+/// socket under it and a socket path in a temp folder can outgrow agent-browser's ~103 bytes.
+fn session_dir() -> &'static Path {
+    static DIR: OnceLock<PathBuf> = OnceLock::new();
+    DIR.get_or_init(|| {
+        if cfg!(windows) {
+            let own = std::env::temp_dir()
+                .join(format!("http-runner-agent-browser-{}", std::process::id()));
+            // SAFETY: setting a variable is always safe on Windows (std's docs).
+            unsafe { std::env::set_var("XDG_RUNTIME_DIR", own) };
         }
-        thread::sleep(Duration::from_millis(20));
+        let home = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+        std::env::var_os("XDG_RUNTIME_DIR")
+            .filter(|d| !d.is_empty())
+            .map_or_else(
+                || PathBuf::from(std::env::var_os(home).unwrap()).join(".agent-browser"),
+                |d| PathBuf::from(d).join("agent-browser"),
+            )
+    })
+}
+
+/// The program a page opens with when no browser can: agent-browser with a command it doesn't know, which starts and
+/// exits with an error.
+pub fn no_browser() -> Vec<OsString> {
+    let program: Vec<OsString> = vec![agent_browser().into(), "no-such-command".into()];
+    let out = Command::new(&program[0])
+        .args(&program[1..])
+        .arg("http://127.0.0.1:9/")
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "agent-browser took the command");
+    program
+}
+
+/// `program` as `HTTP_RUNNER_OPEN` takes it: one line each.
+pub fn open_hook(program: &[OsString]) -> String {
+    let lines: Vec<_> = program.iter().map(|a| a.to_string_lossy()).collect();
+    lines.join("\n")
+}
+
+/// Where a test's login page opens.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Page {
+    /// Nowhere: every host is confirmed, and a page that opens anyway has no program to start, so the run fails.
+    Never,
+    /// In real Chrome through agent-browser.
+    Browser,
+    /// In `no_browser`'s program.
+    NoBrowser,
+}
+
+/// Whether a `Browser` has its Chrome: one at a time, since a dozen at once abort pages they are sent to.
+static ONE: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
+
+/// One session of the real agent-browser, whose Chrome shows the login pages; dropping it closes it.
+pub struct Browser {
+    session: String,
+    started: AtomicBool,
+    /// Each login page the session showed, in order.
+    seen: Mutex<Vec<String>>,
+}
+
+impl Browser {
+    pub fn new(tag: &str) -> Arc<Self> {
+        session_dir();
+        Arc::new(Self {
+            session: format!("http-runner-{tag}-{}", std::process::id()),
+            started: AtomicBool::new(false),
+            seen: Mutex::default(),
+        })
     }
-    panic!("the fake browser got no address {n}");
+
+    /// The program for `page`; for the browser it waits for the other tests' Chrome to close, then starts this
+    /// session's first, since a cold start can abort the first page it is sent to (`net::ERR_ABORTED`).
+    pub fn program(&self, page: Page) -> Vec<OsString> {
+        match page {
+            Page::Never => Vec::new(),
+            Page::NoBrowser => no_browser(),
+            Page::Browser => {
+                let mut busy = ONE.0.lock().unwrap_or_else(PoisonError::into_inner);
+                while *busy {
+                    busy = ONE.1.wait(busy).unwrap_or_else(PoisonError::into_inner);
+                }
+                *busy = true;
+                drop(busy);
+                self.started.store(true, Ordering::SeqCst);
+                self.call(&["open", "about:blank"]);
+                let args = ["--session", &self.session, "open"];
+                let mut program = vec![agent_browser().into_os_string()];
+                program.extend(args.iter().map(OsString::from));
+                program
+            }
+        }
+    }
+
+    fn call(&self, args: &[&str]) -> String {
+        let out = Command::new(agent_browser())
+            .args(["--session", &self.session])
+            .args(args)
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(out.status.success(), "agent-browser {args:?}: {stderr}");
+        String::from_utf8_lossy(&out.stdout).trim().to_owned()
+    }
+
+    /// The login pages shown so far, the current one read first.
+    pub fn addresses(&self) -> Vec<String> {
+        assert!(self.started.load(Ordering::SeqCst), "no browser started");
+        let mut seen = self.seen.lock().unwrap();
+        let url = self.call(&["get", "url"]);
+        if url.starts_with("http://127.0.0.1:") && seen.last() != Some(&url) {
+            seen.push(url);
+        }
+        seen.clone()
+    }
+
+    /// The `n`th login page (from 1) the session showed, from a thread that may block.
+    pub fn wait_address(&self, n: usize) -> String {
+        for _ in 0..300 {
+            if let Some(address) = self.addresses().get(n - 1) {
+                return address.clone();
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+        panic!("the browser showed no login page {n}");
+    }
+
+    /// `wait_address` for a test on the runtime whose task opens the page.
+    pub async fn address(self: &Arc<Self>, n: usize) -> String {
+        for _ in 0..300 {
+            let browser = self.clone();
+            let shown =
+                tokio::task::spawn_blocking(move || browser.addresses().get(n - 1).cloned());
+            if let Some(address) = shown.await.unwrap() {
+                return address;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        panic!("the browser showed no login page {n}");
+    }
+
+    /// Types `pairs` (each field's name and value) into `page`, which the browser must be showing, and saves it; the
+    /// page must answer that it saved.
+    pub fn submit(&self, page: &str, pairs: &[(&str, &str)]) {
+        let shown = self.addresses();
+        let current = shown.last().map(String::as_str);
+        assert_eq!(current, Some(page), "another page is shown");
+        for (name, value) in pairs {
+            self.call(&["fill", &format!("[name=\"{name}\"]"), value]);
+        }
+        self.call(&["click", "button"]);
+        self.call(&["wait", "--fn", "document.title === 'Saved'"]);
+    }
+
+    /// Closes the session, its daemon and its Chrome, if it started.
+    pub fn close(&self) {
+        if self.started.swap(false, Ordering::SeqCst) {
+            let session = &self.session;
+            let _ = Command::new(agent_browser_path())
+                .args(["--session", session, "close"])
+                .output();
+            // agent-browser's close leaves the session's tab binding behind.
+            let _ = std::fs::remove_file(session_dir().join(format!("{session}.target")));
+            *ONE.0.lock().unwrap_or_else(PoisonError::into_inner) = false;
+            ONE.1.notify_one();
+        }
+    }
+}
+
+impl Drop for Browser {
+    fn drop(&mut self) {
+        self.close();
+    }
 }
 
 pub struct Rig {
@@ -195,36 +383,31 @@ pub struct Rig {
     pub carrier: Carrier,
     pub store: Arc<Store>,
     pub dir: PathBuf,
-    out: PathBuf,
+    pub browser: Arc<Browser>,
 }
 
+/// A rig for hosts that are all confirmed, so no login page opens.
 pub fn rig<R: Into<Vec<u8>>>(
     tag: &str,
     confirmed: Confirmed,
     handler: impl Fn(&Seen) -> R + Send + Sync + 'static,
 ) -> Rig {
-    rig_with(tag, &[], confirmed, handler)
+    rig_with(tag, Page::Never, confirmed, handler)
 }
 
 pub fn rig_with<R: Into<Vec<u8>>>(
     tag: &str,
-    browser_flags: &[&str],
+    page: Page,
     confirmed: Confirmed,
     handler: impl Fn(&Seen) -> R + Send + Sync + 'static,
 ) -> Rig {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let dir = tempdir(&format!("run-{tag}"));
     let store = seeded_store(&dir, confirmed);
-    let out = dir.join("browser.txt");
-    let mut program: Vec<OsString> = vec![
-        env!("CARGO_BIN_EXE_fake-browser").into(),
-        "--out".into(),
-        out.clone().into(),
-    ];
-    program.extend(browser_flags.iter().map(OsString::from));
+    let browser = Browser::new(&format!("run-{tag}"));
     let pages = Pages::new(
         store.clone(),
-        Open::Program(program),
+        Open::Program(browser.program(page)),
         Duration::from_secs(60),
     );
     Rig {
@@ -232,7 +415,7 @@ pub fn rig_with<R: Into<Vec<u8>>>(
         carrier: Carrier::start(handler),
         store,
         dir,
-        out,
+        browser,
     }
 }
 
@@ -264,15 +447,14 @@ impl Rig {
         tokio::spawn(async move { run::run(&ctx, args).await })
     }
 
-    /// The `n`th address (from 1) the fake browser was given.
+    /// The `n`th login page (from 1) the browser showed.
     pub async fn address(&self, n: usize) -> String {
-        for _ in 0..250 {
-            if let Some(address) = nth_address(&self.out, n) {
-                return address;
-            }
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
-        panic!("the fake browser got no address {n}");
+        self.browser.address(n).await
+    }
+
+    /// Types `pairs` into the login page at `page` in the browser and saves it.
+    pub fn submit(&self, page: &str, pairs: &[(&str, &str)]) {
+        self.browser.submit(page, pairs);
     }
 
     /// Every file under `http-replies`, side files included: its path and its text.
@@ -309,26 +491,6 @@ impl Rig {
     }
 }
 
-/// Posts `pairs` to a login page and expects it to save them.
-pub fn submit(address: &str, pairs: &[(&str, &str)]) {
-    let url = url::Url::parse(address).unwrap();
-    let port = url.port().unwrap();
-    let form = url::form_urlencoded::Serializer::new(String::new())
-        .extend_pairs(pairs)
-        .finish();
-    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-    write!(
-        stream,
-        "POST {} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{form}",
-        url.path(),
-        form.len()
-    )
-    .unwrap();
-    let mut answer = String::new();
-    stream.read_to_string(&mut answer).unwrap();
-    assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
-}
-
 /// A port nothing listens on.
 pub fn closed_port() -> u16 {
     TcpListener::bind(("127.0.0.1", 0))
@@ -338,11 +500,11 @@ pub fn closed_port() -> u16 {
         .port()
 }
 
-/// The `http-runner` binary over stdio, initialized, with a fake browser and a login store of its own.
+/// The `http-runner` binary over stdio, initialized, with the browser and a login store of its own.
 pub struct Mcp {
-    /// The folder holding the store, the fake browser's log and the files a test writes.
+    /// The folder holding the store and the files a test writes.
     pub dir: PathBuf,
-    out: PathBuf,
+    browser: Arc<Browser>,
     child: Child,
     stdin: Option<ChildStdin>,
     stdout: BufReader<ChildStdout>,
@@ -352,15 +514,14 @@ pub struct Mcp {
 
 #[allow(clippy::needless_pass_by_value)] // callers build the JSON inline with `json!`
 impl Mcp {
-    /// A server whose store already holds `confirmed`; `envs` go on top of the fake browser's.
-    pub fn start(tag: &str, confirmed: Confirmed, envs: &[(&str, &str)]) -> Self {
+    /// A server whose store already holds `confirmed` and whose login page opens as `page`, with `envs` set.
+    pub fn start(tag: &str, page: Page, confirmed: Confirmed, envs: &[(&str, &str)]) -> Self {
         let dir = tempdir(&format!("mcp-{tag}"));
         seeded_store(&dir, confirmed);
-        let out = dir.join("browser.txt");
+        let browser = Browser::new(&format!("mcp-{tag}"));
         let mut child = Command::new(env!("CARGO_BIN_EXE_http-runner"))
             .env("HTTP_RUNNER_DIR", dir.join("store"))
-            .env("HTTP_RUNNER_OPEN", env!("CARGO_BIN_EXE_fake-browser"))
-            .env("FAKE_BROWSER_OUT", &out)
+            .env("HTTP_RUNNER_OPEN", open_hook(&browser.program(page)))
             .envs(envs.iter().copied())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -377,7 +538,7 @@ impl Mcp {
         });
         let mut mcp = Self {
             dir,
-            out,
+            browser,
             child,
             stdin,
             stdout,
@@ -437,9 +598,9 @@ impl Mcp {
         path
     }
 
-    /// The `n`th address (from 1) the fake browser was given.
+    /// The `n`th login page (from 1) the browser showed.
     pub fn address(&self, n: usize) -> String {
-        wait_address(&self.out, n)
+        self.browser.wait_address(n)
     }
 
     /// Types `pairs` on the first login page from another thread, since `call` blocks this one.
@@ -447,14 +608,16 @@ impl Mcp {
         &self,
         pairs: &'static [(&'static str, &'static str)],
     ) -> thread::JoinHandle<()> {
-        let out = self.out.clone();
-        thread::spawn(move || submit(&wait_address(&out, 1), pairs))
+        let browser = self.browser.clone();
+        thread::spawn(move || browser.submit(&browser.wait_address(1), pairs))
     }
 
     /// Closes the server's stdin as a client does on exit, waits for it and returns what it wrote to stderr.
     pub fn finish(mut self) -> String {
         self.stdin = None;
         self.child.wait().unwrap();
+        // On Windows the browser it started inherited its stderr, which ends only once that browser does.
+        self.browser.close();
         self.stderr.take().unwrap().join().unwrap()
     }
 }

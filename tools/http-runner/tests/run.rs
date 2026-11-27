@@ -1,4 +1,4 @@
-//! `run::run` through the library, against a fake carrier on loopback.
+//! `run::run` through the library, against a fake carrier on loopback, with login pages in real Chrome.
 
 mod common;
 
@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use common::{Seen, closed_port, ok, reply, reply_bytes, rig, rig_with, submit};
+use common::{Page, Seen, closed_port, ok, reply, reply_bytes, rig, rig_with};
 use http_runner::mask::{Place, escape};
 use http_runner::run::{self, RunArgs};
 use http_runner::store::Store;
@@ -167,44 +167,36 @@ async fn http_error_and_soap_fault_are_results() {
 }
 
 #[tokio::test]
-async fn unconfirmed_host_is_not_sent() {
-    let rig = rig_with("unconfirmed", &["--fail"], &[], |_| ok(""));
-    let file = rig.file("# @name a\nGET http://localhost:PORT/a\n");
-    rig.run(&file, "a").await;
-    rig.address(1).await;
-    assert_eq!(rig.carrier.connections(), 0);
-}
-
-#[tokio::test]
 async fn host_without_secrets_needs_confirming() {
-    let rig = rig("confirming", &[], |_| ok("answer"));
+    let rig = rig_with("confirming", Page::Browser, &[], |_| ok("answer"));
     let file = rig.file("# @name a\nGET http://localhost:PORT/a\n");
     let running = rig.start(&file, "a", false);
     let page = rig.address(1).await;
     assert_eq!(rig.carrier.connections(), 0);
-    submit(&page, &[]);
+    rig.submit(&page, &[]);
     says(&running.await.unwrap(), "answer");
     assert!(rig.store.is_confirmed("localhost").unwrap());
 }
 
 #[tokio::test]
 async fn no_browser_tells_agent_to_ask_the_user() {
-    let rig = rig_with("nobrowser", &["--fail"], &[], |_| ok(""));
+    let rig = rig_with("nobrowser", Page::NoBrowser, &[], |_| ok(""));
     let file = rig.file("# @name a\nGET http://localhost:PORT/a\n");
     let result = rig.run(&file, "a").await;
     says(&result, "ask the user");
     says(&result, "localhost");
-    let page = rig.address(1).await;
-    never(&result, &page);
-    never(&result, url::Url::parse(&page).unwrap().path());
+    // The page's address, which the program was given, is the only `127.0.0.1` here.
+    never(&result, "127.0.0.1");
+    assert_eq!(rig.carrier.connections(), 0);
 }
 
 const KEYED: &str = "# @name a\nGET http://localhost:PORT/a\nX-Key: {{$dotenv KEY}}\n";
 
 #[tokio::test]
 async fn retype_login_reopens_before_sending() {
-    let rig = rig(
+    let rig = rig_with(
         "retype",
+        Page::Browser,
         &[("localhost", &[("KEY", "old-key-value")])],
         |_| ok("answer"),
     );
@@ -212,15 +204,16 @@ async fn retype_login_reopens_before_sending() {
     let running = rig.start(&file, "a", true);
     let page = rig.address(1).await;
     assert_eq!(rig.carrier.connections(), 0);
-    submit(&page, &[("localhost/KEY", "new-key-value")]);
+    rig.submit(&page, &[("localhost/KEY", "new-key-value")]);
     says(&running.await.unwrap(), "answer");
     assert_eq!(rig.carrier.seen()[0].header("x-key"), Some("new-key-value"));
 }
 
 #[tokio::test]
 async fn retype_retried_while_the_page_is_open_sends_nothing() {
-    let rig = rig(
+    let rig = rig_with(
         "retype-open",
+        Page::Browser,
         &[("localhost", &[("KEY", "old-key-value")])],
         |_| ok("answer"),
     )
@@ -233,13 +226,13 @@ async fn retype_retried_while_the_page_is_open_sends_nothing() {
     let second = rig.start(&file, "a", true).await.unwrap();
     says(&second, "Keep `retype_login` on");
     assert_eq!(rig.carrier.connections(), 0);
-    // A retry that had replaced the page would leave this address answering 404.
-    submit(&page, &[("localhost/KEY", "new-key-value")]);
+    // A retry that had replaced the page would have opened another in the browser.
+    rig.submit(&page, &[("localhost/KEY", "new-key-value")]);
 }
 
 #[tokio::test]
 async fn replaced_page_sends_nothing() {
-    let rig = rig("replaced", &[], |_| ok("answer"));
+    let rig = rig_with("replaced", Page::Browser, &[], |_| ok("answer"));
     let file = rig.file(
         "# @name a\nGET http://localhost:PORT/a\nX-Key: {{$dotenv KEY}}\n\n###\n# @name b\nGET http://127.0.0.1:PORT/b\nX-Key: {{$dotenv KEY}}\n",
     );
@@ -247,7 +240,7 @@ async fn replaced_page_sends_nothing() {
     rig.address(1).await;
     let second = rig.start(&file, "b", false);
     let page = rig.address(2).await;
-    submit(&page, &[("127.0.0.1/KEY", "second-value")]);
+    rig.submit(&page, &[("127.0.0.1/KEY", "second-value")]);
     let replaced = first.await.unwrap();
     says(&replaced, "replaced");
     says(&replaced, CALL_AGAIN);
@@ -800,8 +793,9 @@ async fn transport_error_holds_no_secret() {
 
 #[tokio::test]
 async fn value_not_sent_to_other_host() {
-    let rig = rig(
+    let rig = rig_with(
         "other-host",
+        Page::Browser,
         &[("localhost", &[("KEY", "only-for-localhost")])],
         |_| ok(""),
     )
@@ -1049,10 +1043,12 @@ async fn same_timestamp_does_not_overwrite() {
 
 #[tokio::test]
 async fn deadline_before_send_says_call_again() {
-    let rig = rig("deadline-page", &[], |_| ok("")).deadline(Duration::from_millis(300));
+    let rig = rig_with("deadline-page", Page::Browser, &[], |_| ok(""))
+        .deadline(Duration::from_millis(300));
     let file = rig.file("# @name a\nGET http://localhost:PORT/a\n");
     says(&rig.run(&file, "a").await, CALL_AGAIN);
     assert_eq!(rig.carrier.connections(), 0);
+    rig.address(1).await;
 }
 
 #[tokio::test]

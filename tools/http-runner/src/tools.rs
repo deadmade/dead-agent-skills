@@ -38,8 +38,15 @@ impl Server {
     /// Returns why there is no folder for the saved logins, or why the HTTP client cannot be built.
     pub fn new() -> Result<Self, String> {
         let store = Arc::new(Store::open()?);
-        let open =
-            hook("HTTP_RUNNER_OPEN").map_or(Open::System, |program| Open::Program(vec![program]));
+        // The program and each argument on a line of their own: a path may hold spaces.
+        let open = hook("HTTP_RUNNER_OPEN").map_or(Open::System, |v| {
+            Open::Program(
+                v.to_string_lossy()
+                    .split('\n')
+                    .map(OsString::from)
+                    .collect(),
+            )
+        });
         let pages = Pages::new(store.clone(), open, PAGE_LIFETIME);
         let mut ctx = Ctx::new(store, pages)?;
         if let Some(ms) = hook("HTTP_RUNNER_DEADLINE_MS").and_then(|v| v.to_str()?.parse().ok()) {

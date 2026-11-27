@@ -236,6 +236,57 @@
         nativeCheckInputs = [pkgs.cacert];
         # Debug checks: the HTTP_RUNNER_OPEN and HTTP_RUNNER_DEADLINE_MS hooks exist only in debug builds.
         checkType = "debug";
+        # The sandbox has no agent-browser, Chrome or display: the tests that open a login page in the browser, or
+        # start agent-browser as a browser that cannot open, run in crates.yml's rust job instead
+        # (docs/adr/0017-tests-use-the-real-thing.md).
+        checkFlags = [
+          "--skip"
+          "a_real_browser_submits_the_login_form"
+          "--skip"
+          "shows_host_and_each_field"
+          "--skip"
+          "refuses_missing_token"
+          "--skip"
+          "refuses_bad_host_and_origin"
+          "--skip"
+          "refuses_short_or_multiline_value"
+          "--skip"
+          "refuses_oversized_body"
+          "--skip"
+          "still_open_then_saved"
+          "--skip"
+          "saved_page_is_not_replayed_later"
+          "--skip"
+          "different_ask_replaces_the_open_page"
+          "--skip"
+          "idle_connection_does_not_block_the_page"
+          "--skip"
+          "expires_after_its_lifetime"
+          "--skip"
+          "no_browser_fails_without_the_address"
+          "--skip"
+          "one_time"
+          "--skip"
+          "host_without_secrets_needs_confirming"
+          "--skip"
+          "no_browser_tells_agent_to_ask_the_user"
+          "--skip"
+          "retype_login_reopens_before_sending"
+          "--skip"
+          "retype_retried_while_the_page_is_open_sends_nothing"
+          "--skip"
+          "replaced_page_sends_nothing"
+          "--skip"
+          "value_not_sent_to_other_host"
+          "--skip"
+          "deadline_before_send_says_call_again"
+          "--skip"
+          "run_through_the_tool"
+          "--skip"
+          "page_address_never_in_a_result"
+          "--skip"
+          "secrets_and_address_absent_from_stderr"
+        ];
         meta = {
           inherit (httpRunner) description;
           mainProgram = "http-runner";

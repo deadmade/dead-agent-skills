@@ -1,12 +1,14 @@
-//! `Pages` over real loopback HTTP, with a fake browser that records the address it is given.
+//! `Pages` over real loopback HTTP, each page opened in real Chrome through agent-browser. Requests a browser cannot
+//! make (a wrong host or origin, a bad value, an oversized body) go over raw TCP.
 
-use std::ffi::OsString;
+mod common;
+
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use common::{Browser, Page};
 use http_runner::login_page::{Ask, HostFields, Open, Outcome, Pages};
 use http_runner::store::Store;
 use tokio::task::JoinHandle;
@@ -17,23 +19,20 @@ const TEN: Duration = Duration::from_secs(10);
 struct Rig {
     pages: Arc<Pages>,
     store: Arc<Store>,
-    out: PathBuf,
+    browser: Arc<Browser>,
 }
 
-fn rig(tag: &str, lifetime: Duration, flags: &[&str]) -> Rig {
-    let dir = std::env::temp_dir().join(format!("http-runner-pages-{tag}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    let out = dir.join("out.txt");
-    let mut program: Vec<OsString> = vec![
-        env!("CARGO_BIN_EXE_fake-browser").into(),
-        "--out".into(),
-        out.clone().into(),
-    ];
-    program.extend(flags.iter().map(OsString::from));
+fn rig(tag: &str, lifetime: Duration, page: Page) -> Rig {
+    let dir = common::tempdir(&format!("pages-{tag}"));
+    let browser = Browser::new(&format!("pages-{tag}"));
+    let program = browser.program(page);
     let store = Arc::new(Store::at(dir.join("store")));
     let pages = Arc::new(Pages::new(store.clone(), Open::Program(program), lifetime));
-    Rig { pages, store, out }
+    Rig {
+        pages,
+        store,
+        browser,
+    }
 }
 
 impl Rig {
@@ -42,15 +41,9 @@ impl Rig {
         tokio::spawn(async move { pages.ask(ask, wait).await })
     }
 
-    /// The `n`th address (from 1) the fake browser was given.
+    /// The `n`th page (from 1) the browser showed.
     async fn address(&self, n: usize) -> String {
-        for _ in 0..250 {
-            if let Some(line) = addresses(&self.out).get(n - 1) {
-                return line.clone();
-            }
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
-        panic!("the fake browser got no address {n}");
+        self.browser.address(n).await
     }
 }
 
@@ -62,11 +55,6 @@ fn ask(hosts: &[(&str, &[&str])]) -> Ask {
     Ask {
         hosts: hosts.iter().map(field).collect(),
     }
-}
-
-fn addresses(out: &Path) -> Vec<String> {
-    let text = std::fs::read_to_string(out).unwrap_or_default();
-    text.lines().map(String::from).collect()
 }
 
 fn form(pairs: &[(&str, &str)]) -> String {
@@ -120,18 +108,21 @@ const A_VALUES: [(&str, &str); 2] = [
 ];
 
 #[tokio::test]
-async fn saves_typed_values_for_the_host() {
-    let rig = rig("saves", LONG, &[]);
+async fn a_real_browser_submits_the_login_form() {
+    // Chrome posts the form with its own `Origin` under the page's referrer policy: `no-referrer` would make it `null`.
+    let rig = rig("real", LONG, Page::Browser);
     let asking = rig.start(&[("a.example", &["USER", "PASS"]), ("b.example", &[])], TEN);
-    let url = rig.address(1).await;
-    let typed = form(&[
-        ("a.example/USER", "user-one"),
-        ("a.example/PASS", "p&ss w0rd"),
-    ]);
-    assert_eq!(post(&url, &typed).0, 200);
+    let page = rig.address(1).await;
+    rig.browser.submit(
+        &page,
+        &[
+            ("a.example/USER", "secret-value"),
+            ("a.example/PASS", "p&ss w0rd"),
+        ],
+    );
     assert_eq!(asking.await.unwrap(), Outcome::Saved);
     let saved = |host, name| rig.store.get(host, name).unwrap();
-    assert_eq!(saved("a.example", "USER").as_deref(), Some("user-one"));
+    assert_eq!(saved("a.example", "USER").as_deref(), Some("secret-value"));
     assert_eq!(saved("a.example", "PASS").as_deref(), Some("p&ss w0rd"));
     assert_eq!(saved("b.example", "USER"), None);
     assert!(rig.store.is_confirmed("b.example").unwrap());
@@ -139,7 +130,7 @@ async fn saves_typed_values_for_the_host() {
 
 #[tokio::test]
 async fn shows_host_and_each_field() {
-    let rig = rig("shows", LONG, &[]);
+    let rig = rig("shows", LONG, Page::Browser);
     let _asking = rig.start(
         &[("h<i>.example", &["P&Q\"<b>", "TOKEN"]), ("c.example", &[])],
         TEN,
@@ -160,7 +151,7 @@ async fn shows_host_and_each_field() {
 
 #[tokio::test]
 async fn refuses_missing_token() {
-    let rig = rig("token", LONG, &[]);
+    let rig = rig("token", LONG, Page::Browser);
     let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
     let base = format!("http://127.0.0.1:{}/", port(&url));
@@ -174,7 +165,7 @@ async fn refuses_missing_token() {
 
 #[tokio::test]
 async fn refuses_bad_host_and_origin() {
-    let rig = rig("origin", LONG, &[]);
+    let rig = rig("origin", LONG, Page::Browser);
     let asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
     // A browser sends `Origin: null` for a form posted under a `no-referrer` policy, so none is served.
@@ -197,25 +188,8 @@ async fn refuses_bad_host_and_origin() {
 }
 
 #[tokio::test]
-async fn served_policy_is_same_origin() {
-    // A raw client cannot show the browser's `Origin: null`; the policy that causes it is checked instead.
-    let rig = rig("policy", LONG, &[]);
-    let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
-    let (head, page) = exchange(&rig.address(1).await, "GET", &[], "");
-    assert!(
-        head.contains("\r\nReferrer-Policy: same-origin\r\n"),
-        "{head}"
-    );
-    assert!(
-        page.contains("<meta name=\"referrer\" content=\"same-origin\">"),
-        "{page}"
-    );
-    assert!(!head.contains("no-referrer") && !page.contains("no-referrer"));
-}
-
-#[tokio::test]
 async fn refuses_short_or_multiline_value() {
-    let rig = rig("values", LONG, &[]);
+    let rig = rig("values", LONG, Page::Browser);
     let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
     for bad in ["abc", "two\r\nlines", "two\nlines", ""] {
@@ -238,7 +212,7 @@ async fn refuses_short_or_multiline_value() {
 
 #[tokio::test]
 async fn refuses_oversized_body() {
-    let rig = rig("big", LONG, &[]);
+    let rig = rig("big", LONG, Page::Browser);
     let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
     let mut stream = TcpStream::connect(("127.0.0.1", port(&url))).unwrap();
@@ -256,7 +230,7 @@ async fn refuses_oversized_body() {
 
 #[tokio::test]
 async fn still_open_then_saved() {
-    let rig = rig("still", LONG, &[]);
+    let rig = rig("still", LONG, Page::Browser);
     let hosts: &[(&str, &[&str])] = &[("a.example", &["USER", "PASS"])];
     let short = Duration::from_millis(100);
     assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::StillOpen);
@@ -266,34 +240,34 @@ async fn still_open_then_saved() {
         Outcome::StillOpen
     );
     let url = rig.address(1).await;
-    assert_eq!(post(&url, &form(&A_VALUES)).0, 200);
+    rig.browser.submit(&url, &A_VALUES);
     assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::Saved);
-    assert_eq!(addresses(&rig.out), [url]);
+    assert_eq!(rig.browser.addresses(), [url]);
     // The saved page answers once: a later ask, such as a retyped login, gets a page of its own.
     assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::StillOpen);
-    assert_eq!(addresses(&rig.out).len(), 2);
+    rig.address(2).await;
 }
 
 #[tokio::test]
 async fn saved_page_is_not_replayed_later() {
-    let rig = rig("later", LONG, &[]);
+    let rig = rig("later", LONG, Page::Browser);
     let hosts: &[(&str, &[&str])] = &[("a.example", &["USER", "PASS"])];
     let short = Duration::from_millis(100);
     assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::StillOpen);
     let old = rig.address(1).await;
-    assert_eq!(post(&old, &form(&A_VALUES)).0, 200);
+    rig.browser.submit(&old, &A_VALUES);
     // Past the window, as with a retyped login after the carrier refused the saved one.
     tokio::time::sleep(Duration::from_millis(2500)).await;
     assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::StillOpen);
     let new = rig.address(2).await;
     assert_ne!(old, new);
-    assert_eq!(post(&new, &form(&A_VALUES)).0, 200);
+    rig.browser.submit(&new, &A_VALUES);
     assert_eq!(rig.start(hosts, short).await.unwrap(), Outcome::Saved);
 }
 
 #[tokio::test]
 async fn different_ask_replaces_the_open_page() {
-    let rig = rig("replace", LONG, &[]);
+    let rig = rig("replace", LONG, Page::Browser);
     let first = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let old = rig.address(1).await;
     let second = rig.start(&[("b.example", &["KEY"])], TEN);
@@ -302,14 +276,14 @@ async fn different_ask_replaces_the_open_page() {
     assert_eq!(get(&old).0, 404);
     assert_eq!(first.await.unwrap(), Outcome::Replaced);
     assert_eq!(post(&old, &form(&A_VALUES)).0, 404);
-    assert_eq!(post(&new, &form(&[("b.example/KEY", "key-one")])).0, 200);
+    rig.browser.submit(&new, &[("b.example/KEY", "key-one")]);
     assert_eq!(second.await.unwrap(), Outcome::Saved);
     assert!(!rig.store.is_confirmed("a.example").unwrap());
 }
 
 #[tokio::test]
 async fn idle_connection_does_not_block_the_page() {
-    let rig = rig("idle", LONG, &[]);
+    let rig = rig("idle", LONG, Page::Browser);
     let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
     let _idle = TcpStream::connect(("127.0.0.1", port(&url))).unwrap();
@@ -320,37 +294,35 @@ async fn idle_connection_does_not_block_the_page() {
 
 #[tokio::test]
 async fn expires_after_its_lifetime() {
-    let rig = rig("expires", Duration::from_millis(300), &[]);
+    // Long enough for the browser to show the page first: an expired one is an error page with no address.
+    let rig = rig("expires", Duration::from_secs(2), Page::Browser);
     let started = Instant::now();
-    let outcome = rig
-        .start(&[("a.example", &["USER", "PASS"])], TEN)
-        .await
-        .unwrap();
+    let asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
+    let url = rig.address(1).await;
+    let outcome = asking.await.unwrap();
     assert!(matches!(outcome, Outcome::Failed(_)), "{outcome:?}");
     assert!(started.elapsed() < Duration::from_secs(5));
-    assert_eq!(post(&rig.address(1).await, &form(&A_VALUES)).0, 404);
+    assert_eq!(post(&url, &form(&A_VALUES)).0, 404);
     assert!(!rig.store.is_confirmed("a.example").unwrap());
 }
 
 #[tokio::test]
 async fn no_browser_fails_without_the_address() {
-    let rig = rig("nobrowser", LONG, &["--fail"]);
+    let rig = rig("nobrowser", LONG, Page::NoBrowser);
     let outcome = rig
         .start(&[("a.example", &["USER", "PASS"])], TEN)
         .await
         .unwrap();
     assert_eq!(outcome, Outcome::Failed("no browser opened".into()));
-    let url = rig.address(1).await;
-    assert!(!format!("{outcome:?}").contains(&port(&url).to_string()));
-    assert_eq!(get(&url).0, 404);
+    assert!(!rig.store.is_confirmed("a.example").unwrap());
 }
 
 #[tokio::test]
 async fn one_time() {
-    let rig = rig("once", LONG, &[]);
+    let rig = rig("once", LONG, Page::Browser);
     let asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
-    assert_eq!(post(&url, &form(&A_VALUES)).0, 200);
+    rig.browser.submit(&url, &A_VALUES);
     assert_eq!(asking.await.unwrap(), Outcome::Saved);
     assert_eq!(get(&url).0, 404);
     let again = form(&[

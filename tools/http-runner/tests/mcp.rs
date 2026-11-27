@@ -4,7 +4,7 @@ mod common;
 
 use std::process::Command;
 
-use common::{Carrier, Mcp, ok};
+use common::{Carrier, Mcp, Page, ok};
 use serde_json::json;
 
 const LOCAL: common::Confirmed = &[("localhost", &[])];
@@ -56,7 +56,7 @@ fn version_prints() {
 
 #[test]
 fn tool_list_is_fixed_and_identical_after_calls() {
-    let mut mcp = Mcp::start("list", LOCAL, &[]);
+    let mut mcp = Mcp::start("list", Page::Never, LOCAL, &[]);
     let before = mcp.request("tools/list", json!({}));
     let names: Vec<_> = before["tools"]
         .as_array()
@@ -75,7 +75,7 @@ fn tool_list_is_fixed_and_identical_after_calls() {
 fn run_through_the_tool() {
     let carrier =
         Carrier::start(|s| ok(&json!({"echo": s.header("x-key"), "kept": "visible"}).to_string()));
-    let mut mcp = Mcp::start("run", &[], &[]);
+    let mut mcp = Mcp::start("run", Page::Browser, &[], &[]);
     let file = mcp.file(&at(KEYED, &carrier));
     let typing = mcp.type_login(TYPING);
     let result = mcp.call("run", json!({"file": file, "request": "a"}));
@@ -84,39 +84,30 @@ fn run_through_the_tool() {
     says(&result, "visible");
     never(&result, TYPED);
     assert_eq!(carrier.seen()[0].header("x-key"), Some(TYPED));
+    let address = mcp.address(1);
+    never(&result, &address);
+    never(&result, token(&address));
 }
 
 #[test]
 fn page_address_never_in_a_result() {
     let carrier = Carrier::start(|_| ok("fine"));
-    // The page is saved, still open when the call's time is up, and never opened.
+    // The page is still open when the call's time is up, and never opened; `run_through_the_tool` saves it.
     let cases = [
-        ("address-saved", None, true, "200 OK"),
-        (
-            "address-open",
-            Some(("HTTP_RUNNER_DEADLINE_MS", "500")),
-            false,
-            "open and waiting",
-        ),
-        (
-            "address-none",
-            Some(("FAKE_BROWSER_FAIL", "1")),
-            false,
-            "ask the user",
-        ),
+        ("address-open", Page::Browser, "open and waiting"),
+        ("address-none", Page::NoBrowser, "ask the user"),
     ];
-    for (tag, env, types, want) in cases {
-        let mut mcp = Mcp::start(tag, &[], env.as_slice());
+    for (tag, page, want) in cases {
+        let deadline = ("HTTP_RUNNER_DEADLINE_MS", "500");
+        let mut mcp = Mcp::start(tag, page, &[], &[deadline]);
         let file = mcp.file(&at(KEYED, &carrier));
-        let typing = types.then(|| mcp.type_login(TYPING));
         let result = mcp.call("run", json!({"file": file, "request": "a"}));
-        if let Some(typing) = typing {
-            typing.join().unwrap();
-        }
         says(&result, want);
-        let address = mcp.address(1);
-        never(&result, &address);
-        never(&result, token(&address));
+        // The page's address is the only `127.0.0.1` here: the file calls `localhost`.
+        never(&result, "127.0.0.1");
+        if page == Page::Browser {
+            never(&result, token(&mcp.address(1)));
+        }
     }
 }
 
@@ -129,7 +120,7 @@ fn secrets_and_address_absent_from_stderr() {
             "fine"
         })
     });
-    let mut mcp = Mcp::start("stderr", &[], &[]);
+    let mut mcp = Mcp::start("stderr", Page::Browser, &[], &[]);
     let file = mcp.file(&at(LOGIN_AND_SHIP, &carrier));
     let typing = mcp.type_login(TYPING);
     says(
@@ -150,7 +141,7 @@ fn secrets_and_address_absent_from_stderr() {
 
 #[test]
 fn failures_are_results_not_protocol_errors() {
-    let mut mcp = Mcp::start("failures", LOCAL, &[]);
+    let mut mcp = Mcp::start("failures", Page::Never, LOCAL, &[]);
     let broken = mcp.file("# @name a\nGET http://localhost:1/a\nX: {{$prompt x}}\n");
     let calls = [
         ("run", json!({"file": broken, "request": "a"}), "line 3"),
@@ -173,7 +164,7 @@ fn failures_are_results_not_protocol_errors() {
 
 #[test]
 fn run_refuses_a_file_that_is_not_http() {
-    let mut mcp = Mcp::start("not-http", LOCAL, &[]);
+    let mut mcp = Mcp::start("not-http", Page::Never, LOCAL, &[]);
     // A parse error quotes the line it fails on, so reading this file would show the marker.
     let logins = mcp.dir.join("logins.json");
     std::fs::write(
@@ -189,7 +180,7 @@ fn run_refuses_a_file_that_is_not_http() {
 #[test]
 fn generate_writes_a_file_run_can_parse() {
     let carrier = Carrier::start(|_| ok("made"));
-    let mut mcp = Mcp::start("generate", LOCAL, &[]);
+    let mut mcp = Mcp::start("generate", Page::Never, LOCAL, &[]);
     let spec = mcp.dir.join("api.yaml");
     std::fs::write(&spec, SPEC).unwrap();
     let output = mcp.dir.join("out");
