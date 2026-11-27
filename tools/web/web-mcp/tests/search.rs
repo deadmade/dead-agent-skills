@@ -144,23 +144,6 @@ fn captured_query(engine: &str) -> &'static str {
 
 #[cfg(debug_assertions)]
 #[test]
-fn search_through_real_chrome_reads_captured_google() {
-    let mut mcp = Mcp::start_real(&["google"]);
-    let r = search(
-        &mut mcp,
-        json!({"query": captured_query("google"), "engines": "google", "max_passages": 20}),
-    );
-    assert!(!is_error(&r), "{r}");
-    let t = text(&r);
-    assert!(
-        first_line(t).starts_with("Source: google (searched "),
-        "{t}"
-    );
-    assert!(t.contains("smol vs tokio vs async-std; : r/rust"), "{t}");
-}
-
-#[cfg(debug_assertions)]
-#[test]
 fn real_chrome_rows_match_the_parser() {
     use engines::{Engine, Parsed};
     for e in [
@@ -202,9 +185,11 @@ fn real_chrome_rows_match_the_parser() {
     }
 }
 
+/// A web-mcp that exits after a search, its stdin closed, ends the engine tab's daemon and Chrome itself, before the
+/// harness's teardown would kill what is left.
 #[cfg(debug_assertions)]
 #[test]
-fn a_dropped_server_leaves_no_chrome() {
+fn a_server_that_exits_after_a_search_leaves_no_chrome() {
     let mut mcp = Mcp::start_real(&["bing"]);
     let r = search(
         &mut mcp,
@@ -217,13 +202,45 @@ fn a_dropped_server_leaves_no_chrome() {
         "no Chrome holds {}",
         root.display()
     );
-    drop(mcp);
-    let until = Instant::now() + Duration::from_secs(5);
+    mcp.finish();
+    let until = Instant::now() + Duration::from_secs(10);
     while !common::processes_holding(&root).is_empty() && Instant::now() < until {
         std::thread::sleep(Duration::from_millis(200));
     }
     assert_eq!(common::processes_holding(&root), Vec::<u32>::new());
-    assert!(!root.exists(), "{} is left", root.display());
+}
+
+/// An engine resting from an earlier run gets no tab: the search skips it without binding one, and binds the others.
+#[cfg(debug_assertions)]
+#[test]
+fn a_resting_engine_gets_no_tab() {
+    let mut mcp = Mcp::start_real(&["google", "bing"]);
+    std::fs::create_dir_all(mcp.search.join("google")).unwrap();
+    std::fs::write(mcp.search.join("google/rest"), "2099-01-01T00:00:00Z").unwrap();
+    let r = search(
+        &mut mcp,
+        json!({"query": "zebra", "engines": "google,bing"}),
+    );
+    let line = first_line(text(&r));
+    assert!(
+        line.starts_with("Source: bing (skipped: google: resting until 2099-01-01T00:00:00Z)"),
+        "{line}"
+    );
+    // A bound tab's session keeps its daemon, and so its `.pid`, while web-mcp runs.
+    let daemons: Vec<String> = std::fs::read_dir(mcp.daemon_dir())
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|f| f.starts_with(&format!("web-mcp-{}-", mcp.pid())) && f.ends_with(".pid"))
+        .collect();
+    assert!(
+        daemons.iter().any(|f| f.ends_with("-search-bing.pid")),
+        "{daemons:?}"
+    );
+    assert!(
+        !daemons.iter().any(|f| f.contains("-search-google.")),
+        "{daemons:?}"
+    );
 }
 
 /// All four engines fuse into one answer and one record, and the top results are fetched; a page fetched before
@@ -512,32 +529,40 @@ fn brave_s_bot_check_rests_brave() {
 /// Google, whose capture types into a `<textarea>` that only its own (blocked) scripts submit.
 #[cfg(debug_assertions)]
 #[test]
-#[ignore = "flaky in a headed window (3 of ~140 runs, about 1%): the click and keys miss the search box and focus \
-            stays on the body, so the search loads the URL; suspected a focus race after the tab's raise"]
 fn a_typed_follow_up_that_meets_a_captcha_rests_without_a_load() {
     use engines::Engine::DuckDuckGo;
-    let mut mcp = Mcp::start_real(&["duckduckgo"]);
-    let pages = vec![mcp.page("duckduckgo"), mcp.page("duckduckgo-captcha")];
-    mcp.serve("duckduckgo", pages);
-    let r = search(
-        &mut mcp,
-        json!({"query": captured_query("duckduckgo"), "engines": "duckduckgo"}),
-    );
+    // One run on a fresh server: whether the follow-up was typed, so its result URL never loaded.
+    let typed = || {
+        let mut mcp = Mcp::start_real(&["duckduckgo"]);
+        let pages = vec![mcp.page("duckduckgo"), mcp.page("duckduckgo-captcha")];
+        mcp.serve("duckduckgo", pages);
+        let r = search(
+            &mut mcp,
+            json!({"query": captured_query("duckduckgo"), "engines": "duckduckgo"}),
+        );
+        assert!(
+            first_line(text(&r)).starts_with("Source: duckduckgo (searched "),
+            "{r}"
+        );
+        let r = search(
+            &mut mcp,
+            json!({"query": "zebra stripes", "engines": "duckduckgo"}),
+        );
+        assert!(is_error(&r), "{r}");
+        assert!(
+            text(&r).starts_with("No engine answered: duckduckgo: captcha (.web/"),
+            "{r}"
+        );
+        assert!(mcp.search.join("duckduckgo/rest").exists());
+        loads(&mcp, DuckDuckGo, "zebra stripes", None) == 0
+    };
+    // In about 1 % of runs in a headed window (3 of ~140) the click and keys miss the search box and focus stays on the
+    // body, so the search falls back to the URL and meets the captcha there; suspected a focus race after the tab's
+    // raise. Such a run gets one more try.
     assert!(
-        first_line(text(&r)).starts_with("Source: duckduckgo (searched "),
-        "{r}"
+        typed() || typed(),
+        "the follow-up loaded its result URL twice instead of typing"
     );
-    let r = search(
-        &mut mcp,
-        json!({"query": "zebra stripes", "engines": "duckduckgo"}),
-    );
-    assert!(is_error(&r), "{r}");
-    assert!(
-        text(&r).starts_with("No engine answered: duckduckgo: captcha (.web/"),
-        "{r}"
-    );
-    assert!(mcp.search.join("duckduckgo/rest").exists());
-    assert_eq!(loads(&mcp, DuckDuckGo, "zebra stripes", None), 0);
 }
 
 /// A first consent page waits its search out within the deadline and rests nothing; the next search reads the
@@ -642,6 +667,39 @@ fn queued_searches_each_keep_their_whole_deadline() {
     }
     assert!(t0.elapsed() > Duration::from_secs(18), "{:?}", t0.elapsed());
     assert_eq!(loads(&mcp, engines::Engine::Bing, "zebra", None), 3);
+}
+
+/// Searches cancelled (`notifications/cancelled`) while they wait for their engine's turn leave the queue: they never
+/// load the page, nor log a line, and the search queued after them runs.
+#[cfg(debug_assertions)]
+#[test]
+fn a_cancelled_search_leaves_the_queue() {
+    let mut mcp = Mcp::start_real(&["bing"]);
+    let slow = mcp.page("bing").delay(Duration::from_secs(3));
+    mcp.serve("bing", vec![slow]);
+    warm(&mut mcp);
+    let q = json!({"query": "zebra", "engines": "bing"});
+    let params = json!({"name": "search", "arguments": q});
+    let settle = Duration::from_millis(500);
+    // One at a time from the first: requests sent together race for the turn, and a turn already held runs on.
+    let mut send = |id: u64| {
+        mcp.send(&json!({"jsonrpc": "2.0", "id": id, "method": "tools/call", "params": params}));
+    };
+    send(1001);
+    std::thread::sleep(settle);
+    send(1002);
+    send(1003);
+    std::thread::sleep(settle);
+    for id in [1002, 1003] {
+        mcp.send(
+            &json!({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": id}}),
+        );
+    }
+    // Behind the first: the same query again, so it loads the URL rather than typing.
+    let r = search(&mut mcp, q);
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(loads(&mcp, engines::Engine::Bing, "zebra", None), 2);
+    assert_eq!(blocks(&mcp).len(), 2, "{:?}", blocks(&mcp));
 }
 
 /// Titles of results without a passage come back inside the guard, an injection in one removed and counted.

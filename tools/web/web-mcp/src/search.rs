@@ -134,9 +134,20 @@ pub fn tab(e: Engine) -> String {
     format!("search-{}", e.name())
 }
 
-/// Binds the tabs of `run`'s engines that aren't bound yet, before any of them navigates (`Browser::bind`).
+/// Binds the tabs of `run`'s engines that aren't bound yet, before any of them navigates (`Browser::bind`); a resting
+/// engine, which `run_engine` skips, gets none.
 pub async fn bind(ctx: &Ctx, run: &[Engine]) {
-    let keys: Vec<String> = run.iter().map(|&e| tab(e)).collect();
+    let now = Timestamp::now();
+    let resting = |e: Engine| {
+        ctx.profiles
+            .as_ref()
+            .is_ok_and(|p| p.resting(e.name(), now).is_some())
+    };
+    let keys: Vec<String> = run
+        .iter()
+        .filter(|&&e| !resting(e))
+        .map(|&e| tab(e))
+        .collect();
     ctx.browser.bind(&keys).await;
 }
 
