@@ -62,7 +62,7 @@ mod tests {
         url("https://www.semanticscholar.org/search?q=x")
     }
 
-    /// The pages of R8, read at run time because they aren't in the repository yet.
+    /// The result captures of R8, read at run time while their tests are ignored.
     fn fixture(name: &str) -> String {
         let path = format!(
             "{}/tests/fixtures/engines/{name}",
@@ -72,7 +72,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs a result page captured off the VPN without a burst (R8)"]
+    #[ignore = "the parser finds no abstract in the captured rows: its snippet selector predates the capture"]
     fn semanticscholar_parses_fixture() {
         assert_results(
             Engine::SemanticScholar.parse(&fixture("semanticscholar.html"), &page()),
@@ -81,7 +81,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs a result page captured off the VPN without a burst (R8)"]
+    #[ignore = "the capture says \"No Papers Found\" in [data-test-id=no-papers-found], outside what the parser reads"]
     fn semanticscholar_no_results_is_empty() {
         assert_eq!(
             Engine::SemanticScholar.parse(&fixture("semanticscholar-none.html"), &page()),
