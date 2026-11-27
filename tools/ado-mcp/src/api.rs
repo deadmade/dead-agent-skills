@@ -769,6 +769,10 @@ impl Masks {
             self.name(s("name"), true);
         }
         for (k, x) in o {
+            // A work item names its project only here (search answers spell the key in lower case).
+            if k.eq_ignore_ascii_case("System.TeamProject") {
+                self.name(x.as_str().unwrap_or_default(), false);
+            }
             self.collect(x, k);
         }
     }

@@ -293,6 +293,8 @@ impl Mcp {
             // No longer read; removed so only tests that set it on purpose have it.
             "ADO_DEFAULT_PROJECT",
             "ADO_PROJECT_DIR",
+            // A capture session in the same shell would get fixture answers written over its files.
+            "ADO_CAPTURE_DIR",
             "http_proxy",
             "https_proxy",
             "all_proxy",

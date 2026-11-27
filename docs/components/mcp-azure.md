@@ -44,10 +44,13 @@ stdio MCP server for one Azure DevOps Server collection and PAT: `pr_*`, `wi_*`,
   `docs/features/ado-mcp/smoke.md`, read every file, then replace the matching fixtures with them and keep
   `tests/fixtures.rs` and the tests green. A failed write prints one line on stderr (the file and the OS error, never a
   body); a body that isn't UTF-8 is not written, since it can't be masked. No header is written, so the PAT never is.
+  `Mcp::start_with` in `tests/common/mod.rs` removes an inherited `ADO_CAPTURE_DIR`, so `cargo test` in a capture
+  shell never writes over reviewed captures.
 - Masking is two passes over each answer. The first collects identities (objects with `uniqueName`, a descriptor,
   `providerDisplayName` or `imageUrl`, or a `displayName` with a GUID `id` and no non-identity `url`; git authors;
   `Name <DOMAIN\user>` strings; any email), the collection from `ADO_ORG_URL`, and project and repository names from
-  the request path and from `project`, `repository`, `visibility` and `remoteUrl` objects. The second replaces those
+  the request path, from `project`, `repository`, `visibility` and `remoteUrl` objects and from a work item's
+  `System.TeamProject` (any case), so its area and iteration paths lose the project too. The second replaces those
   values, and their percent-encoded forms, in string values and the file name, never in keys: whole words only, ASCII
   case ignored, longest first in one sweep. Names become `User <n>`, emails `user<n>@example.com`, identity ids
   `00000000-0000-0000-0000-<n>`, descriptors and SIDs `descriptor-<n>` (one identity keeps its `<n>` for the whole

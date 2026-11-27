@@ -484,11 +484,26 @@ fn capture_routes(fx: &Fixture) {
         &format!("{builds}/logs/4"),
         vec![Resp::new(200, "text/plain", log)],
     );
+    // No project in the path, no `project` object: `Billing` shows only in the fields until the comments' path.
+    fx.route(
+        "/tfs/Acme/_apis/wit/workitems/123",
+        vec![Resp::json(
+            &json!({"id": 123, "rev": 7, "relations": [],
+            "url": format!("{base}/tfs/Acme/_apis/wit/workItems/123"),
+            "fields": {"System.TeamProject": "Billing", "System.WorkItemType": "Bug",
+                "System.State": "Active", "System.Title": "Login fails",
+                "System.AreaPath": "Billing\\Web", "System.IterationPath": "Billing\\Sprint 12"}}),
+        )],
+    );
+    fx.route(
+        "/tfs/Acme/Billing/_apis/wit/workItems/123/comments",
+        vec![fixture("wi-comments.json")],
+    );
 }
 
 /// One captured file: its name's shape, no leak in name or body, and a JSON body that still fits the crate model.
 fn check_capture(name: &str, body: &str, leaks: &[&str]) {
-    use azure_devops_rust_api::{build, core, git};
+    use azure_devops_rust_api::{build, core, git, wit};
     let (stem, ext) = name.rsplit_once('.').unwrap();
     let hash = stem.rsplit_once('-').unwrap().1;
     assert!(
@@ -531,14 +546,20 @@ fn check_capture(name: &str, body: &str, leaks: &[&str]) {
         |b| serde_json::from_slice::<build::models::Timeline>(b).map(drop)
     } else if name.contains("_logs-") {
         |b| serde_json::from_slice::<build::models::BuildLogList>(b).map(drop)
+    } else if name.contains("_workitems_123-") {
+        |b| serde_json::from_slice::<wit::models::WorkItem>(b).map(drop)
+    } else if name.contains("_comments-") {
+        // Hand-written in `tests/fixtures.rs`: no crate model reads it.
+        |_| Ok(())
     } else {
         panic!("unexpected capture {name}")
     };
     check(body.as_bytes()).unwrap_or_else(|e| panic!("{name}: {e}"));
 }
 
-/// `pr_list` (with `connectionData`) and `pipeline_log` (a text answer) in the collection `Acme`, `extra` on top.
-fn capture_calls(fx: &Fixture, extra: &[(&str, &str)]) -> [(bool, String); 2] {
+/// `pr_list` (with `connectionData`), `pipeline_log` (a text answer) and `wi_view` in the collection `Acme`, `extra`
+/// on top.
+fn capture_calls(fx: &Fixture, extra: &[(&str, &str)]) -> [(bool, String); 3] {
     let dir = common::tempdir();
     let org = fx.url("/tfs/Acme/");
     let mut env = vec![
@@ -552,6 +573,7 @@ fn capture_calls(fx: &Fixture, extra: &[(&str, &str)]) -> [(bool, String); 2] {
     [
         mcp.call("pr_list", prs),
         mcp.call("pipeline_log", json!({"project": "url", "run": 77})),
+        mcp.call("wi_view", json!({"id": 123})),
     ]
 }
 
@@ -589,6 +611,7 @@ fn capture_writes_masked_answers() {
         "Acme",
         "url-tools",
         "-tools",
+        "Billing",
         "test-pat",
         "127.0.0.1",
         &port,
@@ -646,6 +669,11 @@ fn capture_writes_masked_answers() {
         log.contains("push to http://dev.example/tfs/Coll/Project1/_git/Repo1 failed for User 1 <user1@example.com>"),
         "{log}"
     );
+    let (_, wi) = file("GET-_apis_wit_workitems_123-");
+    let wi: serde_json::Value = serde_json::from_str(&wi).unwrap();
+    assert_eq!(wi["fields"]["System.TeamProject"], "Project2");
+    assert_eq!(wi["fields"]["System.AreaPath"], "Project2\\Web");
+    assert_eq!(wi["fields"]["System.IterationPath"], "Project2\\Sprint 12");
 }
 
 /// A capture that can't be written (the folder is a file) leaves the caller's answer as it was.

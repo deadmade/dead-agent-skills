@@ -207,7 +207,7 @@ wiki, pipeline and branch names, so every file is read before it leaves your mac
    and start Claude Code from that same shell.
 2. Repeat the reads of steps 2 to 5. Each answer adds one file; a file that can't be written shows as one
    `ado-mcp: couldn't write the capture …` line in the MCP server's log, and the tool's answer stays as it was.
-3. Quit Claude Code and start it again without `ADO_CAPTURE_DIR`.
+3. Quit Claude Code, run `Remove-Item Env:ADO_CAPTURE_DIR` in that shell, and start Claude Code again.
 4. Open every file. Replace anything that still names a person, a customer, a team, a server or work you wouldn't
    publish, or delete the file.
 
