@@ -629,11 +629,14 @@ impl Mcp {
             ("WEB_MCP_AGENT_BROWSER", agent_browser.display().to_string()),
             ("WEB_MCP_TEST_PUBLIC_IP", format!("{PUBLIC},{ENGINE_HOST}")),
             ("WEB_MCP_TEST_ENGINES", origins.join(",")),
-            // agent-browser keeps its sessions' files (`.pid`, `.port`, `.target`, …) in
-            // `$XDG_RUNTIME_DIR/agent-browser`, on Windows too (measured, 0.43.0), else in `~/.agent-browser`, which
-            // they would pile up in. web-mcp passes this variable on; inside the root, they go with it.
-            ("XDG_RUNTIME_DIR", root.display().to_string()),
         ];
+        // On Windows agent-browser keeps its sessions' files (`.pid`, `.port`, `.target`, …) in
+        // `%XDG_RUNTIME_DIR%/agent-browser` (measured, 0.43.0), else in `~/.agent-browser`, which they would pile up
+        // in; web-mcp passes the variable on, so inside the root they go with it. Not off Windows: there Chrome finds
+        // its Wayland socket under it, and a socket path under the root can outgrow the ~103-byte limit.
+        if cfg!(windows) {
+            all.push(("XDG_RUNTIME_DIR", root.display().to_string()));
+        }
         all.extend(envs);
         let mut m = Self::start_with(root.join("project"), &all);
         m.real = Some(real);
@@ -681,9 +684,19 @@ impl Mcp {
         }
     }
 
-    /// Where agent-browser keeps a `start_real` server's sessions' files (`<session>.pid` and the rest).
+    /// Where agent-browser keeps a `start_real` server's sessions' files (`<session>.pid` and the rest): the root's
+    /// `agent-browser` on Windows (see `start_real_with`), else `$XDG_RUNTIME_DIR/agent-browser` when that is set,
+    /// else `~/.agent-browser`.
     pub fn daemon_dir(&self) -> PathBuf {
-        self.real.as_ref().unwrap().root.join("agent-browser")
+        let runtime = if cfg!(windows) {
+            Some(self.real.as_ref().unwrap().root.clone().into_os_string())
+        } else {
+            std::env::var_os("XDG_RUNTIME_DIR").filter(|d| !d.is_empty())
+        };
+        runtime.map_or_else(
+            || PathBuf::from(std::env::var_os("HOME").unwrap()).join(".agent-browser"),
+            |d| PathBuf::from(d).join("agent-browser"),
+        )
     }
 
     /// The window's debug port and browser path, from the `DevToolsActivePort` its Chrome writes into the profile.
@@ -722,10 +735,12 @@ impl Mcp {
                 cmd.env_remove(k);
             }
         }
+        // web-mcp's sessions are found where `start_real_with` put them.
+        if cfg!(windows) {
+            cmd.env("XDG_RUNTIME_DIR", &self.real.as_ref().unwrap().root);
+        }
         let out = cmd
             .current_dir(&self.search)
-            // web-mcp's sessions are found there.
-            .env("XDG_RUNTIME_DIR", &self.real.as_ref().unwrap().root)
             .env(
                 "AGENT_BROWSER_DEFAULT_TIMEOUT",
                 browser_core::browser::ATTACHED_TIMEOUT
