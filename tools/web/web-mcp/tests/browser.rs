@@ -519,7 +519,7 @@ fn typing_is_paced_and_a_long_text_capped() {
     // Timer slop: a 30 ms delay is never measured as much less.
     assert!(short.iter().all(|g| *g >= 25.0), "{short:?}");
     let long = gaps(&mut mcp, &"ü".repeat(500));
-    let mean = long.iter().sum::<f64>() / long.len() as f64;
+    let mean = long.iter().sum::<f64>() / f64::from(u32::try_from(long.len()).unwrap());
     // At most 10 ms each, plus the key's own dispatch; an uncapped pace would be at least 30.
     assert!(mean < 25.0, "{mean}");
 }
