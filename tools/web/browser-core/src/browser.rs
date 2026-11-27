@@ -96,7 +96,7 @@ pub struct Browser {
     front: tokio::sync::Mutex<()>,
     /// The client that activates a tab through Chrome's debug port, built on the first raise.
     http: std::sync::OnceLock<Option<reqwest::Client>>,
-    /// Where agent-browser keeps its sessions' `.pid` and `.sock` files; `None` where that isn't known.
+    /// Where agent-browser keeps its sessions' `.pid` and `.sock` files (`session_dir`); `None` on Windows.
     socket_dir: Option<PathBuf>,
     /// Where agent-browser keeps every session file, `.target` included (`session_dir`).
     pub(crate) session_dir: PathBuf,
@@ -329,6 +329,7 @@ impl Browser {
     /// `name` as configured: found on PATH, or kept as given so that running it reports `Missing`.
     #[must_use]
     pub fn new(name: &str, window: Window) -> Self {
+        let session_dir = session_dir();
         Self {
             // Absolute: calls run in the search dir.
             bin: Self::resolve(name)
@@ -341,11 +342,9 @@ impl Browser {
             owner_config: Mutex::default(),
             front: tokio::sync::Mutex::default(),
             http: std::sync::OnceLock::new(),
-            // The default dir: every call drops `AGENT_BROWSER_SOCKET_DIR` with the rest of `AGENT_BROWSER_*`.
-            socket_dir: std::env::var_os("XDG_RUNTIME_DIR")
-                .filter(|d| !cfg!(windows) && !d.is_empty())
-                .map(|d| PathBuf::from(d).join("agent-browser")),
-            session_dir: session_dir(),
+            // A Windows daemon listens on a port (`.port`), not a `.sock`: `session_gone` waits its flat 1 s there.
+            socket_dir: (!cfg!(windows)).then(|| session_dir.clone()),
+            session_dir,
         }
     }
 
@@ -905,7 +904,7 @@ impl Browser {
     }
 
     /// Waits, at most 1 s, until agent-browser has removed `session`'s `.pid` and `.sock`: an `open` right after a
-    /// `close` fails otherwise (web-mcp-search/findings.md, "Daemon behaviour"). Where they live isn't known: 1 s.
+    /// `close` fails otherwise (web-mcp-search/findings.md, "Daemon behaviour"). Without a `socket_dir` (Windows): 1 s.
     async fn session_gone(&self, session: &str) {
         let Some(dir) = &self.socket_dir else {
             return tokio::time::sleep(Duration::from_secs(1)).await;
