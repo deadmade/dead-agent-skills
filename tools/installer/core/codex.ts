@@ -78,8 +78,8 @@ export function managedRules(raw: string, rules: string): string {
 }
 
 // A url server's table, written here because `codex mcp add --url` starts an OAuth sign-in that fails the add after
-// 5 minutes without a browser (measured on Codex CLI 0.172.0). Replaces this server's earlier table and its subtables;
-// every other table is kept.
+// 5 minutes without a browser (measured on Codex CLI 0.172.0). In an existing table only the url and
+// bearer_token_env_var lines are ours: a key or subtable the user added there stays, as does every other table.
 export function mcpUrlServer(raw: string, name: string, url: string, bearerTokenEnvVar?: string): string {
   if (!/^[a-z0-9-]+$/.test(name)) throw new Error('Unsafe MCP name');
   const header = `[mcp_servers.${name}]`;
@@ -89,13 +89,23 @@ export function mcpUrlServer(raw: string, name: string, url: string, bearerToken
   const index = lines.findIndex((line) => [header, `[mcp_servers."${name}"]`].includes(line.trim()));
   if (index < 0)
     return `${raw}${raw && !raw.endsWith('\n') ? '\n' : ''}${raw ? '\n' : ''}${[header, ...body].join('\n')}\n`;
-  const end = lines.findIndex(
-    (line, i) => i > index && /^\s*\[/.test(line) && !line.trim().startsWith(`[mcp_servers.${name}.`),
-  );
-  const section = lines.slice(index + 1, end < 0 ? undefined : end).filter((line) => line.trim());
-  if (section.map((line) => line.trim()).join('\n') === body.join('\n')) return raw;
-  const rest = end < 0 ? [] : ['', ...lines.slice(end)];
-  return [...lines.slice(0, index), header, ...body, ...rest].join('\n') + (end < 0 ? '\n' : '');
+  const end = lines.findIndex((line, i) => i > index && /^\s*\[/.test(line));
+  const stop = end < 0 ? lines.length : end;
+  const section = lines.slice(index + 1, stop);
+  const managed = (line: string) => /^\s*(url|bearer_token_env_var)\s*=/.test(line);
+  if (
+    section
+      .filter(managed)
+      .map((line) => line.trim())
+      .join('\n') === body.join('\n')
+  )
+    return raw;
+  return [
+    ...lines.slice(0, index + 1),
+    ...body,
+    ...section.filter((line) => !managed(line)),
+    ...lines.slice(stop),
+  ].join('\n');
 }
 
 // The lines of native MCP table `name`: all lines, the header index and the table's own lines.

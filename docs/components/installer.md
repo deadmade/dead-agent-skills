@@ -40,7 +40,8 @@ release's versioned URL (`newerInstaller`).
 
 Codex owns its plugin cache and configuration: `steps/codex.ts` installs plugins and stdio MCP servers through
 `codex plugin` and `codex mcp add`. It writes the url MCP servers (Context7, GitHub, Atlassian) into `config.toml`
-itself (`mcpUrlServer` in `core/codex.ts`, idempotent, other tables kept), because `codex mcp add --url` starts an OAuth
+itself (`mcpUrlServer` in `core/codex.ts`, idempotent; it replaces only a table's `url` and `bearer_token_env_var`
+lines, so keys and subtables the user added and other tables stay), because `codex mcp add --url` starts an OAuth
 sign-in that fails the add after 5 minutes without a browser (Codex CLI 0.172.0); signing in stays `codex mcp login`.
 Its only other direct edit is the Azure `env_vars` allowlist.
 

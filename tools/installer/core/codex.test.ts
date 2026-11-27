@@ -44,14 +44,17 @@ test('mcpUrlServer leaves a config that already holds the same table byte for by
   const once = mcpUrlServer('', NAME, 'https://api.example/mcp');
   assert.equal(mcpUrlServer(once, NAME, 'https://api.example/mcp'), once);
 });
-test('mcpUrlServer replaces only its own table and subtables, keeping every foreign entry', () => {
+test('mcpUrlServer replaces only its url and bearer lines, keeping user keys, subtables and every foreign entry', () => {
   const before = '[mcp_servers.foreign]\nurl = "https://foreign/mcp"\n\n';
   const after = '\n[mcp_servers.other]\ncommand = "x"\n';
-  const old = `[mcp_servers.${NAME}]\nurl = "https://old/mcp"\n[mcp_servers.${NAME}.http_headers]\nX = "1"\n`;
-  assert.equal(
-    mcpUrlServer(before + old + after, NAME, 'https://api.example/mcp', 'TOKEN'),
-    `${before}${TABLE}${after}`,
-  );
+  const own = (lines: string) =>
+    `[mcp_servers.${NAME}]\n${lines}startup_timeout_sec = 30\n[mcp_servers.${NAME}.env]\nX = "1"\n`;
+  const old = own('url = "https://old/mcp"\nbearer_token_env_var = "OLD"\n');
+  const next = mcpUrlServer(before + old + after, NAME, 'https://api.example/mcp', 'TOKEN');
+  assert.equal(next, `${before}${own('url = "https://api.example/mcp"\nbearer_token_env_var = "TOKEN"\n')}${after}`);
+  assert.equal(mcpUrlServer(next, NAME, 'https://api.example/mcp', 'TOKEN'), next);
+  // A bearer variable the server no longer takes goes with the url it came with.
+  assert.equal(mcpUrlServer(old, NAME, 'https://api.example/mcp'), own('url = "https://api.example/mcp"\n'));
 });
 test('a rerun removes graphify, which left the catalog, and reports it as retired', () => {
   const plan = codexPlan(readCatalog(PKG), ['flows'], ['dead-skills', 'flows', 'graphify', 'web-mcp'], '1');
