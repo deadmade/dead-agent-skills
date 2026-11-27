@@ -1,10 +1,13 @@
 //! The Azure DevOps client: the crate's clients behind our own reqwest client, PAT auth, timeouts, and errors that
 //! fit on one line. `/vsts/info` and `connectionData`, which the crate doesn't cover, are sent by hand.
 
+use std::collections::HashMap;
 use std::error::Error as _;
 use std::fmt;
 use std::future::Future;
-use std::sync::Arc;
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -14,7 +17,7 @@ use azure_core::http::headers::{
     CONTENT_TYPE as AZ_CONTENT_TYPE, RETRY_AFTER as AZ_RETRY_AFTER, USER_AGENT,
 };
 use azure_core::http::policies::{Policy, PolicyResult};
-use azure_core::http::{Context, Request, RetryOptions, Transport};
+use azure_core::http::{AsyncRawResponse, Context, Request, RetryOptions, Transport};
 use azure_devops_rust_api::{
     Credential, build, git, ims, pipelines, policy, search, test, wiki, wit,
 };
@@ -164,8 +167,18 @@ impl Policy for Guard {
             .unwrap_or("none")
             .to_owned();
         // A 429 goes on to `Api::az`, which waits for it once.
-        if status == 429 || ((200..300).contains(&status) && !ct.contains("html")) {
+        if status == 429 {
             return Ok(resp);
+        }
+        if (200..300).contains(&status) && !ct.contains("html") {
+            let Some(dir) = capture_dir() else {
+                return Ok(resp);
+            };
+            let (status, headers, body) = resp.deconstruct();
+            let body = body.collect().await?;
+            let method = request.method();
+            capture(&dir, &self.org, method.as_str(), request.url(), &ct, &body);
+            return Ok(AsyncRawResponse::from_bytes(status, headers, body));
         }
         let body = resp.deconstruct().2.collect().await?;
         Err(az_err(status_error(
@@ -436,6 +449,19 @@ impl Api {
                 .to_owned();
             let text = resp.text().await.map_err(|e| net_err(&e))?;
             return if (200..300).contains(&status) && !(status == 203 && ct.contains("html")) {
+                // A U+FFFD is a body reqwest couldn't decode as text, so it can't be masked (see `capture`).
+                if let Some(dir) = capture_dir()
+                    && !text.contains('\u{FFFD}')
+                {
+                    capture(
+                        &dir,
+                        self.org_url.as_str(),
+                        method.as_str(),
+                        &url,
+                        &ct,
+                        text.as_bytes(),
+                    );
+                }
                 Ok((status, ct, text))
             } else {
                 Err(status_error(status, &ct, &text, path))
@@ -562,6 +588,379 @@ fn status_error(status: u16, ct: &str, body: &str, path: &str) -> ApiError {
         }
         // A redirect (not followed) or an odd 1xx/2xx/3xx.
         _ => unexpected(status, ct),
+    }
+}
+
+/// `ADO_CAPTURE_DIR`, when set: every 2xx answer is written there, masked, to replace the tests' fixtures.
+fn capture_dir() -> Option<PathBuf> {
+    std::env::var_os("ADO_CAPTURE_DIR")
+        .filter(|d| !d.is_empty())
+        .map(PathBuf::from)
+}
+
+/// What one capture session has masked so far, so an identity keeps its number across files.
+static MASKS: LazyLock<Mutex<Masks>> = LazyLock::new(Mutex::default);
+
+#[derive(Clone, Copy)]
+enum Id {
+    Name,
+    Email,
+    Guid,
+    Descriptor,
+}
+
+#[derive(Default)]
+struct Masks {
+    /// ASCII-lowercased value → what replaces it.
+    to: HashMap<String, String>,
+    /// ASCII-lowercased identity value → the identity's number.
+    users: HashMap<String, usize>,
+    people: usize,
+    projects: usize,
+    repos: usize,
+}
+
+impl Masks {
+    /// `value`, and its forms in a URL, become `mask`; the first mask a value gets stays.
+    fn add(&mut self, value: &str, mask: &str) {
+        if value.is_empty() {
+            return;
+        }
+        let [a, b] = encodings(value);
+        let [ma, mb] = encodings(mask);
+        for (v, m) in [(value.to_owned(), mask.to_owned()), (a, ma), (b, mb)] {
+            self.to.entry(v.to_ascii_lowercase()).or_insert(m);
+        }
+    }
+
+    /// One identity's values: a value seen before brings its number along.
+    fn user(&mut self, values: &[(Id, &str)]) {
+        let values: Vec<_> = values.iter().filter(|(_, v)| !v.is_empty()).collect();
+        if values.is_empty() {
+            return;
+        }
+        let n = values
+            .iter()
+            .find_map(|(_, v)| self.users.get(&v.to_ascii_lowercase()).copied())
+            .unwrap_or_else(|| {
+                self.people += 1;
+                self.people
+            });
+        for (kind, v) in values {
+            self.users.insert(v.to_ascii_lowercase(), n);
+            let mask = match kind {
+                Id::Name => format!("User {n}"),
+                Id::Email => format!("user{n}@example.com"),
+                Id::Guid => format!("00000000-0000-0000-0000-{n:012}"),
+                Id::Descriptor => format!("descriptor-{n}"),
+            };
+            self.add(v, &mask);
+        }
+    }
+
+    /// A project or repository name; ids stay.
+    fn name(&mut self, value: &str, repo: bool) {
+        if value.is_empty() || is_guid(value) || self.to.contains_key(&value.to_ascii_lowercase()) {
+            return;
+        }
+        let mask = if repo {
+            self.repos += 1;
+            format!("Repo{}", self.repos)
+        } else {
+            self.projects += 1;
+            format!("Project{}", self.projects)
+        };
+        self.add(value, &mask);
+    }
+
+    /// Project and repository names from a path relative to the collection.
+    fn path(&mut self, rel: &str) {
+        let segs: Vec<String> = rel.split('/').map(decode).collect();
+        for (i, seg) in segs.iter().enumerate() {
+            let next = segs.get(i + 1).map_or("", String::as_str);
+            let seg = seg.to_ascii_lowercase();
+            if (seg == "_apis" || seg == "_git") && i > 0 {
+                self.name(&segs[i - 1], false);
+            }
+            if seg == "projects" {
+                self.name(next, false);
+            }
+            if seg == "_git" || seg == "repositories" {
+                self.name(next, true);
+            }
+        }
+    }
+
+    /// Emails anywhere, and `Name <DOMAIN\user>` as work-item fields give a person.
+    fn text(&mut self, s: &str) {
+        if let Some((name, inner)) = s.strip_suffix('>').and_then(|r| r.rsplit_once(" <"))
+            && (inner.contains('@') || inner.contains('\\'))
+        {
+            self.user(&[(Id::Name, name), (mail_or_name(inner), inner)]);
+        }
+        for e in emails(s) {
+            self.user(&[(Id::Email, e)]);
+        }
+    }
+
+    /// First pass: the identity values, project and repository names in an answer.
+    fn collect(&mut self, v: &Value, key: &str) {
+        let o = match v {
+            Value::String(s) => {
+                self.text(s);
+                return;
+            }
+            Value::Array(a) => {
+                for x in a {
+                    self.collect(x, key);
+                }
+                return;
+            }
+            Value::Object(o) => o,
+            _ => return,
+        };
+        let s = |k: &str| o.get(k).and_then(Value::as_str).unwrap_or_default();
+        let shaped = [
+            "uniqueName",
+            "descriptor",
+            "subjectDescriptor",
+            "providerDisplayName",
+            "customDisplayName",
+            "imageUrl",
+        ]
+        .iter()
+        .any(|k| o.contains_key(*k));
+        // A policy type has a `displayName` and a GUID too, but its `url` isn't an identity's.
+        let bare = o.contains_key("displayName")
+            && is_guid(s("id"))
+            && o.get("url")
+                .and_then(Value::as_str)
+                .is_none_or(|u| u.to_ascii_lowercase().contains("/identities/"));
+        if shaped || bare {
+            let mut vals = vec![
+                (Id::Name, s("displayName")),
+                (Id::Name, s("providerDisplayName")),
+                (Id::Name, s("customDisplayName")),
+                (mail_or_name(s("uniqueName")), s("uniqueName")),
+                (Id::Email, s("mailAddress")),
+            ];
+            for k in ["descriptor", "subjectDescriptor"] {
+                vals.push((Id::Descriptor, s(k)));
+                // `Microsoft.TeamFoundation.Identity;S-1-5-21-…`: the SID shows up on its own too.
+                vals.extend(s(k).split_once(';').map(|(_, sid)| (Id::Descriptor, sid)));
+            }
+            if is_guid(s("id")) {
+                vals.push((Id::Guid, s("id")));
+            }
+            for k in ["Account", "Mail"] {
+                let p = o.get("properties").and_then(|p| p[k]["$value"].as_str());
+                vals.extend(p.map(|p| (mail_or_name(p), p)));
+            }
+            self.user(&vals);
+        }
+        // A git author or committer.
+        if o.contains_key("email") {
+            self.user(&[(Id::Name, s("name")), (Id::Email, s("email"))]);
+        }
+        if key == "project" || o.contains_key("visibility") {
+            self.name(s("name"), false);
+        }
+        if key == "repository" || o.contains_key("remoteUrl") {
+            self.name(s("name"), true);
+        }
+        for (k, x) in o {
+            self.collect(x, k);
+        }
+    }
+
+    /// Every value, longest first, so a name that starts another doesn't leave the rest behind.
+    fn sorted(&self) -> Vec<(&str, &str)> {
+        let mut m: Vec<_> = self
+            .to
+            .iter()
+            .map(|(v, m)| (v.as_str(), m.as_str()))
+            .collect();
+        m.sort_by_key(|(v, _)| std::cmp::Reverse(v.len()));
+        m
+    }
+}
+
+/// Second pass: each value in `s` replaced where it stands as a whole word, without regard to ASCII case, in one
+/// sweep (a mask is never masked again).
+fn replace(s: &str, masks: &[(&str, &str)]) -> String {
+    let word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+    let mut out = String::with_capacity(s.len());
+    let mut i = 0;
+    'sweep: while let Some(c) = s[i..].chars().next() {
+        if !word(s[..i].chars().next_back()) {
+            for (v, m) in masks {
+                let end = i + v.len();
+                if s.get(i..end).is_some_and(|w| w.eq_ignore_ascii_case(v))
+                    && !word(s[end..].chars().next())
+                {
+                    out.push_str(m);
+                    i = end;
+                    continue 'sweep;
+                }
+            }
+        }
+        out.push(c);
+        i += c.len_utf8();
+    }
+    out
+}
+
+/// String values only: a key is never rewritten (a short project name could match one).
+fn replace_values(v: &mut Value, masks: &[(&str, &str)]) {
+    match v {
+        Value::String(s) => *s = replace(s, masks),
+        Value::Array(a) => a.iter_mut().for_each(|x| replace_values(x, masks)),
+        Value::Object(o) => o.values_mut().for_each(|x| replace_values(x, masks)),
+        _ => {}
+    }
+}
+
+/// `s` as the url crate puts it into a path, and as .NET's `EscapeDataString` writes it.
+fn encodings(s: &str) -> [String; 2] {
+    let enc = |keep: fn(u8) -> bool| {
+        s.bytes()
+            .map(|b| {
+                if keep(b) {
+                    char::from(b).to_string()
+                } else {
+                    format!("%{b:02X}")
+                }
+            })
+            .collect::<String>()
+    };
+    [
+        enc(|b| b.is_ascii_graphic() && !b"\"#<>?`{}".contains(&b)),
+        enc(|b| b.is_ascii_alphanumeric() || b"-._~".contains(&b)),
+    ]
+}
+
+/// A percent-encoded path segment, decoded.
+fn decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hex = b
+            .get(i + 1..i + 3)
+            .filter(|h| h.iter().all(u8::is_ascii_hexdigit))
+            .and_then(|h| u8::from_str_radix(std::str::from_utf8(h).ok()?, 16).ok());
+        match (b[i], hex) {
+            (b'%', Some(x)) => {
+                out.push(x);
+                i += 3;
+            }
+            (c, _) => {
+                out.push(c);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn is_guid(s: &str) -> bool {
+    s.len() == 36
+        && s.bytes().enumerate().all(|(i, b)| {
+            if [8, 13, 18, 23].contains(&i) {
+                b == b'-'
+            } else {
+                b.is_ascii_hexdigit()
+            }
+        })
+}
+
+/// The email-shaped words in `s`.
+fn emails(s: &str) -> Vec<&str> {
+    let local = |c: char| c.is_ascii_alphanumeric() || "._%+-".contains(c);
+    let domain = |c: char| c.is_ascii_alphanumeric() || ".-".contains(c);
+    s.match_indices('@')
+        .filter_map(|(at, _)| {
+            let start = s[..at]
+                .char_indices()
+                .rev()
+                .find(|(_, c)| !local(*c))
+                .map_or(0, |(i, c)| i + c.len_utf8());
+            let rest = &s[at + 1..];
+            let d = rest[..rest.find(|c| !domain(c)).unwrap_or(rest.len())].trim_end_matches('.');
+            (start < at && d.contains('.')).then(|| &s[start..at + 1 + d.len()])
+        })
+        .collect()
+}
+
+fn mail_or_name(s: &str) -> Id {
+    if emails(s) == [s] {
+        Id::Email
+    } else {
+        Id::Name
+    }
+}
+
+/// Writes one answer's body, masked, as `<method>-<path, / as _>-<hash of the query>.<ext>`. Headers aren't written,
+/// so the PAT never is; a failure goes to stderr and leaves the answer to the caller as it was.
+fn capture(dir: &Path, org: &str, method: &str, url: &Url, ct: &str, body: &[u8]) {
+    // Masking works on text: a binary body can't be masked, so it isn't written.
+    let Ok(text) = std::str::from_utf8(body) else {
+        return;
+    };
+    let Ok(org) = Url::parse(org) else {
+        return;
+    };
+    let rel = url.path().strip_prefix(org.path()).unwrap_or(url.path());
+    let mut json = ct
+        .contains("json")
+        .then(|| serde_json::from_str::<Value>(text).ok())
+        .flatten();
+    let (file, ext, out) = {
+        let mut masks = MASKS.lock().unwrap_or_else(PoisonError::into_inner);
+        let coll = org
+            .path_segments()
+            .and_then(|mut s| s.rfind(|s| !s.is_empty()));
+        masks.add(&decode(coll.unwrap_or_default()), "Coll");
+        if let Some(host) = org.host_str() {
+            if let Some(port) = org.port() {
+                masks.add(&format!("{host}:{port}"), "dev.example");
+            }
+            masks.add(host, "dev.example");
+        }
+        masks.path(rel);
+        match &json {
+            Some(v) => masks.collect(v, ""),
+            None => masks.text(text),
+        }
+        let sorted = masks.sorted();
+        let (ext, out) = match &mut json {
+            Some(v) => {
+                replace_values(v, &sorted);
+                (
+                    "json",
+                    serde_json::to_string_pretty(v).map_err(std::io::Error::other),
+                )
+            }
+            None if ct.contains("html") => ("html", Ok(replace(text, &sorted))),
+            None if ct.contains("xml") => ("xml", Ok(replace(text, &sorted))),
+            None => ("txt", Ok(replace(text, &sorted))),
+        };
+        (replace(rel, &sorted), ext, out)
+    };
+    let mut h = DefaultHasher::new();
+    url.query().unwrap_or_default().hash(&mut h);
+    let file = file.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+    let path = dir.join(format!("{method}-{file}-{:08x}.{ext}", h.finish() >> 32));
+    // shortcut: a blocking write on the runtime's thread, fine for a capture run by hand; spawn_blocking if capture
+    // ever runs in normal use.
+    if let Err(e) = out.and_then(|out| {
+        std::fs::create_dir_all(dir)?;
+        std::fs::write(&path, out)
+    }) {
+        eprintln!(
+            "ado-mcp: couldn't write the capture {}: {e}",
+            path.display()
+        );
     }
 }
 

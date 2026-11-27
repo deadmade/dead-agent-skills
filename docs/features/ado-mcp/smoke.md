@@ -196,7 +196,26 @@ Clean up:
 Paste back: for each call its output or error line (they hold only the scratch titles), whether the prompt appeared
 every time, and especially any error line from step 3 or naming `lastMergeSourceCommit` from step 9.
 
-## 7. Minimal PAT
+## 7. Capture answers for the tests
+
+The tests answer from fixtures shaped like the Server docs' samples; real answers make them better. This step writes
+your server's answers into files, with names, emails, identity ids, descriptors, the collection, project and repo
+names and the host replaced. The masking misses names in free text (titles, descriptions, comments, logs) and team,
+wiki, pipeline and branch names, so every file is read before it leaves your machine.
+
+1. Quit Claude Code, set `ADO_CAPTURE_DIR` to an empty folder (PowerShell: `$env:ADO_CAPTURE_DIR = "$HOME\ado-capture"`)
+   and start Claude Code from that same shell.
+2. Repeat the reads of steps 2 to 5. Each answer adds one file; a file that can't be written shows as one
+   `ado-mcp: couldn't write the capture …` line in the MCP server's log, and the tool's answer stays as it was.
+3. Quit Claude Code and start it again without `ADO_CAPTURE_DIR`.
+4. Open every file. Replace anything that still names a person, a customer, a team, a server or work you wouldn't
+   publish, or delete the file.
+
+Paste back: the number of files, and whether you had to edit or delete any (no content). Hand the reviewed folder over
+separately; the files replace the matching ones in `tools/ado-mcp/tests/fixtures/`, and `tests/fixtures.rs` and the
+tests must stay green.
+
+## 8. Minimal PAT
 
 Make a second PAT with only the scopes the plugin's README lists, and set it with `/plugin configure mcp-azure`.
 Repeat steps 2, 5 and 6 with new scratch items. Afterwards, set your usual PAT again and revoke the minimal one.

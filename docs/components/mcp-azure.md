@@ -37,6 +37,24 @@ stdio MCP server for one Azure DevOps Server collection and PAT: `pr_*`, `wi_*`,
   out of mentions, D7). The inline answers in `tests/api.rs` use a non-GUID project id (`p1`), unlike the files in
   `tests/fixtures/`, so a test that a reply prints no GUID needs a GUID-shaped id, or a leak passes unseen. Test-only
   hook: `ADO_TIMEOUT_MS` (debug builds) replaces the 60 s request timeout.
+- The fixtures are doc-shaped until real answers replace them. `ADO_CAPTURE_DIR` (release builds too) makes the server
+  write every 2xx answer's body, masked, into that folder as `<method>-<path, / as _>-<hash of the query>.<ext>`, at the
+  two places every answer passes (`Guard::send` and `Api::exec` in `api.rs`, through `capture`); the caller still gets
+  the unmasked answer. To capture: start Claude Code with `ADO_CAPTURE_DIR` set, run the reads of
+  `docs/features/ado-mcp/smoke.md`, read every file, then replace the matching fixtures with them and keep
+  `tests/fixtures.rs` and the tests green. A failed write prints one line on stderr (the file and the OS error, never a
+  body); a body that isn't UTF-8 is not written, since it can't be masked. No header is written, so the PAT never is.
+- Masking is two passes over each answer. The first collects identities (objects with `uniqueName`, a descriptor,
+  `providerDisplayName` or `imageUrl`, or a `displayName` with a GUID `id` and no non-identity `url`; git authors;
+  `Name <DOMAIN\user>` strings; any email), the collection from `ADO_ORG_URL`, and project and repository names from
+  the request path and from `project`, `repository`, `visibility` and `remoteUrl` objects. The second replaces those
+  values, and their percent-encoded forms, in string values and the file name, never in keys: whole words only, ASCII
+  case ignored, longest first in one sweep. Names become `User <n>`, emails `user<n>@example.com`, identity ids
+  `00000000-0000-0000-0000-<n>`, descriptors and SIDs `descriptor-<n>` (one identity keeps its `<n>` for the whole
+  session), projects `Project<n>`, repos `Repo<n>`, the collection `Coll` and the configured host `dev.example`. Other
+  GUIDs stay. Not masked: names that appear only in free text (titles, descriptions, comments, logs) before any answer
+  in the session named them, team, wiki, pipeline and branch names, AD domains outside a unique name, and host names
+  other than `ADO_ORG_URL`'s. That is why every file is read before it is committed.
 
 ## Checks
 
