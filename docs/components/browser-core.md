@@ -68,8 +68,8 @@ folder. On Windows that folder is also the process's `XDG_RUNTIME_DIR` while the
 files go with it, and the test process is tied to its children (`tie_to_process`), so a daemon a failed test never
 closed dies with it. Off Windows the variable is left alone, as in web-mcp's harness. A Chrome that went away is ended
 through its debug port (`Browser.close`). A refused tab raise has no real trigger (Chrome activates every tab it
-lists) and has no test. The Nix package check skips these tests (`checkFlags` in `flake.nix`); crates.yml's rust job
-runs them.
+lists) and has no test. Each of these tests has a name that begins with `real_`, so the Nix package check skips them
+(`--skip real_` in `flake.nix`); crates.yml's rust job runs them.
 
 ## Names that stay web-mcp's
 

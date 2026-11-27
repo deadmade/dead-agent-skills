@@ -567,7 +567,7 @@ fn refusal(status: u16) -> Resp {
 /// time: each fetch's plain request and the browser's load are a hit.
 #[cfg(debug_assertions)]
 #[test]
-fn blocked_public_page_is_loaded_in_the_browser_and_not_cached() {
+fn real_blocked_public_page_is_loaded_in_the_browser_and_not_cached() {
     let fx = Fixture::start(PUBLIC);
     blocked(
         &fx,
@@ -595,7 +595,7 @@ fn blocked_public_page_is_loaded_in_the_browser_and_not_cached() {
 
 #[cfg(debug_assertions)]
 #[test]
-fn blocked_page_shows_where_the_browser_ended() {
+fn real_blocked_page_shows_where_the_browser_ended() {
     let fx = Fixture::start(PUBLIC);
     let landed = fx.url("/welcome");
     blocked(&fx, "/guarded", 403, vec![Resp::redirect(&landed)]);
@@ -611,7 +611,7 @@ fn blocked_page_shows_where_the_browser_ended() {
 
 #[cfg(debug_assertions)]
 #[test]
-fn blocked_page_landing_private_names_the_status() {
+fn real_blocked_page_landing_private_names_the_status() {
     let fx = Fixture::start(PUBLIC);
     let private = Fixture::start("127.0.0.1");
     private.route("/admin", vec![article()]);
@@ -633,7 +633,7 @@ fn blocked_page_landing_private_names_the_status() {
 
 #[cfg(debug_assertions)]
 #[test]
-fn blocked_public_page_rendering_empty_keeps_the_error() {
+fn real_blocked_public_page_rendering_empty_keeps_the_error() {
     let fx = Fixture::start(PUBLIC);
     let shell = Resp::html("<html><body><p>Checking your browser</p></body></html>");
     // The plain 503 is retried once after its Retry-After first.
@@ -649,7 +649,7 @@ fn blocked_public_page_rendering_empty_keeps_the_error() {
 
 #[cfg(debug_assertions)]
 #[test]
-fn blocked_page_the_browser_also_gets_refused_keeps_the_error() {
+fn real_blocked_page_the_browser_also_gets_refused_keeps_the_error() {
     let fx = Fixture::start(PUBLIC);
     blocked(&fx, "/guarded", 403, vec![]);
     let mut mcp = Mcp::start_real(&[]);
@@ -665,7 +665,7 @@ fn blocked_page_the_browser_also_gets_refused_keeps_the_error() {
 /// A 429, a private host's 403 and a JSON 403 are the answer: the browser never loads them (it would be another hit).
 #[cfg(debug_assertions)]
 #[test]
-fn refusals_that_are_not_a_bot_check_are_not_loaded_in_the_browser() {
+fn real_refusals_that_are_not_a_bot_check_are_not_loaded_in_the_browser() {
     let public = Fixture::start(PUBLIC);
     public.route(
         "/busy",

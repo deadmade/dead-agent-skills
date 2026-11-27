@@ -267,7 +267,7 @@ fn route_attention_since_a_year(fx: &Fixture) {
 /// takes the year and Semantic Scholar, which has no date filter, is skipped.
 #[cfg(debug_assertions)]
 #[test]
-fn papers_merge_browser_engines_with_the_apis() {
+fn real_papers_merge_browser_engines_with_the_apis() {
     let fx = Fixture::start(PUBLIC);
     route_attention(&fx);
     route_attention_since_a_year(&fx);

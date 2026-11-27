@@ -167,7 +167,7 @@ async fn http_error_and_soap_fault_are_results() {
 }
 
 #[tokio::test]
-async fn host_without_secrets_needs_confirming() {
+async fn real_host_without_secrets_needs_confirming() {
     let rig = rig_with("confirming", Page::Browser, &[], |_| ok("answer"));
     let file = rig.file("# @name a\nGET http://localhost:PORT/a\n");
     let running = rig.start(&file, "a", false);
@@ -179,7 +179,7 @@ async fn host_without_secrets_needs_confirming() {
 }
 
 #[tokio::test]
-async fn no_browser_tells_agent_to_ask_the_user() {
+async fn real_no_browser_tells_agent_to_ask_the_user() {
     let rig = rig_with("nobrowser", Page::NoBrowser, &[], |_| ok(""));
     let file = rig.file("# @name a\nGET http://localhost:PORT/a\n");
     let result = rig.run(&file, "a").await;
@@ -193,7 +193,7 @@ async fn no_browser_tells_agent_to_ask_the_user() {
 const KEYED: &str = "# @name a\nGET http://localhost:PORT/a\nX-Key: {{$dotenv KEY}}\n";
 
 #[tokio::test]
-async fn retype_login_reopens_before_sending() {
+async fn real_retype_login_reopens_before_sending() {
     let rig = rig_with(
         "retype",
         Page::Browser,
@@ -210,7 +210,7 @@ async fn retype_login_reopens_before_sending() {
 }
 
 #[tokio::test]
-async fn retype_retried_while_the_page_is_open_sends_nothing() {
+async fn real_retype_retried_while_the_page_is_open_sends_nothing() {
     let rig = rig_with(
         "retype-open",
         Page::Browser,
@@ -231,7 +231,7 @@ async fn retype_retried_while_the_page_is_open_sends_nothing() {
 }
 
 #[tokio::test]
-async fn replaced_page_sends_nothing() {
+async fn real_replaced_page_sends_nothing() {
     let rig = rig_with("replaced", Page::Browser, &[], |_| ok("answer"));
     let file = rig.file(
         "# @name a\nGET http://localhost:PORT/a\nX-Key: {{$dotenv KEY}}\n\n###\n# @name b\nGET http://127.0.0.1:PORT/b\nX-Key: {{$dotenv KEY}}\n",
@@ -499,7 +499,7 @@ async fn set_cookie_value_is_masked_and_its_attributes_stay() {
 }
 
 #[tokio::test]
-async fn named_token_is_sent_real_and_masked_from_its_reply_onward() {
+async fn named_token_is_sent_unmasked_and_masked_from_its_reply_onward() {
     let rig = rig("named-chain", TYPED_KEY, |s: &Seen| {
         if s.path == "/login" {
             ok(r#"{"session_token":"chain-tok-5"}"#)
@@ -792,7 +792,7 @@ async fn transport_error_holds_no_secret() {
 }
 
 #[tokio::test]
-async fn value_not_sent_to_other_host() {
+async fn real_value_not_sent_to_other_host() {
     let rig = rig_with(
         "other-host",
         Page::Browser,
@@ -1042,7 +1042,7 @@ async fn same_timestamp_does_not_overwrite() {
 }
 
 #[tokio::test]
-async fn deadline_before_send_says_call_again() {
+async fn real_deadline_before_send_says_call_again() {
     let rig = rig_with("deadline-page", Page::Browser, &[], |_| ok(""))
         .deadline(Duration::from_millis(300));
     let file = rig.file("# @name a\nGET http://localhost:PORT/a\n");

@@ -130,7 +130,7 @@ fn the_harness_finds_and_kills_a_process_by_its_path() {
 /// A `fetch` starts no browser; each session reads its own page in its own tab, a 32-character name included
 /// (agent-browser's socket path is short); and a web-mcp that exits leaves no tab, daemon or Chrome behind.
 #[test]
-fn each_session_reads_its_own_tab_and_exit_closes_them() {
+fn real_each_session_reads_its_own_tab_and_exit_closes_them() {
     let fx = pages();
     let mut mcp = Mcp::start_real(&[]);
     let root = mcp.search.parent().unwrap().to_owned();
@@ -171,7 +171,7 @@ fn each_session_reads_its_own_tab_and_exit_closes_them() {
 /// none of their files in agent-browser's folder, `.target` included (agent-browser 0.43.0's `close` keeps it). Files
 /// of other sessions there stay, one whose name only starts with a closed session's among them.
 #[test]
-fn closed_sessions_leave_no_files_and_others_keep_theirs() {
+fn real_closed_sessions_leave_no_files_and_others_keep_theirs() {
     let fx = pages();
     fx.route("/shell.html", vec![Resp::html(app_shell())]);
     let mut mcp = Mcp::start_real(&[]);
@@ -233,7 +233,7 @@ fn closed_sessions_leave_no_files_and_others_keep_theirs() {
 // hidden tab's input is not lost here and this test does not show the raise is needed, nor that it bypasses a proxy.
 // Helium 0.18 under agent-browser 0.41.1 lost it (see `raise`).
 #[test]
-fn input_reaches_a_hidden_tab() {
+fn real_input_reaches_a_hidden_tab() {
     let fx = pages();
     let mut mcp = Mcp::start_real(&[]);
     open(&mut mcp, "s", &fx.url("/form.html"));
@@ -266,7 +266,7 @@ fn input_reaches_a_hidden_tab() {
 /// A tab closed outside web-mcp (by hand, or by agent-browser): the next action gets a new tab and succeeds, and
 /// closing a session whose tab is already gone is no error.
 #[test]
-fn a_closed_tab_is_replaced_and_closing_it_again_is_no_error() {
+fn real_a_closed_tab_is_replaced_and_closing_it_again_is_no_error() {
     let fx = pages();
     let mut mcp = Mcp::start_real(&[]);
     let s = session(&mcp, "s");
@@ -289,7 +289,7 @@ fn a_closed_tab_is_replaced_and_closing_it_again_is_no_error() {
 
 /// Chrome dies under the window (a crash, or killed): the next action starts a new Chrome and succeeds there.
 #[test]
-fn a_dead_chrome_is_replaced_on_the_next_action() {
+fn real_a_dead_chrome_is_replaced_on_the_next_action() {
     let fx = pages();
     let mut mcp = Mcp::start_real(&[]);
     open(&mut mcp, "s", &fx.url("/other.html"));
@@ -301,7 +301,7 @@ fn a_dead_chrome_is_replaced_on_the_next_action() {
 /// A page that is empty without JavaScript and loads too slowly in the browser: the fetch answers the server's page
 /// with a note once the fallback's deadline passes, and the fallback's tab and session are closed.
 #[test]
-fn a_slow_page_ends_the_fallback_at_its_deadline_and_closes_its_tab() {
+fn real_a_slow_page_ends_the_fallback_at_its_deadline_and_closes_its_tab() {
     let fx = Fixture::start(PUBLIC);
     let slow = Duration::from_secs(10);
     // The fetch's own download is quick; the browser's load of the same page is not.
@@ -341,7 +341,7 @@ fn a_slow_page_ends_the_fallback_at_its_deadline_and_closes_its_tab() {
 
 /// An open Chrome can't load (nothing listens on the port) is a tool error with Chrome's own reason.
 #[test]
-fn an_open_chrome_cannot_load_is_a_tool_error() {
+fn real_an_open_chrome_cannot_load_is_a_tool_error() {
     // Bound and let go: nothing listens there.
     let port = std::net::TcpListener::bind((PUBLIC, 0))
         .unwrap()
@@ -360,7 +360,7 @@ fn an_open_chrome_cannot_load_is_a_tool_error() {
 /// A screenshot comes back as a JPEG image, is archived under `.web/` with its index line, and leaves no scratch
 /// file.
 #[test]
-fn a_screenshot_is_a_jpeg_and_archived() {
+fn real_a_screenshot_is_a_jpeg_and_archived() {
     let fx = Fixture::start(PUBLIC);
     let mut mcp = Mcp::start_real(&[]);
     open(&mut mcp, "s", &fx.url("/form.html"));
@@ -387,7 +387,7 @@ fn a_screenshot_is_a_jpeg_and_archived() {
 // Release builds treat the fixture as private, and private pages are never cached.
 #[cfg(debug_assertions)]
 #[test]
-fn an_app_shell_is_rendered_archived_and_cached() {
+fn real_an_app_shell_is_rendered_archived_and_cached() {
     let fx = Fixture::start(PUBLIC);
     for p in ["/a.html", "/b.html"] {
         fx.route(p, vec![Resp::html(app_shell())]);
@@ -471,7 +471,7 @@ fn empty_type_is_rejected() {
 /// `type` presses one key at a time, 30 to 60 ms apart, and a text that starts with `-` arrives as it is; a long
 /// text's pace is cut so the whole of it takes at most about 5 s. The gaps are the page's own input-event times.
 #[test]
-fn typing_is_paced_and_a_long_text_capped() {
+fn real_typing_is_paced_and_a_long_text_capped() {
     let fx = pages();
     let mut mcp = Mcp::start_real(&[]);
     open(&mut mcp, "s", &fx.url("/form.html"));
@@ -514,7 +514,7 @@ fn typing_is_paced_and_a_long_text_capped() {
 }
 
 #[test]
-fn eval_output_is_guarded() {
+fn real_eval_output_is_guarded() {
     let mut mcp = Mcp::start_real(&[]);
     let r = mcp.call(
         "browser",

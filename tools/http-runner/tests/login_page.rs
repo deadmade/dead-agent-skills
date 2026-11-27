@@ -108,7 +108,7 @@ const A_VALUES: [(&str, &str); 2] = [
 ];
 
 #[tokio::test]
-async fn a_real_browser_submits_the_login_form() {
+async fn real_browser_submits_the_login_form() {
     // Chrome posts the form with its own `Origin` under the page's referrer policy: `no-referrer` would make it `null`.
     let rig = rig("real", LONG, Page::Browser);
     let asking = rig.start(&[("a.example", &["USER", "PASS"]), ("b.example", &[])], TEN);
@@ -129,7 +129,7 @@ async fn a_real_browser_submits_the_login_form() {
 }
 
 #[tokio::test]
-async fn shows_host_and_each_field() {
+async fn real_shows_host_and_each_field() {
     let rig = rig("shows", LONG, Page::Browser);
     let _asking = rig.start(
         &[("h<i>.example", &["P&Q\"<b>", "TOKEN"]), ("c.example", &[])],
@@ -150,7 +150,7 @@ async fn shows_host_and_each_field() {
 }
 
 #[tokio::test]
-async fn refuses_missing_token() {
+async fn real_refuses_missing_token() {
     let rig = rig("token", LONG, Page::Browser);
     let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
@@ -164,7 +164,7 @@ async fn refuses_missing_token() {
 }
 
 #[tokio::test]
-async fn refuses_bad_host_and_origin() {
+async fn real_refuses_bad_host_and_origin() {
     let rig = rig("origin", LONG, Page::Browser);
     let asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
@@ -188,7 +188,7 @@ async fn refuses_bad_host_and_origin() {
 }
 
 #[tokio::test]
-async fn refuses_short_or_multiline_value() {
+async fn real_refuses_short_or_multiline_value() {
     let rig = rig("values", LONG, Page::Browser);
     let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
@@ -211,7 +211,7 @@ async fn refuses_short_or_multiline_value() {
 }
 
 #[tokio::test]
-async fn refuses_oversized_body() {
+async fn real_refuses_oversized_body() {
     let rig = rig("big", LONG, Page::Browser);
     let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
@@ -229,7 +229,7 @@ async fn refuses_oversized_body() {
 }
 
 #[tokio::test]
-async fn still_open_then_saved() {
+async fn real_still_open_then_saved() {
     let rig = rig("still", LONG, Page::Browser);
     let hosts: &[(&str, &[&str])] = &[("a.example", &["USER", "PASS"])];
     let short = Duration::from_millis(100);
@@ -249,7 +249,7 @@ async fn still_open_then_saved() {
 }
 
 #[tokio::test]
-async fn saved_page_is_not_replayed_later() {
+async fn real_saved_page_is_not_replayed_later() {
     let rig = rig("later", LONG, Page::Browser);
     let hosts: &[(&str, &[&str])] = &[("a.example", &["USER", "PASS"])];
     let short = Duration::from_millis(100);
@@ -266,7 +266,7 @@ async fn saved_page_is_not_replayed_later() {
 }
 
 #[tokio::test]
-async fn different_ask_replaces_the_open_page() {
+async fn real_different_ask_replaces_the_open_page() {
     let rig = rig("replace", LONG, Page::Browser);
     let first = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let old = rig.address(1).await;
@@ -282,7 +282,7 @@ async fn different_ask_replaces_the_open_page() {
 }
 
 #[tokio::test]
-async fn idle_connection_does_not_block_the_page() {
+async fn real_idle_connection_does_not_block_the_page() {
     let rig = rig("idle", LONG, Page::Browser);
     let _asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;
@@ -293,7 +293,7 @@ async fn idle_connection_does_not_block_the_page() {
 }
 
 #[tokio::test]
-async fn expires_after_its_lifetime() {
+async fn real_expires_after_its_lifetime() {
     // Long enough for a slow browser to show the page first: an expired one is an error page with no address. The
     // ask waits longer, so its end is the page's lifetime, not the wait (which would leave it `StillOpen`).
     let rig = rig("expires", TEN, Page::Browser);
@@ -308,7 +308,7 @@ async fn expires_after_its_lifetime() {
 }
 
 #[tokio::test]
-async fn no_browser_fails_without_the_address() {
+async fn real_no_browser_fails_without_the_address() {
     let rig = rig("nobrowser", LONG, Page::NoBrowser);
     let outcome = rig
         .start(&[("a.example", &["USER", "PASS"])], TEN)
@@ -319,7 +319,7 @@ async fn no_browser_fails_without_the_address() {
 }
 
 #[tokio::test]
-async fn one_time() {
+async fn real_one_time() {
     let rig = rig("once", LONG, Page::Browser);
     let asking = rig.start(&[("a.example", &["USER", "PASS"])], TEN);
     let url = rig.address(1).await;

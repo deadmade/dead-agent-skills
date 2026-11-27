@@ -189,7 +189,7 @@ fn real_chrome_rows_match_the_parser() {
 /// harness's teardown would kill what is left.
 #[cfg(debug_assertions)]
 #[test]
-fn a_server_that_exits_after_a_search_leaves_no_chrome() {
+fn real_a_server_that_exits_after_a_search_leaves_no_chrome() {
     let mut mcp = Mcp::start_real(&["bing"]);
     let r = search(
         &mut mcp,
@@ -213,7 +213,7 @@ fn a_server_that_exits_after_a_search_leaves_no_chrome() {
 /// An engine resting from an earlier run gets no tab: the search skips it without binding one, and binds the others.
 #[cfg(debug_assertions)]
 #[test]
-fn a_resting_engine_gets_no_tab() {
+fn real_a_resting_engine_gets_no_tab() {
     let mut mcp = Mcp::start_real(&["google", "bing"]);
     std::fs::create_dir_all(mcp.search.join("google")).unwrap();
     std::fs::write(mcp.search.join("google/rest"), "2099-01-01T00:00:00Z").unwrap();
@@ -248,7 +248,7 @@ fn a_resting_engine_gets_no_tab() {
 /// the engine's filtered URL.
 #[cfg(debug_assertions)]
 #[test]
-fn four_engines_fuse_into_one_answer_and_record() {
+fn real_four_engines_fuse_into_one_answer_and_record() {
     let old = Fixture::start(PUBLIC);
     let mut body = String::new();
     for i in 0..3 {
@@ -326,7 +326,7 @@ fn four_engines_fuse_into_one_answer_and_record() {
 /// a request, one slower than the 3 s wait and one that fails are listed, the failing one with the fetch hint.
 #[cfg(debug_assertions)]
 #[test]
-fn unread_results_are_named_and_a_private_one_is_never_asked() {
+fn real_unread_results_are_named_and_a_private_one_is_never_asked() {
     use engines::{Engine, Parsed};
     let q = captured_query("bing");
     let html = std::fs::read_to_string(format!(
@@ -389,7 +389,7 @@ fn unread_results_are_named_and_a_private_one_is_never_asked() {
 /// second load. None of it rests the engine.
 #[cfg(debug_assertions)]
 #[test]
-fn typing_a_follow_up_falls_back_or_times_out() {
+fn real_typing_a_follow_up_falls_back_or_times_out() {
     use engines::Engine::Bing;
     let mut mcp = Mcp::start_real(&["bing"]);
     let pages = [
@@ -441,7 +441,7 @@ fn typing_a_follow_up_falls_back_or_times_out() {
 /// Brave's no-results pages (not captured, `tests/fixtures/engines/README.md`).
 #[cfg(debug_assertions)]
 #[test]
-fn no_results_rests_nothing() {
+fn real_no_results_rests_nothing() {
     let mut mcp = Mcp::start_real(&["bing", "duckduckgo"]);
     for e in ["bing", "duckduckgo"] {
         let none = mcp.page(&format!("{e}-none"));
@@ -468,7 +468,7 @@ fn no_results_rests_nothing() {
 /// engine doesn't load it again, and a search of that engine alone is an error naming why.
 #[cfg(debug_assertions)]
 #[test]
-fn a_captcha_rests_its_engine_and_the_others_answer() {
+fn real_a_captcha_rests_its_engine_and_the_others_answer() {
     let mut mcp = Mcp::start_real(&["google", "bing"]);
     let captcha = mcp.page("google-captcha");
     mcp.serve("google", vec![captcha]);
@@ -512,7 +512,7 @@ fn a_captcha_rests_its_engine_and_the_others_answer() {
 /// Brave's own bot check ("Verifying you're not a bot") is a captcha too: it rests Brave and the others answer.
 #[cfg(debug_assertions)]
 #[test]
-fn brave_s_bot_check_rests_brave() {
+fn real_brave_s_bot_check_rests_brave() {
     let mut mcp = Mcp::start_real(&["brave", "bing"]);
     let check = mcp.page("brave-captcha");
     mcp.serve("brave", vec![check]);
@@ -529,7 +529,7 @@ fn brave_s_bot_check_rests_brave() {
 /// Google, whose capture types into a `<textarea>` that only its own (blocked) scripts submit.
 #[cfg(debug_assertions)]
 #[test]
-fn a_typed_follow_up_that_meets_a_captcha_rests_without_a_load() {
+fn real_a_typed_follow_up_that_meets_a_captcha_rests_without_a_load() {
     use engines::Engine::DuckDuckGo;
     // One run on a fresh server: whether the follow-up was typed, so its result URL never loaded.
     let typed = || {
@@ -569,7 +569,7 @@ fn a_typed_follow_up_that_meets_a_captcha_rests_without_a_load() {
 /// results. A consent page met twice in a row counts as blocked.
 #[cfg(debug_assertions)]
 #[test]
-fn consent_clears_by_the_next_search_unless_it_comes_back() {
+fn real_consent_clears_by_the_next_search_unless_it_comes_back() {
     let mut mcp = Mcp::start_real(&["google"]);
     let pages = [
         "google-consent",
@@ -616,7 +616,7 @@ fn consent_clears_by_the_next_search_unless_it_comes_back() {
 /// agent-browser reports a refusal only after about 8.4 s of the 10 s deadline (measured).
 #[cfg(debug_assertions)]
 #[test]
-fn slow_and_offline_engines_are_skipped_without_rest() {
+fn real_slow_and_offline_engines_are_skipped_without_rest() {
     let closed = std::net::TcpListener::bind("127.0.0.3:0").unwrap();
     let offline = format!("duckduckgo=http://{}", closed.local_addr().unwrap());
     drop(closed);
@@ -652,7 +652,7 @@ fn slow_and_offline_engines_are_skipped_without_rest() {
 /// than one deadline, and each loads its page.
 #[cfg(debug_assertions)]
 #[test]
-fn queued_searches_each_keep_their_whole_deadline() {
+fn real_queued_searches_each_keep_their_whole_deadline() {
     let mut mcp = Mcp::start_real(&["bing"]);
     let slow = mcp.page("bing").delay(Duration::from_secs(6));
     mcp.serve("bing", vec![slow]);
@@ -673,7 +673,7 @@ fn queued_searches_each_keep_their_whole_deadline() {
 /// load the page, nor log a line, and the search queued after them runs.
 #[cfg(debug_assertions)]
 #[test]
-fn a_cancelled_search_leaves_the_queue() {
+fn real_a_cancelled_search_leaves_the_queue() {
     let mut mcp = Mcp::start_real(&["bing"]);
     let slow = mcp.page("bing").delay(Duration::from_secs(3));
     mcp.serve("bing", vec![slow]);
@@ -705,7 +705,7 @@ fn a_cancelled_search_leaves_the_queue() {
 /// Titles of results without a passage come back inside the guard, an injection in one removed and counted.
 #[cfg(debug_assertions)]
 #[test]
-fn titles_without_passages_are_guarded() {
+fn real_titles_without_passages_are_guarded() {
     let mut mcp = Mcp::start_real(&["google"]);
     let mut page = mcp.page("google");
     page.body = String::from_utf8(page.body)
@@ -735,7 +735,7 @@ fn titles_without_passages_are_guarded() {
 /// A Google page whose `/goto` links all answer 404 resolves no row: the search skips Google and logs it unresolved.
 #[cfg(debug_assertions)]
 #[test]
-fn unresolved_google_links_are_logged() {
+fn real_unresolved_google_links_are_logged() {
     let mut mcp = Mcp::start_real(&["google", "bing"]);
     let html = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -763,7 +763,7 @@ fn unresolved_google_links_are_logged() {
 /// Two servers on one search folder, each running two engines at once, still leave whole lines.
 #[cfg(debug_assertions)]
 #[test]
-fn concurrent_lines_stay_whole() {
+fn real_concurrent_lines_stay_whole() {
     let mut a = Mcp::start_real(&["bing", "duckduckgo"]);
     // A second `start_real` would wait for the first's permit: the second server copies the first's environment.
     let mut envs = vec![

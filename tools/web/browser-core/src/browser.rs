@@ -1400,7 +1400,7 @@ mod tests {
     /// A search page whose ready check never turns true is read anyway once its wait (the deadline less
     /// `READ_MARGIN`) runs out, before the deadline, and its tab stays open for the next search.
     #[tokio::test]
-    async fn render_reads_a_page_that_never_gets_ready() {
+    async fn real_render_reads_a_page_that_never_gets_ready() {
         let r = Real::new("never");
         r.b.warm().await.unwrap();
         // Its daemon starts here, outside the deadline, as a search binds its tabs first.
@@ -1425,7 +1425,7 @@ mod tests {
 
     /// A search without a URL reads the page its tab already shows, without loading it again.
     #[tokio::test]
-    async fn render_search_without_open_reads_the_tab() {
+    async fn real_render_search_without_open_reads_the_tab() {
         let r = Real::new("tab");
         let (url, seen) = page();
         let run = || SearchRun { ready_js: READY_JS };
@@ -1447,7 +1447,7 @@ mod tests {
     /// (`CLOSE_TIMEOUT`), then `session_gone` waits for the session's files (at most 1 s), so the call ends within
     /// those; the session is kept, and a later close ends it and its tab once the page has failed.
     #[tokio::test]
-    async fn a_hung_page_ends_render_at_its_deadline_and_is_closed_later() {
+    async fn real_a_hung_page_ends_render_at_its_deadline_and_is_closed_later() {
         let r = Real::new("hung");
         r.b.warm().await.unwrap();
         let hung = Silent::new();
@@ -1510,7 +1510,7 @@ mod tests {
     /// it does when an earlier daemon of the session ended with its tab gone: agent-browser keeps the session's binding
     /// to that tab (its `.target`), and the next daemon answers `tab_gone`.
     #[tokio::test]
-    async fn bind_tries_a_failed_tab_again() {
+    async fn real_bind_tries_a_failed_tab_again() {
         let r = Real::new("bind");
         let b = &r.b;
         b.warm().await.unwrap();
@@ -1545,7 +1545,7 @@ mod tests {
     /// `batch_once` stops at a failed command, and a gone tab fails it with `TabGone` without binding a new one: its
     /// caller has another way to the page.
     #[tokio::test]
-    async fn batch_once_bails_and_never_rebinds() {
+    async fn real_batch_once_bails_and_never_rebinds() {
         let r = Real::new("once");
         let (url, _) = page();
         open_all(&r.b, &url, &["search-bing", "search-brave"]).await;
@@ -1578,7 +1578,7 @@ mod tests {
     /// `tab <id>`, which makes it forget its refs); a batch that only reads does not. Chrome for Testing 158 delivers
     /// a click to a hidden tab anyway (measured), so the raise shows in the page's visibility, not in the click.
     #[tokio::test]
-    async fn batch_once_raises_the_tab_only_for_input() {
+    async fn real_batch_once_raises_the_tab_only_for_input() {
         let r = Real::new("raise");
         let (url, _) = page();
         open_all(&r.b, &url, &["search-bing", "search-brave"]).await;
@@ -1594,7 +1594,7 @@ mod tests {
     /// Sessions typing at once take the front tab one at a time: each raises its tab and sends its input as one step,
     /// so no other session's raise hides its tab before its input is done.
     #[tokio::test]
-    async fn input_takes_the_front_tab_one_session_at_a_time() {
+    async fn real_input_takes_the_front_tab_one_session_at_a_time() {
         let r = Real::new("front");
         let (url, _) = page();
         open_all(&r.b, &url, &["search-bing", "search-brave"]).await;

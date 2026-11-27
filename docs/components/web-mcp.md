@@ -19,7 +19,8 @@ extension download) lives in the `tools/web/browser-core/` library crate, which 
 (`docs/components/browser-core.md`). The search policy (engines, their turns, rests and deadlines) stays here.
 `search` and `papers` bind their engines' tabs (`Browser::bind`) after the window starts and before any engine
 navigates: in agent-browser a tab's first call waits on another tab's pending page, so one hanging engine would
-otherwise time the others out on a fresh window.
+otherwise time the others out on a fresh window. A resting engine gets no tab
+(`real_a_resting_engine_gets_no_tab`).
 
 `rows` opens its pages as a tab of that window too, holds a 1 s gap per host, and its group detection is tested on
 captured pages in `tests/fixtures/rows/` (`docs/adr/0013-rows-tool-and-shop-skill.md`). Its tree walk is bounded by a
@@ -170,10 +171,11 @@ from `/proc`, or on Windows through the kernel (Toolhelp and each process's comm
 `.target`, …) go with it instead of piling up in `~/.agent-browser`. On Linux it leaves the variable alone (Chrome finds
 its Wayland socket under it, and a `.sock` path under the temp folder can outgrow the socket path limit), so the files
 (`.sock` there instead of `.port`) stay in `/run/user/<uid>/agent-browser`, a tmpfs cleared at logout. The parsers still
-see the loopback host, so a host check (Google's consent host) isn't covered. These tests are skipped in the Nix
-package checks (`checkFlags` in `flake.nix`) and run in crates.yml's rust job, which downloads the pinned agent-browser
-and caches Chrome for Testing; `scripts/test.mjs` reports web-mcp, browser-core and http-runner as NOT RUN when it
-finds no agent-browser.
+see the loopback host, so a host check (Google's consent host) isn't covered. A test that starts agent-browser or
+Chrome has a name that begins with `real_`, so the Nix package checks skip it with one `--skip real_` (`checkFlags` in
+`flake.nix`; libtest skips every name that holds the filter, so no other test's name may). crates.yml's rust job runs
+these tests, downloading the pinned agent-browser and caching Chrome for Testing; `scripts/test.mjs` reports web-mcp,
+browser-core and http-runner as NOT RUN when it finds no agent-browser.
 
 Env knobs: `WEB_MCP_CHROME` picks the browser binary; `WEB_MCP_SEARCH_DIR` picks where profile slots live (no temp
 fallback).

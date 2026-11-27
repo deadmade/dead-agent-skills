@@ -71,7 +71,7 @@ fn rows_failed_render_reports_the_browsers_error() {
 /// archived; a group, an `item` or a page without groups, with or without a heading, is answered as such, and calls to one host are a second
 /// apart.
 #[test]
-fn rows_reads_numbered_groups_where_the_page_landed() {
+fn real_rows_reads_numbered_groups_where_the_page_landed() {
     let fx = Fixture::start(PUBLIC);
     fx.route("/start", vec![Resp::redirect(&fx.url("/results/ads"))]);
     fx.route(
@@ -174,7 +174,7 @@ fn rows_reads_numbered_groups_where_the_page_landed() {
 /// A public page that lands on a private address is refused and not archived, a private address asked for is read,
 /// and a page slower than the deadline is reported as still loading.
 #[test]
-fn rows_refuses_a_private_landing_and_a_slow_page() {
+fn real_rows_refuses_a_private_landing_and_a_slow_page() {
     let private = Fixture::start("127.0.0.1");
     private.route(
         "/ads",
@@ -237,7 +237,7 @@ document.currentScript.remove();
 /// Baseline in real Chrome for Testing on Windows (2026-11-27, three runs): ratios 0.80-1.58, the walk at most 0.9 s
 /// over the parse.
 #[test]
-fn rows_hostile_pages_return_in_bounded_time() {
+fn real_rows_hostile_pages_return_in_bounded_time() {
     let fx = Fixture::start(PUBLIC);
     fx.route("/big", vec![page("Big", &"x".repeat(4 * 1024 * 1024 + 1))]);
     // 1,500 levels holding about 200 KB of text: building the text under every child took over 10 s.

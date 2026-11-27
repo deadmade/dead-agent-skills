@@ -72,7 +72,7 @@ fn tool_list_is_fixed_and_identical_after_calls() {
 }
 
 #[test]
-fn run_through_the_tool() {
+fn real_run_through_the_tool() {
     let carrier =
         Carrier::start(|s| ok(&json!({"echo": s.header("x-key"), "kept": "visible"}).to_string()));
     let mut mcp = Mcp::start("run", Page::Browser, &[], &[]);
@@ -90,9 +90,9 @@ fn run_through_the_tool() {
 }
 
 #[test]
-fn page_address_never_in_a_result() {
+fn real_page_address_never_in_a_result() {
     let carrier = Carrier::start(|_| ok("fine"));
-    // The page is still open when the call's time is up, and never opened; `run_through_the_tool` saves it.
+    // The page is still open when the call's time is up, and never opened; `real_run_through_the_tool` saves it.
     let cases = [
         ("address-open", Page::Browser, "open and waiting"),
         ("address-none", Page::NoBrowser, "ask the user"),
@@ -112,7 +112,7 @@ fn page_address_never_in_a_result() {
 }
 
 #[test]
-fn secrets_and_address_absent_from_stderr() {
+fn real_secrets_and_address_absent_from_stderr() {
     let carrier = Carrier::start(|s| {
         ok(if s.path == "/login" {
             r#"{"token":"login-tok-5"}"#

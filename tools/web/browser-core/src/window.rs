@@ -167,7 +167,7 @@ mod tests {
     use crate::browser::{Real, end_chrome};
 
     #[tokio::test]
-    async fn live_starts_once_for_parallel_callers() {
+    async fn real_live_starts_once_for_parallel_callers() {
         let r = Real::new("parallel");
         let w = r.window();
         let (x, y) = tokio::join!(w.live(&r.b), w.live(&r.b));
@@ -177,7 +177,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn same_url_keeps_the_generation() {
+    async fn real_same_url_keeps_the_generation() {
         let r = Real::new("same");
         let w = r.window();
         let first = w.live(&r.b).await.unwrap();
@@ -187,7 +187,7 @@ mod tests {
 
     /// Chrome gone under the window: the owner starts another, on a new url, which is the next generation.
     #[tokio::test]
-    async fn changed_url_starts_next_generation() {
+    async fn real_changed_url_starts_next_generation() {
         let r = Real::new("changed");
         let w = r.window();
         let first = w.live(&r.b).await.unwrap();
@@ -201,7 +201,7 @@ mod tests {
     /// binding goes with it, and the slot names the new owner.
     #[cfg(target_os = "linux")]
     #[tokio::test]
-    async fn previous_owner_is_closed_first() {
+    async fn real_previous_owner_is_closed_first() {
         let r = Real::new("previous");
         let w = r.window();
         let previous = "web-mcp-999999-window";

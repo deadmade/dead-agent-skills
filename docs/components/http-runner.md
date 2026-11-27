@@ -29,5 +29,5 @@ to its end closes the browser first.
 Test-only hooks (debug builds): `HTTP_RUNNER_OPEN` is the program that opens the login page in place of the system
 browser, one line each for the program and its arguments (a path may hold spaces), the address appended last; and
 `HTTP_RUNNER_DEADLINE_MS` replaces the 55 s call deadline. The Nix package's tests therefore run with
-`checkType = "debug"`, and skip the tests that start agent-browser (`checkFlags`): the sandbox has none, so crates.yml's
-rust job runs them.
+`checkType = "debug"`, and skip the tests that start agent-browser, whose names begin with `real_` (`--skip real_` in
+`checkFlags`): the sandbox has none, so crates.yml's rust job runs them.

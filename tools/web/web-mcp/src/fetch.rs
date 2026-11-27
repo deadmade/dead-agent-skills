@@ -1088,7 +1088,7 @@ pub(crate) mod tests {
     /// The browser follows a redirect onto this machine: the page is dropped unless the fetch may reach it. On the
     /// real agent-browser and Chrome for Testing.
     #[tokio::test]
-    async fn fallback_landing_on_private_url_is_dropped() {
+    async fn real_fallback_landing_on_private_url_is_dropped() {
         // browser-core's test setup: its dir (on Windows also the `XDG_RUNTIME_DIR`) goes on drop. The context runs a
         // `Browser` of its own over that dir, which it closes itself; `real.b` runs nothing.
         let _ = rustls::crypto::ring::default_provider().install_default();
