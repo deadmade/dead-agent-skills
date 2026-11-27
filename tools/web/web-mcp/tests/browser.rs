@@ -170,6 +170,66 @@ fn each_session_reads_its_own_tab_and_exit_closes_them() {
     assert_eq!(processes_holding(&root), Vec::<u32>::new());
 }
 
+/// A closed session, a fetch's rendering session and, at exit, the window's owner and the sessions still open leave
+/// none of their files in agent-browser's folder, `.target` included (agent-browser 0.43.0's `close` keeps it). Files
+/// of other sessions there stay, one whose name only starts with a closed session's among them.
+#[test]
+fn closed_sessions_leave_no_files_and_others_keep_theirs() {
+    let fx = pages();
+    fx.route("/shell.html", vec![Resp::html(app_shell())]);
+    let mut mcp = Mcp::start_real(&[]);
+    let dir = mcp.daemon_dir();
+    std::fs::create_dir_all(&dir).unwrap();
+    let decoys = [
+        format!("{}-x.target", session(&mcp, "s")),
+        format!("someone-{}.target", std::process::id()),
+    ]
+    .map(|f| dir.join(f));
+    for d in &decoys {
+        std::fs::write(d, r#"{"targetId":"0","url":"","pinned":false}"#).unwrap();
+    }
+    let ours = |mcp: &Mcp| -> Vec<String> {
+        let pid = mcp.pid();
+        let mut files: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|f| {
+                (f.starts_with(&format!("web-mcp-{pid}-"))
+                    || f.starts_with(&format!("web-mcp-fetch-{pid}-")))
+                    && !decoys.iter().any(|d| d.ends_with(f))
+            })
+            .collect();
+        files.sort();
+        files
+    };
+    open(&mut mcp, "s", &fx.url("/other.html"));
+    open(&mut mcp, "t", &fx.url("/form.html"));
+    let r = mcp.call("fetch", json!({"url": fx.url("/shell.html")}));
+    assert!(text(&r).contains("Rendered /shell.html"), "{r}");
+    browse(&mut mcp, json!({"action": "close", "session": "s"}));
+    let s = session(&mcp, "s");
+    let until = Instant::now() + Duration::from_secs(5);
+    while ours(&mcp).iter().any(|f| f.starts_with(&format!("{s}."))) && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    let left = ours(&mcp);
+    assert!(
+        !left.iter().any(|f| f.starts_with(&format!("{s}."))),
+        "{left:?}"
+    );
+    mcp.finish();
+    let until = Instant::now() + Duration::from_secs(5);
+    while !ours(&mcp).is_empty() && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    assert_eq!(ours(&mcp), Vec::<String>::new());
+    for d in &decoys {
+        assert!(d.is_file(), "{} is gone", d.display());
+        std::fs::remove_file(d).unwrap();
+    }
+}
+
 /// Fill, click, press, scroll and eval reach a session's tab while another session's tab is in front, with a proxy in
 /// the environment that would swallow web-mcp's raise. Text and a script that start with `-` arrive as they are.
 // Measured 2026-11-25 (agent-browser 0.43.0, headed Chrome for Testing 158): this passes with the raise disabled, and

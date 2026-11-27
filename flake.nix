@@ -160,6 +160,8 @@
           "--skip"
           "each_session_reads_its_own_tab_and_exit_closes_them"
           "--skip"
+          "closed_sessions_leave_no_files_and_others_keep_theirs"
+          "--skip"
           "input_reaches_a_hidden_tab_despite_a_proxy"
           "--skip"
           "a_closed_tab_is_replaced_and_closing_it_again_is_no_error"

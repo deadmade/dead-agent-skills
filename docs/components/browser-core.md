@@ -6,7 +6,9 @@
 
 - `browser.rs`: the agent-browser driver. It runs agent-browser as a child process, keeps each call's session key, runs
   `batch`, `render` and `rendered_html`, and holds the attached-call timeout (`ATTACHED_TIMEOUT`, 8 s, part of
-  agent-browser's daemon fingerprint).
+  agent-browser's daemon fingerprint). After a session's `close` succeeds it removes that session's `<session>.target`
+  from agent-browser's folder (`$XDG_RUNTIME_DIR/agent-browser`, on Windows too, else `~/.agent-browser`), which
+  agent-browser 0.43.0's `close` keeps; a failed or timed-out close leaves it, since the daemon may still hold the tab.
 - `window.rs`: the one window. It names the owner session, starts the window on the first call, relaunches a dead
   Chrome through the owner's `open` (agent-browser doesn't on its own; a restarted Chrome counts as a new generation),
   and hands out the attach config. `tie_to_process` makes the window's Chrome die with the server (a kill-on-close job

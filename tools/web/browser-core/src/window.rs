@@ -3,7 +3,6 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
 
 use crate::browser::Browser;
 use crate::profile::Profiles;
@@ -102,9 +101,7 @@ impl Window {
         if cfg!(target_os = "linux")
             && let Some(prev) = p.previous_owner().filter(|o| *o != owner)
         {
-            let close = ["close".to_owned()];
-            let close = b.run_owner(&prev, &config, &close);
-            let _ = tokio::time::timeout(Duration::from_secs(5), close).await;
+            b.close_owner(&prev, &config).await;
         }
         p.set_owner(&owner);
         b.run_owner(&owner, &config, &open)
@@ -273,7 +270,10 @@ mod tests {
         let (dir, w) = window("previous");
         std::fs::create_dir_all(dir.join("profiles/1")).unwrap();
         std::fs::write(dir.join("profiles/1/owner"), "web-mcp-999999-window").unwrap();
-        w.live(&fake()).await.unwrap();
+        // Off the user's agent-browser folder: the close removes the previous owner's `.target` there.
+        let mut b = fake();
+        b.session_dir = dir.join("sessions");
+        w.live(&b).await.unwrap();
         let c = calls(&dir);
         assert_eq!(
             c[..2],

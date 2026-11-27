@@ -95,6 +95,8 @@ pub struct Browser {
     http: std::sync::OnceLock<Option<reqwest::Client>>,
     /// Where agent-browser keeps its sessions' `.pid` and `.sock` files; `None` where that isn't known.
     socket_dir: Option<PathBuf>,
+    /// Where agent-browser keeps every session file, `.target` included (`session_dir`).
+    pub(crate) session_dir: PathBuf,
 }
 
 /// A search's page load, in an engine's tab.
@@ -195,6 +197,27 @@ const BIND_TIMEOUT: Duration = Duration::from_secs(2);
 /// warm batch, so 2 s lets a page that never gets ready still be read inside the deadline.
 pub const READ_MARGIN: Duration = Duration::from_secs(2);
 
+/// The folder agent-browser 0.43.0 keeps its sessions' files in, as it finds it (`get_socket_dir`):
+/// `$XDG_RUNTIME_DIR/agent-browser`, on Windows too, else `~/.agent-browser`, else the temp dir's `agent-browser`. Its
+/// `AGENT_BROWSER_SOCKET_DIR` comes first there, but every call drops it with the rest of `AGENT_BROWSER_*`.
+fn session_dir() -> PathBuf {
+    match std::env::var("XDG_RUNTIME_DIR") {
+        Ok(d) if !d.is_empty() => PathBuf::from(d).join("agent-browser"),
+        _ => std::env::home_dir().map_or_else(
+            || std::env::temp_dir().join("agent-browser"),
+            |h| h.join(".agent-browser"),
+        ),
+    }
+}
+
+/// Removes `session`'s `.target`, its tab binding, once its `close` succeeded: agent-browser 0.43.0's `close` removes
+/// the session's other files but keeps this one (it unpins it), so one per session would pile up. Never after a failed
+/// or cut-short close: the daemon may still be alive, and other sessions read its binding to keep off its tab. A
+/// missing file is no error.
+fn forget_binding(dir: &Path, session: &str) {
+    let _ = std::fs::remove_file(dir.join(format!("{session}.target")));
+}
+
 /// The agent-browser session of `key` in generation `g`.
 fn name(key: &str, g: u32) -> String {
     let pid = std::process::id(); // sessions are global per user: another web-mcp may be running
@@ -267,12 +290,14 @@ async fn call(
 }
 
 /// `tab close` while `session`'s generation is current (`cdp`), then `close` without `--cdp`, which also works
-/// after its Chrome died. A tab already gone counts as closed.
+/// after its Chrome died. A tab already gone counts as closed. When both succeed, the session's `.target` in `dir` goes
+/// too.
 async fn end(
     bin: &Path,
     session: &str,
     config: &Path,
     cdp: Option<&str>,
+    dir: &Path,
 ) -> Result<Value, BrowserError> {
     let tab = match cdp {
         Some(cdp) => {
@@ -290,7 +315,11 @@ async fn end(
     };
     let close = ["close".to_owned()];
     let closed = call(bin, session, &close, None, Via::Detached(config)).await;
-    tab.and(closed)
+    let ended = tab.and(closed);
+    if ended.is_ok() {
+        forget_binding(dir, session);
+    }
+    ended
 }
 
 impl Browser {
@@ -313,6 +342,7 @@ impl Browser {
             socket_dir: std::env::var_os("XDG_RUNTIME_DIR")
                 .filter(|d| !cfg!(windows) && !d.is_empty())
                 .map(|d| PathBuf::from(d).join("agent-browser")),
+            session_dir: session_dir(),
         }
     }
 
@@ -418,11 +448,10 @@ impl Browser {
         let Ok(config) = self.window.attach_config() else {
             return;
         };
-        let bin = self.bin.clone();
+        let (bin, dir) = (self.bin.clone(), self.session_dir.clone());
         tokio::spawn(async move {
-            let close = ["close".to_owned()];
             futures::future::join_all(old.keys().map(|s| {
-                let close = call(&bin, s, &close, None, Via::Detached(&config));
+                let close = end(&bin, s, &config, None, &dir);
                 tokio::time::timeout(CLOSE_TIMEOUT, close)
             }))
             .await;
@@ -504,14 +533,21 @@ impl Browser {
         }
         let config = self.window.attach_config().map_err(BrowserError::Failed)?;
         if !key.starts_with(FETCH_PREFIX) {
-            return end(&self.bin, &session, &config, Some(&live.url)).await;
+            return end(
+                &self.bin,
+                &session,
+                &config,
+                Some(&live.url),
+                &self.session_dir,
+            )
+            .await;
         }
         // A fetch key is used once, so its close gets its own task: a caller that stops waiting (`render`'s 5 s)
         // doesn't stop it, and a tab whose page is still loading (its `tab close` waits behind the load, measured)
         // still gets its session closed afterwards. Any other key may be in use again by then, and a late `close`
         // would end the daemon under it: dropping that close kills it before it sends more.
-        let bin = self.bin.clone();
-        tokio::spawn(async move { end(&bin, &session, &config, Some(&live.url)).await })
+        let (bin, dir) = (self.bin.clone(), self.session_dir.clone());
+        tokio::spawn(async move { end(&bin, &session, &config, Some(&live.url), &dir).await })
             .await
             .map_err(|e| BrowserError::Failed(e.to_string()))?
     }
@@ -527,15 +563,24 @@ impl Browser {
         if let (Some(live), Ok(config)) = (&live, self.window.attach_config()) {
             futures::future::join_all(ran.iter().map(|(s, g)| {
                 let cdp = (*g == live.r#gen).then_some(live.url.as_str());
-                tokio::time::timeout(CLOSE_TIMEOUT, end(&self.bin, s, &config, cdp))
+                let close = end(&self.bin, s, &config, cdp, &self.session_dir);
+                tokio::time::timeout(CLOSE_TIMEOUT, close)
             }))
             .await;
         }
         let owner = self.owner_config.lock().expect("owner").clone();
         if let Some(config) = owner {
-            let (owner, close) = (self.window.owner(), ["close".to_owned()]);
-            let close = self.run_owner(&owner, &config, &close);
-            let _ = tokio::time::timeout(CLOSE_TIMEOUT, close).await;
+            self.close_owner(&self.window.owner(), &config).await;
+        }
+    }
+
+    /// Closes the owner `session` under `config`, within 5 s, and removes its `.target` once that succeeded.
+    pub(crate) async fn close_owner(&self, session: &str, config: &Path) {
+        let close = ["close".to_owned()];
+        let closed =
+            tokio::time::timeout(CLOSE_TIMEOUT, self.run_owner(session, config, &close)).await;
+        if matches!(closed, Ok(Ok(_))) {
+            forget_binding(&self.session_dir, session);
         }
     }
 
@@ -1026,6 +1071,7 @@ mod tests {
             .with_chrome(dir.join("browser"));
         let mut b = Browser::new(&bin.to_string_lossy(), Window::new(Ok(Arc::new(p))));
         b.socket_dir = Some(dir.join("sock"));
+        b.session_dir = dir.join("sock");
         (dir, b)
     }
 
