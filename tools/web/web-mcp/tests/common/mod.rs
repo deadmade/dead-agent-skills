@@ -351,24 +351,47 @@ pub fn processes_holding(dir: &Path) -> Vec<u32> {
 /// `processes_holding`, with each process's command line.
 fn command_lines_holding(dir: &Path) -> Vec<(u32, String)> {
     let dir = format!("{}{}", dir.to_str().unwrap(), std::path::MAIN_SEPARATOR);
-    let dir = dir.as_str();
+    command_lines()
+        .into_iter()
+        .filter(|(_, c)| c.contains(dir.as_str()))
+        .collect()
+}
+
+/// Every process's id and command line: from `/proc`, or on Windows from the kernel (a Toolhelp snapshot, then each
+/// process's own command line). Not through WMI or `tasklist`: measured 2026-11-26 on a machine whose WMI hung,
+/// `Get-CimInstance Win32_Process` took 60–120 s and `tasklist` didn't return in 120 s. A process this user can't
+/// open (a protected or another user's one) is left out; no test starts one.
+fn command_lines() -> Vec<(u32, String)> {
     #[cfg(windows)]
     {
-        // Not this PowerShell, whose own command line holds it too.
-        let script = format!(
-            "Get-CimInstance Win32_Process | Where-Object {{ $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('{}') }} | ForEach-Object {{ \"$($_.ProcessId) $($_.CommandLine)\" }}",
-            dir.replace('\'', "''")
-        );
-        let out = Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-            .output()
-            .unwrap();
-        String::from_utf8_lossy(&out.stdout)
-            .lines()
-            .filter_map(|l| {
-                let (pid, cmdline) = l.split_once(' ')?;
-                Some((pid.parse().ok()?, cmdline.to_owned()))
-            })
+        use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+        use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
+            TH32CS_SNAPPROCESS,
+        };
+        let mut pids = Vec::new();
+        // SAFETY: the snapshot is checked and closed; `entry` is a sized PROCESSENTRY32W the calls fill in.
+        unsafe {
+            let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            assert_ne!(
+                snap,
+                INVALID_HANDLE_VALUE,
+                "{}",
+                std::io::Error::last_os_error()
+            );
+            let mut entry = PROCESSENTRY32W {
+                dwSize: u32::try_from(size_of::<PROCESSENTRY32W>()).unwrap(),
+                ..Default::default()
+            };
+            let mut more = Process32FirstW(snap, &raw mut entry) != 0;
+            while more {
+                pids.push(entry.th32ProcessID);
+                more = Process32NextW(snap, &raw mut entry) != 0;
+            }
+            CloseHandle(snap);
+        }
+        pids.into_iter()
+            .filter_map(|pid| Some((pid, command_line(pid)?)))
             .collect()
     }
     #[cfg(not(windows))]
@@ -379,10 +402,82 @@ fn command_lines_holding(dir: &Path) -> Vec<(u32, String)> {
             .filter_map(|e| {
                 let pid = e.file_name().to_str()?.parse().ok()?;
                 let cmdline = std::fs::read(e.path().join("cmdline")).ok()?;
-                let cmdline = String::from_utf8_lossy(&cmdline).replace('\0', " ");
-                cmdline.contains(dir).then_some((pid, cmdline))
+                Some((pid, String::from_utf8_lossy(&cmdline).replace('\0', " ")))
             })
             .collect()
+    }
+}
+
+/// `pid`'s command line, as the process holds it (`ProcessCommandLineInformation`, Windows 8.1 and later), or `None`
+/// when it can't be opened or has gone.
+#[cfg(windows)]
+fn command_line(pid: u32) -> Option<String> {
+    use windows_sys::Wdk::System::Threading::{
+        NtQueryInformationProcess, ProcessCommandLineInformation,
+    };
+    use windows_sys::Win32::Foundation::{CloseHandle, UNICODE_STRING};
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    // SAFETY: the handle is checked and closed; the second query writes at most `len` bytes into `buf`, which holds
+    // them 8-aligned, and on success starts with a UNICODE_STRING whose buffer lies inside `buf`.
+    unsafe {
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if process.is_null() {
+            return None;
+        }
+        // The first query only reports the size: a UNICODE_STRING followed by its characters.
+        let mut len = 0;
+        let query = |buf: *mut u64, len: &mut u32| {
+            NtQueryInformationProcess(
+                process,
+                ProcessCommandLineInformation,
+                buf.cast(),
+                *len,
+                len,
+            )
+        };
+        query(std::ptr::null_mut(), &mut len);
+        let mut buf = vec![0u64; (len as usize).div_ceil(8)];
+        let status = query(buf.as_mut_ptr(), &mut len);
+        CloseHandle(process);
+        if status < 0 || len == 0 {
+            return None;
+        }
+        let s = &*buf.as_ptr().cast::<UNICODE_STRING>();
+        if s.Length == 0 {
+            return Some(String::new());
+        }
+        let chars = std::slice::from_raw_parts(s.Buffer, usize::from(s.Length) / 2);
+        Some(String::from_utf16_lossy(chars))
+    }
+}
+
+/// Kills `pid` at once, as `kill -9` does, and on Windows waits up to 5 s until it has exited; whether it was killed.
+pub fn kill(pid: u32) -> bool {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, PROCESS_SYNCHRONIZE, PROCESS_TERMINATE, TerminateProcess,
+            WaitForSingleObject,
+        };
+        // SAFETY: the handle is checked and closed.
+        unsafe {
+            let process = OpenProcess(PROCESS_TERMINATE | PROCESS_SYNCHRONIZE, 0, pid);
+            if process.is_null() {
+                return false;
+            }
+            let killed = TerminateProcess(process, 1) != 0
+                && WaitForSingleObject(process, 5000) == WAIT_OBJECT_0;
+            CloseHandle(process);
+            killed
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .output()
+            .is_ok_and(|o| o.status.success())
     }
 }
 
@@ -534,6 +629,10 @@ impl Mcp {
             ("WEB_MCP_AGENT_BROWSER", agent_browser.display().to_string()),
             ("WEB_MCP_TEST_PUBLIC_IP", format!("{PUBLIC},{ENGINE_HOST}")),
             ("WEB_MCP_TEST_ENGINES", origins.join(",")),
+            // agent-browser keeps its sessions' files (`.pid`, `.port`, `.target`, …) in
+            // `$XDG_RUNTIME_DIR/agent-browser`, on Windows too (measured, 0.43.0), else in `~/.agent-browser`, which
+            // they would pile up in. web-mcp passes this variable on; inside the root, they go with it.
+            ("XDG_RUNTIME_DIR", root.display().to_string()),
         ];
         all.extend(envs);
         let mut m = Self::start_with(root.join("project"), &all);
@@ -582,6 +681,11 @@ impl Mcp {
         }
     }
 
+    /// Where agent-browser keeps a `start_real` server's sessions' files (`<session>.pid` and the rest).
+    pub fn daemon_dir(&self) -> PathBuf {
+        self.real.as_ref().unwrap().root.join("agent-browser")
+    }
+
     /// The window's debug port and browser path, from the `DevToolsActivePort` its Chrome writes into the profile.
     fn devtools(&self) -> (u16, String) {
         let file = self.search.join("profiles/1/profile/DevToolsActivePort");
@@ -620,6 +724,8 @@ impl Mcp {
         }
         let out = cmd
             .current_dir(&self.search)
+            // web-mcp's sessions are found there.
+            .env("XDG_RUNTIME_DIR", &self.real.as_ref().unwrap().root)
             .env(
                 "AGENT_BROWSER_DEFAULT_TIMEOUT",
                 browser_core::browser::ATTACHED_TIMEOUT
@@ -651,18 +757,7 @@ impl Mcp {
             .find(|(_, c)| c.contains("--user-data-dir=") && !c.contains("--type="))
             .unwrap_or_else(|| panic!("no Chrome holds {}", profile.display()))
             .0;
-        let pid_s = pid.to_string();
-        let killed = if cfg!(windows) {
-            Command::new("taskkill")
-                .args(["/F", "/PID", &pid_s])
-                .output()
-        } else {
-            Command::new("kill").args(["-9", &pid_s]).output()
-        };
-        assert!(
-            killed.unwrap().status.success(),
-            "could not kill Chrome {pid}"
-        );
+        assert!(kill(pid), "could not kill Chrome {pid}");
     }
 
     pub fn send(&mut self, m: &Value) {
@@ -761,12 +856,7 @@ impl Drop for Mcp {
             let _ = self.child.kill();
             let _ = self.child.wait();
             for pid in processes_holding(&real.root) {
-                let pid = pid.to_string();
-                let _ = if cfg!(windows) {
-                    Command::new("taskkill").args(["/F", "/PID", &pid]).output()
-                } else {
-                    Command::new("kill").args(["-9", &pid]).output()
-                };
+                kill(pid);
             }
             // Windows frees a killed process's files a moment later.
             let until = Instant::now() + Duration::from_secs(5);

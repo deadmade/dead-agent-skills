@@ -50,7 +50,11 @@ scrubs are in its `README.md`) on its own server on `127.0.0.3`, at the engine's
 runs none of the capture's scripts and loads nothing from the engine's hosts. As it serves a capture, every absolute
 `href` points at a stand-in page on `127.0.0.2` (a Bing `ck/a` wrapper by the address it wraps), and Google's `/goto`
 links redirect to one, so a search fetches no real result. One such test runs at a time; dropping its `Mcp` closes web-mcp's stdin, waits up to 5 s, then
-kills web-mcp and every process whose command line holds its temp folder, and removes that folder. The parsers still
+kills web-mcp and every process whose command line holds its temp folder, and removes that folder. It finds them
+from `/proc`, or on Windows through the kernel (Toolhelp and each process's command line), never WMI, `tasklist` or
+`taskkill`, which a hung WMI holds up for minutes. Its `XDG_RUNTIME_DIR` is that folder, so agent-browser's session
+files (`<session>.pid`, `.port`, `.target`, …; on Windows too) go with it instead of piling up in `~/.agent-browser`
+(agent-browser 0.43.0 leaves a session's `.target` behind even after a clean `close`). The parsers still
 see the loopback host, so a host check (Google's consent host) isn't covered. These tests are skipped in the Nix
 package checks (`checkFlags` in `flake.nix`) and run in crates.yml's rust job, which downloads the pinned agent-browser
 and caches Chrome for Testing; `scripts/test.mjs` reports web-mcp, browser-core and http-runner as NOT RUN when it

@@ -36,6 +36,13 @@ browser-core = { workspace = true, features = ["test-support"] }
 criterion = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 
+# The real tests find and kill their processes through the kernel, not WMI (`tests/common/mod.rs`); already in the
+# tree through tokio.
+
+[target.'cfg(windows)'.dev-dependencies]
+
+windows-sys = { workspace = true, features = ["Wdk_System_Threading", "Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading"] }
+
 [[bench]]
 name = "extract"
 harness = false
