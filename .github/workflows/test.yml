@@ -56,7 +56,6 @@ jobs:
         if: needs.changes.outputs.node == 'true'
         run: npm install -g @anthropic-ai/claude-code@2.1.316
 
-      # The installer's end-to-end test (tools/installer/install.real.test.ts) installs into Codex too.
       # The installer suite's end-to-end test (tools/installer/install.real.test.ts) installs into Codex too. The steps
       # only it needs run when ci-changes' installer output is true, which also selects this job.
       - name: Codex CLI
