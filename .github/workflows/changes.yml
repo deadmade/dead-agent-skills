@@ -11,6 +11,8 @@ on:
         value: ${{ jobs.changes.outputs.node }}
       skills:
         value: ${{ jobs.changes.outputs.skills }}
+      installer:
+        value: ${{ jobs.changes.outputs.installer }}
       rust:
         value: ${{ jobs.changes.outputs.rust }}
       binaries:
@@ -28,6 +30,7 @@ jobs:
     outputs:
       node: ${{ steps.select.outputs.node }}
       skills: ${{ steps.select.outputs.skills }}
+      installer: ${{ steps.select.outputs.installer }}
       rust: ${{ steps.select.outputs.rust }}
       binaries: ${{ steps.select.outputs.binaries }}
       packages: ${{ steps.select.outputs.packages }}

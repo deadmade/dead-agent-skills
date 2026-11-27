@@ -55,32 +55,28 @@ jobs:
           $selection = @($packages | ForEach-Object { '-p'; $_ })
           cargo clippy @selection --all-targets --locked -- -D warnings
 
-      # The tests that drive a real browser: the pinned, checksum-checked agent-browser, which the rust suite passes to
-      # cargo through WEB_MCP_AGENT_BROWSER.
+      # The tests that drive a real browser, only in web-mcp, browser-core and http-runner: the pinned, checksum-checked
+      # agent-browser, which the rust suite passes to cargo through WEB_MCP_AGENT_BROWSER.
       - name: agent-browser
         id: agent-browser
+        if: contains(fromJSON(env.PACKAGES), 'web-mcp') || contains(fromJSON(env.PACKAGES), 'browser-core') || contains(fromJSON(env.PACKAGES), 'http-runner')
         run: |
-          echo "version=$(node -p "require('./tools/installer/assets/tools.json').tools['agent-browser'].version")" >> "$GITHUB_OUTPUT"
-          node --input-type=module -e "
-            import { appendFileSync } from 'node:fs';
-            import { join } from 'node:path';
-            import { resolveTool } from './tools/installer/core/tools.ts';
-            import { downloadBin } from './tools/installer/system/net.ts';
-            const bin = join(process.env.RUNNER_TEMP, 'agent-browser' + (process.platform === 'win32' ? '.exe' : ''));
-            await downloadBin('agent-browser', resolveTool('agent-browser', process.platform, process.arch, '0.0.0'), bin);
-            appendFileSync(process.env.GITHUB_ENV, 'WEB_MCP_AGENT_BROWSER=' + bin + '\n');
-            process.exit(0);
-          "
+          node scripts/agent-browser.mjs key
+          bin=$(node scripts/agent-browser.mjs download "$RUNNER_TEMP")
+          echo "WEB_MCP_AGENT_BROWSER=$bin" >> "$GITHUB_ENV"
 
       # Chrome for Testing, whichever version agent-browser installs (ADR 0018's one unpinned download).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: browsers
+        if: steps.agent-browser.outcome == 'success'
         with:
           path: ~/.agent-browser/browsers
-          key: agent-browser-browsers-${{ runner.os }}-${{ steps.agent-browser.outputs.version }}
+          key: ${{ steps.agent-browser.outputs.key }}
 
-      # Fetches only what the cache lacks.
+      # On a miss, fill the cache.
       - name: Chrome for Testing
-        run: '"$WEB_MCP_AGENT_BROWSER" install'
+        if: steps.agent-browser.outcome == 'success' && steps.browsers.outputs.cache-hit != 'true'
+        run: node scripts/agent-browser.mjs install "$WEB_MCP_AGENT_BROWSER"
 
       # On Linux the headed Chrome gets a virtual display.
       - name: Rust tests

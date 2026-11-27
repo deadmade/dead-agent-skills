@@ -57,8 +57,10 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code@2.1.316
 
       # The installer's end-to-end test (tools/installer/install.real.test.ts) installs into Codex too.
+      # The installer suite's end-to-end test (tools/installer/install.real.test.ts) installs into Codex too. The steps
+      # only it needs run when ci-changes' installer output is true, which also selects this job.
       - name: Codex CLI
-        if: needs.changes.outputs.node == 'true'
+        if: needs.changes.outputs.installer == 'true'
         run: npm install -g @openai/codex@0.172.0
 
       - run: npm ci
@@ -66,52 +68,47 @@ jobs:
 
       # The end-to-end test serves this checkout's debug builds as the release; the workspace needs Rust 1.97.
       - name: Rust toolchain
-        if: needs.changes.outputs.node == 'true'
+        if: needs.changes.outputs.installer == 'true'
         run: rustup update stable && rustup default stable
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        if: needs.changes.outputs.node == 'true'
+        if: needs.changes.outputs.installer == 'true'
         with:
           workspaces: .
 
       # pwsh, so Windows links with MSVC's link.exe rather than Git Bash's /usr/bin/link.
       - name: Debug builds for the installer test
-        if: needs.changes.outputs.node == 'true'
+        if: needs.changes.outputs.installer == 'true'
         shell: pwsh
         run: cargo build --locked -p web-mcp -p http-runner -p ado-mcp
 
       # The test seeds its temporary home's browsers from this folder, so only a new Chrome for Testing downloads.
-      - name: agent-browser pin
+      - name: agent-browser cache key
         id: agent-browser
-        if: needs.changes.outputs.node == 'true'
-        run: echo "version=$(node -p "require('./tools/installer/assets/tools.json').tools['agent-browser'].version")" >> "$GITHUB_OUTPUT"
+        if: needs.changes.outputs.installer == 'true'
+        run: node scripts/agent-browser.mjs key
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: browsers
-        if: needs.changes.outputs.node == 'true'
+        if: needs.changes.outputs.installer == 'true'
         with:
           path: ~/.agent-browser/browsers
-          key: agent-browser-browsers-${{ runner.os }}-${{ steps.agent-browser.outputs.version }}
+          key: ${{ steps.agent-browser.outputs.key }}
 
       # On a miss, fill the cache with the pinned, checksum-checked agent-browser's own browser download.
       - name: Chrome for Testing
-        if: needs.changes.outputs.node == 'true' && steps.browsers.outputs.cache-hit != 'true'
+        if: needs.changes.outputs.installer == 'true' && steps.browsers.outputs.cache-hit != 'true'
         run: |
-          node --input-type=module -e "
-            import { resolveTool } from './tools/installer/core/tools.ts';
-            import { downloadBin } from './tools/installer/system/net.ts';
-            const exe = process.platform === 'win32' ? '.exe' : '';
-            await downloadBin('agent-browser', resolveTool('agent-browser', process.platform, process.arch, '0.0.0'), 'target/agent-browser' + exe);
-            process.exit(0);
-          "
-          ./target/agent-browser install
+          bin=$(node scripts/agent-browser.mjs download target)
+          node scripts/agent-browser.mjs install "$bin"
 
       # The repo suite builds the native distributions (gitignored) that the later suites and steps read.
       - name: Repo checks and tests
         if: needs.changes.outputs.node == 'true'
         env:
           UV_PROJECT_ENVIRONMENT: ${{ runner.temp }}/trim-venv
-        run: node scripts/test.mjs --strict repo node mods python real
+          INSTALLER: ${{ needs.changes.outputs.installer == 'true' && 'installer' || '' }}
+        run: node scripts/test.mjs --strict repo node mods python real $INSTALLER
 
       - name: Installer and upstream-sync typecheck
         if: needs.changes.outputs.node == 'true'

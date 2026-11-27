@@ -12,10 +12,20 @@ select all checks; docs/ changes select none. Manual runs select everything. `cr
 binaries on PRs, but release calls always build the complete matrix because each version ships all binaries. Keep
 routing and its tests current when adding consumers.
 
-`scripts/test.mjs` is the one list of Node suites. `test.yml` runs `--strict repo node mods python real`; the pre-commit
+`scripts/test.mjs` is the one list of test suites (Node, Python and `rust`). `test.yml` runs
+`--strict repo node mods python real`, plus `installer` when ci-changes' `installer` output is true; the pre-commit
 hook (`repo-node` in `flake.nix`) and the release jobs (`release.yml`, `scripts/release.mjs`) run `repo node` only. The
-`real` suite holds the slow `*.real.test.{mjs,ts}` tests (which `node` leaves out) and the installer's tests under the
-84 % line-coverage floor. `--strict` also sets `DEAD_SKILLS_STRICT`, which makes a test fail, not skip, when its real tool is missing.
+`real` suite holds the slow `*.real.test.{mjs,ts}` tests (which `node` leaves out) outside the installer, and the
+`installer` suite the installer's tests with its end-to-end run under the 84 % line-coverage floor. `--strict` also sets
+`DEAD_SKILLS_STRICT`, which makes a test fail, not skip, when its real tool is missing.
+
+The `installer` output is true for changes to `tools/installer/`, `scripts/test.mjs`, `plugins/catalog.json` and the
+crates the end-to-end test builds (web-mcp, http-runner, ado-mcp, browser-core), and on full runs; it also selects the
+Node job. Only then does `test.yml` set up Rust, build the debug binaries, install Codex, fetch agent-browser and Chrome
+for Testing and run the `installer` suite; headroom-trim's real test runs whenever the Node job does.
+`scripts/agent-browser.mjs` is the one place both workflows get the agent-browser pin, the Chrome for Testing cache
+key, the download and `install` from; `install` runs only on a cache miss, and `crates.yml` takes those steps only when
+web-mcp, browser-core or http-runner is selected.
 
 The repo's rulesets live in its GitHub settings (Settings → Rules), not in the repo: main takes squash or rebase PRs
 once `test.yml`'s three jobs pass (admins bypass it, which `npm run release` pushed to main needs), and only admins move

@@ -61,7 +61,7 @@ self-update check). With the file present the TTY guard passes. The steps read n
 `install.real.test.ts` is the end-to-end test through it: the whole installer for Claude Code and Codex into temporary
 homes, with the real `claude` and `codex` CLIs, a copy of the built marketplace (headroom-trim on a free port) and this
 checkout's debug builds of web-mcp, http-runner and ado-mcp served as a local release. Its answers leave dcg, serena
-and flows (which brings serena) unpicked: their installs are unpinned (ADR 0018). It runs in the `real` suite under
+and flows (which brings serena) unpicked: their installs are unpinned (ADR 0018). It runs in the `installer` suite under
 the 84 % coverage floor, which reports it NOT RUN without claude, codex or `cargo build --locked -p web-mcp -p
 http-runner -p ado-mcp`. The step tests left keep only what one fresh install can't reach (reruns, upgrades, foreign
 entries, failures, darwin, the legacy rules block), each fake marked `// fake:`.

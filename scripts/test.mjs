@@ -22,7 +22,8 @@ import { startSync, which } from '../tools/installer/system/proc.ts';
 // The extensions are named because, given no paths, `node --test` also runs .test.cjs, the stale .test.js that
 // prepack's tsc writes, and target/.
 const GLOBS = {
-  node: ['{scripts,tools}/**/*.test.{ts,mjs}', 'plugins/**/*.test.mjs'], // not *.real.test.*, which only `real` runs
+  // Not *.real.test.*, which only `real` and `installer` run.
+  node: ['{scripts,tools}/**/*.test.{ts,mjs}', 'plugins/**/*.test.mjs'],
   real: ['plugins/**/*.real.test.mjs', 'tools/**/*.real.test.ts'],
   mods: ['plugins/**/*.test.{ts,tsx}'],
   python: ['plugins/opt-in/headroom-trim/server/tests/test*.py'],

@@ -31,8 +31,10 @@ answers file and a local release source read only where it asks and where it pic
   `serena-agent`, ADR 0016) are not run there.
 - CI installs the real tools (Claude Code, Codex, uv, agent-browser and Chrome for Testing, Xvfb on Linux) and builds
   the Rust binaries before the installer's test.
-- The slow real Node tests are `*.real.test.{mjs,ts}` and run only in the `real` suite of `scripts/test.mjs`, which also
-  holds the installer's coverage floor. `npm test` and CI run it; the pre-commit hook and the release jobs run `repo node`.
+- The slow real Node tests are `*.real.test.{mjs,ts}` and run only in the `real` suite of `scripts/test.mjs`, the
+  installer's in its `installer` suite, which holds the installer's coverage floor. `npm test` runs both and CI runs
+  `real`, plus `installer` when the change reaches what the installer's end-to-end test builds or installs; the
+  pre-commit hook and the release jobs run `repo node`.
 - One named download exception: Chrome for Testing, whichever version `agent-browser install` fetches; CI caches it.
 - A change to the agent-browser pin (`tools/installer/assets/tools.json`) selects the web-mcp and http-runner checks,
   whose tests run it. The weekly sync PRs that bump the pin are not tested beyond today's checks, as now.
