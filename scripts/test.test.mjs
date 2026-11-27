@@ -156,14 +156,14 @@ test('under Git Bash the rust suite refuses to run cargo', (t) => {
   assert.deepEqual(r.log, []);
 });
 
-test('the rust suite tests the packages together, then each one', (t) => {
+test('the rust suite tests the packages together, then builds each one alone', (t) => {
   const d = door(t);
   const cargo = (args) => d.run(args, { WEB_MCP_AGENT_BROWSER: d.agentBrowser }).log.map((l) => l.split(' :: ')[1]);
   const test = 'test --locked --no-fail-fast';
   assert.deepEqual(cargo(['rust', '--packages', 'web-mcp,ado-mcp', '--each-package']), [
     `${test} -p web-mcp -p ado-mcp`,
-    `${test} -p web-mcp`,
-    `${test} -p ado-mcp`,
+    'test --locked --no-run -p web-mcp',
+    'test --locked --no-run -p ado-mcp',
   ]);
   assert.deepEqual(cargo(['rust', '--packages', 'ado-mcp', '--each-package']), [`${test} -p ado-mcp`]);
   assert.deepEqual(cargo(['rust']), [`${test} --workspace`]);

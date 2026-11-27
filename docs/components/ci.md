@@ -5,7 +5,8 @@
 CI: `changes.yml` uses `scripts/ci-changes.mjs` to route checks from the complete Git diff (PR merge base or push range,
 including deleted and renamed paths). `test.yml` runs Node/plugin checks and skill scanning when their inputs change;
 its two OS matrix jobs retain their required check names even when their steps skip. A detection failure fails those
-jobs. `crates.yml` tests selected Rust packages together and independently on Linux and Windows, lints them together,
+jobs. `crates.yml` tests selected Rust packages together on Linux and Windows, builds each one's tests alone (so
+feature unification can't hide a missing feature) without running them twice, lints them together,
 checks their minimum Rust version and Nix packages. Root Cargo, Nix and npm dependencies, CI changes and unknown paths
 select all checks; docs/ changes select none. Manual runs select everything. `crates-build.yml` builds only selected
 binaries on PRs, but release calls always build the complete matrix because each version ships all binaries. Keep

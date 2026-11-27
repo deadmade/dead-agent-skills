@@ -210,6 +210,8 @@ const SUITES = {
     const browser = agentBrowser();
     const env = browser && { ...process.env, WEB_MCP_AGENT_BROWSER: browser };
     const test = (...select) => ({ file, args: ['test', '--locked', '--no-fail-fast', ...select], env });
+    // Each package alone only builds its tests, so a feature another one turns on can't hide; the joint run ran them.
+    const build = (p) => ({ file, args: ['test', '--locked', '--no-run', '-p', p], env });
     const select = (p) => ['-p', p];
     // Without agent-browser only the packages that don't drive it run.
     const skipped = browser ? [] : (packages ?? BROWSER_PACKAGES).filter((p) => BROWSER_PACKAGES.includes(p));
@@ -218,7 +220,7 @@ const SUITES = {
     return {
       commands: [
         ...(chosen?.length === 0 ? [] : [test(...(chosen ? chosen.flatMap(select) : workspace))]),
-        ...(each && chosen.length > 1 ? chosen.map((p) => test(...select(p))) : []),
+        ...(each && chosen.length > 1 ? chosen.map(build) : []),
         ...(skipped.length ? [{ notRun: `${skipped.join(', ')}: agent-browser not found` }] : []),
       ],
     };
