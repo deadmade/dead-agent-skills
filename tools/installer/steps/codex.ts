@@ -191,7 +191,7 @@ export async function applyCodex(io: CodexIO = {}) {
     return true;
   };
   const managedElsewhere = (what: string) =>
-    new Error(`Codex config.toml links to a read-only ${realpathSync(config)}; add ${what} where it is managed`);
+    failures.push(`Codex: config.toml links to a read-only ${realpathSync(config)}; add ${what} where it is managed`);
   // The url server tables a read-only config.toml didn't take, for one failure line at the end.
   const unwritten: string[] = [];
   // server: the stdio command line `codex mcp add` takes, or a url server, which is written directly.
@@ -297,7 +297,7 @@ export async function applyCodex(io: CodexIO = {}) {
     configure('mcp-azure', ['--', binary]);
     const { envVars } = settings('mcp-azure');
     if (!editConfig((raw) => mcpEnvironment(raw, mcpName('mcp-azure'), envVars)))
-      throw managedElsewhere('Azure env_vars');
+      managedElsewhere(`env_vars = ${JSON.stringify(envVars)} to [mcp_servers.${mcpName('mcp-azure')}]`);
     note('Codex Azure authentication', [
       `Set ${envVars.join(', ')} in the environment that starts Codex; the setup-mcp-azure skill says which are optional.`,
     ]);
@@ -313,13 +313,10 @@ export async function applyCodex(io: CodexIO = {}) {
     if (path) {
       configure('serena', ['--', path, ...(settings('serena').args ?? [])]);
       if (!editConfig((raw) => mcpTableLine(raw, mcpName('serena'), 'startup_timeout_sec = 15')))
-        throw managedElsewhere("serena's startup_timeout_sec");
+        managedElsewhere(`startup_timeout_sec = 15 to [mcp_servers.${mcpName('serena')}]`);
     }
   }
-  if (unwritten.length)
-    failures.push(
-      `Codex: config.toml links to a read-only ${realpathSync(config)}; add where it is managed: ${unwritten.join('; ')}`,
-    );
+  if (unwritten.length) managedElsewhere(unwritten.join('; '));
   if (plan.retired.includes('graphify'))
     await (
       io.cleanup ??

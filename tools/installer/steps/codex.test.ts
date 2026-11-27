@@ -124,7 +124,7 @@ test('Codex writes the GitHub and Atlassian url servers, and removes a deselecte
     f.close();
   }
 });
-test('a symlinked config.toml is edited at a writable target; a read-only one is one failure line', async (t) => {
+test('a symlinked config.toml is edited at a writable target; a read-only one is failure lines, and the step goes on', async (t) => {
   const f = fixture();
   const target = join(f.temp, 'dotfiles', 'config.toml');
   try {
@@ -136,21 +136,38 @@ test('a symlinked config.toml is edited at a writable target; a read-only one is
       if ((error as NodeJS.ErrnoException).code !== 'EPERM') throw error;
       return t.skip('creating a symlink needs symlink rights here');
     }
-    f.select(['mcp-github']);
+    f.select(['mcp-github', 'mcp-azure', 'serena']);
+    f.io.serena = async () => '/tools/uv-bin/serena';
     await applyCodex(f.io);
     assert.ok(lstatSync(join(f.home, 'config.toml')).isSymbolicLink());
-    assert.match(readFileSync(target, 'utf8'), /^model = "o3"\n[\s\S]*\[mcp_servers\.dead-agent-skills-mcp-github\]/);
+    const written = readFileSync(target, 'utf8');
+    assert.match(written, /^model = "o3"\n[\s\S]*\[mcp_servers\.dead-agent-skills-mcp-github\]/);
+    assert.match(written, /\[mcp_servers\.dead-agent-skills-mcp-azure\]\nenv_vars = /);
+    assert.match(written, /\[mcp_servers\.dead-agent-skills-serena\]\nstartup_timeout_sec = 15\n/);
 
-    // home-manager's link points into the read-only nix store.
-    writeFileSync(target, 'model = "o3"\n');
+    // home-manager's link points into the read-only nix store, which already holds the servers codex adds.
+    const managed = [
+      'model = "o3"',
+      '[mcp_servers.dead-agent-skills-mcp-azure]',
+      'command = "node"',
+      '[mcp_servers.dead-agent-skills-serena]',
+      'command = "node"',
+      '',
+    ].join('\n');
+    writeFileSync(target, managed);
     chmodSync(target, 0o444);
+    const command = f.io.command!;
+    // fake: a codex that finds its stdio server already declared in a read-only config writes nothing there.
+    f.io.command = (...args) => (args[0] === 'mcp' && args[1] === 'add' ? '{}' : command(...args));
     const before = failures.length;
     await applyCodex(f.io);
-    assert.equal(readFileSync(target, 'utf8'), 'model = "o3"\n');
+    assert.equal(readFileSync(target, 'utf8'), managed);
     const lines = failures.slice(before);
-    assert.equal(lines.length, 1, lines.join('\n'));
-    assert.match(lines[0], /dead-agent-skills-dead-skills/);
-    assert.match(lines[0], /dead-agent-skills-mcp-github/);
+    assert.equal(lines.length, 3, lines.join('\n'));
+    assert.match(lines[0], /env_vars = \[.*\] to \[mcp_servers\.dead-agent-skills-mcp-azure\]/);
+    assert.match(lines[1], /startup_timeout_sec = 15 to \[mcp_servers\.dead-agent-skills-serena\]/);
+    assert.match(lines[2], /dead-agent-skills-dead-skills\][\s\S]*dead-agent-skills-mcp-github\]/);
+    for (const line of lines) assert.match(line, /read-only .*config\.toml; add .* where it is managed$/);
     assert.equal(f.state().version, VERSION);
   } finally {
     if (existsSync(target)) chmodSync(target, 0o644);

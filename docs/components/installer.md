@@ -45,8 +45,8 @@ lines, so keys and subtables the user added and other tables stay), because `cod
 sign-in that fails the add after 5 minutes without a browser (Codex CLI 0.172.0); signing in stays `codex mcp login`.
 Its only other direct edit is the Azure `env_vars` allowlist. A symlinked `config.toml` (dotfiles, home-manager) is
 edited at its target when that is writable; when the target is read-only (the nix store), the url servers it lacks
-become one failure line naming their tables to add where the file is managed, and the rest of the install goes on;
-a missing Azure `env_vars` or serena timeout line there stops the Codex step, naming what to add.
+become one failure line naming their tables to add where the file is managed, and a missing Azure `env_vars` or serena
+`startup_timeout_sec` line one failure line each; the rest of the install goes on.
 
 ## Test seam: the answers file
 
