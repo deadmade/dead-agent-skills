@@ -807,10 +807,17 @@ impl Mcp {
         self.child.id()
     }
 
-    /// Closes the server's stdin, as Claude Code does when it exits, and waits for the server to finish.
+    /// Closes the server's stdin, as Claude Code does when it exits, and waits up to 30 s for the server to finish.
     pub fn finish(&mut self) {
         self.stdin = None;
-        self.child.wait().unwrap();
+        let until = Instant::now() + Duration::from_secs(30);
+        while self.child.try_wait().unwrap().is_none() {
+            assert!(
+                Instant::now() < until,
+                "web-mcp did not exit within 30 s of its stdin closing"
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        }
     }
 
     /// `<project>/.web/<run>`.
