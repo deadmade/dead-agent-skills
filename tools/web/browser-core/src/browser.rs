@@ -167,10 +167,9 @@ fn is_input(command: &str) -> bool {
 /// one at a time while the waits last: a typed follow-up search takes about the sum of its engines' typing, not the
 /// longest. A waiter that has waited `FRONT_WAIT` raises its own tab and types anyway, which takes the front from the
 /// session typing then, so either may lose its keys (the search falls back to loading the URL, or the engine times
-/// out); with four engines that starts at about 1.7 s a batch, because the fourth waits through three (the fake showed
-/// two batches overlapping at 2 s a batch). How long one step takes was not measured: the
-/// four-engine follow-ups of one live run finished in 6.1 to 8.3 s in all, which says nothing of the longest batch.
-/// In the test fake, engines timed out at 3 s a step. The 5 s is a guess: it lets a step finish, and a hung holder
+/// out); with four engines that starts at about 1.7 s a batch, because the fourth waits through three. How long one
+/// step takes was not measured: the four-engine follow-ups of one live run finished in 6.1 to 8.3 s in all, which says
+/// nothing of the longest batch. The 5 s is a guess: it lets a step finish, and a hung holder
 /// costs each waiter up to 5 s of the 8 s the engines have for typing (`slow_typing_times_out_without_a_second_load`).
 const FRONT_WAIT: Duration = Duration::from_secs(5);
 /// How long Chrome's activate request may take. The 2 s is a guess, not a measured latency: the request goes to the
@@ -1077,6 +1076,8 @@ pub(crate) fn end_chrome(cdp: &str) {
     let url = Url::parse(cdp).unwrap();
     let (host, port) = (url.host_str().unwrap(), url.port().unwrap());
     let mut s = std::net::TcpStream::connect((host, port)).unwrap();
+    // A Chrome that never answers fails the test instead of hanging it.
+    s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
     write!(
         s,
         "GET {} HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\
