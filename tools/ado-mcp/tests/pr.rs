@@ -1,6 +1,6 @@
 mod common;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use common::{Fixture, Mcp, Resp, ado, clone_of, fixture, own_remote};
 use serde_json::{Value, json};
@@ -288,25 +288,15 @@ fn view_no_run() {
 fn view_concurrent() {
     let fx = Fixture::start();
     view_routes(&fx);
-    // The first call answers at once and measures the rest (process, git, scope); the second waits 1000 ms on each of
-    // four calls: 4000 ms one after the other, about 1000 together.
-    let slow = Duration::from_millis(1000);
-    let twice = |name: &str| vec![fixture(name), fixture(name).delay(slow)];
-    fx.route(POLICY, twice("policy-evaluations.json"));
-    fx.route(&format!("{PR412}/workitems"), twice("pr-workitems.json"));
-    fx.route(BUILDS, twice("builds-one.json"));
-    fx.route(&format!("{PR412}/iterations"), twice("iterations.json"));
-    let mut mcp = env(&fx);
-    let t = Instant::now();
-    ok(&mut mcp, "pr_view", json!({"id": 412}));
-    let base = t.elapsed();
-    let t = Instant::now();
-    ok(&mut mcp, "pr_view", json!({"id": 412}));
-    let took = t.elapsed();
-    assert!(
-        took < base + Duration::from_millis(1500),
-        "{took:?} against {base:?}"
-    );
+    // All four requests are held 2 s: asked one after the other, they never wait at the same time.
+    let slow = Duration::from_secs(2);
+    let held = |name: &str| vec![fixture(name).delay(slow)];
+    fx.route(POLICY, held("policy-evaluations.json"));
+    fx.route(&format!("{PR412}/workitems"), held("pr-workitems.json"));
+    fx.route(BUILDS, held("builds-one.json"));
+    fx.route(&format!("{PR412}/iterations"), held("iterations.json"));
+    ok(&mut env(&fx), "pr_view", json!({"id": 412}));
+    assert_eq!(fx.peak_delayed(), 4);
 }
 
 #[test]

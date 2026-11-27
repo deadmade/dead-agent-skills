@@ -81,6 +81,9 @@ struct State {
     routes: HashMap<String, Vec<Resp>>,
     hits: HashMap<String, usize>,
     log: Vec<Req>,
+    /// Delayed answers waiting now, and the most that ever waited at once.
+    delayed: usize,
+    peak: usize,
 }
 
 /// Serves `tests/fixtures/` plus scripted routes, one thread per connection, `Connection: close`.
@@ -120,6 +123,11 @@ impl Fixture {
             .get(path)
             .copied()
             .unwrap_or(0)
+    }
+
+    /// The most delayed answers that were waiting at the same time.
+    pub fn peak_delayed(&self) -> usize {
+        self.state.lock().unwrap().peak
     }
 
     /// Every request received so far, oldest first.
@@ -183,7 +191,15 @@ fn serve(conn: TcpStream, state: &Mutex<State>) {
     if resp.hang_up {
         return;
     }
+    if !resp.delay.is_zero() {
+        let mut st = state.lock().unwrap();
+        st.delayed += 1;
+        st.peak = st.peak.max(st.delayed);
+    }
     std::thread::sleep(resp.delay);
+    if !resp.delay.is_zero() {
+        state.lock().unwrap().delayed -= 1;
+    }
     let mut out = conn;
     let mut head = format!(
         "HTTP/1.1 {} X\r\nContent-Length: {}\r\nConnection: close\r\n",

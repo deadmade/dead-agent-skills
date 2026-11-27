@@ -1,6 +1,6 @@
 mod common;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use common::{Fixture, Mcp, Resp, ado, clone_of, fixture, own_remote};
 use serde_json::{Value, json};
@@ -225,31 +225,12 @@ fn view_not_found_and_comments_degrade() {
 #[test]
 fn view_concurrent() {
     let fx = Fixture::start();
-    // The first call answers at once and measures the rest (process, git, scope); the second waits 600 ms on each of
-    // two calls: 1200 ms one after the other, about 600 together.
-    let slow = Duration::from_millis(600);
-    fx.route(
-        WI123,
-        vec![fixture("wi.json"), fixture("wi.json").delay(slow)],
-    );
-    fx.route(
-        COMMENTS,
-        vec![
-            fixture("wi-comments.json"),
-            fixture("wi-comments.json").delay(slow),
-        ],
-    );
-    let mut mcp = env(&fx);
-    let t = Instant::now();
-    ok(&mut mcp, "wi_view", json!({"id": 123}));
-    let base = t.elapsed();
-    let t = Instant::now();
-    ok(&mut mcp, "wi_view", json!({"id": 123}));
-    let took = t.elapsed();
-    assert!(
-        took < base + Duration::from_millis(1000),
-        "{took:?} against {base:?}"
-    );
+    // Both requests are held 2 s: asked one after the other, they never wait at the same time.
+    let slow = Duration::from_secs(2);
+    fx.route(WI123, vec![fixture("wi.json").delay(slow)]);
+    fx.route(COMMENTS, vec![fixture("wi-comments.json").delay(slow)]);
+    ok(&mut env(&fx), "wi_view", json!({"id": 123}));
+    assert_eq!(fx.peak_delayed(), 2);
 }
 
 /// A comments answer `Notes` can't read: the item still shows, the comments say why, and nothing is retried.
